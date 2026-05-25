@@ -242,6 +242,29 @@ namespace MistikLauncher
         }
 
         // ── Avatar ────────────────────────────────────────────────────────────
+        public static System.Windows.Media.ImageSource? GetSkinFace(string filePath)
+        {
+            try {
+                using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)) {
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit();
+                    bmp.CacheOption = BitmapCacheOption.OnLoad;
+                    bmp.StreamSource = stream;
+                    bmp.EndInit();
+                    bmp.Freeze();
+                    
+                    if ((bmp.PixelWidth == 64 && bmp.PixelHeight == 64) || (bmp.PixelWidth == 64 && bmp.PixelHeight == 32)) {
+                        var cropped = new System.Windows.Media.Imaging.CroppedBitmap(bmp, new Int32Rect(8, 8, 8, 8));
+                        cropped.Freeze();
+                        return cropped;
+                    }
+                    return null;
+                }
+            } catch {
+                return null;
+            }
+        }
+
         public void LoadAvatar()
         {
             _ = Task.Run(async () => {
@@ -249,13 +272,11 @@ namespace MistikLauncher
                 {
                     Dispatcher.Invoke(() => {
                         try {
-                            var bmp = new BitmapImage();
-                            bmp.BeginInit(); bmp.CacheOption = BitmapCacheOption.OnLoad;
-                            bmp.UriSource = new Uri(Config.SkinUser);
-                            bmp.EndInit(); bmp.Freeze();
-                            var cropped = new System.Windows.Media.Imaging.CroppedBitmap(bmp, new Int32Rect(8, 8, 8, 8));
-                            AvatarImg.Source = cropped;
-                            System.Windows.Media.RenderOptions.SetBitmapScalingMode(AvatarImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
+                            var face = GetSkinFace(Config.SkinUser);
+                            if (face != null) {
+                                AvatarImg.Source = face;
+                                System.Windows.Media.RenderOptions.SetBitmapScalingMode(AvatarImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
+                            }
                         } catch { }
                     });
                 }
@@ -505,21 +526,18 @@ namespace MistikLauncher
                 }
 
                 var lines = File.ReadAllLines(optionsPath);
-                bool found = false;
+                bool foundRes = false;
+                
                 for (int i = 0; i < lines.Length; i++)
                 {
                     var trimmed = lines[i].Trim();
                     if (trimmed.StartsWith("resourcePacks:", StringComparison.OrdinalIgnoreCase))
                     {
-                        found = true;
+                        foundRes = true;
                         string content = trimmed.Substring("resourcePacks:".Length).Trim();
-                        
                         var items = new List<string>();
                         var matches = System.Text.RegularExpressions.Regex.Matches(content, @"""([^""]+)""");
-                        foreach (System.Text.RegularExpressions.Match m in matches)
-                        {
-                            items.Add(m.Groups[1].Value);
-                        }
+                        foreach (System.Text.RegularExpressions.Match m in matches) items.Add(m.Groups[1].Value);
 
                         bool hasPackFile = items.Contains("file/MistikSkinPack");
                         bool hasPackPlain = items.Contains("MistikSkinPack");
@@ -535,13 +553,23 @@ namespace MistikLauncher
                             items.Remove("MistikSkinPack");
                         }
 
-                        string newArray = "[" + string.Join(",", items.Select(x => $"\"{x}\"")) + "]";
-                        lines[i] = "resourcePacks:" + newArray;
-                        break;
+                        lines[i] = "resourcePacks:[" + string.Join(",", items.Select(x => $"\"{x}\"")) + "]";
+                    }
+                    else if (trimmed.StartsWith("incompatibleResourcePacks:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string content = trimmed.Substring("incompatibleResourcePacks:".Length).Trim();
+                        var items = new List<string>();
+                        var matches = System.Text.RegularExpressions.Regex.Matches(content, @"""([^""]+)""");
+                        foreach (System.Text.RegularExpressions.Match m in matches) items.Add(m.Groups[1].Value);
+
+                        items.Remove("file/MistikSkinPack");
+                        items.Remove("MistikSkinPack");
+
+                        lines[i] = "incompatibleResourcePacks:[" + string.Join(",", items.Select(x => $"\"{x}\"")) + "]";
                     }
                 }
 
-                if (!found && enable)
+                if (!foundRes && enable)
                 {
                     var newLines = lines.ToList();
                     newLines.Add("resourcePacks:[\"MistikSkinPack\",\"file/MistikSkinPack\"]");
