@@ -9,7 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
-namespace MistikLauncherUltra.Pages
+namespace MistikLauncher.Pages
 {
     // ─── Skin Page ────────────────────────────────────────────────────────────
     public class SkinPage : Page

@@ -4,7 +4,7 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 
-namespace MistikLauncherUltra.Windows
+namespace MistikLauncher.Windows
 {
     public partial class InstallerWindow : Window
     {
@@ -37,7 +37,7 @@ namespace MistikLauncherUltra.Windows
 
                 // Launch installed exe
                 string appDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".mistik_ultra");
-                string officialExePath = Path.Combine(appDataFolder, "MistikLauncherUltra.exe");
+                string officialExePath = Path.Combine(appDataFolder, "MistikLauncher.exe");
 
                 Process.Start(new ProcessStartInfo(officialExePath)
                 {
@@ -59,7 +59,7 @@ namespace MistikLauncherUltra.Windows
         private void PerformInstallation()
         {
             string appDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".mistik_ultra");
-            string officialExePath = Path.Combine(appDataFolder, "MistikLauncherUltra.exe");
+            string officialExePath = Path.Combine(appDataFolder, "MistikLauncher.exe");
             string currentExePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
 
             Directory.CreateDirectory(appDataFolder);
@@ -76,10 +76,10 @@ namespace MistikLauncherUltra.Windows
             string currentDir = Path.GetDirectoryName(currentExePath) ?? "";
             if (!string.IsNullOrEmpty(currentDir))
             {
-                var pdbPath = Path.Combine(currentDir, "MistikLauncherUltra.pdb");
+                var pdbPath = Path.Combine(currentDir, "MistikLauncher.pdb");
                 if (File.Exists(pdbPath))
                 {
-                    try { File.Copy(pdbPath, Path.Combine(appDataFolder, "MistikLauncherUltra.pdb"), true); } catch { }
+                    try { File.Copy(pdbPath, Path.Combine(appDataFolder, "MistikLauncher.pdb"), true); } catch { }
                 }
             }
 

@@ -10,7 +10,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using Newtonsoft.Json.Linq;
 
-namespace MistikLauncherUltra.Pages
+namespace MistikLauncher.Pages
 {
     // Version Manager
     public class VersionManagerPage : Page

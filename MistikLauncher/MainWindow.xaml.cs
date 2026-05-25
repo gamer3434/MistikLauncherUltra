@@ -13,7 +13,7 @@ using System.Diagnostics;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
-namespace MistikLauncherUltra
+namespace MistikLauncher
 {
     public partial class MainWindow : Window
     {

@@ -12,7 +12,7 @@ using MQTTnet;
 using MQTTnet.Client;
 using Newtonsoft.Json;
 
-namespace MistikLauncherUltra
+namespace MistikLauncher
 {
     // â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     public class LauncherConfig

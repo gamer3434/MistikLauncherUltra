@@ -9,7 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using Newtonsoft.Json.Linq;
 
-namespace MistikLauncherUltra.Pages
+namespace MistikLauncher.Pages
 {
     public class ServerManagerPage : Page
     {
@@ -1354,7 +1354,7 @@ namespace MistikLauncherUltra.Pages
                         try
                         {
                             using var http = new System.Net.Http.HttpClient();
-                            http.DefaultRequestHeaders.Add("User-Agent", "MistikLauncherUltra/1.0");
+                            http.DefaultRequestHeaders.Add("User-Agent", "MistikLauncher/1.0");
 
                             // Plasmo Voice — Modrinth slug: plasmo-voice
                             string loaders = (serverType == "fabric") ? "[%22fabric%22]" : 
@@ -2007,7 +2007,7 @@ namespace MistikLauncherUltra.Pages
             try
             {
                 using var http = new HttpClient();
-                http.DefaultRequestHeaders.Add("User-Agent", "MistikLauncherUltra/1.0 (contact@mistik.com)");
+                http.DefaultRequestHeaders.Add("User-Agent", "MistikLauncher/1.0 (contact@mistik.com)");
                 
                 // Fetch search hits
                 var response = await http.GetStringAsync($"https://api.modrinth.com/v2/search?query={Uri.EscapeDataString(query)}&limit=9&facets=[[%22categories:spigot%22,%22categories:paper%22]]");
@@ -2110,7 +2110,7 @@ namespace MistikLauncherUltra.Pages
             try
             {
                 using var http = new HttpClient();
-                http.DefaultRequestHeaders.Add("User-Agent", "MistikLauncherUltra/1.0 (contact@mistik.com)");
+                http.DefaultRequestHeaders.Add("User-Agent", "MistikLauncher/1.0 (contact@mistik.com)");
                 
                 // Get project version list
                 var response = await http.GetStringAsync($"https://api.modrinth.com/v2/project/{slug}/version");
@@ -2246,7 +2246,7 @@ namespace MistikLauncherUltra.Pages
             try
             {
                 using var http = new HttpClient();
-                http.DefaultRequestHeaders.Add("User-Agent", "MistikLauncherUltra/1.0");
+                http.DefaultRequestHeaders.Add("User-Agent", "MistikLauncher/1.0");
 
                 var loader = serverType == "paper" ? "spigot" : serverType;
                 var resp = await http.GetStringAsync($"https://api.modrinth.com/v2/project/geyser/version?loaders=[%22{loader}%22]&limit=1");
