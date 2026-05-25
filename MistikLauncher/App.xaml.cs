@@ -3,7 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 
-namespace MistikLauncherUltra
+namespace MistikLauncher
 {
     public partial class Application : System.Windows.Application
     {
@@ -36,7 +36,7 @@ namespace MistikLauncherUltra
                 }
 
                 string appDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".mistik_ultra");
-                string officialExePath = Path.Combine(appDataFolder, "MistikLauncherUltra.exe");
+                string officialExePath = Path.Combine(appDataFolder, "MistikLauncher.exe");
                 string currentExePath = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
 
                 if (!string.IsNullOrEmpty(currentExePath) && 

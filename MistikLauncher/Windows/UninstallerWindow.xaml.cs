@@ -4,7 +4,7 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 
-namespace MistikLauncherUltra.Windows
+namespace MistikLauncher.Windows
 {
     public partial class UninstallerWindow : Window
     {

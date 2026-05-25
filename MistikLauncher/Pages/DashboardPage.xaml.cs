@@ -2,7 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
-namespace MistikLauncherUltra.Pages
+namespace MistikLauncher.Pages
 {
     public class DashboardPage : Page
     {
@@ -70,7 +70,7 @@ namespace MistikLauncherUltra.Pages
                     await Task.Run(() => {
                         string exePath = System.IO.Path.Combine(App.GameDir, "auto-mcs.exe");
                         if (!System.IO.File.Exists(exePath)) {
-                            using var stream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("MistikLauncherUltra.Resources.auto-mcs.exe");
+                            using var stream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("MistikLauncher.Resources.auto-mcs.exe");
                             if (stream != null) {
                                 using var fs = System.IO.File.Create(exePath);
                                 stream.CopyTo(fs);

@@ -7,7 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
-namespace MistikLauncherUltra.Pages
+namespace MistikLauncher.Pages
 {
     public class MapManagerPage : Page
     {
