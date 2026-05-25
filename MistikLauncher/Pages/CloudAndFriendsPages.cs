@@ -148,19 +148,46 @@ namespace MistikLauncher.Pages
             localSp.Children.Add(PageHelpers.Lbl("📁 Bilgisayardan Ozel Skin (.png) Yukle", 14, "#2EB82E", true));
             localSp.Children.Add(PageHelpers.Lbl("Kendi indirdiginiz .png skin dosyasini oyuna kaynak paketi olarak yukleyin:", 10, "#888", wrap: TextWrapping.Wrap));
             
-            var chooseBtn = PageHelpers.MkBtn("Skin Dosyasi Sec (.png)", "#2EB82E");
-            chooseBtn.Height = 40;
-            chooseBtn.Margin = new Thickness(0, 16, 0, 0);
+            var selectedPathRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) };
+            var pathBox = PageHelpers.DarkTextBox(main.Config.SkinType == "local" ? main.Config.SkinUser : "Dosya secilmedi...", 38);
+            pathBox.Width = 150;
+            pathBox.IsReadOnly = true;
+            selectedPathRow.Children.Add(pathBox);
+
+            var chooseBtn = PageHelpers.MkBtn("Gozat", "#2EB82E", 60);
+            chooseBtn.Margin = new Thickness(8, 0, 0, 0);
+
+            var applyLocalBtn = PageHelpers.MkBtn("Uygula", "#00A3FF", 80);
+            applyLocalBtn.Margin = new Thickness(8, 0, 0, 0);
+
+            selectedPathRow.Children.Add(chooseBtn);
+            selectedPathRow.Children.Add(applyLocalBtn);
+
+            localSp.Children.Add(selectedPathRow);
+
+            string currentLocalPath = "";
+
             chooseBtn.Click += (_, _) => {
                 var dlg = new Microsoft.Win32.OpenFileDialog {
                     Filter = "Minecraft Skin (*.png)|*.png",
                     Title = "PNG formatindaki skin dosyanizi secin"
                 };
                 if (dlg.ShowDialog() == true) {
-                    ApplyLocalSkin(main, dlg.FileName);
+                    currentLocalPath = dlg.FileName;
+                    pathBox.Text = currentLocalPath;
                 }
             };
-            localSp.Children.Add(chooseBtn);
+
+            applyLocalBtn.Click += (_, _) => {
+                if (!string.IsNullOrEmpty(currentLocalPath) && File.Exists(currentLocalPath)) {
+                    ApplyLocalSkin(main, currentLocalPath);
+                } else if (main.Config.SkinType == "local" && File.Exists(main.Config.SkinUser)) {
+                    ApplyLocalSkin(main, main.Config.SkinUser);
+                } else {
+                    MessageBox.Show("Lutfen once bir skin dosyasi secin.", "Uyari", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            };
+
             localCard.Child = localSp;
             Grid.SetColumn(localCard, 2); skinTypeGrid.Children.Add(localCard);
 
