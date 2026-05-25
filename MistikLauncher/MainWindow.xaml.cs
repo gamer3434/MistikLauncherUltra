@@ -245,9 +245,24 @@ namespace MistikLauncher
         public void LoadAvatar()
         {
             _ = Task.Run(async () => {
-                var uname = Config.SkinType == "username" ? Config.SkinUser : Config.User;
-                var img   = await FetchAvatarAsync(uname, 40);
-                Dispatcher.Invoke(() => { if (img != null) AvatarImg.Source = img; });
+                if (Config.SkinType == "local" && !string.IsNullOrEmpty(Config.SkinUser) && File.Exists(Config.SkinUser))
+                {
+                    Dispatcher.Invoke(() => {
+                        try {
+                            var bmp = new BitmapImage();
+                            bmp.BeginInit(); bmp.CacheOption = BitmapCacheOption.OnLoad;
+                            bmp.UriSource = new Uri(Config.SkinUser);
+                            bmp.EndInit(); bmp.Freeze();
+                            AvatarImg.Source = bmp;
+                        } catch { }
+                    });
+                }
+                else
+                {
+                    var uname = Config.SkinType == "username" ? Config.SkinUser : Config.User;
+                    var img   = await FetchAvatarAsync(uname, 40);
+                    Dispatcher.Invoke(() => { if (img != null) AvatarImg.Source = img; });
+                }
             });
         }
 
@@ -565,7 +580,7 @@ namespace MistikLauncher
                             await File.WriteAllBytesAsync(Path.Combine(textureDir, "alex.png"), bytes);
 
                             var mcmetaPath = Path.Combine(packDir, "pack.mcmeta");
-                            var mcmetaContent = "{\n  \"pack\": {\n    \"pack_format\": 15,\n    \"description\": \"Mistik Launcher Ozel Skin Kaynak Paketi\"\n  }\n}";
+                            var mcmetaContent = "{\n  \"pack\": {\n    \"pack_format\": 1,\n    \"description\": \"Mistik Launcher Ozel Skin Kaynak Paketi\"\n  }\n}";
                             await File.WriteAllTextAsync(mcmetaPath, mcmetaContent);
 
                             EnsureMistikSkinPackEnabled(true);
@@ -587,7 +602,7 @@ namespace MistikLauncher
                         File.Copy(filePath, Path.Combine(textureDir, "alex.png"), true);
 
                         var mcmetaPath = Path.Combine(packDir, "pack.mcmeta");
-                        var mcmetaContent = "{\n  \"pack\": {\n    \"pack_format\": 15,\n    \"description\": \"Mistik Launcher Ozel Skin Kaynak Paketi\"\n  }\n}";
+                        var mcmetaContent = "{\n  \"pack\": {\n    \"pack_format\": 1,\n    \"description\": \"Mistik Launcher Ozel Skin Kaynak Paketi\"\n  }\n}";
                         File.WriteAllText(mcmetaPath, mcmetaContent);
 
                         EnsureMistikSkinPackEnabled(true);
