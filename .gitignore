@@ -1,0 +1,30 @@
+## Visual Studio Tooling
+.vs/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+bin/
+obj/
+
+## User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## Mono/VS Code/Rider
+.mono/
+.idea/
+.vscode/
+
+## Artifacts and backup directories
+*.zip
+*.tar.gz
+*.rar
+
+## Log files
+*.log
