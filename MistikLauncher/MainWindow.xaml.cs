@@ -253,7 +253,9 @@ namespace MistikLauncher
                             bmp.BeginInit(); bmp.CacheOption = BitmapCacheOption.OnLoad;
                             bmp.UriSource = new Uri(Config.SkinUser);
                             bmp.EndInit(); bmp.Freeze();
-                            AvatarImg.Source = bmp;
+                            var cropped = new System.Windows.Media.Imaging.CroppedBitmap(bmp, new Int32Rect(8, 8, 8, 8));
+                            AvatarImg.Source = cropped;
+                            System.Windows.Media.RenderOptions.SetBitmapScalingMode(AvatarImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
                         } catch { }
                     });
                 }
