@@ -23,7 +23,7 @@ namespace MistikLauncherUltra
                             Directory.Delete(targetFolder, true);
                         }
                     } catch { }
-                    MessageBox.Show("Mistik Client ve tüm verileri sisteminizden başarıyla silindi.", "Kaldırma Tamamlandı", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show("Mistik Launcher ve tüm verileri sisteminizden başarıyla silindi.", "Kaldırma Tamamlandı", MessageBoxButton.OK, MessageBoxImage.Information);
                     System.Windows.Application.Current.Shutdown();
                     return;
                 }
