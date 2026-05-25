@@ -73,7 +73,9 @@ namespace MistikLauncher.Pages
                     bmp.BeginInit(); bmp.CacheOption = BitmapCacheOption.OnLoad;
                     bmp.UriSource = new Uri(main.Config.SkinUser);
                     bmp.EndInit(); bmp.Freeze();
-                    previewImg.Source = bmp;
+                    var cropped = new CroppedBitmap(bmp, new Int32Rect(8, 8, 8, 8));
+                    previewImg.Source = cropped;
+                    System.Windows.Media.RenderOptions.SetBitmapScalingMode(previewImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
                 } catch { }
                 previewNameLbl = PageHelpers.Lbl("Ozel Skin", 14, "#FFFFFF", true);
                 previewStatusLbl = PageHelpers.Lbl("Karakter hazır. Oyuna kurmak için aşağıdaki butona basın.", 10, "#A0A0A0", wrap: TextWrapping.Wrap);
@@ -179,10 +181,27 @@ namespace MistikLauncher.Pages
             };
 
             applyLocalBtn.Click += (_, _) => {
-                if (!string.IsNullOrEmpty(currentLocalPath) && File.Exists(currentLocalPath)) {
-                    ApplyLocalSkin(main, currentLocalPath);
-                } else if (main.Config.SkinType == "local" && File.Exists(main.Config.SkinUser)) {
-                    ApplyLocalSkin(main, main.Config.SkinUser);
+                string targetPath = currentLocalPath;
+                if (string.IsNullOrEmpty(targetPath)) {
+                    if (main.Config.SkinType == "local" && File.Exists(main.Config.SkinUser))
+                        targetPath = main.Config.SkinUser;
+                }
+
+                if (!string.IsNullOrEmpty(targetPath) && File.Exists(targetPath)) {
+                    ApplyLocalSkin(main, targetPath);
+                    try {
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit(); bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.UriSource = new Uri(main.Config.SkinUser);
+                        bmp.EndInit(); bmp.Freeze();
+                        var cropped = new CroppedBitmap(bmp, new Int32Rect(8, 8, 8, 8));
+                        previewImg.Source = cropped;
+                        System.Windows.Media.RenderOptions.SetBitmapScalingMode(previewImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
+                        previewNameLbl.Text = "Ozel Skin";
+                        previewStatusLbl.Text = "Karakter hazır.";
+                        previewStatusLbl.Foreground = PageHelpers.HexBrush("#2EB82E");
+                    } catch { }
+                    MessageBox.Show("Ozel skin basariyla oyuna kuruldu!", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
                 } else {
                     MessageBox.Show("Lutfen once bir skin dosyasi secin.", "Uyari", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
