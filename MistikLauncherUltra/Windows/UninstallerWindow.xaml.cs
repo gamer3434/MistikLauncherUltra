@@ -47,7 +47,7 @@ namespace MistikLauncherUltra.Windows
             UpdateProgress("Kayıt defteri temizleniyor...", 60);
             DeleteRegistry();
 
-            UpdateProgress("Mistik Client siliniyor...", 90);
+            UpdateProgress("Mistik Launcher siliniyor...", 90);
             
             string appDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".mistik_ultra");
             
@@ -77,8 +77,8 @@ namespace MistikLauncherUltra.Windows
                 string desk = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
                 string start = Environment.GetFolderPath(Environment.SpecialFolder.StartMenu);
                 
-                string lnk1 = Path.Combine(desk, "Mistik Launcher Ultra.lnk");
-                string lnk2 = Path.Combine(start, "Mistik Launcher Ultra.lnk");
+                string lnk1 = Path.Combine(desk, "Mistik Launcher.lnk");
+                string lnk2 = Path.Combine(start, "Mistik Launcher.lnk");
 
                 if (File.Exists(lnk1)) File.Delete(lnk1);
                 if (File.Exists(lnk2)) File.Delete(lnk2);

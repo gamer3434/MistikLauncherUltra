@@ -30,7 +30,7 @@ namespace MistikLauncherUltra.Windows
                 await Task.Run(() => PerformInstallation());
 
                 MessageBox.Show(
-                    "Mistik Client başarıyla kuruldu!\nArtık masaüstü kısayolunuzla oyuna girebilirsiniz.",
+                    "Mistik Launcher başarıyla kuruldu!\nArtık masaüstü kısayolunuzla oyuna girebilirsiniz.",
                     "Kurulum Tamamlandı",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -86,8 +86,8 @@ namespace MistikLauncherUltra.Windows
             UpdateProgress("Kısayollar oluşturuluyor...", 50);
 
             // 3. Create Shortcuts without PowerShell (Vanguard safe)
-            CreateShortcut(Environment.SpecialFolder.Desktop, "Mistik Launcher Ultra.lnk", officialExePath, appDataFolder);
-            CreateShortcut(Environment.SpecialFolder.StartMenu, "Mistik Launcher Ultra.lnk", officialExePath, appDataFolder);
+            CreateShortcut(Environment.SpecialFolder.Desktop, "Mistik Launcher.lnk", officialExePath, appDataFolder);
+            CreateShortcut(Environment.SpecialFolder.StartMenu, "Mistik Launcher.lnk", officialExePath, appDataFolder);
 
             UpdateProgress("Denetim Masasına kaydediliyor...", 80);
 
@@ -126,7 +126,7 @@ namespace MistikLauncherUltra.Windows
                 using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\MistikClient");
                 if (key != null)
                 {
-                    key.SetValue("DisplayName", "Mistik Client Ultra");
+                    key.SetValue("DisplayName", "Mistik Launcher");
                     key.SetValue("DisplayIcon", exePath + ",0");
                     key.SetValue("DisplayVersion", "5.0.0");
                     key.SetValue("Publisher", "Mistik");

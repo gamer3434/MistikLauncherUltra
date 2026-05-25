@@ -21,7 +21,8 @@ obj/
 .idea/
 .vscode/
 
-## Artifacts and backup directories
+## Executables and Compressed Packages (Excluded from Source Code Repo)
+*.exe
 *.zip
 *.tar.gz
 *.rar

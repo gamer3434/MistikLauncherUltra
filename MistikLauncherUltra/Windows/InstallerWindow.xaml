@@ -16,14 +16,14 @@
             <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
                 <TextBlock Text="🚀" FontSize="36" Margin="0,0,15,0" VerticalAlignment="Center" />
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Mistik Client Ultra" FontSize="26" FontWeight="Bold" Foreground="#FFFFFF" />
+                    <TextBlock Text="Mistik Launcher" FontSize="26" FontWeight="Bold" Foreground="#FFFFFF" />
                     <TextBlock Text="Kurulum Sihirbazı" FontSize="14" Foreground="#00A3FF" />
                 </StackPanel>
             </StackPanel>
 
             <!-- Content -->
             <StackPanel Grid.Row="1" VerticalAlignment="Center">
-                <TextBlock Text="Mistik Client bilgisayarınıza kurulmaya hazır." FontSize="16" Foreground="#E0E0E0" TextAlignment="Center" Margin="0,0,0,15" />
+                <TextBlock Text="Mistik Launcher bilgisayarınıza kurulmaya hazır." FontSize="16" Foreground="#E0E0E0" TextAlignment="Center" Margin="0,0,0,15" />
                 
                 <Border Background="#161a29" CornerRadius="8" Padding="15" Margin="20,0">
                     <StackPanel>
