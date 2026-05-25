@@ -58,20 +58,36 @@ namespace MistikLauncher.Pages
             var previewRow = new Grid { Margin = new Thickness(0, 16, 0, 0) };
             previewRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             previewRow.ColumnDefinitions.Add(new ColumnDefinition());
-
+            
             var previewImg = new Image { Width = 80, Height = 80, Margin = new Thickness(0, 0, 16, 0), HorizontalAlignment = HorizontalAlignment.Center };
-            // Load current skin as initial preview
-            string initialUser = !string.IsNullOrEmpty(main.Config.SkinUser) ? main.Config.SkinUser : (string.IsNullOrEmpty(main.Config.User) ? "Steve" : main.Config.User);
-            if (initialUser.Contains("/") || initialUser.Contains("\\")) initialUser = "Steve"; // Safety check for local skin path
-            _ = LoadImgAsync(previewImg, initialUser, 80);
             Grid.SetColumn(previewImg, 0);
             previewRow.Children.Add(previewImg);
 
             var previewDetails = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            var previewNameLbl = PageHelpers.Lbl(initialUser, 14, "#FFFFFF", true);
-            var previewStatusLbl = PageHelpers.Lbl("Karakter hazır. Oyuna kurmak için aşağıdaki butona basın.", 10, "#A0A0A0", wrap: TextWrapping.Wrap);
-            previewDetails.Children.Add(previewNameLbl);
-            previewDetails.Children.Add(previewStatusLbl);
+            TextBlock previewNameLbl;
+            TextBlock previewStatusLbl;
+
+            if (main.Config.SkinType == "local" && !string.IsNullOrEmpty(main.Config.SkinUser) && File.Exists(main.Config.SkinUser)) {
+                try {
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit(); bmp.CacheOption = BitmapCacheOption.OnLoad;
+                    bmp.UriSource = new Uri(main.Config.SkinUser);
+                    bmp.EndInit(); bmp.Freeze();
+                    previewImg.Source = bmp;
+                } catch { }
+                previewNameLbl = PageHelpers.Lbl("Ozel Skin", 14, "#FFFFFF", true);
+                previewStatusLbl = PageHelpers.Lbl("Karakter hazır. Oyuna kurmak için aşağıdaki butona basın.", 10, "#A0A0A0", wrap: TextWrapping.Wrap);
+                previewDetails.Children.Add(previewNameLbl);
+                previewDetails.Children.Add(previewStatusLbl);
+            } else {
+                string initialUser = !string.IsNullOrEmpty(main.Config.SkinUser) ? main.Config.SkinUser : (string.IsNullOrEmpty(main.Config.User) ? "Steve" : main.Config.User);
+                if (initialUser.Contains("/") || initialUser.Contains("\\")) initialUser = "Steve"; // Safety check for local skin path
+                _ = LoadImgAsync(previewImg, initialUser, 80);
+                previewNameLbl = PageHelpers.Lbl(initialUser, 14, "#FFFFFF", true);
+                previewStatusLbl = PageHelpers.Lbl("Karakter hazır. Oyuna kurmak için aşağıdaki butona basın.", 10, "#A0A0A0", wrap: TextWrapping.Wrap);
+                previewDetails.Children.Add(previewNameLbl);
+                previewDetails.Children.Add(previewStatusLbl);
+            }
             Grid.SetColumn(previewDetails, 1);
             previewRow.Children.Add(previewDetails);
             searchSp.Children.Add(previewRow);
@@ -113,8 +129,9 @@ namespace MistikLauncher.Pages
                 previewStatusLbl.Foreground = PageHelpers.HexBrush("#FFB100");
                 _ = LoadImgAsync(previewImg, n, 80).ContinueWith(t => {
                     previewImg.Dispatcher.Invoke(() => {
-                        previewStatusLbl.Text = "Karakter önizlemesi yüklendi. Oyuna kurmaya hazır!";
-                        previewStatusLbl.Foreground = PageHelpers.HexBrush("#2EB82E");
+                        var statusLbl = (TextBlock)previewDetails.Children[1];
+                        statusLbl.Text = "Karakter önizlemesi yüklendi. Oyuna kurmaya hazır!";
+                        statusLbl.Foreground = PageHelpers.HexBrush("#2EB82E");
                     });
                 });
             };
@@ -166,24 +183,29 @@ namespace MistikLauncher.Pages
         void ApplyLocalSkin(MainWindow main, string filePath)
         {
             try {
+                // Kalici olarak AppData icine kopyala
+                string localDest = Path.Combine(App.AppData, "custom_skin.png");
+                File.Copy(filePath, localDest, true);
+
                 var packDir = Path.Combine(App.GameDir, "resourcepacks", "MistikSkinPack");
                 var textureDir = Path.Combine(packDir, "assets", "minecraft", "textures", "entity");
                 Directory.CreateDirectory(textureDir);
 
                 // Copy to steve and alex
-                File.Copy(filePath, Path.Combine(textureDir, "steve.png"), true);
-                File.Copy(filePath, Path.Combine(textureDir, "alex.png"), true);
+                File.Copy(localDest, Path.Combine(textureDir, "steve.png"), true);
+                File.Copy(localDest, Path.Combine(textureDir, "alex.png"), true);
 
                 // Create pack.mcmeta
                 var mcmetaPath = Path.Combine(packDir, "pack.mcmeta");
-                var mcmetaContent = "{\n  \"pack\": {\n    \"pack_format\": 15,\n    \"description\": \"Mistik Launcher Ozel Skin Kaynak Paketi\"\n  }\n}";
+                var mcmetaContent = "{\n  \"pack\": {\n    \"pack_format\": 1,\n    \"description\": \"Mistik Launcher Ozel Skin Kaynak Paketi\"\n  }\n}";
                 File.WriteAllText(mcmetaPath, mcmetaContent);
 
                 main.Config.SkinType = "local";
-                main.Config.SkinUser = filePath;
+                main.Config.SkinUser = localDest;
                 ConfigManager.Save(main.Config); main.ReloadConfig();
 
                 main.EnsureMistikSkinPackEnabled(true);
+                main.LoadAvatar();
 
                 MessageBox.Show("Ozel skininiz basariyla 'Mistik Ozel Skin' kaynak paketi olarak yuklendi ve aktif edildi!\n\nOyuna girdiginizde karakteriniz otomatik olarak hazir olacaktir!", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
             } catch (Exception ex) {
