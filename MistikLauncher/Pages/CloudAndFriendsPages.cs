@@ -69,13 +69,11 @@ namespace MistikLauncher.Pages
 
             if (main.Config.SkinType == "local" && !string.IsNullOrEmpty(main.Config.SkinUser) && File.Exists(main.Config.SkinUser)) {
                 try {
-                    var bmp = new BitmapImage();
-                    bmp.BeginInit(); bmp.CacheOption = BitmapCacheOption.OnLoad;
-                    bmp.UriSource = new Uri(main.Config.SkinUser);
-                    bmp.EndInit(); bmp.Freeze();
-                    var cropped = new CroppedBitmap(bmp, new Int32Rect(8, 8, 8, 8));
-                    previewImg.Source = cropped;
-                    System.Windows.Media.RenderOptions.SetBitmapScalingMode(previewImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
+                    var face = MainWindow.GetSkinFace(main.Config.SkinUser);
+                    if (face != null) {
+                        previewImg.Source = face;
+                        System.Windows.Media.RenderOptions.SetBitmapScalingMode(previewImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
+                    }
                 } catch { }
                 previewNameLbl = PageHelpers.Lbl("Ozel Skin", 14, "#FFFFFF", true);
                 previewStatusLbl = PageHelpers.Lbl("Karakter hazır. Oyuna kurmak için aşağıdaki butona basın.", 10, "#A0A0A0", wrap: TextWrapping.Wrap);
@@ -175,8 +173,21 @@ namespace MistikLauncher.Pages
                     Title = "PNG formatindaki skin dosyanizi secin"
                 };
                 if (dlg.ShowDialog() == true) {
+                    var face = MainWindow.GetSkinFace(dlg.FileName);
+                    if (face == null) {
+                        MessageBox.Show("Sectiginiz resim gecerli bir Minecraft skin sablonu (64x64 veya 64x32) degil!", "Gecersiz Resim", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+                    
                     currentLocalPath = dlg.FileName;
                     pathBox.Text = currentLocalPath;
+                    
+                    // Aninda onizleme
+                    previewImg.Source = face;
+                    System.Windows.Media.RenderOptions.SetBitmapScalingMode(previewImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
+                    previewNameLbl.Text = "Ozel Skin (Secildi)";
+                    previewStatusLbl.Text = "Uygula butonuna basarak oyuna kurun.";
+                    previewStatusLbl.Foreground = PageHelpers.HexBrush("#FFB100");
                 }
             };
 
@@ -188,14 +199,16 @@ namespace MistikLauncher.Pages
                 }
 
                 if (!string.IsNullOrEmpty(targetPath) && File.Exists(targetPath)) {
+                    // Check validity again just in case
+                    var face = MainWindow.GetSkinFace(targetPath);
+                    if (face == null) {
+                         MessageBox.Show("Gecersiz skin boyutu! Skin 64x64 veya 64x32 olmalidir.", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                         return;
+                    }
+
                     ApplyLocalSkin(main, targetPath);
                     try {
-                        var bmp = new BitmapImage();
-                        bmp.BeginInit(); bmp.CacheOption = BitmapCacheOption.OnLoad;
-                        bmp.UriSource = new Uri(main.Config.SkinUser);
-                        bmp.EndInit(); bmp.Freeze();
-                        var cropped = new CroppedBitmap(bmp, new Int32Rect(8, 8, 8, 8));
-                        previewImg.Source = cropped;
+                        previewImg.Source = face;
                         System.Windows.Media.RenderOptions.SetBitmapScalingMode(previewImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
                         previewNameLbl.Text = "Ozel Skin";
                         previewStatusLbl.Text = "Karakter hazır.";
@@ -234,6 +247,11 @@ namespace MistikLauncher.Pages
                 File.Copy(filePath, localDest, true);
 
                 var packDir = Path.Combine(App.GameDir, "resourcepacks", "MistikSkinPack");
+                
+                if (Directory.Exists(packDir)) {
+                    try { Directory.Delete(packDir, true); } catch { }
+                }
+
                 var textureDir = Path.Combine(packDir, "assets", "minecraft", "textures", "entity");
                 Directory.CreateDirectory(textureDir);
 
