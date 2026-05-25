@@ -94,8 +94,10 @@ namespace MistikLauncher.Pages
             genSp.Children.Add(PageHelpers.Lbl("Kullanici Adi", 12, "#A0A0A0"));
             _tbUser = PageHelpers.DarkTextBox(main.Config.User);
             genSp.Children.Add(_tbUser);
-            genSp.Children.Add(new UIElement { });
-            genSp.Children.Add(PageHelpers.Lbl("RAM (GB)", 12, "#A0A0A0"));
+            genSp.Children.Add(PageHelpers.Lbl("GitHub Kullanici Adi", 12, "#A0A0A0", pad: new Thickness(0, 10, 0, 0)));
+            _tbGithubUser = PageHelpers.DarkTextBox(main.Config.GithubUser);
+            genSp.Children.Add(_tbGithubUser);
+            genSp.Children.Add(PageHelpers.Lbl("RAM (GB)", 12, "#A0A0A0", pad: new Thickness(0, 10, 0, 0)));
             _tbRam = PageHelpers.DarkTextBox(main.Config.Ram.ToString());
             _tbRam.Width = 120; _tbRam.HorizontalAlignment = HorizontalAlignment.Left;
             genSp.Children.Add(_tbRam);
