@@ -938,16 +938,35 @@ namespace MistikLauncher
             var optArgs = string.Join(" ", optList);
 
             string mainClass = "net.minecraft.client.main.Main";
+            string assetIndex = "legacy";
             try
             {
                 var jsonPath = Path.Combine(App.GameDir, "versions", version, $"{version}.json");
                 if (File.Exists(jsonPath))
                 {
-                    var jsonStr = File.ReadAllText(jsonPath);
-                    var match = Regex.Match(jsonStr, @"""mainClass""\s*:\s*""([^""]+)""");
-                    if (match.Success)
+                    var json = JObject.Parse(File.ReadAllText(jsonPath));
+                    
+                    var mcObj = json["mainClass"]?.ToString();
+                    if (!string.IsNullOrEmpty(mcObj)) mainClass = mcObj;
+
+                    var idObj = json["assetIndex"]?["id"]?.ToString();
+                    if (!string.IsNullOrEmpty(idObj))
                     {
-                        mainClass = match.Groups[1].Value;
+                        assetIndex = idObj;
+                    }
+                    else
+                    {
+                        var parent = json["inheritsFrom"]?.ToString();
+                        if (!string.IsNullOrEmpty(parent))
+                        {
+                            var parentJsonPath = Path.Combine(App.GameDir, "versions", parent, $"{parent}.json");
+                            if (File.Exists(parentJsonPath))
+                            {
+                                var parentJson = JObject.Parse(File.ReadAllText(parentJsonPath));
+                                var pIdObj = parentJson["assetIndex"]?["id"]?.ToString();
+                                if (!string.IsNullOrEmpty(pIdObj)) assetIndex = pIdObj;
+                            }
+                        }
                     }
                 }
             }
@@ -960,6 +979,7 @@ namespace MistikLauncher
                    $"--version \"{version}\" " +
                    $"--gameDir \"{App.GameDir}\" " +
                    $"--assetsDir \"{Path.Combine(App.GameDir, "assets")}\" " +
+                   $"--assetIndex {assetIndex} " +
                    $"--accessToken 0 --uuid {GetOfflineUUID(Config.User)}";
         }
 
