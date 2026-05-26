@@ -106,6 +106,50 @@ namespace MistikLauncher.Pages
             };
             if (_cbAuthType.SelectedItem == null) _cbAuthType.SelectedIndex = 0;
             genSp.Children.Add(_cbAuthType);
+
+            var checkElyBtn = PageHelpers.MkBtn("Ely.by Bağlantısını Test Et", "#00A3FF", 240);
+            checkElyBtn.Margin = new Thickness(0, 6, 0, 0);
+            checkElyBtn.HorizontalAlignment = HorizontalAlignment.Left;
+            checkElyBtn.Click += async (_, _) => {
+                checkElyBtn.IsEnabled = false;
+                checkElyBtn.Content = "Test ediliyor...";
+                try
+                {
+                    var selAuth = (_cbAuthType?.SelectedItem as string) ?? "Normal (Çevrimdışı)";
+                    bool isElySelected = selAuth.Contains("Ely.by");
+
+                    if (!isElySelected)
+                    {
+                        MessageBox.Show("Ely.by entegrasyonu şu anda aktif değil.\n\nAktif etmek için yukarıdaki seçim kutusundan 'Ely.by (Cilt & Giriş Desteği)' seçeneğini belirleyip 'KAYDET' butonuna basın.", "Entegrasyon Aktif Değil", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
+                    // Ely.by sunucusunu test et
+                    using var cts = new System.Threading.CancellationTokenSource(4000);
+                    using var http = new System.Net.Http.HttpClient();
+                    http.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+                    
+                    var response = await http.GetAsync("https://authserver.ely.by/api/authlib-injector", cts.Token);
+                    if (response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.Forbidden || response.StatusCode == System.Net.HttpStatusCode.Unauthorized || response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    {
+                        MessageBox.Show("✅ Ely.by entegrasyonu AKTİF ve sunucularına başarıyla bağlanıldı!\n\nCildiniz oyunda ve sunucularda sorunsuz görünecektir.", "Bağlantı Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show($"❌ Ely.by entegrasyonu aktif ancak sunucu hata döndürdü: {(int)response.StatusCode}\n\nSunucu bakımda olabilir.", "Bağlantı Sorunu", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"❌ Ely.by sunucularına bağlanılamadı!\n\nOlası Nedenler:\n• İnternet bağlantınız yok.\n• Ely.by sunucusu şu an çökmüş/bakımda.\n• Türkiye'deki servis sağlayıcınız Ely.by adresini engellemiş.\n\nHata detayı: {ex.Message}", "Bağlantı Başarısız", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                finally
+                {
+                    checkElyBtn.Content = "Ely.by Bağlantısını Test Et";
+                    checkElyBtn.IsEnabled = true;
+                }
+            };
+            genSp.Children.Add(checkElyBtn);
             genSp.Children.Add(PageHelpers.Lbl("GitHub Kullanici Adi", 12, "#A0A0A0", pad: new Thickness(0, 10, 0, 0)));
             _tbGithubUser = PageHelpers.DarkTextBox(main.Config.GithubUser);
             genSp.Children.Add(_tbGithubUser);
