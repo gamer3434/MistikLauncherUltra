@@ -154,6 +154,7 @@ namespace MistikLauncher
         // ── Version box ───────────────────────────────────────────────────────
         public void PopulateVersionBox()
         {
+            SyncModsForCurrentVersion();
             VerBox.Items.Clear();
             var uniqueVersions = new HashSet<string>();
 
@@ -629,6 +630,98 @@ namespace MistikLauncher
             catch (Exception ex)
             {
                 App.Log($"EnsureGameLanguageMatchesLauncher error: {ex.Message}");
+            }
+        }
+
+        public void SyncModsForCurrentVersion()
+        {
+            try
+            {
+                var currentVer = Config.Version ?? "";
+                if (string.IsNullOrEmpty(currentVer)) return;
+
+                // Extract exact MC version (e.g. 1.21.1) from folder name
+                var mcVersion = "1.21.1";
+                var mcMatch = System.Text.RegularExpressions.Regex.Match(currentVer, @"1\.\d+(\.\d+)?");
+                if (mcMatch.Success) mcVersion = mcMatch.Value;
+
+                var lastSynced = Config.LastSyncedVersion ?? "";
+
+                // If nothing has changed, do not do anything
+                if (lastSynced == currentVer) return;
+
+                var modsPoolDir = Path.Combine(App.AppData, "mods_pool");
+                Directory.CreateDirectory(modsPoolDir);
+
+                // 1. If we had a previously synced version, move current mods from App.ModsDir back to mods_pool/{lastSynced}
+                if (!string.IsNullOrEmpty(lastSynced) && Directory.Exists(App.ModsDir))
+                {
+                    var lastMcVersion = "1.21.1";
+                    var lastMcMatch = System.Text.RegularExpressions.Regex.Match(lastSynced, @"1\.\d+(\.\d+)?");
+                    if (lastMcMatch.Success) lastMcVersion = lastMcMatch.Value;
+
+                    var lastPoolDir = Path.Combine(modsPoolDir, lastMcVersion);
+                    Directory.CreateDirectory(lastPoolDir);
+
+                    var currentJars = Directory.GetFiles(App.ModsDir, "*.jar");
+                    foreach (var jar in currentJars)
+                    {
+                        var dest = Path.Combine(lastPoolDir, Path.GetFileName(jar));
+                        try
+                        {
+                            if (File.Exists(dest)) File.Delete(dest);
+                            File.Move(jar, dest);
+                            App.Log($"Moved active mod to pool: {Path.GetFileName(jar)} -> mods_pool/{lastMcVersion}");
+                        }
+                        catch (Exception ex)
+                        {
+                            App.Log($"Failed to move mod {Path.GetFileName(jar)} to pool: {ex.Message}");
+                        }
+                    }
+                }
+
+                // 2. Clear any leftover active jars in App.ModsDir to be perfectly clean
+                if (Directory.Exists(App.ModsDir))
+                {
+                    foreach (var jar in Directory.GetFiles(App.ModsDir, "*.jar"))
+                    {
+                        try { File.Delete(jar); } catch { }
+                    }
+                }
+                else
+                {
+                    Directory.CreateDirectory(App.ModsDir);
+                }
+
+                // 3. Move/Copy mods from mods_pool/{mcVersion} into App.ModsDir
+                var newPoolDir = Path.Combine(modsPoolDir, mcVersion);
+                if (Directory.Exists(newPoolDir))
+                {
+                    var poolJars = Directory.GetFiles(newPoolDir, "*.jar");
+                    foreach (var jar in poolJars)
+                    {
+                        var dest = Path.Combine(App.ModsDir, Path.GetFileName(jar));
+                        try
+                        {
+                            if (File.Exists(dest)) File.Delete(dest);
+                            File.Move(jar, dest);
+                            App.Log($"Moved pool mod to active: {Path.GetFileName(jar)} from mods_pool/{mcVersion}");
+                        }
+                        catch (Exception ex)
+                        {
+                            App.Log($"Failed to activate mod {Path.GetFileName(jar)}: {ex.Message}");
+                        }
+                    }
+                }
+
+                // Update config
+                Config.LastSyncedVersion = currentVer;
+                ConfigManager.Save(Config);
+                App.Log($"Mods synchronized successfully for version: {currentVer}");
+            }
+            catch (Exception ex)
+            {
+                App.Log($"SyncModsForCurrentVersion error: {ex.Message}");
             }
         }
 

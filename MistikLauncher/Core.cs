@@ -38,6 +38,7 @@ namespace MistikLauncher
         [JsonProperty("tunnel_custom_host")] public string TunnelCustomHost { get; set; } = "";
         [JsonProperty("tunnel_custom_subdomain")] public string TunnelCustomSubdomain { get; set; } = "";
         [JsonProperty("tunnel_port")] public int TunnelPort { get; set; } = 25565;
+        [JsonProperty("last_synced_version")] public string LastSyncedVersion { get; set; } = "";
     }
 
     public static class ConfigManager
