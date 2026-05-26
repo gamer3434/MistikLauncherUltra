@@ -87,7 +87,7 @@
                                    FontSize="10" FontWeight="Bold"
                                    Foreground="#555" HorizontalAlignment="Center" Margin="0,3,0,0"/>
                         <Border Background="#1a1a2e" CornerRadius="10" Margin="20,10,20,0"
-                                Padding="8,4">
+                                Padding="8,4" Visibility="Collapsed">
                             <TextBlock x:Name="RelayStatusLbl" Text="Relay baglaniyor..."
                                        FontSize="10" Foreground="#A349A4"
                                        HorizontalAlignment="Center" FontFamily="Segoe UI"/>

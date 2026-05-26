@@ -91,7 +91,6 @@ namespace MistikLauncher
             AddNav("Mods",      "Mod Merkezi");
             AddNav("Maps",      "Harita Merkezi");
             AddNav("Skin",      "Karakter Skin");
-            AddNav("Friends",   "Arkadaslar");
             AddNav("Changelog", "Son Guncellemeler");
             if (Config.Role == "Yonetici")
                 AddNav("Admin", "Yonetici Paneli");
