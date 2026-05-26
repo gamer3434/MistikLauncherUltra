@@ -479,8 +479,12 @@ namespace MistikLauncher
                 SetStatus("Eksik kütüphaneler indiriliyor...");
                 await EnsureLibrariesInstalledAsync(version, (pct, status) => Dispatcher.Invoke(() => SetProgress((int)(40 + pct * 0.25), status)));
 
-                SetStatus("Ely.by skin doğrulayıcı kontrol ediliyor...");
-                var injectorPath = await EnsureAuthlibInjectorInstalledAsync();
+                string? injectorPath = null;
+                if ((Config.AuthType ?? "").ToLower() == "elyby")
+                {
+                    SetStatus("Ely.by skin doğrulayıcı kontrol ediliyor...");
+                    injectorPath = await EnsureAuthlibInjectorInstalledAsync();
+                }
 
                 // 4. Argumanlari olustur
                 var ram  = Math.Max(Config.Ram, 1) * 1024;
