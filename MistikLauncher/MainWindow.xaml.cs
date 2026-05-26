@@ -12,6 +12,9 @@ using System.Net.Http;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
 
 namespace MistikLauncher
 {
@@ -456,7 +459,13 @@ namespace MistikLauncher
                 catch { }
 
                 SetStatus("Karakter (Skin) yaması uygulanıyor...");
-                await PrepareSkinPackAsync();
+                await PrepareSkinPackAsync(version);
+
+                SetStatus("Oyun dili senkronize ediliyor...");
+                EnsureGameLanguageMatchesLauncher();
+
+                SetStatus("Eksik kütüphaneler indiriliyor...");
+                await EnsureLibrariesInstalledAsync(version, (pct, status) => Dispatcher.Invoke(() => SetProgress((int)(40 + pct * 0.25), status)));
 
                 // 4. Argumanlari olustur
                 var ram  = Math.Max(Config.Ram, 1) * 1024;
@@ -539,18 +548,15 @@ namespace MistikLauncher
                         var matches = System.Text.RegularExpressions.Regex.Matches(content, @"""([^""]+)""");
                         foreach (System.Text.RegularExpressions.Match m in matches) items.Add(m.Groups[1].Value);
 
-                        bool hasPackFile = items.Contains("file/MistikSkinPack");
-                        bool hasPackPlain = items.Contains("MistikSkinPack");
+                        // Once eski kayitlari temizle
+                        items.Remove("file/MistikSkinPack");
+                        items.Remove("MistikSkinPack");
                         
                         if (enable)
                         {
-                            if (!hasPackFile) items.Insert(0, "file/MistikSkinPack");
-                            if (!hasPackPlain) items.Insert(0, "MistikSkinPack");
-                        }
-                        else
-                        {
-                            items.Remove("file/MistikSkinPack");
-                            items.Remove("MistikSkinPack");
+                            // En yüksek öncelik (listenin sonu / en sağı) için listenin sonuna ekle
+                            items.Add("MistikSkinPack");
+                            items.Add("file/MistikSkinPack");
                         }
 
                         lines[i] = "resourcePacks:[" + string.Join(",", items.Select(x => $"\"{x}\"")) + "]";
@@ -584,12 +590,123 @@ namespace MistikLauncher
             }
         }
 
-        public async Task PrepareSkinPackAsync()
+        public void EnsureGameLanguageMatchesLauncher()
+        {
+            try
+            {
+                string optionsPath = Path.Combine(App.GameDir, "options.txt");
+                string targetLangCode = (Config.Lang ?? "").Contains("English") ? "en_us" : "tr_tr";
+
+                if (!File.Exists(optionsPath))
+                {
+                    File.WriteAllText(optionsPath, $"lang:{targetLangCode}\r\n");
+                    App.Log($"options.txt created with default language: {targetLangCode}");
+                    return;
+                }
+
+                var lines = File.ReadAllLines(optionsPath).ToList();
+                bool langFound = false;
+
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    var trimmed = lines[i].Trim();
+                    if (trimmed.StartsWith("lang:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        lines[i] = $"lang:{targetLangCode}";
+                        langFound = true;
+                        break;
+                    }
+                }
+
+                if (!langFound)
+                {
+                    lines.Add($"lang:{targetLangCode}");
+                }
+
+                File.WriteAllLines(optionsPath, lines);
+                App.Log($"Game language synchronized to option: {targetLangCode}");
+            }
+            catch (Exception ex)
+            {
+                App.Log($"EnsureGameLanguageMatchesLauncher error: {ex.Message}");
+            }
+        }
+
+        public static int GetPackFormatForVersion(string version)
+        {
+            if (string.IsNullOrEmpty(version)) return 1;
+            
+            var clean = version;
+            var mcMatch = System.Text.RegularExpressions.Regex.Match(version, @"1\.\d+(\.\d+)?");
+            if (mcMatch.Success)
+            {
+                clean = mcMatch.Value;
+            }
+
+            var parts = new List<int>();
+            var matches = System.Text.RegularExpressions.Regex.Matches(clean, @"\d+");
+            foreach (System.Text.RegularExpressions.Match m in matches)
+            {
+                if (int.TryParse(m.Value, out var n)) parts.Add(n);
+            }
+
+            if (parts.Count < 2) return 1;
+            
+            int major = parts[0];
+            int minor = parts[1];
+            int patch = parts.Count >= 3 ? parts[2] : 0;
+
+            if (major > 1) return 46;
+
+            if (major == 1)
+            {
+                if (minor >= 22) return 48;
+                if (minor == 21)
+                {
+                    if (patch >= 2) return 42;
+                    return 34;
+                }
+                if (minor == 20)
+                {
+                    if (patch >= 5) return 32;
+                    if (patch >= 2) return 18;
+                    return 15;
+                }
+                if (minor == 19)
+                {
+                    if (patch >= 4) return 13;
+                    if (patch >= 3) return 12;
+                    return 10;
+                }
+                if (minor == 18)
+                {
+                    if (patch >= 2) return 9;
+                    return 8;
+                }
+                if (minor == 17) return 7;
+                if (minor == 16)
+                {
+                    if (patch >= 2) return 6;
+                    return 5;
+                }
+                if (minor == 15) return 5;
+                if (minor == 14 || minor == 13) return 4;
+                if (minor == 12 || minor == 11) return 3;
+                if (minor == 10 || minor == 9) return 2;
+            }
+
+            return 1;
+        }
+
+        public async Task PrepareSkinPackAsync(string version)
         {
             try
             {
                 var packDir = Path.Combine(App.GameDir, "resourcepacks", "MistikSkinPack");
-                var textureDir = Path.Combine(packDir, "assets", "minecraft", "textures", "entity");
+                var textureDirOld = Path.Combine(packDir, "assets", "minecraft", "textures", "entity");
+                var textureDirNewWide = Path.Combine(packDir, "assets", "minecraft", "textures", "entity", "player", "wide");
+                var textureDirNewSlim = Path.Combine(packDir, "assets", "minecraft", "textures", "entity", "player", "slim");
+                int format = GetPackFormatForVersion(version);
 
                 if (Config.SkinType == "username")
                 {
@@ -605,16 +722,26 @@ namespace MistikLauncher
                         if (response.IsSuccessStatusCode)
                         {
                             var bytes = await response.Content.ReadAsByteArrayAsync();
-                            Directory.CreateDirectory(textureDir);
-                            await File.WriteAllBytesAsync(Path.Combine(textureDir, "steve.png"), bytes);
-                            await File.WriteAllBytesAsync(Path.Combine(textureDir, "alex.png"), bytes);
+                            
+                            if (Directory.Exists(packDir))
+                            {
+                                try { Directory.Delete(packDir, true); } catch { }
+                            }
+                            Directory.CreateDirectory(textureDirOld);
+                            Directory.CreateDirectory(textureDirNewWide);
+                            Directory.CreateDirectory(textureDirNewSlim);
+                            
+                            await File.WriteAllBytesAsync(Path.Combine(textureDirOld, "steve.png"), bytes);
+                            await File.WriteAllBytesAsync(Path.Combine(textureDirOld, "alex.png"), bytes);
+                            await File.WriteAllBytesAsync(Path.Combine(textureDirNewWide, "steve.png"), bytes);
+                            await File.WriteAllBytesAsync(Path.Combine(textureDirNewSlim, "alex.png"), bytes);
 
                             var mcmetaPath = Path.Combine(packDir, "pack.mcmeta");
-                            var mcmetaContent = "{\n  \"pack\": {\n    \"pack_format\": 1,\n    \"description\": \"Mistik Launcher Ozel Skin Kaynak Paketi\"\n  }\n}";
+                            var mcmetaContent = "{\n  \"pack\": {\n    \"pack_format\": " + format + ",\n    \"description\": \"Mistik Launcher Ozel Skin Kaynak Paketi\"\n  }\n}";
                             await File.WriteAllTextAsync(mcmetaPath, mcmetaContent);
 
                             EnsureMistikSkinPackEnabled(true);
-                            App.Log($"Skin for '{user}' successfully downloaded and applied.");
+                            App.Log($"Skin for '{user}' successfully downloaded and applied with pack_format {format}.");
                         }
                         else
                         {
@@ -627,16 +754,25 @@ namespace MistikLauncher
                     var filePath = Config.SkinUser;
                     if (File.Exists(filePath))
                     {
-                        Directory.CreateDirectory(textureDir);
-                        File.Copy(filePath, Path.Combine(textureDir, "steve.png"), true);
-                        File.Copy(filePath, Path.Combine(textureDir, "alex.png"), true);
+                        if (Directory.Exists(packDir))
+                        {
+                            try { Directory.Delete(packDir, true); } catch { }
+                        }
+                        Directory.CreateDirectory(textureDirOld);
+                        Directory.CreateDirectory(textureDirNewWide);
+                        Directory.CreateDirectory(textureDirNewSlim);
+                        
+                        File.Copy(filePath, Path.Combine(textureDirOld, "steve.png"), true);
+                        File.Copy(filePath, Path.Combine(textureDirOld, "alex.png"), true);
+                        File.Copy(filePath, Path.Combine(textureDirNewWide, "steve.png"), true);
+                        File.Copy(filePath, Path.Combine(textureDirNewSlim, "alex.png"), true);
 
                         var mcmetaPath = Path.Combine(packDir, "pack.mcmeta");
-                        var mcmetaContent = "{\n  \"pack\": {\n    \"pack_format\": 1,\n    \"description\": \"Mistik Launcher Ozel Skin Kaynak Paketi\"\n  }\n}";
+                        var mcmetaContent = "{\n  \"pack\": {\n    \"pack_format\": " + format + ",\n    \"description\": \"Mistik Launcher Ozel Skin Kaynak Paketi\"\n  }\n}";
                         File.WriteAllText(mcmetaPath, mcmetaContent);
 
                         EnsureMistikSkinPackEnabled(true);
-                        App.Log($"Local skin applied successfully from: {filePath}");
+                        App.Log($"Local skin applied successfully from: {filePath} with pack_format {format}.");
                     }
                     else
                     {
@@ -763,14 +899,180 @@ namespace MistikLauncher
 
         string BuildClasspath(string version)
         {
-            var libs  = new List<string>();
-            var vDir  = Path.Combine(App.GameDir, "versions", version);
-            var jar   = Path.Combine(vDir, $"{version}.jar");
-            if (File.Exists(jar)) libs.Add(jar);
-            var libDir = Path.Combine(App.GameDir, "libraries");
-            if (Directory.Exists(libDir))
-                libs.AddRange(Directory.GetFiles(libDir, "*.jar", SearchOption.AllDirectories));
+            var libs = new List<string>();
+            AddLibrariesFromVersionJson(version, libs);
             return string.Join(";", libs);
+        }
+
+        void AddLibrariesFromVersionJson(string version, List<string> libs)
+        {
+            try
+            {
+                var vDir = Path.Combine(App.GameDir, "versions", version);
+                var jar = Path.Combine(vDir, $"{version}.jar");
+                if (File.Exists(jar) && !libs.Contains(jar)) libs.Add(jar);
+
+                var jsonPath = Path.Combine(vDir, $"{version}.json");
+                if (!File.Exists(jsonPath)) return;
+
+                var json = JObject.Parse(File.ReadAllText(jsonPath));
+                
+                // Inherit libraries from parent if inheritsFrom is specified
+                var parent = json["inheritsFrom"]?.ToString();
+                if (!string.IsNullOrEmpty(parent))
+                {
+                    AddLibrariesFromVersionJson(parent, libs);
+                }
+
+                var libsArray = json["libraries"] as JArray;
+                if (libsArray != null)
+                {
+                    foreach (var lib in libsArray)
+                    {
+                        string? name = lib["name"]?.ToString();
+                        if (string.IsNullOrEmpty(name)) continue;
+
+                        string? relPath = null;
+                        var artifact = lib["downloads"]?["artifact"];
+                        if (artifact != null)
+                        {
+                            relPath = artifact["path"]?.ToString();
+                        }
+
+                        if (string.IsNullOrEmpty(relPath))
+                        {
+                            var parts = name.Split(':');
+                            if (parts.Length >= 3)
+                            {
+                                var group = parts[0].Replace('.', '/');
+                                var art = parts[1];
+                                var ver = parts[2];
+                                var classifier = parts.Length >= 4 ? $"-{parts[3]}" : "";
+                                relPath = $"{group}/{art}/{ver}/{art}-{ver}{classifier}.jar";
+                            }
+                        }
+
+                        if (string.IsNullOrEmpty(relPath)) continue;
+
+                        // 1. Check local libraries folder
+                        var localLib = Path.Combine(App.GameDir, "libraries", relPath);
+                        if (File.Exists(localLib))
+                        {
+                            if (!libs.Contains(localLib)) libs.Add(localLib);
+                            continue;
+                        }
+
+                        // 2. Check official .minecraft libraries folder
+                        var officialLib = Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                            ".minecraft", "libraries", relPath);
+                        if (File.Exists(officialLib))
+                        {
+                            if (!libs.Contains(officialLib)) libs.Add(officialLib);
+                            continue;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Log($"AddLibrariesFromVersionJson error for {version}: {ex.Message}");
+            }
+        }
+
+        public async Task EnsureLibrariesInstalledAsync(string version, Action<double, string>? progress = null)
+        {
+            try
+            {
+                var jsonPath = Path.Combine(App.GameDir, "versions", version, $"{version}.json");
+                if (!File.Exists(jsonPath)) return;
+
+                var json = JObject.Parse(await File.ReadAllTextAsync(jsonPath));
+                
+                var parentVer = json["inheritsFrom"]?.ToString();
+                if (!string.IsNullOrEmpty(parentVer))
+                {
+                    await EnsureLibrariesInstalledAsync(parentVer, progress);
+                }
+
+                var libsArray = json["libraries"] as JArray;
+                if (libsArray == null) return;
+
+                var client = new HttpClient();
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("MistikLauncher/1.0 (contact@mistik.com)");
+
+                int count = libsArray.Count;
+                int current = 0;
+
+                foreach (var lib in libsArray)
+                {
+                    current++;
+                    string? name = lib["name"]?.ToString();
+                    if (string.IsNullOrEmpty(name)) continue;
+
+                    string? downloadUrl = null;
+                    string? relPath = null;
+
+                    var artifact = lib["downloads"]?["artifact"];
+                    if (artifact != null)
+                    {
+                        downloadUrl = artifact["url"]?.ToString();
+                        relPath = artifact["path"]?.ToString();
+                    }
+
+                    if (string.IsNullOrEmpty(relPath) || string.IsNullOrEmpty(downloadUrl))
+                    {
+                        var parts = name.Split(':');
+                        if (parts.Length >= 3)
+                        {
+                            var group = parts[0].Replace('.', '/');
+                            var art = parts[1];
+                            var ver = parts[2];
+                            var classifier = parts.Length >= 4 ? $"-{parts[3]}" : "";
+                            
+                            relPath = $"{group}/{art}/{ver}/{art}-{ver}{classifier}.jar";
+                            
+                            var baseUrl = lib["url"]?.ToString() ?? "https://libraries.minecraft.net/";
+                            if (!baseUrl.EndsWith("/")) baseUrl += "/";
+                            
+                            downloadUrl = baseUrl + relPath;
+                        }
+                    }
+
+                    if (string.IsNullOrEmpty(relPath) || string.IsNullOrEmpty(downloadUrl)) continue;
+
+                    var localFile = Path.Combine(App.GameDir, "libraries", relPath);
+                    var officialFile = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                        ".minecraft", "libraries", relPath);
+
+                    if (File.Exists(localFile) || File.Exists(officialFile))
+                    {
+                        continue;
+                    }
+
+                    if (progress != null)
+                    {
+                        double pct = ((double)current / count) * 100.0;
+                        progress(pct, $"Kütüphane indiriliyor ({current}/{count}): {Path.GetFileName(relPath)}");
+                    }
+
+                    try
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(localFile)!);
+                        var data = await client.GetByteArrayAsync(downloadUrl);
+                        await File.WriteAllBytesAsync(localFile, data);
+                    }
+                    catch (Exception ex)
+                    {
+                        App.Log($"Failed to download library {name} from {downloadUrl}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Log($"EnsureLibrariesInstalledAsync error: {ex.Message}");
+            }
         }
 
         static async Task<string?> FindJavaAsync()
@@ -924,13 +1226,44 @@ namespace MistikLauncher
             var jreDir = Path.Combine(javaDir, "jre21");
             var javaExe = Path.Combine(jreDir, "bin", "java.exe");
 
-            if (File.Exists(javaExe))
+            // Hem varligini hem de dosya boyutunu kontrol et (bozuk/yarim kalmis kurulumlari engeller)
+            if (File.Exists(javaExe) && new FileInfo(javaExe).Length > 50000)
             {
                 return javaExe;
             }
 
             try
             {
+                // Kurulum klasorunun kilitlenmesini onlemek icin varsa eski calisan java sureclerini sonlandir
+                try
+                {
+                    foreach (var proc in System.Diagnostics.Process.GetProcessesByName("java"))
+                    {
+                        try
+                        {
+                            if (proc.MainModule?.FileName.StartsWith(javaDir, StringComparison.OrdinalIgnoreCase) == true)
+                            {
+                                proc.Kill();
+                                proc.WaitForExit(3000);
+                            }
+                        }
+                        catch { }
+                    }
+                    foreach (var proc in System.Diagnostics.Process.GetProcessesByName("javaw"))
+                    {
+                        try
+                        {
+                            if (proc.MainModule?.FileName.StartsWith(javaDir, StringComparison.OrdinalIgnoreCase) == true)
+                            {
+                                proc.Kill();
+                                proc.WaitForExit(3000);
+                            }
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+
                 Directory.CreateDirectory(javaDir);
                 var zipPath = Path.Combine(javaDir, "jre21.zip");
                 var tempExtractDir = Path.Combine(javaDir, "jre21_temp");
@@ -944,9 +1277,20 @@ namespace MistikLauncher
                 SetProgress(5, "Java 21 indiriliyor...");
                 var url = "https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jre/hotspot/normal/eclipse";
                 
-                await Pages.VersionManagerPage.DownloadFileWithProgressAsync(url, zipPath, (pct, status) => {
-                    SetProgress(5 + pct * 0.75, $"[Java 21] {status}");
-                }, 0, 100);
+                try
+                {
+                    await Pages.VersionManagerPage.DownloadFileWithProgressAsync(url, zipPath, (pct, status) => {
+                        SetProgress(5 + pct * 0.75, $"[Java 21] {status}");
+                    }, 0, 100);
+                }
+                catch (Exception apiEx)
+                {
+                    App.Log($"Adoptium API failed ({apiEx.Message}), trying stable GitHub fallback...");
+                    url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.3%2B9/OpenJDK21U-jre_x64_windows_hotspot_21.0.3_9.zip";
+                    await Pages.VersionManagerPage.DownloadFileWithProgressAsync(url, zipPath, (pct, status) => {
+                        SetProgress(5 + pct * 0.75, $"[Java 21 - Alternatif] {status}");
+                    }, 0, 100);
+                }
 
                 SetProgress(80, "Java 21 kuruluyor (Arşiv açılıyor)...");
                 await Task.Run(() => {
@@ -967,7 +1311,7 @@ namespace MistikLauncher
                 try { Directory.Delete(tempExtractDir, true); } catch { }
                 try { File.Delete(zipPath); } catch { }
 
-                if (File.Exists(javaExe))
+                if (File.Exists(javaExe) && new FileInfo(javaExe).Length > 50000)
                 {
                     SetProgress(100, "Java 21 başarıyla kuruldu!");
                     return javaExe;
@@ -1047,13 +1391,44 @@ namespace MistikLauncher
             var jreDir = Path.Combine(javaDir, "jre25");
             var javaExe = Path.Combine(jreDir, "bin", "java.exe");
 
-            if (File.Exists(javaExe))
+            // Hem varligini hem de dosya boyutunu kontrol et (bozuk/yarim kalmis kurulumlari engeller)
+            if (File.Exists(javaExe) && new FileInfo(javaExe).Length > 50000)
             {
                 return javaExe;
             }
 
             try
             {
+                // Kurulum klasorunun kilitlenmesini onlemek icin varsa eski calisan java sureclerini sonlandir
+                try
+                {
+                    foreach (var proc in System.Diagnostics.Process.GetProcessesByName("java"))
+                    {
+                        try
+                        {
+                            if (proc.MainModule?.FileName.StartsWith(javaDir, StringComparison.OrdinalIgnoreCase) == true)
+                            {
+                                proc.Kill();
+                                proc.WaitForExit(3000);
+                            }
+                        }
+                        catch { }
+                    }
+                    foreach (var proc in System.Diagnostics.Process.GetProcessesByName("javaw"))
+                    {
+                        try
+                        {
+                            if (proc.MainModule?.FileName.StartsWith(javaDir, StringComparison.OrdinalIgnoreCase) == true)
+                            {
+                                proc.Kill();
+                                proc.WaitForExit(3000);
+                            }
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+
                 Directory.CreateDirectory(javaDir);
                 var zipPath = Path.Combine(javaDir, "jre25.zip");
                 var tempExtractDir = Path.Combine(javaDir, "jre25_temp");
@@ -1067,9 +1442,20 @@ namespace MistikLauncher
                 SetProgress(5, "Java 25 indiriliyor...");
                 var url = "https://api.adoptium.net/v3/binary/latest/25/ga/windows/x64/jre/hotspot/normal/eclipse";
                 
-                await Pages.VersionManagerPage.DownloadFileWithProgressAsync(url, zipPath, (pct, status) => {
-                    SetProgress(5 + pct * 0.75, $"[Java 25] {status}");
-                }, 0, 100);
+                try
+                {
+                    await Pages.VersionManagerPage.DownloadFileWithProgressAsync(url, zipPath, (pct, status) => {
+                        SetProgress(5 + pct * 0.75, $"[Java 25] {status}");
+                    }, 0, 100);
+                }
+                catch (Exception apiEx)
+                {
+                    App.Log($"Adoptium API failed ({apiEx.Message}), trying stable GitHub fallback...");
+                    url = "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.3%2B9/OpenJDK25U-jre_x64_windows_hotspot_25.0.3_9.zip";
+                    await Pages.VersionManagerPage.DownloadFileWithProgressAsync(url, zipPath, (pct, status) => {
+                        SetProgress(5 + pct * 0.75, $"[Java 25 - Alternatif] {status}");
+                    }, 0, 100);
+                }
 
                 SetProgress(80, "Java 25 kuruluyor (Arşiv açılıyor)...");
                 await Task.Run(() => {
@@ -1090,7 +1476,7 @@ namespace MistikLauncher
                 try { Directory.Delete(tempExtractDir, true); } catch { }
                 try { File.Delete(zipPath); } catch { }
 
-                if (File.Exists(javaExe))
+                if (File.Exists(javaExe) && new FileInfo(javaExe).Length > 50000)
                 {
                     SetProgress(100, "Java 25 başarıyla kuruldu!");
                     return javaExe;
@@ -1347,19 +1733,46 @@ del ""%~f0""
         // ── Reload ────────────────────────────────────────────────────────────
         public void ReloadConfig()
         {
-            Config = ConfigManager.Load();
-            _accent = Config.Accent switch {
-                "Red"    => "#FF4B4B",
-                "Green"  => "#2EB82E",
-                "Purple" => "#A349A4",
-                "Orange" => "#FFB100",
-                _        => "#00A3FF"
-            };
-            ApplyAccent(_accent);
-            UserNameLbl.Text = Config.User;
-            BuildNav();
-            PopulateVersionBox();
-            LoadAvatar();
+            try { Config = ConfigManager.Load(); } catch { Config ??= new LauncherConfig(); }
+
+            // Null-safe Config fields
+            Config.User       ??= "Oyuncu";
+            Config.Version    ??= "1.21";
+            Config.Lang       ??= "Turkce";
+            Config.Accent     ??= "Blue";
+            Config.SkinType   ??= "default";
+            Config.SkinUser   ??= "";
+            Config.Role       ??= "Kullanici";
+            Config.GithubUser ??= "";
+
+            try
+            {
+                _accent = Config.Accent switch {
+                    "Red"    => "#FF4B4B",
+                    "Green"  => "#2EB82E",
+                    "Purple" => "#A349A4",
+                    "Orange" => "#FFB100",
+                    _        => "#00A3FF"
+                };
+                ApplyAccent(_accent);
+            }
+            catch (Exception ex) { App.Log($"ReloadConfig ApplyAccent error: {ex.Message}"); }
+
+            try { UserNameLbl.Text = Config.User ?? "Oyuncu"; }
+            catch (Exception ex) { App.Log($"ReloadConfig UserNameLbl error: {ex.Message}"); }
+
+            try { BuildNav(); }
+            catch (Exception ex) { App.Log($"ReloadConfig BuildNav error: {ex.Message}"); }
+
+            try { PopulateVersionBox(); }
+            catch (Exception ex) { App.Log($"ReloadConfig PopulateVersionBox error: {ex.Message}"); }
+
+            try { LoadAvatar(); }
+            catch (Exception ex) { App.Log($"ReloadConfig LoadAvatar error: {ex.Message}"); }
+
+            // Settings sayfasının cache'ini temizle ki yeni config ile yeniden oluşturulsun
+            try { InvalidatePageCache("Settings"); }
+            catch { }
         }
     }
 }

@@ -105,7 +105,7 @@ namespace MistikLauncher.Pages
                 {
                     main.Config.User = n; main.Config.SkinType = "username"; main.Config.SkinUser = n;
                     ConfigManager.Save(main.Config); main.ReloadConfig();
-                    await main.PrepareSkinPackAsync();
+                    await main.PrepareSkinPackAsync(main.Config.Version);
                     MessageBox.Show($"Karakteriniz '{n}' skini başarıyla indirildi ve kuruldu!\n\nEğer oyununuz açıksa F3 + T tuşlarına basarak kaynak paketini yenileyin.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 catch (Exception ex)
@@ -239,36 +239,19 @@ namespace MistikLauncher.Pages
             } catch {}
         }
 
-        void ApplyLocalSkin(MainWindow main, string filePath)
+        async void ApplyLocalSkin(MainWindow main, string filePath)
         {
             try {
                 // Kalici olarak AppData icine kopyala
                 string localDest = Path.Combine(App.AppData, "custom_skin.png");
                 File.Copy(filePath, localDest, true);
 
-                var packDir = Path.Combine(App.GameDir, "resourcepacks", "MistikSkinPack");
-                
-                if (Directory.Exists(packDir)) {
-                    try { Directory.Delete(packDir, true); } catch { }
-                }
-
-                var textureDir = Path.Combine(packDir, "assets", "minecraft", "textures", "entity");
-                Directory.CreateDirectory(textureDir);
-
-                // Copy to steve and alex
-                File.Copy(localDest, Path.Combine(textureDir, "steve.png"), true);
-                File.Copy(localDest, Path.Combine(textureDir, "alex.png"), true);
-
-                // Create pack.mcmeta
-                var mcmetaPath = Path.Combine(packDir, "pack.mcmeta");
-                var mcmetaContent = "{\n  \"pack\": {\n    \"pack_format\": 1,\n    \"description\": \"Mistik Launcher Ozel Skin Kaynak Paketi\"\n  }\n}";
-                File.WriteAllText(mcmetaPath, mcmetaContent);
-
                 main.Config.SkinType = "local";
                 main.Config.SkinUser = localDest;
                 ConfigManager.Save(main.Config); main.ReloadConfig();
 
-                main.EnsureMistikSkinPackEnabled(true);
+                // Ortak skin paketi hazirlama mantigini cagir (boylece dinamik pack_format ve en yuksek oncelik kurallari uygulanir)
+                await main.PrepareSkinPackAsync(main.Config.Version);
                 main.LoadAvatar();
 
                 MessageBox.Show("Ozel skininiz basariyla 'Mistik Ozel Skin' kaynak paketi olarak yuklendi ve aktif edildi!\n\nOyuna girdiginizde karakteriniz otomatik olarak hazir olacaktir!", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
