@@ -479,9 +479,12 @@ namespace MistikLauncher
                 SetStatus("Eksik kütüphaneler indiriliyor...");
                 await EnsureLibrariesInstalledAsync(version, (pct, status) => Dispatcher.Invoke(() => SetProgress((int)(40 + pct * 0.25), status)));
 
+                SetStatus("Ely.by skin doğrulayıcı kontrol ediliyor...");
+                var injectorPath = await EnsureAuthlibInjectorInstalledAsync();
+
                 // 4. Argumanlari olustur
                 var ram  = Math.Max(Config.Ram, 1) * 1024;
-                var args = BuildLaunchArgs(version, ram, natives);
+                var args = BuildLaunchArgs(version, ram, natives, injectorPath);
 
                 SetProgress(70);
                 SetStatus("Minecraft baslatılıyor...");
@@ -641,6 +644,45 @@ namespace MistikLauncher
             catch (Exception ex)
             {
                 App.Log($"EnsureGameLanguageMatchesLauncher error: {ex.Message}");
+            }
+        }
+
+        public async Task<string?> EnsureAuthlibInjectorInstalledAsync()
+        {
+            try
+            {
+                var injectorPath = Path.Combine(App.AppData, "authlib-injector.jar");
+                if (File.Exists(injectorPath) && new FileInfo(injectorPath).Length > 10000)
+                {
+                    return injectorPath;
+                }
+
+                App.Log("authlib-injector.jar not found, downloading from official release...");
+                var url = "https://github.com/yushijinhun/authlib-injector/releases/download/v1.2.5/authlib-injector-1.2.5.jar";
+                var bytes = await _http.GetByteArrayAsync(url);
+                Directory.CreateDirectory(App.AppData);
+                await File.WriteAllBytesAsync(injectorPath, bytes);
+                App.Log("authlib-injector.jar downloaded successfully!");
+                return injectorPath;
+            }
+            catch (Exception ex)
+            {
+                App.Log($"Failed to download authlib-injector: {ex.Message}");
+                try
+                {
+                    var fallbackUrl = "https://authlib-injector.yushijinhun.ms/artifact/latest/authlib-injector.jar";
+                    var bytes = await _http.GetByteArrayAsync(fallbackUrl);
+                    var injectorPath = Path.Combine(App.AppData, "authlib-injector.jar");
+                    Directory.CreateDirectory(App.AppData);
+                    await File.WriteAllBytesAsync(injectorPath, bytes);
+                    App.Log("authlib-injector.jar fallback download success!");
+                    return injectorPath;
+                }
+                catch (Exception ex2)
+                {
+                    App.Log($"Fallback download failed: {ex2.Message}");
+                    return null;
+                }
             }
         }
 
@@ -898,10 +940,14 @@ namespace MistikLauncher
             }
         }
 
-        string BuildLaunchArgs(string version, int ramMb, string natives)
+        string BuildLaunchArgs(string version, int ramMb, string natives, string? injectorPath = null)
         {
             var libs    = BuildClasspath(version);
             var jvm     = $"-Xmx{ramMb}m -Xms{ramMb / 2}m -Dminecraft.server.onlineMode=false -Dminecraft.server.online-mode=false";
+            if (!string.IsNullOrEmpty(injectorPath) && File.Exists(injectorPath))
+            {
+                jvm += $" -javaagent:\"{injectorPath}\"=https://authserver.ely.by/api/authlib-injector";
+            }
             
             // Ultimate JVM & GC Optimizations for very old and modern computers!
             var optList = new List<string>();
