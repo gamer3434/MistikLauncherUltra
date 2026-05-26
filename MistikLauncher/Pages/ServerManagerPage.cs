@@ -2513,7 +2513,7 @@ namespace MistikLauncher.Pages
             {
                 var jre25Dir = Path.Combine(javaDir, "jre25");
                 var java25Exe = Path.Combine(jre25Dir, "bin", "java.exe");
-                if (File.Exists(java25Exe))
+                if (File.Exists(java25Exe) && new FileInfo(java25Exe).Length > 50000)
                 {
                     return java25Exe;
                 }
@@ -2523,6 +2523,36 @@ namespace MistikLauncher.Pages
 
                 try
                 {
+                    // Eski çakışan java süreçlerini sonlandır
+                    try
+                    {
+                        foreach (var proc in System.Diagnostics.Process.GetProcessesByName("java"))
+                        {
+                            try
+                            {
+                                if (proc.MainModule?.FileName.StartsWith(javaDir, StringComparison.OrdinalIgnoreCase) == true)
+                                {
+                                    proc.Kill();
+                                    proc.WaitForExit(3000);
+                                }
+                            }
+                            catch { }
+                        }
+                        foreach (var proc in System.Diagnostics.Process.GetProcessesByName("javaw"))
+                        {
+                            try
+                            {
+                                if (proc.MainModule?.FileName.StartsWith(javaDir, StringComparison.OrdinalIgnoreCase) == true)
+                                {
+                                    proc.Kill();
+                                    proc.WaitForExit(3000);
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                    catch { }
+
                     Directory.CreateDirectory(javaDir);
                     var zipPath = Path.Combine(javaDir, "jre25.zip");
                     var tempExtractDir = Path.Combine(javaDir, "jre25_temp");
@@ -2535,12 +2565,26 @@ namespace MistikLauncher.Pages
 
                     var url = "https://api.adoptium.net/v3/binary/latest/25/ga/windows/x64/jre/hotspot/normal/eclipse";
                     
-                    await VersionManagerPage.DownloadFileWithProgressAsync(url, zipPath, (pct, status) => {
-                        Dispatcher.Invoke(() => {
-                            _installProgress.Value = pct;
-                            _btnInstall.Content = $"Java 25: %{pct}";
-                        });
-                    }, 0, 100);
+                    try
+                    {
+                        await VersionManagerPage.DownloadFileWithProgressAsync(url, zipPath, (pct, status) => {
+                            Dispatcher.Invoke(() => {
+                                _installProgress.Value = pct;
+                                _btnInstall.Content = $"Java 25: %{pct}";
+                            });
+                        }, 0, 100);
+                    }
+                    catch (Exception apiEx)
+                    {
+                        AppendConsole(slot, $"[MİSTİK] ⚠️ Adoptium API bağlantısı kurulamadı ({apiEx.Message}). Alternatif sunucudan indiriliyor...");
+                        url = "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.3%2B9/OpenJDK25U-jre_x64_windows_hotspot_25.0.3_9.zip";
+                        await VersionManagerPage.DownloadFileWithProgressAsync(url, zipPath, (pct, status) => {
+                            Dispatcher.Invoke(() => {
+                                _installProgress.Value = pct;
+                                _btnInstall.Content = $"Java 25 (Alternatif): %{pct}";
+                            });
+                        }, 0, 100);
+                    }
 
                     AppendConsole(slot, "[MİSTİK] 📦 Java 25 arşiv dosyası açılıyor...");
                     await Task.Run(() => {
@@ -2561,7 +2605,7 @@ namespace MistikLauncher.Pages
                     try { Directory.Delete(tempExtractDir, true); } catch { }
                     try { File.Delete(zipPath); } catch { }
 
-                    if (File.Exists(java25Exe))
+                    if (File.Exists(java25Exe) && new FileInfo(java25Exe).Length > 50000)
                     {
                         AppendConsole(slot, "[MİSTİK] ✅ Java 25 başarıyla kuruldu ve etkinleştirildi!");
                         return java25Exe;
@@ -2576,7 +2620,7 @@ namespace MistikLauncher.Pages
             // JRE 21 check and download if required (or default)
             var jre21Dir = Path.Combine(javaDir, "jre21");
             var java21Exe = Path.Combine(jre21Dir, "bin", "java.exe");
-            if (File.Exists(java21Exe))
+            if (File.Exists(java21Exe) && new FileInfo(java21Exe).Length > 50000)
             {
                 return java21Exe;
             }
@@ -2586,6 +2630,36 @@ namespace MistikLauncher.Pages
 
             try
             {
+                // Eski çakışan java süreçlerini sonlandır
+                try
+                {
+                    foreach (var proc in System.Diagnostics.Process.GetProcessesByName("java"))
+                    {
+                        try
+                        {
+                            if (proc.MainModule?.FileName.StartsWith(javaDir, StringComparison.OrdinalIgnoreCase) == true)
+                            {
+                                proc.Kill();
+                                proc.WaitForExit(3000);
+                            }
+                        }
+                        catch { }
+                    }
+                    foreach (var proc in System.Diagnostics.Process.GetProcessesByName("javaw"))
+                    {
+                        try
+                        {
+                            if (proc.MainModule?.FileName.StartsWith(javaDir, StringComparison.OrdinalIgnoreCase) == true)
+                            {
+                                proc.Kill();
+                                proc.WaitForExit(3000);
+                            }
+                        }
+                        catch { }
+                    }
+                }
+                catch { }
+
                 Directory.CreateDirectory(javaDir);
                 var zipPath = Path.Combine(javaDir, "jre21.zip");
                 var tempExtractDir = Path.Combine(javaDir, "jre21_temp");
@@ -2598,12 +2672,26 @@ namespace MistikLauncher.Pages
 
                 var url = "https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jre/hotspot/normal/eclipse";
                 
-                await VersionManagerPage.DownloadFileWithProgressAsync(url, zipPath, (pct, status) => {
-                    Dispatcher.Invoke(() => {
-                        _installProgress.Value = pct;
-                        _btnInstall.Content = $"Java 21: %{pct}";
-                    });
-                }, 0, 100);
+                try
+                {
+                    await VersionManagerPage.DownloadFileWithProgressAsync(url, zipPath, (pct, status) => {
+                        Dispatcher.Invoke(() => {
+                            _installProgress.Value = pct;
+                            _btnInstall.Content = $"Java 21: %{pct}";
+                        });
+                    }, 0, 100);
+                }
+                catch (Exception apiEx)
+                {
+                    AppendConsole(slot, $"[MİSTİK] ⚠️ Adoptium API bağlantısı kurulamadı ({apiEx.Message}). Alternatif sunucudan indiriliyor...");
+                    url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.3%2B9/OpenJDK21U-jre_x64_windows_hotspot_21.0.3_9.zip";
+                    await VersionManagerPage.DownloadFileWithProgressAsync(url, zipPath, (pct, status) => {
+                        Dispatcher.Invoke(() => {
+                            _installProgress.Value = pct;
+                            _btnInstall.Content = $"Java 21 (Alternatif): %{pct}";
+                        });
+                    }, 0, 100);
+                }
 
                 AppendConsole(slot, "[MİSTİK] 📦 Java 21 arşiv dosyası açılıyor...");
                 await Task.Run(() => {
@@ -2624,7 +2712,7 @@ namespace MistikLauncher.Pages
                 try { Directory.Delete(tempExtractDir, true); } catch { }
                 try { File.Delete(zipPath); } catch { }
 
-                if (File.Exists(java21Exe))
+                if (File.Exists(java21Exe) && new FileInfo(java21Exe).Length > 50000)
                 {
                     AppendConsole(slot, "[MİSTİK] ✅ Java 21 başarıyla kuruldu!");
                     return java21Exe;

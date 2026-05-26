@@ -361,7 +361,14 @@ namespace MistikLauncher.Pages
         }
 
         // Pure C# HTTP download - no Python
-        static readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(30) };
+        static readonly HttpClient _http = CreateHttpClient();
+
+        private static HttpClient CreateHttpClient()
+        {
+            var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("MistikLauncher/1.0 (contact@mistik.com)");
+            return client;
+        }
 
         static async Task<string?> DownloadVersionAsync(string version, Action<double, string> progress)
         {

@@ -113,29 +113,44 @@ namespace MistikLauncher.Pages
             appSp.Children.Add(PageHelpers.Lbl("Gorunum", 14, "#00A3FF", true));
             appSp.Children.Add(new Separator { Background = PageHelpers.HexBrush("#282828"), Margin = new Thickness(0, 10, 0, 14) });
             appSp.Children.Add(PageHelpers.Lbl("Dil", 12, "#A0A0A0"));
+            // Config.Lang'ı normalize et: "Türkçe"/"TÃ¼rkÃ§e" gibi bozuk değerleri "Turkce"'ye çevir
+            var normalizedLang = (main.Config.Lang ?? "").Contains("ngl") ? "English" : "Turkce";
+            if (main.Config.Lang == "English") normalizedLang = "English";
             _cbLang = new ComboBox { ItemsSource = new[] { "Turkce", "English" },
-                SelectedItem = main.Config.Lang, Width = 200,
+                SelectedItem = normalizedLang, Width = 200,
                 HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 12) };
+            if (_cbLang.SelectedItem == null) _cbLang.SelectedIndex = 0; // fallback: her zaman seçili olsun
             appSp.Children.Add(_cbLang);
             appSp.Children.Add(PageHelpers.Lbl("Tema Rengi", 12, "#A0A0A0"));
-            _cbAccent = new ComboBox { ItemsSource = new[] { "Blue", "Red", "Green", "Purple", "Orange" },
-                SelectedItem = main.Config.Accent, Width = 200,
+            // Config.Accent'i normalize et: geçerli bir değer olduğundan emin ol
+            var validAccents = new[] { "Blue", "Red", "Green", "Purple", "Orange" };
+            var normalizedAccent = System.Array.Exists(validAccents, a => a == main.Config.Accent) ? main.Config.Accent : "Blue";
+            _cbAccent = new ComboBox { ItemsSource = validAccents,
+                SelectedItem = normalizedAccent, Width = 200,
                 HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 0) };
+            if (_cbAccent.SelectedItem == null) _cbAccent.SelectedIndex = 0; // fallback
             appSp.Children.Add(_cbAccent);
             appCard.Child = appSp; sp.Children.Add(appCard);
 
             var saveBtn = PageHelpers.MkBtn("KAYDET", "#00A3FF", 200);
             saveBtn.Margin = new Thickness(0, 16, 0, 0); saveBtn.HorizontalAlignment = HorizontalAlignment.Left;
             saveBtn.Click += (_, _) => {
-                _main.Config.User       = _tbUser.Text.Trim();
-                _main.Config.Ram        = int.TryParse(_tbRam.Text.Trim(), out var r) ? r : 4;
-                _main.Config.Lang       = (_cbLang.SelectedItem as string) ?? "Turkce";
-                _main.Config.Accent     = (_cbAccent.SelectedItem as string) ?? "Blue";
-                _main.Config.AutoClose  = _chkAutoClose.IsChecked == true;
-                _main.Config.GithubUser = _tbGithubUser.Text.Trim();
-                ConfigManager.Save(_main.Config);
-                _main.ReloadConfig();
-                MessageBox.Show("Ayarlar kaydedildi.", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
+                try
+                {
+                    _main.Config.User       = (_tbUser?.Text ?? "").Trim();
+                    _main.Config.Ram        = int.TryParse((_tbRam?.Text ?? "").Trim(), out var r) ? Math.Max(1, r) : 4;
+                    _main.Config.Lang       = (_cbLang?.SelectedItem as string) ?? "Turkce";
+                    _main.Config.Accent     = (_cbAccent?.SelectedItem as string) ?? "Blue";
+                    _main.Config.AutoClose  = _chkAutoClose?.IsChecked == true;
+                    _main.Config.GithubUser = (_tbGithubUser?.Text ?? "").Trim();
+                    ConfigManager.Save(_main.Config);
+                    try { _main.ReloadConfig(); } catch { /* ReloadConfig hataları sessizce yut */ }
+                    MessageBox.Show("Ayarlar kaydedildi.", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ayarlar kaydedilemedi:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             };
             sp.Children.Add(saveBtn);
 
@@ -341,9 +356,16 @@ namespace MistikLauncher.Pages
             var saveBtn = PageHelpers.MkBtn("KAYDET", "#00A3FF", 200);
             saveBtn.Margin = new Thickness(0, 16, 0, 0); saveBtn.HorizontalAlignment = HorizontalAlignment.Left;
             saveBtn.Click += (_, _) => {
-                main.Config.OptTurbo = vals[0]; main.Config.OptFps = vals[1];
-                ConfigManager.Save(main.Config);
-                MessageBox.Show("Optimizasyon ayarlari kaydedildi.", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
+                try
+                {
+                    main.Config.OptTurbo = vals[0]; main.Config.OptFps = vals[1];
+                    ConfigManager.Save(main.Config);
+                    MessageBox.Show("Optimizasyon ayarlari kaydedildi.", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Optimizasyon kaydedilemedi:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             };
             sp.Children.Add(saveBtn);
 
@@ -628,9 +650,17 @@ namespace MistikLauncher.Pages
             var saveRoleBtn = PageHelpers.MkBtn("KAYDET", "#A349A4", 100);
             saveRoleBtn.Margin = new Thickness(0, 10, 0, 0); saveRoleBtn.HorizontalAlignment = HorizontalAlignment.Left;
             saveRoleBtn.Click += (_, _) => {
-                main.Config.Role = (cbRole.SelectedItem as string) ?? "Kullanici";
-                ConfigManager.Save(main.Config); main.ReloadConfig();
-                MessageBox.Show("Rol guncellendi.", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
+                try
+                {
+                    main.Config.Role = (cbRole?.SelectedItem as string) ?? "Kullanici";
+                    ConfigManager.Save(main.Config);
+                    try { main.ReloadConfig(); } catch { }
+                    MessageBox.Show("Rol guncellendi.", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Rol kaydedilemedi:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
             };
             roleSp.Children.Add(saveRoleBtn);
 
