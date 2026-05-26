@@ -256,9 +256,23 @@ namespace MistikLauncher
                     bmp.Freeze();
                     
                     if ((bmp.PixelWidth == 64 && bmp.PixelHeight == 64) || (bmp.PixelWidth == 64 && bmp.PixelHeight == 32)) {
-                        var cropped = new System.Windows.Media.Imaging.CroppedBitmap(bmp, new Int32Rect(8, 8, 8, 8));
-                        cropped.Freeze();
-                        return cropped;
+                        var baseFace = new System.Windows.Media.Imaging.CroppedBitmap(bmp, new Int32Rect(8, 8, 8, 8));
+                        baseFace.Freeze();
+
+                        var overlayFace = new System.Windows.Media.Imaging.CroppedBitmap(bmp, new Int32Rect(40, 8, 8, 8));
+                        overlayFace.Freeze();
+
+                        var drawingVisual = new DrawingVisual();
+                        using (var drawingContext = drawingVisual.RenderOpen()) {
+                            drawingContext.DrawImage(baseFace, new Rect(0, 0, 8, 8));
+                            drawingContext.DrawImage(overlayFace, new Rect(0, 0, 8, 8));
+                        }
+
+                        var renderTargetBitmap = new RenderTargetBitmap(8, 8, 96, 96, PixelFormats.Pbgra32);
+                        renderTargetBitmap.Render(drawingVisual);
+                        renderTargetBitmap.Freeze();
+
+                        return renderTargetBitmap;
                     }
                     return null;
                 }
