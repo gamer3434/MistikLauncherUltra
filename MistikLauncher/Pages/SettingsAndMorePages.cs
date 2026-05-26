@@ -76,7 +76,7 @@ namespace MistikLauncher.Pages
     {
         readonly MainWindow _main;
         TextBox _tbUser = null!, _tbRam = null!, _tbGithubUser = null!;
-        ComboBox _cbLang = null!, _cbAccent = null!;
+        ComboBox _cbLang = null!, _cbAccent = null!, _cbAuthType = null!;
         CheckBox _chkAutoClose = null!;
 
         public SettingsPage(MainWindow main)
@@ -94,6 +94,18 @@ namespace MistikLauncher.Pages
             genSp.Children.Add(PageHelpers.Lbl("Kullanici Adi", 12, "#A0A0A0"));
             _tbUser = PageHelpers.DarkTextBox(main.Config.User);
             genSp.Children.Add(_tbUser);
+            genSp.Children.Add(PageHelpers.Lbl("Giriş & Karakter Sistemi", 12, "#A0A0A0", pad: new Thickness(0, 10, 0, 0)));
+            var authTypes = new[] { "Normal (Çevrimdışı)", "Ely.by (Cilt & Giriş Desteği)" };
+            var selectedAuthType = (main.Config.AuthType ?? "").ToLower() == "elyby" ? "Ely.by (Cilt & Giriş Desteği)" : "Normal (Çevrimdışı)";
+            _cbAuthType = new ComboBox {
+                ItemsSource = authTypes,
+                SelectedItem = selectedAuthType,
+                Width = 240,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 4, 0, 0)
+            };
+            if (_cbAuthType.SelectedItem == null) _cbAuthType.SelectedIndex = 0;
+            genSp.Children.Add(_cbAuthType);
             genSp.Children.Add(PageHelpers.Lbl("GitHub Kullanici Adi", 12, "#A0A0A0", pad: new Thickness(0, 10, 0, 0)));
             _tbGithubUser = PageHelpers.DarkTextBox(main.Config.GithubUser);
             genSp.Children.Add(_tbGithubUser);
@@ -138,6 +150,8 @@ namespace MistikLauncher.Pages
                 try
                 {
                     _main.Config.User       = (_tbUser?.Text ?? "").Trim();
+                    var selAuth             = (_cbAuthType?.SelectedItem as string) ?? "Normal (Çevrimdışı)";
+                    _main.Config.AuthType   = selAuth.Contains("Ely.by") ? "elyby" : "offline";
                     _main.Config.Ram        = int.TryParse((_tbRam?.Text ?? "").Trim(), out var r) ? Math.Max(1, r) : 4;
                     _main.Config.Lang       = (_cbLang?.SelectedItem as string) ?? "Turkce";
                     _main.Config.Accent     = (_cbAccent?.SelectedItem as string) ?? "Blue";
