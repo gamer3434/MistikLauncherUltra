@@ -958,15 +958,81 @@ namespace MistikLauncher.Pages
                 var resp = await Http.GetStringAsync($"https://api.modrinth.com/v2/project/{projectId}/version");
                 var versions = JArray.Parse(resp);
                 if (versions.Count == 0) return;
-                var fileUrl = versions[0]["files"]?[0]?["url"]?.ToString();
-                var fname   = versions[0]["files"]?[0]?["filename"]?.ToString() ?? $"{name}.jar";
-                if (string.IsNullOrEmpty(fileUrl)) return;
-                Directory.CreateDirectory(App.ModsDir);
-                var bytes = await Http.GetByteArrayAsync(fileUrl);
-                await File.WriteAllBytesAsync(Path.Combine(App.ModsDir, fname), bytes);
-                App.Log($"Mod installed: {fname}");
-                RenderInstalledMods();
-                MessageBox.Show($"{name} kuruldu!\n{fname}", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                // 1. Get launcher's active Minecraft version & loader
+                var currentVer = _main.Config.Version ?? "";
+                var mcVersion = "1.21.1";
+                var mcMatch = System.Text.RegularExpressions.Regex.Match(currentVer, @"1\.\d+(\.\d+)?");
+                if (mcMatch.Success) mcVersion = mcMatch.Value;
+
+                var isFabric = currentVer.Contains("fabric", StringComparison.OrdinalIgnoreCase);
+                var isForge = currentVer.Contains("forge", StringComparison.OrdinalIgnoreCase);
+
+                JToken? targetVersionObj = null;
+
+                // 2. Search for a version compatible with our active profile
+                foreach (var v in versions)
+                {
+                    var gameVers = v["game_versions"] as JArray;
+                    var loaders = v["loaders"] as JArray;
+                    
+                    if (gameVers == null || loaders == null) continue;
+
+                    bool supportsMc = gameVers.Any(gv => gv.ToString().Equals(mcVersion, StringComparison.OrdinalIgnoreCase));
+                    bool supportsLoader = true;
+                    if (isFabric)
+                    {
+                        supportsLoader = loaders.Any(l => l.ToString().Equals("fabric", StringComparison.OrdinalIgnoreCase));
+                    }
+                    else if (isForge)
+                    {
+                        supportsLoader = loaders.Any(l => l.ToString().Equals("forge", StringComparison.OrdinalIgnoreCase) || l.ToString().Equals("neoforge", StringComparison.OrdinalIgnoreCase));
+                    }
+
+                    if (supportsMc && supportsLoader)
+                    {
+                        targetVersionObj = v;
+                        break;
+                    }
+                }
+
+                if (targetVersionObj != null)
+                {
+                    // Compatible version found! Download directly to active mods directory.
+                    var fileUrl = targetVersionObj["files"]?[0]?["url"]?.ToString();
+                    var fname   = targetVersionObj["files"]?[0]?["filename"]?.ToString() ?? $"{name}.jar";
+                    if (string.IsNullOrEmpty(fileUrl)) return;
+
+                    Directory.CreateDirectory(App.ModsDir);
+                    var bytes = await Http.GetByteArrayAsync(fileUrl);
+                    await File.WriteAllBytesAsync(Path.Combine(App.ModsDir, fname), bytes);
+                    App.Log($"Mod installed directly (compatible with {mcVersion}): {fname}");
+                    
+                    RenderInstalledMods();
+                    MessageBox.Show($"'{name}' başarıyla kuruldu!\n\nSürümünüz ({mcVersion}) ile uyumludur.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    // No compatible version found! Download latest and queue in the pool.
+                    var latestVersion = versions[0];
+                    var fileUrl = latestVersion["files"]?[0]?["url"]?.ToString();
+                    var fname   = latestVersion["files"]?[0]?["filename"]?.ToString() ?? $"{name}.jar";
+                    if (string.IsNullOrEmpty(fileUrl)) return;
+
+                    var gameVers = latestVersion["game_versions"] as JArray;
+                    var targetGameVer = gameVers != null && gameVers.Count > 0 ? gameVers[0].ToString() : "1.20.1";
+
+                    // Save to compatibility pool under target version directory
+                    var poolDir = Path.Combine(App.AppData, "mods_pool", targetGameVer);
+                    Directory.CreateDirectory(poolDir);
+                    var destFile = Path.Combine(poolDir, fname);
+
+                    var bytes = await Http.GetByteArrayAsync(fileUrl);
+                    await File.WriteAllBytesAsync(destFile, bytes);
+                    App.Log($"Mod queued in compatibility pool for {targetGameVer}: {fname}");
+
+                    MessageBox.Show($"'{name}' modu şu anki oyun sürümünüz ({mcVersion}) ile uyumsuz!\n\nUyumlu olduğu '{targetGameVer}' sürümünün bekleme klasörüne (mods_pool/{targetGameVer}) indirildi.\n\nOyun sürümünüzü '{targetGameVer}' yaptığınızda otomatik olarak aktif edilecektir!", "Sürüm Beklemeye Alındı", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
             }
             catch (Exception ex)
             {
