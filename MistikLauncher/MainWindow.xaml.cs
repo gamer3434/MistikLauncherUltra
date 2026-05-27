@@ -532,6 +532,9 @@ namespace MistikLauncher
                 SetStatus("Oyun dili senkronize ediliyor...");
                 EnsureGameLanguageMatchesLauncher();
 
+                SetStatus("Görüş mesafesi optimize ediliyor...");
+                EnsureChunkDistanceOptimized();
+
                 SetStatus("Eksik kütüphaneler indiriliyor...");
                 await EnsureLibrariesInstalledAsync(version, (pct, status) => Dispatcher.Invoke(() => SetProgress((int)(40 + pct * 0.25), status)));
 
@@ -753,6 +756,58 @@ namespace MistikLauncher
             catch (Exception ex)
             {
                 App.Log($"EnsureGameLanguageMatchesLauncher error: {ex.Message}");
+            }
+        }
+
+        public void EnsureChunkDistanceOptimized()
+        {
+            try
+            {
+                string optionsPath = Path.Combine(App.GameDir, "options.txt");
+                if (!File.Exists(optionsPath)) return;
+
+                var lines = File.ReadAllLines(optionsPath).ToList();
+                bool modified = false;
+
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    var trimmed = lines[i].Trim();
+                    if (trimmed.StartsWith("renderDistance:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var parts = trimmed.Split(':', 2);
+                        if (parts.Length == 2 && int.TryParse(parts[1].Trim(), out int dist))
+                        {
+                            if (dist > 12)
+                            {
+                                lines[i] = "renderDistance:12";
+                                modified = true;
+                                App.Log($"[ChunkOpt] Render distance capped from {dist} to 12 for smoother startup.");
+                            }
+                        }
+                    }
+                    else if (trimmed.StartsWith("simulationDistance:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var parts = trimmed.Split(':', 2);
+                        if (parts.Length == 2 && int.TryParse(parts[1].Trim(), out int dist))
+                        {
+                            if (dist > 8)
+                            {
+                                lines[i] = "simulationDistance:8";
+                                modified = true;
+                                App.Log($"[ChunkOpt] Simulation distance capped from {dist} to 8 for smoother startup.");
+                            }
+                        }
+                    }
+                }
+
+                if (modified)
+                {
+                    File.WriteAllLines(optionsPath, lines);
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Log($"EnsureChunkDistanceOptimized error: {ex.Message}");
             }
         }
 
