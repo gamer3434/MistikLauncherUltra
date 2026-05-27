@@ -569,28 +569,20 @@ namespace MistikLauncher
                 SetStatus("Minecraft baslatılıyor...");
                 App.Log($"Launch: {javaPath} {args[..Math.Min(args.Length,120)]}...");
 
+                // ★ PERF FIX: stdout/stderr redirect kaldırıldı – pipe buffer overhead yok
                 var psi = new ProcessStartInfo(javaPath, args) {
                     WorkingDirectory = App.GameDir,
                     UseShellExecute  = false,
-                    RedirectStandardError = true,
-                    RedirectStandardOutput = true,
                     CreateNoWindow = true
                 };
                 var process = Process.Start(psi);
                 if (process != null)
                 {
-                    var errTask = process.StandardError.ReadToEndAsync();
-                    var outTask = process.StandardOutput.ReadToEndAsync();
-                    
                     // Wait 1.5 seconds to detect immediate exit or crash
                     await Task.Delay(1500);
                     if (process.HasExited)
                     {
-                        var errText = await errTask;
-                        var outText = await outTask;
-                        var errMsg = !string.IsNullOrEmpty(errText) ? errText : outText;
-                        if (string.IsNullOrEmpty(errMsg)) errMsg = "Oyun baslatilamadi veya beklenmedik sekilde kapandi. (Exit Code: " + process.ExitCode + ")";
-                        throw new Exception(errMsg);
+                        throw new Exception($"Oyun baslatılamadı veya beklenmedik sekilde kapandı. (Exit Code: {process.ExitCode})");
                     }
 
                     // ── Kernel Optimizasyonlarını Uygula ──
@@ -1091,7 +1083,8 @@ namespace MistikLauncher
         string BuildLaunchArgs(string version, int ramMb, string natives, string? injectorPath = null, string? resolvedUuid = null)
         {
             var libs    = BuildClasspath(version);
-            var jvm     = $"-Xmx{ramMb}m -Xms{ramMb / 2}m -Dminecraft.server.onlineMode=false -Dminecraft.server.online-mode=false";
+            // ★ PERF FIX: Xms = Xmx → G1GC heap resize yok, daha az GC pause
+            var jvm     = $"-Xmx{ramMb}m -Xms{ramMb}m -Dminecraft.server.onlineMode=false -Dminecraft.server.online-mode=false";
             if (!string.IsNullOrEmpty(injectorPath) && File.Exists(injectorPath))
             {
                 jvm += $" -javaagent:\"{injectorPath}\"=https://authserver.ely.by/api/authlib-injector";
@@ -1143,7 +1136,6 @@ namespace MistikLauncher
                 optList.Add("-XX:+UseStringDeduplication");
                 optList.Add("-XX:+UseCompressedOops");
                 optList.Add("-XX:+UseCompressedClassPointers");
-                optList.Add("-XX:CICompilerCount=2");
                 optList.Add("-XX:+OptimizeStringConcat");
             }
             else
@@ -1153,13 +1145,10 @@ namespace MistikLauncher
 
             if (Config.OptFps)
             {
-                // Force Direct3D/OpenGL Hardware Rendering Accelerators on Windows!
-                optList.Add("-Dsun.java2d.d3d=true");
-                optList.Add("-Dsun.java2d.opengl=true");
-                optList.Add("-Dsun.java2d.noddraw=true");
-                
-                // Disable console logging overhead (boosts CPU performance!)
-                optList.Add("-Dforge.forceNoStdout=true");
+                // ★ PERF FIX: Java2D flagleri Minecraft'ın LWJGL/OpenGL rendering'ini etkilemez
+                // Büyük methodların JIT derlenmesini aç (Minecraft'ta çok var)
+                optList.Add("-XX:+UnlockDiagnosticVMOptions");
+                optList.Add("-XX:-DontCompileHugeMethods");
             }
 
             var optArgs = string.Join(" ", optList);
