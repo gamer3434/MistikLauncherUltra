@@ -237,6 +237,32 @@ namespace MistikLauncher.Pages
             Grid.SetColumn(localCard, 2); skinTypeGrid.Children.Add(localCard);
 
             sp.Children.Add(skinTypeGrid);
+
+            // Ely.by Cilt Entegrasyon Kartı
+            var elyCard = PageHelpers.Card("#111a24", 12, "#00A3FF", new Thickness(0, 8, 0, 0));
+            var elySp = new StackPanel { Margin = new Thickness(20) };
+            elySp.Children.Add(PageHelpers.Lbl("🌐 Ely.by Cilt Entegrasyonu", 15, "#00A3FF", true));
+            elySp.Children.Add(PageHelpers.Lbl("Ely.by hesabınızdaki skininizi doğrudan yönetin. Yüklediğiniz skinler arkadaşlarınız ve diğer Ely.by kullanıcıları tarafından oyunda otomatik olarak görünür!", 11, "#CCCCCC", wrap: TextWrapping.Wrap));
+            
+            var elyBtnRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) };
+            
+            var openElyInLauncherBtn = PageHelpers.MkBtn("🌐 Başlatıcı İçinde Aç", "#00A3FF", 160);
+            openElyInLauncherBtn.Height = 35;
+            openElyInLauncherBtn.Click += (_, _) => main.Navigate("Elyby");
+            
+            var openElyExternalBtn = PageHelpers.MkBtn("🌍 Tarayıcıda Aç (Dış)", "#2EB82E", 160);
+            openElyExternalBtn.Height = 35;
+            openElyExternalBtn.Margin = new Thickness(12, 0, 0, 0);
+            openElyExternalBtn.Click += (_, _) => {
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://ely.by") { UseShellExecute = true }); } catch { }
+            };
+            
+            elyBtnRow.Children.Add(openElyInLauncherBtn);
+            elyBtnRow.Children.Add(openElyExternalBtn);
+            elySp.Children.Add(elyBtnRow);
+            elyCard.Child = elySp;
+            sp.Children.Add(elyCard);
+
             Content = new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         }
 
