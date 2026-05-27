@@ -1109,14 +1109,34 @@ namespace MistikLauncher
                 }
                 else
                 {
-                    // Advanced low-latency, stutter-free G1GC options
+                    // Advanced low-latency, stutter-free Aikar's G1GC options
                     optList.Add("-XX:+UseG1GC");
-                    optList.Add("-XX:MaxGCPauseMillis=50");
+                    optList.Add("-XX:+ParallelRefProcEnabled");
+                    optList.Add("-XX:MaxGCPauseMillis=200");
                     optList.Add("-XX:+UnlockExperimentalVMOptions");
+                    optList.Add("-XX:+DisableExplicitGC");
+                    optList.Add("-XX:+AlwaysPreTouch");
                     optList.Add("-XX:G1NewSizePercent=30");
                     optList.Add("-XX:G1MaxNewSizePercent=40");
-                    optList.Add("-XX:G1ReservePercent=15");
-                    optList.Add("-XX:G1HeapRegionSize=32m");
+                    optList.Add("-XX:G1ReservePercent=20");
+                    optList.Add("-XX:G1HeapWastePercent=5");
+                    optList.Add("-XX:G1MixedGCCountTarget=4");
+                    optList.Add("-XX:InitiatingHeapOccupancyPercent=15");
+                    optList.Add("-XX:G1MixedGCLiveThresholdPercent=90");
+                    optList.Add("-XX:G1RSetUpdatingPauseTimePercent=5");
+                    optList.Add("-XX:SurvivorRatio=32");
+                    optList.Add("-XX:+PerfDisableSharedMem");
+                    optList.Add("-XX:MaxTenuringThreshold=1");
+
+                    // Dynamic G1HeapRegionSize based on allocated RAM
+                    if (ramMb >= 12288) // 12GB+
+                        optList.Add("-XX:G1HeapRegionSize=32m");
+                    else if (ramMb >= 8192) // 8GB-12GB
+                        optList.Add("-XX:G1HeapRegionSize=16m");
+                    else if (ramMb >= 4096) // 4GB-8GB
+                        optList.Add("-XX:G1HeapRegionSize=8m");
+                    else // 2GB-4GB
+                        optList.Add("-XX:G1HeapRegionSize=4m");
                 }
 
                 // Memory saving and CPU efficiency optimizations

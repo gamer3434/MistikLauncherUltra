@@ -1075,6 +1075,15 @@ namespace MistikLauncher.Pages
             var originalText = btn.Content.ToString();
             try
             {
+                // Active profile info
+                var currentVer = _main.Config.Version ?? "";
+                var mcVersion = "1.21.1";
+                var mcMatch = System.Text.RegularExpressions.Regex.Match(currentVer, @"1\.\d+(\.\d+)?");
+                if (mcMatch.Success) mcVersion = mcMatch.Value;
+
+                var isFabric = currentVer.Contains("fabric", StringComparison.OrdinalIgnoreCase);
+                var isForge = currentVer.Contains("forge", StringComparison.OrdinalIgnoreCase);
+
                 Directory.CreateDirectory(App.ModsDir);
                 for (int i = 0; i < slugs.Length; i++)
                 {
@@ -1086,17 +1095,51 @@ namespace MistikLauncher.Pages
                     var versions = JArray.Parse(resp);
                     if (versions.Count == 0) continue;
 
-                    var fileUrl = versions[0]["files"]?[0]?["url"]?.ToString();
-                    var fname   = versions[0]["files"]?[0]?["filename"]?.ToString() ?? $"{name}.jar";
+                    JToken? targetVersionObj = null;
+
+                    // Search for a version compatible with our active profile
+                    foreach (var v in versions)
+                    {
+                        var gameVers = v["game_versions"] as JArray;
+                        var loaders = v["loaders"] as JArray;
+                        
+                        if (gameVers == null || loaders == null) continue;
+
+                        bool supportsMc = gameVers.Any(gv => gv.ToString().Equals(mcVersion, StringComparison.OrdinalIgnoreCase));
+                        bool supportsLoader = true;
+                        if (isFabric)
+                        {
+                            supportsLoader = loaders.Any(l => l.ToString().Equals("fabric", StringComparison.OrdinalIgnoreCase));
+                        }
+                        else if (isForge)
+                        {
+                            supportsLoader = loaders.Any(l => l.ToString().Equals("forge", StringComparison.OrdinalIgnoreCase) || l.ToString().Equals("neoforge", StringComparison.OrdinalIgnoreCase));
+                        }
+
+                        if (supportsMc && supportsLoader)
+                        {
+                            targetVersionObj = v;
+                            break;
+                        }
+                    }
+
+                    // Fallback to latest version if no exact match is found
+                    if (targetVersionObj == null)
+                    {
+                        targetVersionObj = versions[0];
+                    }
+
+                    var fileUrl = targetVersionObj["files"]?[0]?["url"]?.ToString();
+                    var fname   = targetVersionObj["files"]?[0]?["filename"]?.ToString() ?? $"{name}.jar";
                     if (string.IsNullOrEmpty(fileUrl)) continue;
 
                     var bytes = await Http.GetByteArrayAsync(fileUrl);
                     await File.WriteAllBytesAsync(Path.Combine(App.ModsDir, fname), bytes);
-                    App.Log($"Modpack [{packName}] - Mod installed: {fname}");
+                    App.Log($"Modpack [{packName}] - Mod installed: {fname} (compatible with {mcVersion})");
                 }
                 btn.Content = "✓ KURULDU!";
                 RenderInstalledMods();
-                MessageBox.Show($"'{packName}' başarıyla kuruldu!\n\nToplam {slugs.Length} mod başarıyla entegre edildi.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"'{packName}' başarıyla kuruldu!\n\nToplam {slugs.Length} mod ({mcVersion} sürümünüz ile uyumlu) başarıyla entegre edildi.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
