@@ -120,6 +120,19 @@ namespace MistikLauncher.Pages
             };
             searchSp.Children.Add(applyBtn);
 
+            var resetBtn = PageHelpers.MkBtn("❌ Skini Sıfırla / Kapat", "#D32F2F");
+            resetBtn.Height = 35;
+            resetBtn.Margin = new Thickness(0, 8, 0, 0);
+            resetBtn.Click += async (_, _) => {
+                main.Config.SkinType = "none";
+                main.Config.SkinUser = "";
+                ConfigManager.Save(main.Config);
+                main.ReloadConfig();
+                await main.PrepareSkinPackAsync(main.Config.Version);
+                MessageBox.Show("Skin ayarı sıfırlandı ve kaynak paketi kapatıldı.\nOyunda varsayılan (Steve/Alex) skini göreceksiniz.", "Sıfırlandı", MessageBoxButton.OK, MessageBoxImage.Information);
+            };
+            searchSp.Children.Add(resetBtn);
+
             // Search action
             Action doSearch = () => {
                 var n = tb.Text.Trim();

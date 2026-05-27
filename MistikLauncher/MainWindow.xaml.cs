@@ -990,7 +990,12 @@ namespace MistikLauncher
                     }
                     else
                     {
-                        App.Log($"Failed to download skin for '{user}'.");
+                        App.Log($"Failed to download skin for '{user}'. Disabling custom skin pack.");
+                        EnsureMistikSkinPackEnabled(false);
+                        if (Directory.Exists(packDir))
+                        {
+                            try { Directory.Delete(packDir, true); } catch { }
+                        }
                     }
                 }
                 else if (Config.SkinType == "local")
