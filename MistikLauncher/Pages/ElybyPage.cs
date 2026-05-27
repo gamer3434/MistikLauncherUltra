@@ -19,8 +19,9 @@ namespace MistikLauncher.Pages
 
             // Main Grid
             var grid = new Grid();
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            grid.RowDefinitions.Add(new RowDefinition());
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Header
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Info Bar
+            grid.RowDefinitions.Add(new RowDefinition()); // WebBrowser
 
             // Header Toolbar
             var toolbar = new Border
@@ -84,6 +85,19 @@ namespace MistikLauncher.Pages
             Grid.SetRow(toolbar, 0);
             grid.Children.Add(toolbar);
 
+            // Gömülü Tarayıcı Uyarısı / Bilgilendirme Çubuğu
+            var warningBar = new Border
+            {
+                Background = PageHelpers.HexBrush("#1c2936"),
+                BorderBrush = PageHelpers.HexBrush("#00A3FF"),
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Padding = new Thickness(20, 8, 20, 8)
+            };
+            var warningLbl = PageHelpers.Lbl("💡 Önemli Bilgi: Ely.by web sitesi modern kod yapıları kullandığından, gömülü Internet Explorer motorunda bazı sayfalar tam yüklenmeyebilir veya takılabilir. En pürüzsüz ve hızlı deneyim için lütfen sağ üstteki yeşil \"🌍 Dış Tarayıcıda Aç\" butonuna basarak siteyi Chrome/Edge üzerinde açın!", 10.5, "#CCCCCC", wrap: TextWrapping.Wrap);
+            warningBar.Child = warningLbl;
+            Grid.SetRow(warningBar, 1);
+            grid.Children.Add(warningBar);
+
             // Web Browser Container (with some margin & rounded border if possible)
             var browserBorder = new Border
             {
@@ -99,7 +113,7 @@ namespace MistikLauncher.Pages
             _wb.Source = new Uri("https://ely.by/skins");
 
             browserBorder.Child = _wb;
-            Grid.SetRow(browserBorder, 1);
+            Grid.SetRow(browserBorder, 2);
             grid.Children.Add(browserBorder);
 
             Content = grid;
