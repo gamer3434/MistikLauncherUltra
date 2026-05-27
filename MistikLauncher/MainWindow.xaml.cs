@@ -91,6 +91,7 @@ namespace MistikLauncher
             AddNav("Mods",      "Mod Merkezi");
             AddNav("Maps",      "Harita Merkezi");
             AddNav("Skin",      "Karakter Skin");
+            AddNav("Elyby",     "Ely.by Paneli");
             AddNav("Changelog", "Son Guncellemeler");
             if (Config.Role == "Yonetici")
                 AddNav("Admin", "Yonetici Paneli");
@@ -128,6 +129,7 @@ namespace MistikLauncher
                     "Mods"      => new Pages.ModManagerPage(this),
                     "Maps"      => new Pages.MapManagerPage(this),
                     "Skin"      => new Pages.SkinPage(this),
+                    "Elyby"     => new Pages.ElybyPage(this),
                     "Friends"   => new Pages.FriendsPage(this),
                     "Server"    => new Pages.ServerManagerPage(this),
                     "Changelog" => new Pages.ChangelogPage(this),
