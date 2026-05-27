@@ -231,37 +231,49 @@ namespace MistikLauncher.Pages
         {
             try {
                 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-                byte[] bytes = null;
-                bool isElyBy = false;
+                byte[]? skinBytes = null;
 
-                // Önce Ely.by'den skin çekmeyi dene
                 try {
-                    bytes = await http.GetByteArrayAsync($"http://skinsystem.ely.by/skins/{user}.png");
-                    isElyBy = true;
-                } catch {
-                    // Fallback to mc-heads.net
-                    bytes = await http.GetByteArrayAsync($"https://mc-heads.net/avatar/{user}/{size}");
+                    skinBytes = await http.GetByteArrayAsync($"http://skinsystem.ely.by/skins/{user}.png");
+                } catch { }
+
+                if (skinBytes != null && skinBytes.Length > 100) {
+                    img.Dispatcher.Invoke(() => {
+                        try {
+                            var bmp = new BitmapImage();
+                            using var ms = new System.IO.MemoryStream(skinBytes);
+                            bmp.BeginInit(); bmp.CacheOption = BitmapCacheOption.OnLoad;
+                            bmp.StreamSource = ms; bmp.EndInit(); bmp.Freeze();
+
+                            if ((bmp.PixelWidth == 64 && bmp.PixelHeight == 64) || (bmp.PixelWidth == 64 && bmp.PixelHeight == 32)) {
+                                var baseFace = new System.Windows.Media.Imaging.CroppedBitmap(bmp, new System.Windows.Int32Rect(8, 8, 8, 8));
+                                baseFace.Freeze();
+                                var overlayFace = new System.Windows.Media.Imaging.CroppedBitmap(bmp, new System.Windows.Int32Rect(40, 8, 8, 8));
+                                overlayFace.Freeze();
+                                var drawingVisual = new System.Windows.Media.DrawingVisual();
+                                using (var dc = drawingVisual.RenderOpen()) {
+                                    dc.DrawImage(baseFace, new System.Windows.Rect(0, 0, 8, 8));
+                                    dc.DrawImage(overlayFace, new System.Windows.Rect(0, 0, 8, 8));
+                                }
+                                var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(8, 8, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+                                rtb.Render(drawingVisual);
+                                rtb.Freeze();
+                                img.Source = rtb;
+                                System.Windows.Media.RenderOptions.SetBitmapScalingMode(img, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
+                            } else {
+                                img.Source = bmp;
+                            }
+                        } catch { }
+                    });
+                    return;
                 }
 
-                if (isElyBy && bytes != null) {
-                    var tempPath = Path.Combine(App.AppData, $"temp_skin_{user}.png");
-                    Directory.CreateDirectory(App.AppData);
-                    await File.WriteAllBytesAsync(tempPath, bytes);
-                    img.Dispatcher.Invoke(() => {
-                        var face = MainWindow.GetSkinFace(tempPath);
-                        if (face != null) {
-                            img.Source = face;
-                            System.Windows.Media.RenderOptions.SetBitmapScalingMode(img, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
-                        }
-                    });
-                    // Temizle
-                    try { File.Delete(tempPath); } catch { }
-                } else if (bytes != null) {
-                    var bmp = new BitmapImage();
-                    using var ms = new System.IO.MemoryStream(bytes);
-                    bmp.BeginInit(); bmp.CacheOption=BitmapCacheOption.OnLoad; bmp.StreamSource=ms; bmp.EndInit(); bmp.Freeze();
-                    img.Dispatcher.Invoke(() => img.Source = bmp);
-                }
+                var avatarBytes = await http.GetByteArrayAsync($"https://mc-heads.net/avatar/{user}/{size}");
+                var avatarBmp = new BitmapImage();
+                using var ams = new System.IO.MemoryStream(avatarBytes);
+                avatarBmp.BeginInit(); avatarBmp.CacheOption = BitmapCacheOption.OnLoad;
+                avatarBmp.StreamSource = ams; avatarBmp.EndInit(); avatarBmp.Freeze();
+                img.Dispatcher.Invoke(() => img.Source = avatarBmp);
             } catch {}
         }
 
