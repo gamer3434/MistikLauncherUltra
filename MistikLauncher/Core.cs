@@ -31,7 +31,7 @@ namespace MistikLauncher
         [JsonProperty("auto_close")] public bool   AutoClose  { get; set; } = true;
         [JsonProperty("friends")]    public List<string> Friends     { get; set; } = new();
         [JsonProperty("friend_codes")] public List<string> FriendCodes { get; set; } = new();
-        [JsonProperty("version_code")] public string VersionCode { get; set; } = "v5.2.0";
+        [JsonProperty("version_code")] public string VersionCode { get; set; } = "v5.2.1";
         [JsonProperty("open_count")]   public int OpenCount   { get; set; } = 0;
         [JsonProperty("github_user")]  public string GithubUser { get; set; } = "Musta";
         [JsonProperty("tunnel_gateway")] public int TunnelGateway { get; set; } = 0; // 0=bore.pub 1=Özel SSH
@@ -44,8 +44,8 @@ namespace MistikLauncher
         [JsonProperty("kern_priority")] public bool KernelPriority { get; set; } = true;
         [JsonProperty("kern_timer")]    public bool KernelTimer    { get; set; } = true;
         [JsonProperty("kern_affinity")] public bool KernelAffinity { get; set; } = false;
-        [JsonProperty("kern_power")]    public bool KernelPower    { get; set; } = false;
-        [JsonProperty("kern_nagle")]    public bool KernelNagle    { get; set; } = false;
+        [JsonProperty("kern_power")]    public bool KernelPower    { get; set; } = true;
+        [JsonProperty("kern_nagle")]    public bool KernelNagle    { get; set; } = true;
     }
 
     public static class ConfigManager
