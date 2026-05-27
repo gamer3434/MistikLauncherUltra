@@ -31,7 +31,7 @@ namespace MistikLauncher
         [JsonProperty("auto_close")] public bool   AutoClose  { get; set; } = true;
         [JsonProperty("friends")]    public List<string> Friends     { get; set; } = new();
         [JsonProperty("friend_codes")] public List<string> FriendCodes { get; set; } = new();
-        [JsonProperty("version_code")] public string VersionCode { get; set; } = "v5.1.0";
+        [JsonProperty("version_code")] public string VersionCode { get; set; } = "v5.2.0";
         [JsonProperty("open_count")]   public int OpenCount   { get; set; } = 0;
         [JsonProperty("github_user")]  public string GithubUser { get; set; } = "Musta";
         [JsonProperty("tunnel_gateway")] public int TunnelGateway { get; set; } = 0; // 0=bore.pub 1=Özel SSH
@@ -39,6 +39,13 @@ namespace MistikLauncher
         [JsonProperty("tunnel_custom_subdomain")] public string TunnelCustomSubdomain { get; set; } = "";
         [JsonProperty("tunnel_port")] public int TunnelPort { get; set; } = 25565;
         [JsonProperty("last_synced_version")] public string LastSyncedVersion { get; set; } = "";
+
+        // ── Kernel Optimizasyonları ──
+        [JsonProperty("kern_priority")] public bool KernelPriority { get; set; } = true;
+        [JsonProperty("kern_timer")]    public bool KernelTimer    { get; set; } = true;
+        [JsonProperty("kern_affinity")] public bool KernelAffinity { get; set; } = false;
+        [JsonProperty("kern_power")]    public bool KernelPower    { get; set; } = false;
+        [JsonProperty("kern_nagle")]    public bool KernelNagle    { get; set; } = false;
     }
 
     public static class ConfigManager
@@ -92,6 +99,7 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v5.2.0","2026-05-27","#FF6B00", new[]{ "Kernel düzeyinde oyun optimizasyonları (İşlem Önceliği, Timer 1ms, CPU Affinity, Güç Planı, Nagle)", "Ayarlardan açılıp kapatılabilir toggle sistemi", "Oyun kapanınca tüm değişiklikler otomatik geri alınır" }),
             new("v5.1.0","2026-05-26","#00FFCC", new[]{ "Seçilebilir Ely.by & Çevrimdışı cilt sistemi entegrasyonu", "Akıllı ve optimize edilmiş kütüphane/asset yükleyicisi", "Gelişmiş kararlılık ve performans motoru güncellemeleri" }),
             new("v5.0.0","2026-05-19","#00A3FF", new[]{ "C# WPF'e geçiş – antivirüs false-positive yok","MQTT relay sistemi – IP paylaşılmaz","Otomatik SSH oyun tüneli (Serveo.net)","Gerçek skin önizleme galerisi" }),
             new("v4.3.0","2026-05-18","#2EB82E", new[]{ "P2P arkadaş sistemi eklendi","Skin yaması (CustomSkinLoader)","Performans iyileştirmeleri" }),
