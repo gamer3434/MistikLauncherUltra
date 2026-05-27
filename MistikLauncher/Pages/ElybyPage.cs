@@ -137,6 +137,7 @@ namespace MistikLauncher.Pages
             {
                 SetSilent(_wb, true);
                 SetZoom(_currentZoom);
+                DismissOverlays();
             };
             _wb.Source = new Uri("https://ely.by");
 
@@ -164,6 +165,62 @@ namespace MistikLauncher.Pages
                         _currentZoom = zoomPercent;
                     }
                 }
+            }
+            catch { }
+        }
+
+        private void DismissOverlays()
+        {
+            try
+            {
+                // JavaScript: çerez/onay ekranını, GDPR overlay'ini ve modal'ları otomatik kapat
+                string js = @"
+                    (function() {
+                        // 1. Yaygın consent/cookie butonlarını tıkla
+                        var selectors = [
+                            'button[class*=""accept""]', 'button[class*=""agree""]', 'button[class*=""consent""]',
+                            'button[class*=""cookie""]', 'button[class*=""allow""]', 'button[class*=""close""]',
+                            'a[class*=""accept""]', 'a[class*=""agree""]', 'a[class*=""consent""]',
+                            '.cookie-accept', '.cookie-close', '.cc-btn', '.cc-accept',
+                            '[data-role=""accept""]', '[data-action=""accept""]',
+                            '.gdpr-accept', '.consent-accept',
+                            'button[id*=""accept""]', 'button[id*=""agree""]', 'button[id*=""consent""]',
+                            '.modal .close', '.modal .btn-close', '.modal-close',
+                            '.overlay-close', '.popup-close'
+                        ];
+                        for (var i = 0; i < selectors.length; i++) {
+                            try {
+                                var els = document.querySelectorAll(selectors[i]);
+                                for (var j = 0; j < els.length; j++) {
+                                    els[j].click();
+                                }
+                            } catch(e) {}
+                        }
+                        // 2. Overlay/modal div'lerini gizle
+                        var overlaySelectors = [
+                            '.cookie-banner', '.cookie-overlay', '.cookie-consent',
+                            '.cc-window', '.cc-banner', '.gdpr-banner', '.consent-banner',
+                            '.modal-backdrop', '.overlay', '.popup-overlay',
+                            '[class*=""cookie""][class*=""banner""]',
+                            '[class*=""consent""][class*=""banner""]',
+                            '[id*=""cookie""]', '[id*=""consent""]', '[id*=""gdpr""]'
+                        ];
+                        for (var k = 0; k < overlaySelectors.length; k++) {
+                            try {
+                                var ovs = document.querySelectorAll(overlaySelectors[k]);
+                                for (var l = 0; l < ovs.length; l++) {
+                                    ovs[l].style.display = 'none';
+                                }
+                            } catch(e) {}
+                        }
+                        // 3. Body overflow kilidini kaldır (modal açıkken scroll'u kilitlerler)
+                        try {
+                            document.body.style.overflow = 'auto';
+                            document.documentElement.style.overflow = 'auto';
+                        } catch(e) {}
+                    })();
+                ";
+                _wb.InvokeScript("eval", new object[] { js });
             }
             catch { }
         }
