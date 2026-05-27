@@ -120,6 +120,30 @@ namespace MistikLauncher.Pages
             };
             searchSp.Children.Add(applyBtn);
 
+            // Update Button
+            var updateBtn = PageHelpers.MkBtn("🔄 Skini Güncelle / Yenile", "#00A3FF");
+            updateBtn.Height = 35;
+            updateBtn.Margin = new Thickness(0, 8, 0, 0);
+            updateBtn.Click += async (_, _) => {
+                updateBtn.IsEnabled = false;
+                updateBtn.Content = "Güncelleniyor...";
+                try
+                {
+                    await main.PrepareSkinPackAsync(main.Config.Version);
+                    MessageBox.Show("Karakter skininiz başarıyla güncellendi ve yeniden uygulandı!\n\nEğer oyununuz açıksa F3 + T tuşlarına basarak kaynak paketini yenileyebilirsiniz.", "Güncellendi", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Skin güncellenirken hata oluştu: {ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                finally
+                {
+                    updateBtn.IsEnabled = true;
+                    updateBtn.Content = "🔄 Skini Güncelle / Yenile";
+                }
+            };
+            searchSp.Children.Add(updateBtn);
+
             var resetBtn = PageHelpers.MkBtn("❌ Skini Sıfırla / Kapat", "#D32F2F");
             resetBtn.Height = 35;
             resetBtn.Margin = new Thickness(0, 8, 0, 0);
