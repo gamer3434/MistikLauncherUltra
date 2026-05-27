@@ -32,6 +32,7 @@ namespace MistikLauncher
 
         public MainWindow()
         {
+            SetBrowserEmulation();
             InitializeComponent();
             Config = ConfigManager.Load();
             Config.OpenCount++;
@@ -2023,6 +2024,24 @@ del ""%~f0""
                     StatusLbl.Text = status;
                 }
             });
+        }
+
+        private static void SetBrowserEmulation()
+        {
+            try
+            {
+                string appName = System.IO.Path.GetFileName(System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "MistikLauncher.exe");
+                using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION"))
+                {
+                    if (key != null)
+                    {
+                        key.SetValue(appName, 11001, Microsoft.Win32.RegistryValueKind.DWord);
+                        key.SetValue("MistikLauncher.exe", 11001, Microsoft.Win32.RegistryValueKind.DWord);
+                        key.SetValue("MistikLauncherUltra.exe", 11001, Microsoft.Win32.RegistryValueKind.DWord);
+                    }
+                }
+            }
+            catch { }
         }
 
         // ── Reload ────────────────────────────────────────────────────────────
