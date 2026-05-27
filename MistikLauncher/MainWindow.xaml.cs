@@ -340,17 +340,15 @@ namespace MistikLauncher
             });
         }
 
-        public async Task<BitmapImage?> FetchAvatarAsync(string username, int size = 64)
+        public async Task<System.Windows.Media.ImageSource?> FetchAvatarAsync(string username, int size = 64)
         {
             var elybyCache = Path.Combine(App.AppData, $"elyby_{username}.png");
             var cache = Path.Combine(App.AppData, $"avatar_{username}_{size}.png");
             try {
                 // Önce Ely.by'den skin denemesi yapalım
                 try {
-                    if (File.Exists(elybyCache) && (DateTime.Now - File.GetLastWriteTime(elybyCache)).TotalDays < 1) {
-                        // cache valid
-                    } else {
-                        var jsonStr = await _http.GetStringAsync($"http://skinsystem.ely.by/textures/{username}");
+                    if (!File.Exists(elybyCache) || (DateTime.Now - File.GetLastWriteTime(elybyCache)).TotalDays > 1) {
+                        var jsonStr = await _http.GetStringAsync($"http://skinsystem.ely.by/textures/{Uri.EscapeDataString(username)}");
                         var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
                         var texUrl = jObj["SKIN"]?["url"]?.ToString();
                         if (!string.IsNullOrEmpty(texUrl)) {
@@ -359,11 +357,11 @@ namespace MistikLauncher
                             await File.WriteAllBytesAsync(elybyCache, elyBytes);
                         }
                     }
-                    var faceSrc = GetSkinFace(elybyCache);
-                    if (faceSrc is System.Windows.Media.Imaging.BitmapSource bmpSrc) {
-                        // Crop edilen yüzü BitmapImage formunda kullanamayız ama RenderTargetBitmap vb yapılabilir
-                        // Veya Image nesnesine doğrudan ImageSource olarak verilebilir.
-                        // FetchAvatarAsync sadece BitmapImage dönüyor. 
+                    if (File.Exists(elybyCache)) {
+                        var faceSrc = GetSkinFace(elybyCache);
+                        if (faceSrc != null) {
+                            return faceSrc;
+                        }
                     }
                 } catch { }
 
@@ -372,7 +370,7 @@ namespace MistikLauncher
                     bytes = await File.ReadAllBytesAsync(cache);
                 else {
                     bytes = await _http.GetByteArrayAsync(
-                        $"https://mc-heads.net/avatar/{username}/{size}",
+                        $"https://mc-heads.net/avatar/{Uri.EscapeDataString(username)}/{size}",
                         new CancellationTokenSource(5000).Token);
                     Directory.CreateDirectory(App.AppData);
                     await File.WriteAllBytesAsync(cache, bytes);
@@ -982,6 +980,18 @@ namespace MistikLauncher
                         EnsureMistikSkinPackEnabled(false);
                         return;
                     }
+
+                    // Clear cached avatar files so the bottom circular preview updates immediately!
+                    try
+                    {
+                        var cache1 = Path.Combine(App.AppData, $"elyby_{user}.png");
+                        var cache2 = Path.Combine(App.AppData, $"avatar_{user}_40.png");
+                        var cache3 = Path.Combine(App.AppData, $"avatar_{user}_64.png");
+                        if (File.Exists(cache1)) File.Delete(cache1);
+                        if (File.Exists(cache2)) File.Delete(cache2);
+                        if (File.Exists(cache3)) File.Delete(cache3);
+                    }
+                    catch { }
 
                     byte[]? skinBytes = null;
                     try {
