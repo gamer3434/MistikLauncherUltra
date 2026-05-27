@@ -284,6 +284,7 @@ namespace MistikLauncher
         public void LoadAvatar()
         {
             _ = Task.Run(async () => {
+                // 1. Yerel skin dosyası varsa onu kullan
                 if (Config.SkinType == "local" && !string.IsNullOrEmpty(Config.SkinUser) && File.Exists(Config.SkinUser))
                 {
                     Dispatcher.Invoke(() => {
@@ -295,10 +296,13 @@ namespace MistikLauncher
                             }
                         } catch { }
                     });
+                    return;
                 }
-                else if (Config.AuthType == "elyby")
+
+                // 2. Her zaman Ely.by'den skin çekmeyi dene (AuthType ne olursa olsun)
+                var uname = Config.SkinType == "username" ? Config.SkinUser : Config.User;
+                if (!string.IsNullOrEmpty(uname))
                 {
-                    var uname = Config.SkinType == "username" ? Config.SkinUser : Config.User;
                     var cache = Path.Combine(App.AppData, $"elyby_{uname}.png");
                     bool success = false;
                     try {
@@ -324,16 +328,13 @@ namespace MistikLauncher
                         }
                     } catch { }
 
-                    if (!success) {
+                    if (success) return;
+
+                    // 3. Ely.by başarısız olduysa mc-heads fallback
+                    try {
                         var img = await FetchAvatarAsync(uname, 40);
                         Dispatcher.Invoke(() => { if (img != null) AvatarImg.Source = img; });
-                    }
-                }
-                else
-                {
-                    var uname = Config.SkinType == "username" ? Config.SkinUser : Config.User;
-                    var img   = await FetchAvatarAsync(uname, 40);
-                    Dispatcher.Invoke(() => { if (img != null) AvatarImg.Source = img; });
+                    } catch { }
                 }
             });
         }
