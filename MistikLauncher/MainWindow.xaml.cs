@@ -295,6 +295,32 @@ namespace MistikLauncher
                         } catch { }
                     });
                 }
+                else if (Config.AuthType == "elyby")
+                {
+                    var uname = Config.SkinType == "username" ? Config.SkinUser : Config.User;
+                    var cache = Path.Combine(App.AppData, $"elyby_{uname}.png");
+                    bool success = false;
+                    try {
+                        if (!File.Exists(cache) || (DateTime.Now - File.GetLastWriteTime(cache)).TotalDays > 1) {
+                            var bytes = await _http.GetByteArrayAsync($"http://skinsystem.ely.by/skins/{uname}.png");
+                            Directory.CreateDirectory(App.AppData);
+                            await File.WriteAllBytesAsync(cache, bytes);
+                        }
+                        Dispatcher.Invoke(() => {
+                            var face = GetSkinFace(cache);
+                            if (face != null) {
+                                AvatarImg.Source = face;
+                                System.Windows.Media.RenderOptions.SetBitmapScalingMode(AvatarImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
+                                success = true;
+                            }
+                        });
+                    } catch { }
+
+                    if (!success) {
+                        var img = await FetchAvatarAsync(uname, 40);
+                        Dispatcher.Invoke(() => { if (img != null) AvatarImg.Source = img; });
+                    }
+                }
                 else
                 {
                     var uname = Config.SkinType == "username" ? Config.SkinUser : Config.User;
@@ -306,8 +332,26 @@ namespace MistikLauncher
 
         public async Task<BitmapImage?> FetchAvatarAsync(string username, int size = 64)
         {
+            var elybyCache = Path.Combine(App.AppData, $"elyby_{username}.png");
             var cache = Path.Combine(App.AppData, $"avatar_{username}_{size}.png");
             try {
+                // Önce Ely.by'den skin denemesi yapalım
+                try {
+                    if (File.Exists(elybyCache) && (DateTime.Now - File.GetLastWriteTime(elybyCache)).TotalDays < 1) {
+                        // cache valid
+                    } else {
+                        var elyBytes = await _http.GetByteArrayAsync($"http://skinsystem.ely.by/skins/{username}.png");
+                        Directory.CreateDirectory(App.AppData);
+                        await File.WriteAllBytesAsync(elybyCache, elyBytes);
+                    }
+                    var faceSrc = GetSkinFace(elybyCache);
+                    if (faceSrc is System.Windows.Media.Imaging.BitmapSource bmpSrc) {
+                        // Crop edilen yüzü BitmapImage formunda kullanamayız ama RenderTargetBitmap vb yapılabilir
+                        // Veya Image nesnesine doğrudan ImageSource olarak verilebilir.
+                        // FetchAvatarAsync sadece BitmapImage dönüyor. 
+                    }
+                } catch { }
+
                 byte[] bytes;
                 if (File.Exists(cache))
                     bytes = await File.ReadAllBytesAsync(cache);

@@ -230,12 +230,38 @@ namespace MistikLauncher.Pages
         internal static async Task LoadImgAsync(Image img, string user, int size)
         {
             try {
-                using var http = new HttpClient { Timeout=TimeSpan.FromSeconds(5) };
-                var bytes = await http.GetByteArrayAsync($"https://mc-heads.net/avatar/{user}/{size}");
-                var bmp = new BitmapImage();
-                using var ms = new System.IO.MemoryStream(bytes);
-                bmp.BeginInit(); bmp.CacheOption=BitmapCacheOption.OnLoad; bmp.StreamSource=ms; bmp.EndInit(); bmp.Freeze();
-                img.Dispatcher.Invoke(() => img.Source = bmp);
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                byte[] bytes = null;
+                bool isElyBy = false;
+
+                // Önce Ely.by'den skin çekmeyi dene
+                try {
+                    bytes = await http.GetByteArrayAsync($"http://skinsystem.ely.by/skins/{user}.png");
+                    isElyBy = true;
+                } catch {
+                    // Fallback to mc-heads.net
+                    bytes = await http.GetByteArrayAsync($"https://mc-heads.net/avatar/{user}/{size}");
+                }
+
+                if (isElyBy && bytes != null) {
+                    var tempPath = Path.Combine(App.AppData, $"temp_skin_{user}.png");
+                    Directory.CreateDirectory(App.AppData);
+                    await File.WriteAllBytesAsync(tempPath, bytes);
+                    img.Dispatcher.Invoke(() => {
+                        var face = MainWindow.GetSkinFace(tempPath);
+                        if (face != null) {
+                            img.Source = face;
+                            System.Windows.Media.RenderOptions.SetBitmapScalingMode(img, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
+                        }
+                    });
+                    // Temizle
+                    try { File.Delete(tempPath); } catch { }
+                } else if (bytes != null) {
+                    var bmp = new BitmapImage();
+                    using var ms = new System.IO.MemoryStream(bytes);
+                    bmp.BeginInit(); bmp.CacheOption=BitmapCacheOption.OnLoad; bmp.StreamSource=ms; bmp.EndInit(); bmp.Freeze();
+                    img.Dispatcher.Invoke(() => img.Source = bmp);
+                }
             } catch {}
         }
 
