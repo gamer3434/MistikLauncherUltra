@@ -546,7 +546,7 @@ namespace MistikLauncher
                     injectorPath = await EnsureAuthlibInjectorInstalledAsync();
                     try
                     {
-                        var elyJson = await _http.GetStringAsync($"https://authserver.ely.by/api/users/profiles/minecraft/{Config.User}");
+                        var elyJson = await _http.GetStringAsync($"https://authserver.ely.by/api/users/profiles/minecraft/{Uri.EscapeDataString(Config.User)}");
                         if (!string.IsNullOrEmpty(elyJson))
                         {
                             var elyProfile = JObject.Parse(elyJson);
@@ -971,7 +971,7 @@ namespace MistikLauncher
 
                     byte[]? skinBytes = null;
                     try {
-                        var jsonStr = await _http.GetStringAsync($"http://skinsystem.ely.by/textures/{user}");
+                        var jsonStr = await _http.GetStringAsync($"http://skinsystem.ely.by/textures/{Uri.EscapeDataString(user)}");
                         var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
                         var texUrl = jObj["SKIN"]?["url"]?.ToString();
                         if (!string.IsNullOrEmpty(texUrl)) {
@@ -981,7 +981,7 @@ namespace MistikLauncher
 
                     if (skinBytes == null) {
                         try {
-                            using var response = await _http.GetAsync($"https://mc-heads.net/skin/{user}");
+                            using var response = await _http.GetAsync($"https://mc-heads.net/skin/{Uri.EscapeDataString(user)}");
                             if (response.IsSuccessStatusCode) {
                                 skinBytes = await response.Content.ReadAsByteArrayAsync();
                             }
