@@ -604,7 +604,7 @@ namespace MistikLauncher
                         KernelOptimizer.ApplyAll(process, Config);
                     }
 
-                    // Oyun kapandığında optimizasyonları geri al
+                    // Oyun kapandığında optimizasyonları geri al ve başlatıcıyı geri aç
                     _ = Task.Run(async () =>
                     {
                         try
@@ -618,13 +618,27 @@ namespace MistikLauncher
                             App.Log($"[KernelOpt] Oyun izleme hatası: {ex.Message}");
                             KernelOptimizer.RevertAll();
                         }
+                        finally
+                        {
+                            if (Config.AutoClose)
+                            {
+                                Dispatcher.Invoke(() =>
+                                {
+                                    this.Show();
+                                    this.WindowState = WindowState.Normal;
+                                    this.Activate();
+                                });
+                            }
+                        }
                     });
                 }
                 SetProgress(100);
                 Relay?.UpdateStatus("Oyunda", version, "Minecraft");
 
                 if (Config.AutoClose)
-                    Application.Current.Shutdown();
+                {
+                    Dispatcher.Invoke(() => this.Hide());
+                }
             }
             catch (Exception ex)
             {
