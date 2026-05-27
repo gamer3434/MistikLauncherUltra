@@ -517,6 +517,30 @@ namespace MistikLauncher
                         if (string.IsNullOrEmpty(errMsg)) errMsg = "Oyun baslatilamadi veya beklenmedik sekilde kapandi. (Exit Code: " + process.ExitCode + ")";
                         throw new Exception(errMsg);
                     }
+
+                    // ── Kernel Optimizasyonlarını Uygula ──
+                    bool anyKernelOpt = Config.KernelPriority || Config.KernelTimer || Config.KernelAffinity || Config.KernelPower || Config.KernelNagle;
+                    if (anyKernelOpt)
+                    {
+                        SetStatus("Kernel optimizasyonları uygulanıyor...");
+                        KernelOptimizer.ApplyAll(process, Config);
+                    }
+
+                    // Oyun kapandığında optimizasyonları geri al
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await process.WaitForExitAsync();
+                            KernelOptimizer.RevertAll();
+                            App.Log("[KernelOpt] Oyun kapandı, tüm optimizasyonlar geri alındı.");
+                        }
+                        catch (Exception ex)
+                        {
+                            App.Log($"[KernelOpt] Oyun izleme hatası: {ex.Message}");
+                            KernelOptimizer.RevertAll();
+                        }
+                    });
                 }
                 SetProgress(100);
                 Relay?.UpdateStatus("Oyunda", version, "Minecraft");

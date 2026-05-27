@@ -78,6 +78,7 @@ namespace MistikLauncher.Pages
         TextBox _tbUser = null!, _tbRam = null!, _tbGithubUser = null!;
         ComboBox _cbLang = null!, _cbAccent = null!, _cbAuthType = null!;
         CheckBox _chkAutoClose = null!;
+        CheckBox _chkKernPriority = null!, _chkKernTimer = null!, _chkKernAffinity = null!, _chkKernPower = null!, _chkKernNagle = null!;
 
         public SettingsPage(MainWindow main)
         {
@@ -188,6 +189,48 @@ namespace MistikLauncher.Pages
             appSp.Children.Add(_cbAccent);
             appCard.Child = appSp; sp.Children.Add(appCard);
 
+            // ── Kernel Optimizasyonları Kartı ──
+            var kernCard = PageHelpers.Card("#181818", 12, margin: new Thickness(0, 12, 0, 0));
+            var kernSp = new StackPanel { Margin = new Thickness(24, 20, 24, 20) };
+            kernSp.Children.Add(PageHelpers.Lbl("⚡ Kernel Optimizasyonları", 14, "#FF6B00", true));
+            kernSp.Children.Add(new Separator { Background = PageHelpers.HexBrush("#282828"), Margin = new Thickness(0, 10, 0, 14) });
+            kernSp.Children.Add(PageHelpers.Lbl("Oyun başlatılınca otomatik uygulanır, kapanınca geri alınır.", 11, "#707070"));
+
+            _chkKernPriority = new CheckBox { Content = "İşlem Önceliği → HIGH (CPU'da Minecraft'a öncelik verir)",
+                IsChecked = main.Config.KernelPriority, Foreground = Brushes.White,
+                FontFamily = new FontFamily("Segoe UI"), Margin = new Thickness(0, 10, 0, 0) };
+            kernSp.Children.Add(_chkKernPriority);
+
+            _chkKernTimer = new CheckBox { Content = "Timer Çözünürlüğü → 1ms (Daha akıcı FPS, düşük input lag)",
+                IsChecked = main.Config.KernelTimer, Foreground = Brushes.White,
+                FontFamily = new FontFamily("Segoe UI"), Margin = new Thickness(0, 6, 0, 0) };
+            kernSp.Children.Add(_chkKernTimer);
+
+            _chkKernAffinity = new CheckBox { Content = "CPU Affinity (Çekirdek 0'ı OS'a bırak, kalanını oyuna ver)",
+                IsChecked = main.Config.KernelAffinity, Foreground = Brushes.White,
+                FontFamily = new FontFamily("Segoe UI"), Margin = new Thickness(0, 6, 0, 0) };
+            kernSp.Children.Add(_chkKernAffinity);
+
+            _chkKernPower = new CheckBox { Content = "Güç Planı → Yüksek Performans (Oyun süresince otomatik geçiş)",
+                IsChecked = main.Config.KernelPower, Foreground = Brushes.White,
+                FontFamily = new FontFamily("Segoe UI"), Margin = new Thickness(0, 6, 0, 0) };
+            kernSp.Children.Add(_chkKernPower);
+
+            _chkKernNagle = new CheckBox { Content = "Nagle Kapatma (TCP gecikmesiz, düşük ping - Multiplayer)",
+                IsChecked = main.Config.KernelNagle, Foreground = Brushes.White,
+                FontFamily = new FontFamily("Segoe UI"), Margin = new Thickness(0, 6, 0, 0) };
+            kernSp.Children.Add(_chkKernNagle);
+
+            var kernStatusBtn = PageHelpers.MkBtn("Optimizasyon Durumunu Göster", "#FF6B00", 260);
+            kernStatusBtn.Margin = new Thickness(0, 12, 0, 0);
+            kernStatusBtn.HorizontalAlignment = HorizontalAlignment.Left;
+            kernStatusBtn.Click += (_, _) => {
+                MessageBox.Show(KernelOptimizer.GetStatus(main.Config), "Kernel Optimizasyon Durumu", MessageBoxButton.OK, MessageBoxImage.Information);
+            };
+            kernSp.Children.Add(kernStatusBtn);
+
+            kernCard.Child = kernSp; sp.Children.Add(kernCard);
+
             var saveBtn = PageHelpers.MkBtn("KAYDET", "#00A3FF", 200);
             saveBtn.Margin = new Thickness(0, 16, 0, 0); saveBtn.HorizontalAlignment = HorizontalAlignment.Left;
             saveBtn.Click += (_, _) => {
@@ -201,6 +244,12 @@ namespace MistikLauncher.Pages
                     _main.Config.Accent     = (_cbAccent?.SelectedItem as string) ?? "Blue";
                     _main.Config.AutoClose  = _chkAutoClose?.IsChecked == true;
                     _main.Config.GithubUser = (_tbGithubUser?.Text ?? "").Trim();
+                    // Kernel optimizasyonları
+                    _main.Config.KernelPriority = _chkKernPriority?.IsChecked == true;
+                    _main.Config.KernelTimer    = _chkKernTimer?.IsChecked == true;
+                    _main.Config.KernelAffinity = _chkKernAffinity?.IsChecked == true;
+                    _main.Config.KernelPower    = _chkKernPower?.IsChecked == true;
+                    _main.Config.KernelNagle    = _chkKernNagle?.IsChecked == true;
                     ConfigManager.Save(_main.Config);
                     try { _main.ReloadConfig(); } catch { /* ReloadConfig hataları sessizce yut */ }
                     MessageBox.Show("Ayarlar kaydedildi.", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
