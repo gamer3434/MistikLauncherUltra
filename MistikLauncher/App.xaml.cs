@@ -7,8 +7,28 @@ namespace MistikLauncher
 {
     public partial class Application : System.Windows.Application
     {
+        private static void SetBrowserEmulation()
+        {
+            try
+            {
+                string appName = Path.GetFileName(Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "MistikLauncher.exe");
+                if (string.IsNullOrEmpty(appName)) return;
+
+                using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION", true) ??
+                                 Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION"))
+                {
+                    key.SetValue(appName, 11001, Microsoft.Win32.RegistryValueKind.DWord);
+                    key.SetValue("MistikLauncher.exe", 11001, Microsoft.Win32.RegistryValueKind.DWord);
+                    key.SetValue("MistikLauncherUltra.exe", 11001, Microsoft.Win32.RegistryValueKind.DWord);
+                }
+            }
+            catch { }
+        }
+
         protected override void OnStartup(StartupEventArgs e)
         {
+            SetBrowserEmulation();
+
             // ── Self-Installer Integration ──────────────────────────────────────────
             try
             {
