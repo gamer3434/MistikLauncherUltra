@@ -947,36 +947,50 @@ namespace MistikLauncher
                         return;
                     }
 
-                    using (var response = await _http.GetAsync($"https://mc-heads.net/skin/{user}"))
-                    {
-                        if (response.IsSuccessStatusCode)
-                        {
-                            var bytes = await response.Content.ReadAsByteArrayAsync();
-                            
-                            if (Directory.Exists(packDir))
-                            {
-                                try { Directory.Delete(packDir, true); } catch { }
+                    byte[]? skinBytes = null;
+                    try {
+                        var jsonStr = await _http.GetStringAsync($"http://skinsystem.ely.by/textures/{user}");
+                        var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
+                        var texUrl = jObj["SKIN"]?["url"]?.ToString();
+                        if (!string.IsNullOrEmpty(texUrl)) {
+                            skinBytes = await _http.GetByteArrayAsync(texUrl);
+                        }
+                    } catch { }
+
+                    if (skinBytes == null) {
+                        try {
+                            using var response = await _http.GetAsync($"https://mc-heads.net/skin/{user}");
+                            if (response.IsSuccessStatusCode) {
+                                skinBytes = await response.Content.ReadAsByteArrayAsync();
                             }
-                            Directory.CreateDirectory(textureDirOld);
-                            Directory.CreateDirectory(textureDirNewWide);
-                            Directory.CreateDirectory(textureDirNewSlim);
-                            
-                            await File.WriteAllBytesAsync(Path.Combine(textureDirOld, "steve.png"), bytes);
-                            await File.WriteAllBytesAsync(Path.Combine(textureDirOld, "alex.png"), bytes);
-                            await File.WriteAllBytesAsync(Path.Combine(textureDirNewWide, "steve.png"), bytes);
-                            await File.WriteAllBytesAsync(Path.Combine(textureDirNewSlim, "alex.png"), bytes);
+                        } catch { }
+                    }
 
-                            var mcmetaPath = Path.Combine(packDir, "pack.mcmeta");
-                            var mcmetaContent = "{\n  \"pack\": {\n    \"pack_format\": " + format + ",\n    \"description\": \"Mistik Launcher Ozel Skin Kaynak Paketi\"\n  }\n}";
-                            await File.WriteAllTextAsync(mcmetaPath, mcmetaContent);
-
-                            EnsureMistikSkinPackEnabled(true);
-                            App.Log($"Skin for '{user}' successfully downloaded and applied with pack_format {format}.");
-                        }
-                        else
+                    if (skinBytes != null)
+                    {
+                        if (Directory.Exists(packDir))
                         {
-                            App.Log($"Failed to download skin for '{user}': {response.StatusCode}");
+                            try { Directory.Delete(packDir, true); } catch { }
                         }
+                        Directory.CreateDirectory(textureDirOld);
+                        Directory.CreateDirectory(textureDirNewWide);
+                        Directory.CreateDirectory(textureDirNewSlim);
+                        
+                        await File.WriteAllBytesAsync(Path.Combine(textureDirOld, "steve.png"), skinBytes);
+                        await File.WriteAllBytesAsync(Path.Combine(textureDirOld, "alex.png"), skinBytes);
+                        await File.WriteAllBytesAsync(Path.Combine(textureDirNewWide, "steve.png"), skinBytes);
+                        await File.WriteAllBytesAsync(Path.Combine(textureDirNewSlim, "alex.png"), skinBytes);
+
+                        var mcmetaPath = Path.Combine(packDir, "pack.mcmeta");
+                        var mcmetaContent = "{\n  \"pack\": {\n    \"pack_format\": " + format + ",\n    \"description\": \"Mistik Launcher Ozel Skin Kaynak Paketi\"\n  }\n}";
+                        await File.WriteAllTextAsync(mcmetaPath, mcmetaContent);
+
+                        EnsureMistikSkinPackEnabled(true);
+                        App.Log($"Skin for '{user}' successfully downloaded and applied with pack_format {format}.");
+                    }
+                    else
+                    {
+                        App.Log($"Failed to download skin for '{user}'.");
                     }
                 }
                 else if (Config.SkinType == "local")
