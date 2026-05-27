@@ -57,6 +57,26 @@ namespace MistikLauncher.Pages
             btnRefresh.Margin = new Thickness(0, 0, 8, 0);
             btnRefresh.Click += (_, _) => { try { _wb.Refresh(); } catch { } };
 
+            var btnZoomOut = PageHelpers.MkBtn("🔍 Uzaklaştır (-)", "#333333", 110);
+            btnZoomOut.Height = 28;
+            btnZoomOut.Margin = new Thickness(0, 0, 8, 0);
+            btnZoomOut.Click += (_, _) => {
+                if (_currentZoom > 40) {
+                    _currentZoom -= 10;
+                    SetZoom(_currentZoom);
+                }
+            };
+
+            var btnZoomIn = PageHelpers.MkBtn("🔍 Yakınlaştır (+)", "#333333", 110);
+            btnZoomIn.Height = 28;
+            btnZoomIn.Margin = new Thickness(0, 0, 8, 0);
+            btnZoomIn.Click += (_, _) => {
+                if (_currentZoom < 200) {
+                    _currentZoom += 10;
+                    SetZoom(_currentZoom);
+                }
+            };
+
             var btnExt = PageHelpers.MkBtn("🌍 Dış Tarayıcıda Aç", "#2EB82E", 140);
             btnExt.Height = 28;
             btnExt.Margin = new Thickness(0, 0, 8, 0);
@@ -75,6 +95,8 @@ namespace MistikLauncher.Pages
 
             controlsSp.Children.Add(btnBack);
             controlsSp.Children.Add(btnRefresh);
+            controlsSp.Children.Add(btnZoomOut);
+            controlsSp.Children.Add(btnZoomIn);
             controlsSp.Children.Add(btnExt);
             controlsSp.Children.Add(btnSkinRoom);
 
@@ -111,6 +133,11 @@ namespace MistikLauncher.Pages
 
             _wb.Navigating += (s, e) => SetSilent(_wb, true);
             _wb.Navigated += (s, e) => SetSilent(_wb, true); // Suppress script errors on load
+            _wb.LoadCompleted += (s, e) =>
+            {
+                SetSilent(_wb, true);
+                SetZoom(_currentZoom);
+            };
             _wb.Source = new Uri("https://ely.by");
 
             browserBorder.Child = _wb;
@@ -118,6 +145,27 @@ namespace MistikLauncher.Pages
             grid.Children.Add(browserBorder);
 
             Content = grid;
+        }
+
+        private int _currentZoom = 100;
+
+        private void SetZoom(int zoomPercent)
+        {
+            try
+            {
+                var fi = typeof(WebBrowser).GetField("_axIWebBrowser2", BindingFlags.Instance | BindingFlags.NonPublic);
+                if (fi != null)
+                {
+                    var axIWebBrowser2 = fi.GetValue(_wb);
+                    if (axIWebBrowser2 != null)
+                    {
+                        axIWebBrowser2.GetType().InvokeMember("ExecWB", BindingFlags.InvokeMethod, null, axIWebBrowser2, 
+                            new object[] { 63, 2, zoomPercent, IntPtr.Zero });
+                        _currentZoom = zoomPercent;
+                    }
+                }
+            }
+            catch { }
         }
 
         private static void SetSilent(WebBrowser wb, bool silent)
