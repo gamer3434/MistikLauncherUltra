@@ -233,8 +233,14 @@ namespace MistikLauncher.Pages
                 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
                 byte[]? skinBytes = null;
 
+                // Önce Ely.by'den JSON texture verisi çekmeyi dene
                 try {
-                    skinBytes = await http.GetByteArrayAsync($"http://skinsystem.ely.by/skins/{user}.png");
+                    var jsonStr = await http.GetStringAsync($"http://skinsystem.ely.by/textures/{user}");
+                    var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
+                    var texUrl = jObj["SKIN"]?["url"]?.ToString();
+                    if (!string.IsNullOrEmpty(texUrl)) {
+                        skinBytes = await http.GetByteArrayAsync(texUrl);
+                    }
                 } catch { }
 
                 if (skinBytes != null && skinBytes.Length > 100) {
