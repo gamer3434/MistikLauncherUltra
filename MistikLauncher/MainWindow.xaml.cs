@@ -1108,7 +1108,7 @@ namespace MistikLauncher
                     optList.Add("-XX:MaxGCPauseMillis=200");
                     optList.Add("-XX:+UnlockExperimentalVMOptions");
                     optList.Add("-XX:+DisableExplicitGC");
-                    optList.Add("-XX:+AlwaysPreTouch");
+                    // AlwaysPreTouch kaldırıldı: 10GB+ heap'te başlangıçta CPU'yu %100'e çıkarıyordu
                     optList.Add("-XX:G1NewSizePercent=30");
                     optList.Add("-XX:G1MaxNewSizePercent=40");
                     optList.Add("-XX:G1ReservePercent=20");
