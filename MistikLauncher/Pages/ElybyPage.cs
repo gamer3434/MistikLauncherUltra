@@ -109,8 +109,9 @@ namespace MistikLauncher.Pages
                 BorderThickness = new Thickness(1)
             };
 
+            _wb.Navigating += (s, e) => SetSilent(_wb, true);
             _wb.Navigated += (s, e) => SetSilent(_wb, true); // Suppress script errors on load
-            _wb.Source = new Uri("https://ely.by/skins");
+            _wb.Source = new Uri("https://ely.by");
 
             browserBorder.Child = _wb;
             Grid.SetRow(browserBorder, 2);

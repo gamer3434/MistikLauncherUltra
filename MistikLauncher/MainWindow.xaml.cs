@@ -2026,8 +2026,21 @@ del ""%~f0""
             });
         }
 
+        [System.Runtime.InteropServices.DllImport("urlmon.dll", CharSet = System.Runtime.InteropServices.CharSet.Ansi)]
+        private static extern int UrlMkSetSessionOption(int dwOption, string pBuffer, int dwBufferLength, int dwReserved);
+
+        private const int URLMON_OPTION_USERAGENT = 0x10000001;
+
         private static void SetBrowserEmulation()
         {
+            try
+            {
+                // Force a modern Chrome User Agent to bypass Cloudflare blockages
+                string ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+                UrlMkSetSessionOption(URLMON_OPTION_USERAGENT, ua, ua.Length, 0);
+            }
+            catch { }
+
             try
             {
                 string appName = System.IO.Path.GetFileName(System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "MistikLauncher.exe");
