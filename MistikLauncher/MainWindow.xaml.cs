@@ -90,7 +90,6 @@ namespace MistikLauncher
             AddNav("Dash",      "Ana Panel");
             AddNav("Vers",      "Surum Yoneticisi");
             AddNav("Mods",      "Mod Merkezi");
-            AddNav("Maps",      "Harita Merkezi");
             AddNav("Skin",      "Karakter Skin");
             AddNav("Elyby",     "Ely.by Paneli");
             AddNav("Changelog", "Son Guncellemeler");
@@ -128,7 +127,6 @@ namespace MistikLauncher
                     "Dash"      => new Pages.DashboardPage(this),
                     "Vers"      => new Pages.VersionManagerPage(this),
                     "Mods"      => new Pages.ModManagerPage(this),
-                    "Maps"      => new Pages.MapManagerPage(this),
                     "Skin"      => new Pages.SkinPage(this),
                     "Elyby"     => new Pages.ElybyPage(this),
                     "Friends"   => new Pages.FriendsPage(this),
