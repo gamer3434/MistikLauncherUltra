@@ -294,19 +294,20 @@ namespace MistikLauncher.Pages
             };
             secretSp.Children.Add(pwdBox); secretSp.Children.Add(pwdBtn); secretCard.Child = secretSp; sp.Children.Add(secretCard);
 
-            // Gizli Tuş Kombinasyonu (Ctrl + Shift + A)
-            this.Focusable = true;
-            this.Loaded += (_, _) => this.Focus();
-            this.KeyDown += (s, e) => {
+            // Gizli Tuş Kombinasyonu (Ctrl + Shift + A) - Global Yakalama
+            KeyEventHandler shortcutHandler = (s, e) => {
                 if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.A)
                 {
                     if (adminCard.Visibility != Visibility.Visible)
                     {
                         secretCard.Visibility = Visibility.Visible;
                         pwdBox.Focus();
+                        e.Handled = true;
                     }
                 }
             };
+            _main.PreviewKeyDown += shortcutHandler;
+            this.Unloaded += (s, e) => _main.PreviewKeyDown -= shortcutHandler;
 
             // Shortcut card
             var scCard = PageHelpers.Card("#0d1f2d", 12, "#00A3FF"); scCard.Margin = new Thickness(0, 12, 0, 0);
