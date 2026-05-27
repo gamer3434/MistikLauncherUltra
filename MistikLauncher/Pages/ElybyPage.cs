@@ -3,19 +3,33 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using Microsoft.Web.WebView2.Wpf;
+using Microsoft.Web.WebView2.Core;
 
 namespace MistikLauncher.Pages
 {
     public class ElybyPage : Page
     {
-        private readonly WebBrowser _wb;
+        private readonly WebView2? _wb;
         private readonly MainWindow _main;
+        private double _currentZoom = 1.0;
 
         public ElybyPage(MainWindow main)
         {
             _main = main;
             Background = Brushes.Transparent;
-            _wb = new WebBrowser();
+
+            // WebView2 kullanılabilirliğini kontrol et
+            bool isWebView2Available = false;
+            try
+            {
+                string version = CoreWebView2Environment.GetAvailableBrowserVersionString();
+                isWebView2Available = !string.IsNullOrEmpty(version);
+            }
+            catch
+            {
+                isWebView2Available = false;
+            }
 
             // Main Grid
             var grid = new Grid();
@@ -50,19 +64,19 @@ namespace MistikLauncher.Pages
             var btnBack = PageHelpers.MkBtn("⬅️ Geri", "#333333", 70);
             btnBack.Height = 28;
             btnBack.Margin = new Thickness(0, 0, 8, 0);
-            btnBack.Click += (_, _) => { if (_wb.CanGoBack) _wb.GoBack(); };
+            btnBack.Click += (_, _) => { if (_wb != null && _wb.CanGoBack) _wb.GoBack(); };
 
             var btnRefresh = PageHelpers.MkBtn("🔄 Yenile", "#333333", 80);
             btnRefresh.Height = 28;
             btnRefresh.Margin = new Thickness(0, 0, 8, 0);
-            btnRefresh.Click += (_, _) => { try { _wb.Refresh(); } catch { } };
+            btnRefresh.Click += (_, _) => { try { _wb?.Reload(); } catch { } };
 
             var btnZoomOut = PageHelpers.MkBtn("🔍 Uzaklaştır (-)", "#333333", 110);
             btnZoomOut.Height = 28;
             btnZoomOut.Margin = new Thickness(0, 0, 8, 0);
             btnZoomOut.Click += (_, _) => {
-                if (_currentZoom > 40) {
-                    _currentZoom -= 10;
+                if (_currentZoom > 0.4) {
+                    _currentZoom -= 0.1;
                     SetZoom(_currentZoom);
                 }
             };
@@ -71,8 +85,8 @@ namespace MistikLauncher.Pages
             btnZoomIn.Height = 28;
             btnZoomIn.Margin = new Thickness(0, 0, 8, 0);
             btnZoomIn.Click += (_, _) => {
-                if (_currentZoom < 200) {
-                    _currentZoom += 10;
+                if (_currentZoom < 2.0) {
+                    _currentZoom += 0.1;
                     SetZoom(_currentZoom);
                 }
             };
@@ -115,12 +129,12 @@ namespace MistikLauncher.Pages
                 BorderThickness = new Thickness(0, 0, 0, 1),
                 Padding = new Thickness(20, 8, 20, 8)
             };
-            var warningLbl = PageHelpers.Lbl("💡 Önemli Bilgi: Ely.by web sitesi modern kod yapıları kullandığından, gömülü Internet Explorer motorunda bazı sayfalar tam yüklenmeyebilir veya takılabilir. En pürüzsüz ve hızlı deneyim için lütfen sağ üstteki yeşil \"🌍 Dış Tarayıcıda Aç\" butonuna basarak siteyi Chrome/Edge üzerinde açın!", 10.5, "#CCCCCC", wrap: TextWrapping.Wrap);
+            var warningLbl = PageHelpers.Lbl("💡 Bilgi: Ely.by Cilt Paneli artık Chromium tabanlı WebView2 tarayıcı motoru kullanıyor. Tıpkı Chrome ve Opera GX gibi tüm modern web standartlarını destekler!", 10.5, "#CCCCCC", wrap: TextWrapping.Wrap);
             warningBar.Child = warningLbl;
             Grid.SetRow(warningBar, 1);
             grid.Children.Add(warningBar);
 
-            // Web Browser Container (with some margin & rounded border if possible)
+            // Web Browser Container
             var browserBorder = new Border
             {
                 Margin = new Thickness(15),
@@ -131,48 +145,88 @@ namespace MistikLauncher.Pages
                 BorderThickness = new Thickness(1)
             };
 
-            _wb.Navigating += (s, e) => SetSilent(_wb, true);
-            _wb.Navigated += (s, e) => SetSilent(_wb, true); // Suppress script errors on load
-            _wb.LoadCompleted += (s, e) =>
-            {
-                SetSilent(_wb, true);
-                SetZoom(_currentZoom);
-                DismissOverlays();
-            };
-            _wb.Source = new Uri("https://ely.by");
+            UIElement browserContent;
 
-            browserBorder.Child = _wb;
+            if (isWebView2Available)
+            {
+                _wb = new WebView2();
+                _wb.NavigationCompleted += (s, e) =>
+                {
+                    if (e.IsSuccess)
+                    {
+                        SetZoom(_currentZoom);
+                        DismissOverlays();
+                    }
+                };
+                _wb.Source = new Uri("https://ely.by");
+                browserContent = _wb;
+            }
+            else
+            {
+                _wb = null;
+                // Bilgilendirme ve indirme ekranı
+                var errorSp = new StackPanel
+                {
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(20)
+                };
+                errorSp.Children.Add(PageHelpers.Lbl("⚠️ WebView2 Tarayıcı Motoru Eksik", 18, "#FF3B30", bold: true));
+                
+                var desc = PageHelpers.Lbl(
+                    "Ely.by Cilt Paneli'ni görüntülemek için bilgisayarınızda Microsoft Edge WebView2 Runtime kurulu olmalıdır.\n" +
+                    "Bu bileşen Windows 10/11'de genellikle yüklüdür fakat sisteminizde bulunamadı. Lütfen aşağıdaki butona tıklayarak Microsoft'un sitesinden indirin ve kurun, ardından Launcher'ı yeniden başlatın.",
+                    12, "#CCCCCC", wrap: TextWrapping.Wrap);
+                desc.Margin = new Thickness(0, 10, 0, 20);
+                desc.TextAlignment = TextAlignment.Center;
+                errorSp.Children.Add(desc);
+
+                var btnDownload = PageHelpers.MkBtn("📥 WebView2 Runtime İndir (Microsoft)", "#00A3FF", 280);
+                btnDownload.Height = 36;
+                btnDownload.Click += (_, _) =>
+                {
+                    try
+                    {
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://developer.microsoft.com/microsoft-edge/webview2/#download-section") { UseShellExecute = true });
+                    }
+                    catch { }
+                };
+                errorSp.Children.Add(btnDownload);
+
+                browserContent = new Border
+                {
+                    Background = PageHelpers.HexBrush("#121212"),
+                    Child = errorSp,
+                    VerticalAlignment = VerticalAlignment.Stretch,
+                    HorizontalAlignment = HorizontalAlignment.Stretch
+                };
+            }
+
+            browserBorder.Child = browserContent;
             Grid.SetRow(browserBorder, 2);
             grid.Children.Add(browserBorder);
 
             Content = grid;
         }
 
-        private int _currentZoom = 100;
-
-        private void SetZoom(int zoomPercent)
+        private void SetZoom(double zoomFactor)
         {
             try
             {
-                var fi = typeof(WebBrowser).GetField("_axIWebBrowser2", BindingFlags.Instance | BindingFlags.NonPublic);
-                if (fi != null)
+                if (_wb != null && _wb.CoreWebView2 != null)
                 {
-                    var axIWebBrowser2 = fi.GetValue(_wb);
-                    if (axIWebBrowser2 != null)
-                    {
-                        axIWebBrowser2.GetType().InvokeMember("ExecWB", BindingFlags.InvokeMethod, null, axIWebBrowser2, 
-                            new object[] { 63, 2, zoomPercent, IntPtr.Zero });
-                        _currentZoom = zoomPercent;
-                    }
+                    _wb.ZoomFactor = zoomFactor;
+                    _currentZoom = zoomFactor;
                 }
             }
             catch { }
         }
 
-        private void DismissOverlays()
+        private async void DismissOverlays()
         {
             try
             {
+                if (_wb == null || _wb.CoreWebView2 == null) return;
                 // JavaScript: çerez/onay ekranını, GDPR overlay'ini ve modal'ları otomatik kapat
                 string js = @"
                     (function() {
@@ -220,24 +274,7 @@ namespace MistikLauncher.Pages
                         } catch(e) {}
                     })();
                 ";
-                _wb.InvokeScript("eval", new object[] { js });
-            }
-            catch { }
-        }
-
-        private static void SetSilent(WebBrowser wb, bool silent)
-        {
-            try
-            {
-                var fi = typeof(WebBrowser).GetField("_axIWebBrowser2", BindingFlags.Instance | BindingFlags.NonPublic);
-                if (fi != null)
-                {
-                    var axIWebBrowser2 = fi.GetValue(wb);
-                    if (axIWebBrowser2 != null)
-                    {
-                        axIWebBrowser2.GetType().InvokeMember("Silent", BindingFlags.SetProperty, null, axIWebBrowser2, new object[] { silent });
-                    }
-                }
+                await _wb.ExecuteScriptAsync(js);
             }
             catch { }
         }
