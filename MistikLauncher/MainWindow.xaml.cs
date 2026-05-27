@@ -536,15 +536,34 @@ namespace MistikLauncher
                 await EnsureLibrariesInstalledAsync(version, (pct, status) => Dispatcher.Invoke(() => SetProgress((int)(40 + pct * 0.25), status)));
 
                 string? injectorPath = null;
+                string? resolvedUuid = null;
                 if ((Config.AuthType ?? "").ToLower() == "elyby")
                 {
                     SetStatus("Ely.by skin doğrulayıcı kontrol ediliyor...");
                     injectorPath = await EnsureAuthlibInjectorInstalledAsync();
+                    try
+                    {
+                        var elyJson = await _http.GetStringAsync($"https://authserver.ely.by/api/users/profiles/minecraft/{Config.User}");
+                        if (!string.IsNullOrEmpty(elyJson))
+                        {
+                            var elyProfile = JObject.Parse(elyJson);
+                            var rawId = elyProfile["id"]?.ToString();
+                            if (!string.IsNullOrEmpty(rawId) && rawId.Length == 32)
+                            {
+                                resolvedUuid = $"{rawId[..8]}-{rawId.Substring(8, 4)}-{rawId.Substring(12, 4)}-{rawId.Substring(16, 4)}-{rawId.Substring(20)}";
+                                App.Log($"Resolved Ely.by UUID for '{Config.User}': {resolvedUuid}");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        App.Log($"Failed to resolve Ely.by UUID, falling back to offline UUID: {ex.Message}");
+                    }
                 }
 
                 // 4. Argumanlari olustur
                 var ram  = Math.Max(Config.Ram, 1) * 1024;
-                var args = BuildLaunchArgs(version, ram, natives, injectorPath);
+                var args = BuildLaunchArgs(version, ram, natives, injectorPath, resolvedUuid);
 
                 SetProgress(70);
                 SetStatus("Minecraft baslatılıyor...");
@@ -1043,7 +1062,7 @@ namespace MistikLauncher
             }
         }
 
-        string BuildLaunchArgs(string version, int ramMb, string natives, string? injectorPath = null)
+        string BuildLaunchArgs(string version, int ramMb, string natives, string? injectorPath = null, string? resolvedUuid = null)
         {
             var libs    = BuildClasspath(version);
             var jvm     = $"-Xmx{ramMb}m -Xms{ramMb / 2}m -Dminecraft.server.onlineMode=false -Dminecraft.server.online-mode=false";
@@ -1134,6 +1153,7 @@ namespace MistikLauncher
             }
             catch { }
 
+            string launchUuid = !string.IsNullOrEmpty(resolvedUuid) ? resolvedUuid : GetOfflineUUID(Config.User);
             return $"{jvm} {optArgs} " +
                    $"-Djava.library.path=\"{natives}\" " +
                    $"-cp \"{libs}\" {mainClass} " +
@@ -1142,7 +1162,7 @@ namespace MistikLauncher
                    $"--gameDir \"{App.GameDir}\" " +
                    $"--assetsDir \"{Path.Combine(App.GameDir, "assets")}\" " +
                    $"--assetIndex {assetIndex} " +
-                   $"--accessToken 0 --uuid {GetOfflineUUID(Config.User)}";
+                   $"--accessToken 0 --uuid {launchUuid}";
         }
 
         private string GetOfflineUUID(string username)
