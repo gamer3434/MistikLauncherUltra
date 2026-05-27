@@ -302,18 +302,25 @@ namespace MistikLauncher
                     bool success = false;
                     try {
                         if (!File.Exists(cache) || (DateTime.Now - File.GetLastWriteTime(cache)).TotalDays > 1) {
-                            var bytes = await _http.GetByteArrayAsync($"http://skinsystem.ely.by/skins/{uname}.png");
-                            Directory.CreateDirectory(App.AppData);
-                            await File.WriteAllBytesAsync(cache, bytes);
-                        }
-                        Dispatcher.Invoke(() => {
-                            var face = GetSkinFace(cache);
-                            if (face != null) {
-                                AvatarImg.Source = face;
-                                System.Windows.Media.RenderOptions.SetBitmapScalingMode(AvatarImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
-                                success = true;
+                            var jsonStr = await _http.GetStringAsync($"http://skinsystem.ely.by/textures/{uname}");
+                            var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
+                            var texUrl = jObj["SKIN"]?["url"]?.ToString();
+                            if (!string.IsNullOrEmpty(texUrl)) {
+                                var bytes = await _http.GetByteArrayAsync(texUrl);
+                                Directory.CreateDirectory(App.AppData);
+                                await File.WriteAllBytesAsync(cache, bytes);
                             }
-                        });
+                        }
+                        if (File.Exists(cache)) {
+                            Dispatcher.Invoke(() => {
+                                var face = GetSkinFace(cache);
+                                if (face != null) {
+                                    AvatarImg.Source = face;
+                                    System.Windows.Media.RenderOptions.SetBitmapScalingMode(AvatarImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
+                                    success = true;
+                                }
+                            });
+                        }
                     } catch { }
 
                     if (!success) {
@@ -340,9 +347,14 @@ namespace MistikLauncher
                     if (File.Exists(elybyCache) && (DateTime.Now - File.GetLastWriteTime(elybyCache)).TotalDays < 1) {
                         // cache valid
                     } else {
-                        var elyBytes = await _http.GetByteArrayAsync($"http://skinsystem.ely.by/skins/{username}.png");
-                        Directory.CreateDirectory(App.AppData);
-                        await File.WriteAllBytesAsync(elybyCache, elyBytes);
+                        var jsonStr = await _http.GetStringAsync($"http://skinsystem.ely.by/textures/{username}");
+                        var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
+                        var texUrl = jObj["SKIN"]?["url"]?.ToString();
+                        if (!string.IsNullOrEmpty(texUrl)) {
+                            var elyBytes = await _http.GetByteArrayAsync(texUrl);
+                            Directory.CreateDirectory(App.AppData);
+                            await File.WriteAllBytesAsync(elybyCache, elyBytes);
+                        }
                     }
                     var faceSrc = GetSkinFace(elybyCache);
                     if (faceSrc is System.Windows.Media.Imaging.BitmapSource bmpSrc) {
