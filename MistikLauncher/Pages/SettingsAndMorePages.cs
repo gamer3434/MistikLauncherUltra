@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Input;
 
 namespace MistikLauncher.Pages
 {
@@ -263,12 +264,49 @@ namespace MistikLauncher.Pages
 
             // Admin
             var adminCard = PageHelpers.Card("#1a1015", 12, "#A349A4"); adminCard.Margin = new Thickness(0, 12, 0, 0);
+            adminCard.Visibility = Visibility.Collapsed; // Varsayılan olarak gizli
             var adminSp = new StackPanel { Margin = new Thickness(24, 16, 24, 16) };
             adminSp.Children.Add(PageHelpers.Lbl("Yonetici Modu", 13, "#A349A4", true));
             var adminBtn = PageHelpers.MkBtn("Yonetici Panelini Ac", "#A349A4");
             adminBtn.Margin = new Thickness(0, 8, 0, 0); adminBtn.HorizontalAlignment = HorizontalAlignment.Left;
             adminBtn.Click += (_, _) => main.Navigate("Admin");
             adminSp.Children.Add(adminBtn); adminCard.Child = adminSp; sp.Children.Add(adminCard);
+
+            // Gizli Şifre Kartı
+            var secretCard = PageHelpers.Card("#1a1015", 12, "#A349A4");
+            secretCard.Margin = new Thickness(0, 12, 0, 0);
+            secretCard.Visibility = Visibility.Collapsed;
+            var secretSp = new StackPanel { Margin = new Thickness(24, 16, 24, 16) };
+            secretSp.Children.Add(PageHelpers.Lbl("Yönetici Şifresini Girin", 13, "#A349A4", true));
+            var pwdBox = new PasswordBox { Background = PageHelpers.HexBrush("#121212"), Foreground = Brushes.White, Margin = new Thickness(0, 8, 0, 8), MaxWidth = 200, HorizontalAlignment = HorizontalAlignment.Left };
+            var pwdBtn = PageHelpers.MkBtn("Kilidi Aç", "#A349A4", 100);
+            pwdBtn.HorizontalAlignment = HorizontalAlignment.Left;
+            pwdBtn.Click += (_, _) => {
+                if (pwdBox.Password == "mistik34") // Gizli Şifre
+                {
+                    secretCard.Visibility = Visibility.Collapsed;
+                    adminCard.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    MessageBox.Show("Hatalı şifre!", "Erişim Reddedildi", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            };
+            secretSp.Children.Add(pwdBox); secretSp.Children.Add(pwdBtn); secretCard.Child = secretSp; sp.Children.Add(secretCard);
+
+            // Gizli Tuş Kombinasyonu (Ctrl + Shift + A)
+            this.Focusable = true;
+            this.Loaded += (_, _) => this.Focus();
+            this.KeyDown += (s, e) => {
+                if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.A)
+                {
+                    if (adminCard.Visibility != Visibility.Visible)
+                    {
+                        secretCard.Visibility = Visibility.Visible;
+                        pwdBox.Focus();
+                    }
+                }
+            };
 
             // Shortcut card
             var scCard = PageHelpers.Card("#0d1f2d", 12, "#00A3FF"); scCard.Margin = new Thickness(0, 12, 0, 0);
