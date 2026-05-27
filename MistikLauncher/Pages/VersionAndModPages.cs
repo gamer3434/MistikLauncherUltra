@@ -914,7 +914,44 @@ namespace MistikLauncher.Pages
 
             // ── Kurulu Modlar Bölümü ─────────────────────────────────────────
             sp.Children.Add(new Separator { Background = PageHelpers.HexBrush("#282828"), Margin = new Thickness(0, 24, 0, 10) });
-            sp.Children.Add(PageHelpers.Lbl("📦 Kurulu Modlar", 18, "#A349A4", true));
+            
+            var instHeader = new Grid();
+            instHeader.ColumnDefinitions.Add(new ColumnDefinition());
+            instHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            
+            var instTitle = PageHelpers.Lbl("📦 Kurulu Modlar", 18, "#A349A4", true);
+            Grid.SetColumn(instTitle, 0);
+            instHeader.Children.Add(instTitle);
+            
+            var cleanBtn = PageHelpers.MkBtn("🗑 Klasörü Temizle", "#CC2222", 140);
+            cleanBtn.Click += (_, _) => {
+                var confirm = MessageBox.Show(
+                    "Aktif mod klasöründeki tüm modları silmek istediğinizden emin misiniz?\n\nBu işlem eski/uyumsuz kalıntı modları temizlemek için önerilir.",
+                    "Klasörü Temizle", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (confirm == MessageBoxResult.Yes)
+                {
+                    try
+                    {
+                        if (Directory.Exists(App.ModsDir))
+                        {
+                            foreach (var jar in Directory.GetFiles(App.ModsDir, "*.jar"))
+                            {
+                                try { File.Delete(jar); } catch { }
+                            }
+                        }
+                        RenderInstalledMods();
+                        MessageBox.Show("Mod klasörü başarıyla temizlendi!", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Temizleme hatası: {ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            };
+            Grid.SetColumn(cleanBtn, 1);
+            instHeader.Children.Add(cleanBtn);
+            sp.Children.Add(instHeader);
+            
             sp.Children.Add(PageHelpers.Lbl("Mods klasöründeki tüm .jar dosyaları — yanındaki butona tıklayarak silebilirsin.", 11, "#A0A0A0", wrap: TextWrapping.Wrap));
             _installedPanel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
             sp.Children.Add(_installedPanel);
@@ -997,33 +1034,7 @@ namespace MistikLauncher.Pages
                 var isFabric = currentVer.Contains("fabric", StringComparison.OrdinalIgnoreCase);
                 var isForge = currentVer.Contains("forge", StringComparison.OrdinalIgnoreCase);
 
-                JToken? targetVersionObj = null;
-
-                // 2. Search for a version compatible with our active profile
-                foreach (var v in versions)
-                {
-                    var gameVers = v["game_versions"] as JArray;
-                    var loaders = v["loaders"] as JArray;
-                    
-                    if (gameVers == null || loaders == null) continue;
-
-                    bool supportsMc = gameVers.Any(gv => gv.ToString().Equals(mcVersion, StringComparison.OrdinalIgnoreCase));
-                    bool supportsLoader = true;
-                    if (isFabric)
-                    {
-                        supportsLoader = loaders.Any(l => l.ToString().Equals("fabric", StringComparison.OrdinalIgnoreCase));
-                    }
-                    else if (isForge)
-                    {
-                        supportsLoader = loaders.Any(l => l.ToString().Equals("forge", StringComparison.OrdinalIgnoreCase) || l.ToString().Equals("neoforge", StringComparison.OrdinalIgnoreCase));
-                    }
-
-                    if (supportsMc && supportsLoader)
-                    {
-                        targetVersionObj = v;
-                        break;
-                    }
-                }
+                JToken? targetVersionObj = FindCompatibleVersion(versions, mcVersion, isFabric, isForge);
 
                 if (targetVersionObj != null)
                 {
@@ -1095,33 +1106,7 @@ namespace MistikLauncher.Pages
                     var versions = JArray.Parse(resp);
                     if (versions.Count == 0) continue;
 
-                    JToken? targetVersionObj = null;
-
-                    // Search for a version compatible with our active profile
-                    foreach (var v in versions)
-                    {
-                        var gameVers = v["game_versions"] as JArray;
-                        var loaders = v["loaders"] as JArray;
-                        
-                        if (gameVers == null || loaders == null) continue;
-
-                        bool supportsMc = gameVers.Any(gv => gv.ToString().Equals(mcVersion, StringComparison.OrdinalIgnoreCase));
-                        bool supportsLoader = true;
-                        if (isFabric)
-                        {
-                            supportsLoader = loaders.Any(l => l.ToString().Equals("fabric", StringComparison.OrdinalIgnoreCase));
-                        }
-                        else if (isForge)
-                        {
-                            supportsLoader = loaders.Any(l => l.ToString().Equals("forge", StringComparison.OrdinalIgnoreCase) || l.ToString().Equals("neoforge", StringComparison.OrdinalIgnoreCase));
-                        }
-
-                        if (supportsMc && supportsLoader)
-                        {
-                            targetVersionObj = v;
-                            break;
-                        }
-                    }
+                    JToken? targetVersionObj = FindCompatibleVersion(versions, mcVersion, isFabric, isForge);
 
                     // Fallback to latest version if no exact match is found
                     if (targetVersionObj == null)
@@ -1226,6 +1211,55 @@ namespace MistikLauncher.Pages
                 card.Child = grid;
                 _installedPanel.Children.Add(card);
             }
+        }
+
+        private static JToken? FindCompatibleVersion(JArray versions, string mcVersion, bool isFabric, bool isForge)
+        {
+            // Pass 1: Release only
+            foreach (var v in versions)
+            {
+                if (v["version_type"]?.ToString().Equals("release", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    if (CheckCompatibility(v, mcVersion, isFabric, isForge)) return v;
+                }
+            }
+
+            // Pass 2: Beta only
+            foreach (var v in versions)
+            {
+                if (v["version_type"]?.ToString().Equals("beta", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    if (CheckCompatibility(v, mcVersion, isFabric, isForge)) return v;
+                }
+            }
+
+            // Pass 3: Alpha/Any
+            foreach (var v in versions)
+            {
+                if (CheckCompatibility(v, mcVersion, isFabric, isForge)) return v;
+            }
+
+            return null;
+        }
+
+        private static bool CheckCompatibility(JToken versionObj, string mcVersion, bool isFabric, bool isForge)
+        {
+            var gameVers = versionObj["game_versions"] as JArray;
+            var loaders = versionObj["loaders"] as JArray;
+            if (gameVers == null || loaders == null) return false;
+
+            bool supportsMc = gameVers.Any(gv => gv.ToString().Equals(mcVersion, StringComparison.OrdinalIgnoreCase));
+            bool supportsLoader = true;
+            if (isFabric)
+            {
+                supportsLoader = loaders.Any(l => l.ToString().Equals("fabric", StringComparison.OrdinalIgnoreCase));
+            }
+            else if (isForge)
+            {
+                supportsLoader = loaders.Any(l => l.ToString().Equals("forge", StringComparison.OrdinalIgnoreCase) || l.ToString().Equals("neoforge", StringComparison.OrdinalIgnoreCase));
+            }
+
+            return supportsMc && supportsLoader;
         }
     }
 }
