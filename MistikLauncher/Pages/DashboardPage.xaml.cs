@@ -100,11 +100,30 @@ namespace MistikLauncher.Pages
             var relayCard = PageHelpers.Card("#0d1f2d", 12, "#00A3FF"); relayCard.Margin = new Thickness(0, 14, 0, 0);
             var rSp = new StackPanel { Margin = new Thickness(20, 14, 20, 14) };
             rSp.Children.Add(PageHelpers.Lbl("P2P Relay Durumu", 13, "#00A3FF", true));
-            rSp.Children.Add(PageHelpers.Lbl(
+            var relayText = PageHelpers.Lbl(
                 main.Relay?.Connected == true
                     ? $"MQTT Relay aktif - Oda kodun: {main.Relay.RoomCode}"
                     : "Relay baglaniyor...",
-                12, main.Relay?.Connected == true ? "#2EB82E" : "#FFB100"));
+                12, main.Relay?.Connected == true ? "#2EB82E" : "#FFB100");
+            rSp.Children.Add(relayText);
+            
+            _ = Task.Run(async () => {
+                int waitCount = 0;
+                while (main.Relay?.Connected != true && waitCount < 10) {
+                    await Task.Delay(1000);
+                    waitCount++;
+                }
+                main.Dispatcher.Invoke(() => {
+                    if (main.Relay?.Connected == true) {
+                        relayText.Text = $"MQTT Relay aktif - Oda kodun: {main.Relay.RoomCode}";
+                        relayText.Foreground = PageHelpers.HexBrush("#2EB82E");
+                    } else {
+                        relayText.Text = "Relay baglanti hatasi veya zaman asimi.";
+                        relayText.Foreground = PageHelpers.HexBrush("#FF4B4B");
+                    }
+                });
+            });
+
             relayCard.Child = rSp; sp.Children.Add(relayCard);
 
             scroll.Content = sp; Content = scroll;

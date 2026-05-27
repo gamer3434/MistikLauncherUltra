@@ -294,9 +294,9 @@ namespace MistikLauncher.Pages
             };
             secretSp.Children.Add(pwdBox); secretSp.Children.Add(pwdBtn); secretCard.Child = secretSp; sp.Children.Add(secretCard);
 
-            // Gizli Tuş Kombinasyonu (Ctrl + Shift + A) - Global Yakalama
+            // Gizli Tuş Kombinasyonu (F12) - Global Yakalama
             KeyEventHandler shortcutHandler = (s, e) => {
-                if (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.A)
+                if (e.Key == Key.F12)
                 {
                     if (adminCard.Visibility != Visibility.Visible)
                     {
