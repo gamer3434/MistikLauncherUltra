@@ -875,9 +875,38 @@ namespace MistikLauncher.Pages
             var searchBtn = PageHelpers.MkBtn("ARA", "#00A3FF", 80); searchBtn.Margin = new Thickness(8, 0, 0, 0);
             searchBtn.Click += async (_, _) => await SearchMods();
             _searchBox.KeyDown += async (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) await SearchMods(); };
-            var folderBtn = PageHelpers.MkBtn("Mod Klasoru", "#333333"); folderBtn.Margin = new Thickness(8, 0, 0, 0);
+            var folderBtn = PageHelpers.MkBtn("Mod Klasörü", "#333333"); folderBtn.Margin = new Thickness(8, 0, 0, 0);
             folderBtn.Click += (_, _) => { Directory.CreateDirectory(App.ModsDir); Process.Start("explorer.exe", App.ModsDir); };
-            searchRow.Children.Add(_searchBox); searchRow.Children.Add(searchBtn); searchRow.Children.Add(folderBtn);
+
+            var importBtn = PageHelpers.MkBtn("TL/Orjinal Modları Aktar", "#A349A4"); importBtn.Margin = new Thickness(8, 0, 0, 0);
+            importBtn.Click += async (_, _) => {
+                var mcMods = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "mods");
+                if (!Directory.Exists(mcMods)) {
+                    MessageBox.Show(".minecraft içinde mods klasörü bulunamadı!", "Bulunamadı", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                var jars = Directory.GetFiles(mcMods, "*.jar");
+                if (jars.Length == 0) {
+                    MessageBox.Show(".minecraft/mods klasöründe hiç mod bulunamadı.", "Boş", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+                importBtn.IsEnabled = false; importBtn.Content = "Aktarılıyor...";
+                Directory.CreateDirectory(App.ModsDir);
+                int count = 0;
+                await Task.Run(() => {
+                    foreach (var jar in jars) {
+                        try {
+                            var dest = Path.Combine(App.ModsDir, Path.GetFileName(jar));
+                            if (!File.Exists(dest)) { File.Copy(jar, dest, true); count++; }
+                        } catch { }
+                    }
+                });
+                RenderInstalledMods();
+                importBtn.Content = "TL/Orjinal Modları Aktar"; importBtn.IsEnabled = true;
+                MessageBox.Show($"{count} adet mod başarıyla .minecraft klasöründen Mistik Launcher'a aktarıldı!", "Aktarım Tamamlandı", MessageBoxButton.OK, MessageBoxImage.Information);
+            };
+
+            searchRow.Children.Add(_searchBox); searchRow.Children.Add(searchBtn); searchRow.Children.Add(folderBtn); searchRow.Children.Add(importBtn);
             sp.Children.Add(searchRow);
 
             _resultsPanel = new StackPanel();
