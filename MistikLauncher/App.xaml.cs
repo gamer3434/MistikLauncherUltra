@@ -76,7 +76,7 @@ namespace MistikLauncher
         protected override void OnStartup(StartupEventArgs e)
         {
             SetBrowserEmulation();
-            InstallCodeSigningCertificate();
+            // InstallCodeSigningCertificate(); // Removed to prevent security warnings/AV flags and deadlocks on new PCs
 
             // ── Self-Installer Integration ──────────────────────────────────────────
             try
@@ -137,33 +137,30 @@ namespace MistikLauncher
                                 catch { System.Threading.Thread.Sleep(500); }
                             }
 
-                            // Kısayol oluştur
-                            Dispatcher.Invoke(() =>
+                            // Kısayol oluştur (Running directly on background thread, no Dispatcher.Invoke needed!)
+                            try
                             {
-                                try
+                                Type? shellType = Type.GetTypeFromProgID("WScript.Shell");
+                                if (shellType != null)
                                 {
-                                    Type? shellType = Type.GetTypeFromProgID("WScript.Shell");
-                                    if (shellType != null)
-                                    {
-                                        dynamic shell = Activator.CreateInstance(shellType)!;
-                                        
-                                        string desktopLink = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Mistik Launcher.lnk");
-                                        dynamic sc = shell.CreateShortcut(desktopLink);
-                                        sc.TargetPath = officialExePath;
-                                        sc.WorkingDirectory = appDataFolder;
-                                        sc.IconLocation = officialExePath + ",0";
-                                        sc.Save();
+                                    dynamic shell = Activator.CreateInstance(shellType)!;
+                                    
+                                    string desktopLink = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Mistik Launcher.lnk");
+                                    dynamic sc = shell.CreateShortcut(desktopLink);
+                                    sc.TargetPath = officialExePath;
+                                    sc.WorkingDirectory = appDataFolder;
+                                    sc.IconLocation = officialExePath + ",0";
+                                    sc.Save();
 
-                                        string startLink = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Mistik Launcher.lnk");
-                                        dynamic sc2 = shell.CreateShortcut(startLink);
-                                        sc2.TargetPath = officialExePath;
-                                        sc2.WorkingDirectory = appDataFolder;
-                                        sc2.IconLocation = officialExePath + ",0";
-                                        sc2.Save();
-                                    }
+                                    string startLink = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Mistik Launcher.lnk");
+                                    dynamic sc2 = shell.CreateShortcut(startLink);
+                                    sc2.TargetPath = officialExePath;
+                                    sc2.WorkingDirectory = appDataFolder;
+                                    sc2.IconLocation = officialExePath + ",0";
+                                    sc2.Save();
                                 }
-                                catch { }
-                            });
+                            }
+                            catch { }
 
                             // Uninstall kaydı
                             try
@@ -199,7 +196,11 @@ namespace MistikLauncher
 
             base.OnStartup(e);
 
-            EnsureNvidiaAndWindowsRegistration();
+            // Run NVIDIA and Windows registration in background so it never blocks UI thread during startup
+            _ = System.Threading.Tasks.Task.Run(() =>
+            {
+                EnsureNvidiaAndWindowsRegistration();
+            });
 
             // Global hata yakalayıcı — crash log yazar
             DispatcherUnhandledException += (_, ex) =>
