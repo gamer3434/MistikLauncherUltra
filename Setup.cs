@@ -15,8 +15,8 @@ namespace MistikLauncherSetup
         [STAThread]
         public static void Main()
         {
-            // Enable TLS 1.2 for secure downloads from GitHub
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+            // Enable TLS 1.1, 1.2, and 1.3 for secure downloads from GitHub
+            ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072 | (SecurityProtocolType)12288 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
 
             var app = new App();
             var win = new SetupWindow();
@@ -274,42 +274,53 @@ namespace MistikLauncherSetup
             statusText.Text = "Mistik Launcher indiriliyor...";
             
             string tempFile = Path.Combine(Path.GetTempPath(), "MistikLauncherUltraSetup.tmp");
+            StartDownload(tempFile);
+        }
 
-            using (var webClient = new WebClient())
+        private async void StartDownload(string tempFile)
+        {
+            try
             {
-                webClient.Headers.Add("User-Agent", "Mozilla/5.0");
-                webClient.DownloadProgressChanged += (s, ev) =>
+                using (var http = new System.Net.Http.HttpClient())
                 {
-                    Dispatcher.Invoke(() =>
+                    http.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0");
+                    using (var response = await http.GetAsync(downloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead))
                     {
-                        double percentage = ev.ProgressPercentage;
-                        progressFill.Width = (percentage / 100.0) * 400.0;
-                        statusText.Text = "Mistik Launcher indiriliyor (" + percentage + "%)...";
-                    });
-                };
-
-                webClient.DownloadFileCompleted += (s, ev) =>
-                {
-                    if (ev.Error != null)
-                    {
-                        MessageBox.Show("İndirme sırasında bir hata oluştu:\n" + ev.Error.Message, "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
-                        this.Close();
-                        return;
+                        response.EnsureSuccessStatusCode();
+                        long? totalBytes = response.Content.Headers.ContentLength;
+                        
+                        using (var stream = await response.Content.ReadAsStreamAsync())
+                        using (var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
+                        {
+                            byte[] buffer = new byte[8192];
+                            long totalRead = 0;
+                            int read;
+                            
+                            while ((read = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                            {
+                                await fileStream.WriteAsync(buffer, 0, read);
+                                totalRead += read;
+                                
+                                if (totalBytes.HasValue)
+                                {
+                                    double percentage = Math.Round((double)totalRead / totalBytes.Value * 100);
+                                    Dispatcher.Invoke(() =>
+                                    {
+                                        progressFill.Width = (percentage / 100.0) * 400.0;
+                                        statusText.Text = "Mistik Launcher indiriliyor (" + percentage + "%)...";
+                                    });
+                                }
+                            }
+                        }
                     }
-
-                    // Download succeeded, now perform installation
-                    PerformInstallation(tempFile);
-                };
-
-                try
-                {
-                    webClient.DownloadFileAsync(new Uri(downloadUrl), tempFile);
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Kurulum başlatılamadı:\n" + ex.Message, "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
-                    this.Close();
-                }
+                
+                PerformInstallation(tempFile);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("İndirme sırasında bir hata oluştu:\n" + ex.Message, "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                this.Close();
             }
         }
 
