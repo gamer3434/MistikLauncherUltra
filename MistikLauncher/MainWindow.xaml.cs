@@ -99,41 +99,46 @@ namespace MistikLauncher
         {
             try
             {
-                // GPU Algılama
-                string gpuName = KernelOptimizer.DetectGpuName();
-                App.Log($"[Startup] Algılanan Ekran Kartı: {gpuName}");
-
-                // Firebase'e GPU bilgisi gönderme
-                _ = MistikAnalytics.TrackGpuInfoAsync(Config.User ?? "Oyuncu", gpuName);
-
-                // NVIDIA Profil Kaydı ve GPU tercihi
+                // Run GPU detection and optimizations on a background thread so WMI queries or registry calls never hang the UI thread!
                 await Task.Run(() =>
                 {
                     try
                     {
-                        KernelOptimizer.ApplyGpuPreference(Process.GetCurrentProcess());
-                    }
-                    catch (Exception ex)
-                    {
-                        App.Log($"[Startup GPU Opt Hata] {ex.Message}");
-                    }
-                });
+                        // GPU Algılama
+                        string gpuName = KernelOptimizer.DetectGpuName();
+                        App.Log($"[Startup] Algılanan Ekran Kartı: {gpuName}");
 
-                // Optimizasyon Durum Tespiti
-                await Task.Run(() =>
-                {
-                    try
-                    {
-                        var opts = KernelOptimizer.DetectCurrentOptimizations();
-                        App.Log("[Startup] Mevcut Optimizasyon Durumları:");
-                        foreach (var kv in opts)
+                        // Firebase'e GPU bilgisi gönderme
+                        _ = MistikAnalytics.TrackGpuInfoAsync(Config.User ?? "Oyuncu", gpuName);
+
+                        // NVIDIA Profil Kaydı ve GPU tercihi
+                        try
                         {
-                            App.Log($"  - {kv.Key}: {(kv.Value ? "AKTİF" : "PASİF")}");
+                            KernelOptimizer.ApplyGpuPreference(Process.GetCurrentProcess());
+                        }
+                        catch (Exception ex)
+                        {
+                            App.Log($"[Startup GPU Opt Hata] {ex.Message}");
+                        }
+
+                        // Optimizasyon Durum Tespiti
+                        try
+                        {
+                            var opts = KernelOptimizer.DetectCurrentOptimizations();
+                            App.Log("[Startup] Mevcut Optimizasyon Durumları:");
+                            foreach (var kv in opts)
+                            {
+                                App.Log($"  - {kv.Key}: {(kv.Value ? "AKTİF" : "PASİF")}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            App.Log($"[Startup Opt Hata] {ex.Message}");
                         }
                     }
                     catch (Exception ex)
                     {
-                        App.Log($"[Startup Opt Hata] {ex.Message}");
+                        App.Log($"[Startup Background Opt Hata] {ex.Message}");
                     }
                 });
             }
