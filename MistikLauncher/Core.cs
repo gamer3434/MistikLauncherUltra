@@ -46,6 +46,7 @@ namespace MistikLauncher
         [JsonProperty("kern_affinity")] public bool KernelAffinity { get; set; } = false;
         [JsonProperty("kern_power")]    public bool KernelPower    { get; set; } = true;
         [JsonProperty("kern_nagle")]    public bool KernelNagle    { get; set; } = true;
+        [JsonProperty("kern_gpu")]      public bool KernelGpu      { get; set; } = true;
     }
 
     public static class ConfigManager
@@ -83,8 +84,8 @@ namespace MistikLauncher
         public static readonly string GameDir  = System.IO.Path.Combine(AppData, "game");
         public static readonly string ModsDir  = System.IO.Path.Combine(GameDir, "mods");
         public static readonly string LogFile  = System.IO.Path.Combine(AppData, "launcher.log");
-        public const  string LocalVersion = "v5.1.0";
-        public const  string AdminPassword = "mistik3434";
+        public const  string LocalVersion = "v5.3.0";
+        public const  string AdminPassword = "mustafa3434";
 
         public static readonly List<ServerEntry> Servers = new()
         {
@@ -99,6 +100,13 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v5.3.0","2026-05-27","#2EB82E", new[]{ 
+                "Toplu Mod Sürüm Taşıyıcı (Bulk Mod Migrator) eklendi – Kurulu modları tek tıkla farklı sürümlere taşır",
+                "Sürüm değiştirince modların askıdan indirilmemesi hatası tamamen giderildi",
+                "NVIDIA App & GeForce Experience tam keşif desteği – Launcher sistem tarafından otomatik algılanır",
+                "Fiziksel RAM güvenlik kilidi eklendi – Shader açarken çökme ve Out of Memory hataları önlendi",
+                "Büyük Bellek Sayfaları (Large Pages) desteği ile veri okuma hızı maksimize edildi" 
+            }),
             new("v5.2.0","2026-05-27","#FF6B00", new[]{ "Kernel düzeyinde oyun optimizasyonları (İşlem Önceliği, Timer 1ms, CPU Affinity, Güç Planı, Nagle)", "Ayarlardan açılıp kapatılabilir toggle sistemi", "Oyun kapanınca tüm değişiklikler otomatik geri alınır" }),
             new("v5.1.0","2026-05-26","#00FFCC", new[]{ "Seçilebilir Ely.by & Çevrimdışı cilt sistemi entegrasyonu", "Akıllı ve optimize edilmiş kütüphane/asset yükleyicisi", "Gelişmiş kararlılık ve performans motoru güncellemeleri" }),
             new("v5.0.0","2026-05-19","#00A3FF", new[]{ "C# WPF'e geçiş – antivirüs false-positive yok","MQTT relay sistemi – IP paylaşılmaz","Otomatik SSH oyun tüneli (Serveo.net)","Gerçek skin önizleme galerisi" }),
@@ -345,7 +353,7 @@ namespace MistikLauncher
                 if (topic == "mistik_ultra_v2/updates")
                 {
                     var upd = JsonConvert.DeserializeObject<UpdateMessage>(json);
-                    if (upd != null && upd.Version != App.LocalVersion)
+                    if (upd != null)
                     {
                         OnUpdateNotification?.Invoke(upd.Version, upd.Url, upd.Changelog);
                     }
@@ -1496,6 +1504,636 @@ namespace MistikLauncher
         [JsonProperty("version")]   public string Version   { get; set; } = "";
         [JsonProperty("url")]       public string Url       { get; set; } = "";
         [JsonProperty("changelog")] public string Changelog { get; set; } = "";
+    }
+
+    // ── Firebase Realtime Database Analytics ─────────────────────────────────────
+    // Google Firebase REST API ile kullanıcı veritabanı.
+    // Firebase Console: https://console.firebase.google.com
+    // Veritabanı URL'sini kendi projenizle değiştirin.
+    public static class MistikAnalytics
+    {
+        // ⚠️ Bu URL'yi kendi Firebase projenizin URL'si ile değiştirin!
+        // Firebase Console > Realtime Database > URL kopyala
+        private const string FirebaseUrl = "https://mistiklauncher-9eb4b-default-rtdb.firebaseio.com";
+        
+        private static readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(10) };
+        private static DateTime _sessionStart = DateTime.Now;
+        private static bool _initialized = false;
+
+        /// <summary>
+        /// Kullanıcı oturum açtığında çağrılır. Temel bilgileri Firebase'e kaydeder.
+        /// </summary>
+        public static async Task TrackSessionStartAsync(string username, string launcherVersion, string selectedGameVersion)
+        {
+            _sessionStart = DateTime.Now;
+            _initialized = true;
+
+            var data = new
+            {
+                username = username,
+                launcher_version = launcherVersion,
+                game_version = selectedGameVersion,
+                os = GetExactOSName(),
+                machine_name = SanitizeKey(Environment.MachineName),
+                ram_gb = (int)(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / 1073741824L),
+                session_start = DateTime.UtcNow.ToString("o"),
+                last_active = DateTime.UtcNow.ToString("o"),
+                status = "online",
+                open_count = ConfigManager.Load().OpenCount
+            };
+
+            await FirebasePutAsync($"users/{SanitizeKey(username)}/profile", data);
+            await FirebasePutAsync($"users/{SanitizeKey(username)}/last_session_start", DateTime.UtcNow.ToString("o"));
+            await IncrementDailyStatAsync("total_sessions");
+            
+            App.Log($"[Analytics] Oturum başladı: {username}");
+        }
+
+        /// <summary>
+        /// Oyun başlatıldığında çağrılır. Hangi sürümün oynandığını kaydeder.
+        /// </summary>
+        public static async Task TrackGameLaunchAsync(string username, string gameVersion, int ramGb)
+        {
+            var data = new
+            {
+                version = gameVersion,
+                ram_allocated = ramGb,
+                launched_at = DateTime.UtcNow.ToString("o")
+            };
+
+            await FirebasePutAsync($"users/{SanitizeKey(username)}/last_game_launch", data);
+            await FirebasePostAsync($"users/{SanitizeKey(username)}/game_history", data);
+            await IncrementDailyStatAsync("total_game_launches");
+            
+            // Popüler sürümler istatistiği
+            await IncrementCounterAsync($"stats/popular_versions/{SanitizeKey(gameVersion)}");
+
+            App.Log($"[Analytics] Oyun başlatıldı: {username} -> {gameVersion}");
+
+            // Veritabanı şişmesini önlemek için son 30 kayıtla sınırla
+            _ = Task.Run(() => LimitNodeCountAsync(username, "game_history", 30));
+        }
+
+        /// <summary>
+        /// Mod kurulduğunda çağrılır.
+        /// </summary>
+        public static async Task TrackModInstallAsync(string username, string modName, string modVersion, string gameVersion)
+        {
+            var data = new
+            {
+                mod_name = modName,
+                mod_version = modVersion,
+                game_version = gameVersion,
+                installed_at = DateTime.UtcNow.ToString("o")
+            };
+
+            await FirebasePostAsync($"users/{SanitizeKey(username)}/installed_mods", data);
+            await IncrementCounterAsync($"stats/popular_mods/{SanitizeKey(modName)}");
+            await IncrementDailyStatAsync("total_mod_installs");
+
+            App.Log($"[Analytics] Mod kuruldu: {username} -> {modName}");
+        }
+
+        /// <summary>
+        /// Sunucu başlatıldığında çağrılır.
+        /// </summary>
+        public static async Task TrackServerStartAsync(string username, string serverVersion, int port)
+        {
+            var data = new
+            {
+                version = serverVersion,
+                port = port,
+                started_at = DateTime.UtcNow.ToString("o")
+            };
+
+            await FirebasePostAsync($"users/{SanitizeKey(username)}/server_history", data);
+            await IncrementDailyStatAsync("total_server_starts");
+
+            App.Log($"[Analytics] Sunucu başlatıldı: {username} -> {serverVersion}:{port}");
+
+            // Veritabanı şişmesini önlemek için son 30 kayıtla sınırla
+            _ = Task.Run(() => LimitNodeCountAsync(username, "server_history", 30));
+        }
+
+        /// <summary>
+        /// Oturum kapanışında (launcher kapanırken) çağrılır.
+        /// </summary>
+        public static async Task TrackSessionEndAsync(string username)
+        {
+            if (!_initialized) return;
+
+            var duration = (DateTime.Now - _sessionStart).TotalMinutes;
+            var data = new
+            {
+                status = "offline",
+                last_active = DateTime.UtcNow.ToString("o"),
+                last_session_minutes = Math.Round(duration, 1)
+            };
+
+            await FirebasePatchAsync($"users/{SanitizeKey(username)}/profile", data);
+            
+            // Toplam oynama süresi güncelle
+            await AddToCounterAsync($"users/{SanitizeKey(username)}/total_minutes", duration);
+
+            App.Log($"[Analytics] Oturum bitti: {username} ({duration:F1} dakika)");
+        }
+
+        /// <summary>
+        /// Sürüm değiştirildiğinde çağrılır.
+        /// </summary>
+        public static async Task TrackVersionChangeAsync(string username, string newVersion)
+        {
+            await FirebasePutAsync($"users/{SanitizeKey(username)}/profile/game_version", $"\"{newVersion}\"", raw: true);
+            await IncrementCounterAsync($"stats/popular_versions/{SanitizeKey(newVersion)}");
+        }
+
+        /// <summary>
+        /// Arkadaş ekleme işlemi kaydı.
+        /// </summary>
+        public static async Task TrackFriendAddedAsync(string username, string friendName)
+        {
+            var data = new { friend = friendName, added_at = DateTime.UtcNow.ToString("o") };
+            await FirebasePostAsync($"users/{SanitizeKey(username)}/friend_events", data);
+        }
+
+        /// <summary>
+        /// Alınan launcher/sistem hatalarını veya çökmelerini Firebase'e kaydeder.
+        /// </summary>
+        public static async Task TrackCrashAsync(string username, string errorMessage, string stackTrace)
+        {
+            var data = new
+            {
+                timestamp = DateTime.UtcNow.ToString("o"),
+                error = errorMessage,
+                stack_trace = stackTrace,
+                os = GetExactOSName(),
+                launcher_version = App.LocalVersion
+            };
+
+            await FirebasePostAsync($"users/{SanitizeKey(username)}/crashes", data);
+            await FirebasePostAsync("global_crashes", new { username = username, error = errorMessage, timestamp = DateTime.UtcNow.ToString("o") });
+            
+            App.Log($"[Analytics] Hata Firebase'e kaydedildi: {errorMessage}");
+
+            // Veritabanı şişmesini önlemek için son 25 kayıtla sınırla
+            _ = Task.Run(() => LimitNodeCountAsync(username, "crashes", 25));
+        }
+
+        // ── Admin: Tüm kullanıcıları getir ──────────────────────────
+        /// <summary>
+        /// Firebase'den tüm kullanıcı verilerini çeker (Admin paneli için).
+        /// </summary>
+        public static async Task<string?> GetAllUsersAsync()
+        {
+            try
+            {
+                var resp = await _http.GetStringAsync($"{FirebaseUrl}/users.json");
+                return resp;
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Analytics] Kullanıcı verileri alınamadı: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Firebase'den genel istatistikleri çeker.
+        /// </summary>
+        public static async Task<string?> GetStatsAsync()
+        {
+            try
+            {
+                var resp = await _http.GetStringAsync($"{FirebaseUrl}/stats.json");
+                return resp;
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Analytics] İstatistikler alınamadı: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Windows 11 algılama hatasını düzeltir. Microsoft NT 10.0 build 22000 ve üzerini Windows 11 olarak döner.
+        /// </summary>
+        public static string GetExactOSName()
+        {
+            try
+            {
+                var os = Environment.OSVersion;
+                if (os.Platform == PlatformID.Win32NT)
+                {
+                    var vs = os.Version;
+                    if (vs.Major == 10)
+                    {
+                        if (vs.Build >= 22000)
+                            return $"Windows 11 (Build {vs.Build})";
+                        else
+                            return $"Windows 10 (Build {vs.Build})";
+                    }
+                }
+                return os.ToString();
+            }
+            catch
+            {
+                return Environment.OSVersion.ToString();
+            }
+        }
+
+        // ── İç yardımcı metodlar ────────────────────────────────────
+        private static async Task FirebasePutAsync(string path, object data, bool raw = false)
+        {
+            try
+            {
+                string json = raw ? data.ToString()! : JsonConvert.SerializeObject(data);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                await _http.PutAsync($"{FirebaseUrl}/{path}.json", content);
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Analytics PUT Error] {path}: {ex.Message}");
+            }
+        }
+
+        private static async Task FirebasePostAsync(string path, object data)
+        {
+            try
+            {
+                string json = JsonConvert.SerializeObject(data);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                await _http.PostAsync($"{FirebaseUrl}/{path}.json", content);
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Analytics POST Error] {path}: {ex.Message}");
+            }
+        }
+
+        private static async Task FirebasePatchAsync(string path, object data)
+        {
+            try
+            {
+                string json = JsonConvert.SerializeObject(data);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                var request = new HttpRequestMessage(new HttpMethod("PATCH"), $"{FirebaseUrl}/{path}.json")
+                {
+                    Content = content
+                };
+                await _http.SendAsync(request);
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Analytics PATCH Error] {path}: {ex.Message}");
+            }
+        }
+
+        private static async Task IncrementCounterAsync(string path)
+        {
+            try
+            {
+                var resp = await _http.GetStringAsync($"{FirebaseUrl}/{path}.json");
+                int current = 0;
+                if (resp != null && resp != "null") int.TryParse(resp, out current);
+                current++;
+                var content = new StringContent(current.ToString(), Encoding.UTF8, "application/json");
+                await _http.PutAsync($"{FirebaseUrl}/{path}.json", content);
+            }
+            catch { }
+        }
+
+        private static async Task AddToCounterAsync(string path, double value)
+        {
+            try
+            {
+                var resp = await _http.GetStringAsync($"{FirebaseUrl}/{path}.json");
+                double current = 0;
+                if (resp != null && resp != "null") double.TryParse(resp, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out current);
+                current += value;
+                var content = new StringContent(current.ToString(System.Globalization.CultureInfo.InvariantCulture), Encoding.UTF8, "application/json");
+                await _http.PutAsync($"{FirebaseUrl}/{path}.json", content);
+            }
+            catch { }
+        }
+
+        private static async Task IncrementDailyStatAsync(string statName)
+        {
+            string today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            await IncrementCounterAsync($"stats/daily/{today}/{statName}");
+            await IncrementCounterAsync($"stats/totals/{statName}");
+        }
+
+        /// <summary>
+        /// Firebase path'leri için güvenli anahtar oluşturur (. # $ [ ] / karakterlerini temizler).
+        /// </summary>
+        private static string SanitizeKey(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return "unknown";
+            return key.Replace(".", "_").Replace("#", "_").Replace("$", "_")
+                      .Replace("[", "_").Replace("]", "_").Replace("/", "_");
+        }
+
+        public static async Task TrackBanUserAsync(string username, bool banned)
+        {
+            var data = new { banned = banned };
+            await FirebasePatchAsync($"users/{SanitizeKey(username)}/profile", data);
+        }
+
+        public static async Task SendAlertMessageAsync(string username, string message)
+        {
+            var data = new { alert_message = message };
+            await FirebasePatchAsync($"users/{SanitizeKey(username)}/profile", data);
+        }
+
+        public static async Task SendRemoteModAsync(string username, string modName, string modUrl)
+        {
+            var data = new { pending_mod_name = modName, pending_mod_url = modUrl };
+            await FirebasePatchAsync($"users/{SanitizeKey(username)}/profile", data);
+        }
+
+        public static async Task DeleteUserLogsAsync(string username)
+        {
+            try
+            {
+                await _http.DeleteAsync($"{FirebaseUrl}/users/{SanitizeKey(username)}/crashes.json");
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Analytics DELETE Error] crashes: {ex.Message}");
+            }
+        }
+
+        public static async Task SyncInstalledModsAsync(string username, System.Collections.Generic.List<string> modNames)
+        {
+            try
+            {
+                var data = new System.Collections.Generic.Dictionary<string, object>();
+                foreach (var m in modNames)
+                {
+                    var key = SanitizeKey(m);
+                    data[key] = new
+                    {
+                        mod_name = m,
+                        mod_version = "Yerel/Manuel",
+                        game_version = ConfigManager.Load().Version ?? "1.21",
+                        installed_at = DateTime.UtcNow.ToString("o")
+                    };
+                }
+                await FirebasePutAsync($"users/{SanitizeKey(username)}/installed_mods", data);
+                App.Log($"[Analytics] {modNames.Count} adet mod Firebase'e senkronize edildi.");
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Analytics SyncMods Error] {ex.Message}");
+            }
+        }
+
+        private static async Task LimitNodeCountAsync(string username, string nodeName, int maxCount)
+        {
+            try
+            {
+                string path = $"users/{SanitizeKey(username)}/{nodeName}";
+                var jsonStr = await _http.GetStringAsync($"{FirebaseUrl}/{path}.json");
+                if (string.IsNullOrEmpty(jsonStr) || jsonStr == "null") return;
+
+                var token = Newtonsoft.Json.Linq.JToken.Parse(jsonStr);
+                if (token is Newtonsoft.Json.Linq.JObject jo)
+                {
+                    if (jo.Count > maxCount)
+                    {
+                        var properties = jo.Properties()
+                            .OrderBy(p => p.Value["timestamp"]?.ToString() ?? p.Value["launched_at"]?.ToString() ?? p.Value["started_at"]?.ToString() ?? p.Name)
+                            .ToList();
+
+                        int toRemove = properties.Count - maxCount;
+                        for (int i = 0; i < toRemove; i++)
+                        {
+                            await _http.DeleteAsync($"{FirebaseUrl}/{path}/{properties[i].Name}.json");
+                        }
+                        App.Log($"[Analytics Cleanup] {nodeName} dugumundeki {toRemove} eski kayit temizlendi.");
+                    }
+                }
+                else if (token is Newtonsoft.Json.Linq.JArray ja)
+                {
+                    if (ja.Count > maxCount)
+                    {
+                        var newList = new System.Collections.Generic.List<Newtonsoft.Json.Linq.JToken>();
+                        for (int i = ja.Count - maxCount; i < ja.Count; i++)
+                        {
+                            if (ja[i] != null && ja[i].Type != Newtonsoft.Json.Linq.JTokenType.Null)
+                            {
+                                newList.Add(ja[i]);
+                            }
+                        }
+                        var content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(newList), Encoding.UTF8, "application/json");
+                        await _http.PutAsync($"{FirebaseUrl}/{path}.json", content);
+                        App.Log($"[Analytics Cleanup] {nodeName} dizisindeki eski kayitlar temizlendi.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Analytics Cleanup Error] {nodeName}: {ex.Message}");
+            }
+        }
+
+        // ── Yeni Admin/Yardımcı Metodlar ─────────────────────────────────────
+
+        /// <summary>
+        /// Firebase'deki TÜM kullanıcıların profile/alert_message alanına toplu mesaj yazar.
+        /// Önce GetAllUsersAsync() ile tüm kullanıcıları çekip, her birine PATCH ile alert_message yazar.
+        /// </summary>
+        public static async Task SendBroadcastMessageAsync(string message)
+        {
+            try
+            {
+                var json = await GetAllUsersAsync();
+                if (string.IsNullOrEmpty(json) || json == "null") return;
+
+                var users = Newtonsoft.Json.Linq.JObject.Parse(json);
+                foreach (var user in users.Properties())
+                {
+                    string username = user.Name;
+                    var data = new { alert_message = message };
+                    string patchJson = JsonConvert.SerializeObject(data);
+                    var content = new StringContent(patchJson, Encoding.UTF8, "application/json");
+                    var request = new HttpRequestMessage(new HttpMethod("PATCH"), $"{FirebaseUrl}/users/{SanitizeKey(username)}/profile.json")
+                    {
+                        Content = content
+                    };
+                    await _http.SendAsync(request);
+                }
+
+                App.Log($"[Analytics] Toplu mesaj gönderildi: {message}");
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Analytics Broadcast Error] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Birden fazla kullanıcıyı tek seferde banlar veya ban kaldırır.
+        /// Her biri için TrackBanUserAsync çağrısı yapar.
+        /// </summary>
+        public static async Task BanMultipleUsersAsync(List<string> usernames, bool ban)
+        {
+            try
+            {
+                foreach (var username in usernames)
+                {
+                    await TrackBanUserAsync(username, ban);
+                }
+
+                App.Log($"[Analytics] {usernames.Count} kullanıcı {(ban ? "banlandı" : "ban kaldırıldı")}.");
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Analytics BanMultiple Error] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Tüm kullanıcıların crashes verilerini siler.
+        /// GetAllUsersAsync ile kullanıcıları çekip, her birinin crashes altını DELETE ile temizler.
+        /// </summary>
+        public static async Task DeleteAllCrashLogsAsync()
+        {
+            try
+            {
+                var json = await GetAllUsersAsync();
+                if (string.IsNullOrEmpty(json) || json == "null") return;
+
+                var users = Newtonsoft.Json.Linq.JObject.Parse(json);
+                foreach (var user in users.Properties())
+                {
+                    string username = user.Name;
+                    await _http.DeleteAsync($"{FirebaseUrl}/users/{SanitizeKey(username)}/crashes.json");
+                }
+
+                // Global crash loglarını da temizle
+                await _http.DeleteAsync($"{FirebaseUrl}/global_crashes.json");
+
+                App.Log("[Analytics] Tüm crash logları silindi.");
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Analytics DeleteAllCrash Error] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Firebase veritabanının tamamını JSON string olarak döndürür (GET /users.json).
+        /// </summary>
+        public static async Task<string?> ExportDatabaseAsync()
+        {
+            try
+            {
+                var resp = await _http.GetStringAsync($"{FirebaseUrl}/users.json");
+                App.Log("[Analytics] Veritabanı dışa aktarıldı.");
+                return resp;
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Analytics Export Error] {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// daysThreshold günden uzun süredir aktif olmayan kullanıcıları temizler.
+        /// profile/last_active tarihini kontrol eder, eski olanları DELETE ile siler.
+        /// Silinen kullanıcı sayısını döndürür.
+        /// </summary>
+        public static async Task<int> CleanInactiveUsersAsync(int daysThreshold)
+        {
+            int deletedCount = 0;
+            try
+            {
+                var json = await GetAllUsersAsync();
+                if (string.IsNullOrEmpty(json) || json == "null") return 0;
+
+                var users = Newtonsoft.Json.Linq.JObject.Parse(json);
+                var cutoffDate = DateTime.UtcNow.AddDays(-daysThreshold);
+
+                foreach (var user in users.Properties())
+                {
+                    string username = user.Name;
+                    try
+                    {
+                        var lastActiveStr = user.Value?["profile"]?["last_active"]?.ToString();
+                        if (string.IsNullOrEmpty(lastActiveStr)) continue;
+
+                        if (DateTime.TryParse(lastActiveStr, System.Globalization.CultureInfo.InvariantCulture,
+                            System.Globalization.DateTimeStyles.RoundtripKind, out DateTime lastActive))
+                        {
+                            if (lastActive < cutoffDate)
+                            {
+                                await _http.DeleteAsync($"{FirebaseUrl}/users/{SanitizeKey(username)}.json");
+                                deletedCount++;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Tek bir kullanıcı hata verirse devam et
+                    }
+                }
+
+                App.Log($"[Analytics] {deletedCount} aktif olmayan kullanıcı temizlendi (eşik: {daysThreshold} gün).");
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Analytics CleanInactive Error] {ex.Message}");
+            }
+            return deletedCount;
+        }
+
+        /// <summary>
+        /// Kullanıcının profile/gpu alanına GPU adını yazar (PATCH).
+        /// </summary>
+        public static async Task TrackGpuInfoAsync(string user, string gpuName)
+        {
+            try
+            {
+                var data = new { gpu = gpuName };
+                string patchJson = JsonConvert.SerializeObject(data);
+                var content = new StringContent(patchJson, Encoding.UTF8, "application/json");
+                var request = new HttpRequestMessage(new HttpMethod("PATCH"), $"{FirebaseUrl}/users/{SanitizeKey(user)}/profile.json")
+                {
+                    Content = content
+                };
+                await _http.SendAsync(request);
+
+                App.Log($"[Analytics] GPU bilgisi kaydedildi: {user} -> {gpuName}");
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Analytics GPU Error] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Seçilen yerel mod (.jar) dosyasını catbox.moe bulut sunucusuna yükler ve doğrudan indirme linkini döndürür.
+        /// </summary>
+        public static async Task<string> UploadFileToCatboxAsync(string filePath)
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
+            using var content = new MultipartFormDataContent();
+            
+            byte[] fileBytes = await System.IO.File.ReadAllBytesAsync(filePath);
+            var fileContent = new ByteArrayContent(fileBytes);
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            
+            content.Add(new StringContent("fileupload"), "reqtype");
+            content.Add(fileContent, "fileToUpload", System.IO.Path.GetFileName(filePath));
+            
+            var response = await client.PostAsync("https://catbox.moe/user/api.php", content);
+            response.EnsureSuccessStatusCode();
+            
+            string fileUrl = await response.Content.ReadAsStringAsync();
+            return fileUrl.Trim();
+        }
     }
 }
 

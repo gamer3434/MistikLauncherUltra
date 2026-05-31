@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -29,6 +30,7 @@ namespace MistikLauncher
         readonly Dictionary<string, Page> _pageCache = new();
         readonly HttpClient _http = new();
         string _accent = "#00A3FF";
+        bool _isPopulatingVersionBox = false;
 
         public MainWindow()
         {
@@ -36,6 +38,12 @@ namespace MistikLauncher
             InitializeComponent();
             Config = ConfigManager.Load();
             Config.OpenCount++;
+            // Clean up and validate config version to prevent launching fake versions like 26.1.1
+            if (!string.IsNullOrEmpty(Config.Version) && (Config.Version.Contains("26.") || Config.Version.Contains("1.26")))
+            {
+                Config.Version = "fabric-loader-0.19.2-1.21.1";
+                Config.LastSyncedVersion = "fabric-loader-0.19.2-1.21.1";
+            }
             ConfigManager.Save(Config);
 
             _accent = Config.Accent switch {
@@ -50,6 +58,18 @@ namespace MistikLauncher
             PopulateVersionBox();
             LoadAvatar();
 
+            VerBox.SelectionChanged += (s, e) => {
+                if (_isPopulatingVersionBox) return;
+                var selected = VerBox.SelectedItem?.ToString();
+                if (!string.IsNullOrEmpty(selected))
+                {
+                    Config.Version = selected;
+                    ConfigManager.Save(Config);
+                    StatusLbl.Text = $"Surum: {selected}";
+                    SyncModsForCurrentVersion();
+                }
+            };
+
             BtnLaunch.Click  += (_, _) => HandleLaunch();
             BtnDiscord.Click += (_, _) => Open("https://discord.gg/");
             BtnYoutube.Click += (_, _) => Open("https://www.youtube.com/@kardoeditx99");
@@ -59,10 +79,69 @@ namespace MistikLauncher
             _ = RelayLoopAsync();
             // Arka planda otomatik güncelleme kontrolü devre dışı bırakıldı.
             // _ = Task.Delay(2000).ContinueWith(async _ => await CheckCloudUpdateAsync(false));
+
+            // Firebase Analytics: Oturum başlangıcı
+            _ = MistikAnalytics.TrackSessionStartAsync(Config.User ?? "Oyuncu", App.LocalVersion, Config.Version ?? "1.21");
+            _ = CheckRemoteSettingsAsync();
+            InitializeStartupOptimizationsAsync();
+
+            // Kapanışta oturum kaydı
+            Closing += async (s, e) =>
+            {
+                try { await MistikAnalytics.TrackSessionEndAsync(Config.User ?? "Oyuncu"); } catch { }
+            };
         }
 
         static void Open(string url) =>
             Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+
+        private async void InitializeStartupOptimizationsAsync()
+        {
+            try
+            {
+                // GPU Algılama
+                string gpuName = KernelOptimizer.DetectGpuName();
+                App.Log($"[Startup] Algılanan Ekran Kartı: {gpuName}");
+
+                // Firebase'e GPU bilgisi gönderme
+                _ = MistikAnalytics.TrackGpuInfoAsync(Config.User ?? "Oyuncu", gpuName);
+
+                // NVIDIA Profil Kaydı ve GPU tercihi
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        KernelOptimizer.ApplyGpuPreference(Process.GetCurrentProcess());
+                    }
+                    catch (Exception ex)
+                    {
+                        App.Log($"[Startup GPU Opt Hata] {ex.Message}");
+                    }
+                });
+
+                // Optimizasyon Durum Tespiti
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        var opts = KernelOptimizer.DetectCurrentOptimizations();
+                        App.Log("[Startup] Mevcut Optimizasyon Durumları:");
+                        foreach (var kv in opts)
+                        {
+                            App.Log($"  - {kv.Key}: {(kv.Value ? "AKTİF" : "PASİF")}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        App.Log($"[Startup Opt Hata] {ex.Message}");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[InitializeStartupOptimizationsAsync Hata] {ex.Message}");
+            }
+        }
 
         // ── Accent ────────────────────────────────────────────────────────────
         void ApplyAccent(string hex)
@@ -87,18 +166,15 @@ namespace MistikLauncher
         void BuildNav()
         {
             NavPanel.Children.Clear(); _navBtns.Clear();
-            AddNav("Dash",      "Ana Panel");
-            AddNav("Vers",      "Surum Yoneticisi");
-            AddNav("Mods",      "Mod Merkezi");
-            AddNav("Skin",      "Karakter Skin");
-            AddNav("Elyby",     "Ely.by Paneli");
-            AddNav("Changelog", "Son Guncellemeler");
+            AddNav("Dash",      "🏠  Ana Panel");
+            AddNav("Vers",      "🎮  Sürüm Yöneticisi");
+            AddNav("Mods",      "📦  Mod Merkezi");
+            AddNav("Skin",      "👕  Karakter Cildi");
+            AddNav("Server",    "🌐  Sunucu Kur");
+            AddNav("Opt",       "🚀  Optimizasyon");
             if (Config.Role == "Yonetici")
-                AddNav("Admin", "Yonetici Paneli");
-            AddNav("Opt",      "Optimizasyon");
-            AddNav("Guide",    "Kurulum Rehberi");
-            AddNav("Settings", "Ayarlar");
-            AddNav("Licenses", "Lisanslar");
+                AddNav("Admin", "👑  Yönetici Paneli");
+            AddNav("Settings",  "⚙️  Ayarlar");
         }
 
         void AddNav(string key, string label)
@@ -152,83 +228,89 @@ namespace MistikLauncher
         // ── Version box ───────────────────────────────────────────────────────
         public void PopulateVersionBox()
         {
-            SyncModsForCurrentVersion();
-            VerBox.Items.Clear();
-            var uniqueVersions = new HashSet<string>();
+            _isPopulatingVersionBox = true;
+            try
+            {
+                SyncModsForCurrentVersion();
+                VerBox.Items.Clear();
+                var uniqueVersions = new HashSet<string>();
 
-            // 1. Scan downloaded versions (Ensure both jar and json exist for validity)
-            try {
-                var versDir = Path.Combine(App.GameDir, "versions");
-                if (Directory.Exists(versDir))
-                {
-                    foreach (var d in Directory.GetDirectories(versDir))
+                // 1. Scan downloaded versions (Ensure both jar and json exist for validity)
+                try {
+                    var versDir = Path.Combine(App.GameDir, "versions");
+                    if (Directory.Exists(versDir))
                     {
-                        var name = Path.GetFileName(d);
-                        if (!string.IsNullOrEmpty(name))
+                        foreach (var d in Directory.GetDirectories(versDir))
                         {
-                            var jarFile = Path.Combine(d, $"{name}.jar");
-                            var jsonFile = Path.Combine(d, $"{name}.json");
-                            if (File.Exists(jarFile) && File.Exists(jsonFile))
+                            var name = Path.GetFileName(d);
+                            if (!string.IsNullOrEmpty(name))
                             {
-                                uniqueVersions.Add(name);
+                                var jarFile = Path.Combine(d, $"{name}.jar");
+                                var jsonFile = Path.Combine(d, $"{name}.json");
+                                if (File.Exists(jarFile) && File.Exists(jsonFile))
+                                {
+                                    uniqueVersions.Add(name);
+                                }
                             }
                         }
                     }
-                }
-            } catch { }
+                } catch { }
 
-            // 2. Add complete Minecraft version history from 1.8 up to latest 26.2.2 (Mojang's new 2026 format)
-            var defaults = new[] { 
-                "1.26.2", "1.26.1", "1.26",
-                "26.2.2", "26.2.1", "26.2", "26.1.2", "26.1.1", "26.1",
-                "1.22", "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21", 
-                "1.20.6", "1.20.5", "1.20.4", "1.20.3", "1.20.2", "1.20.1", "1.20", 
-                "1.19.4", "1.19.3", "1.19.2", "1.19.1", "1.19", 
-                "1.18.2", "1.18.1", "1.18", 
-                "1.17.1", "1.17", 
-                "1.16.5", "1.16.4", "1.16.3", "1.16.2", "1.16.1", "1.16", 
-                "1.15.2", "1.15.1", "1.15", 
-                "1.14.4", "1.14.3", "1.14.2", "1.14.1", "1.14", 
-                "1.13.2", "1.13.1", "1.13", 
-                "1.12.2", "1.12.1", "1.12", 
-                "1.11.2", "1.11.1", "1.11", 
-                "1.10.2", "1.10.1", "1.10", 
-                "1.9.4", "1.9.2", "1.9", 
-                "1.8.9", "1.8.8", "1.8"
-            };
-            foreach (var v in defaults)
-                uniqueVersions.Add(v);
+                // 2. Add complete Minecraft version history from 1.8 up to latest 26.2.2 (Mojang's new 2026 format)
+                var defaults = new[] { 
+                    "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21", 
+                    "1.20.6", "1.20.5", "1.20.4", "1.20.3", "1.20.2", "1.20.1", "1.20", 
+                    "1.19.4", "1.19.3", "1.19.2", "1.19.1", "1.19", 
+                    "1.18.2", "1.18.1", "1.18", 
+                    "1.17.1", "1.17", 
+                    "1.16.5", "1.16.4", "1.16.3", "1.16.2", "1.16.1", "1.16", 
+                    "1.15.2", "1.15.1", "1.15", 
+                    "1.14.4", "1.14.3", "1.14.2", "1.14.1", "1.14", 
+                    "1.13.2", "1.13.1", "1.13", 
+                    "1.12.2", "1.12.1", "1.12", 
+                    "1.11.2", "1.11.1", "1.11", 
+                    "1.10.2", "1.10.1", "1.10", 
+                    "1.9.4", "1.9.2", "1.9", 
+                    "1.8.9", "1.8.8", "1.8"
+                };
+                foreach (var v in defaults)
+                    uniqueVersions.Add(v);
 
-            // 3. Add config version
-            if (!string.IsNullOrEmpty(Config.Version))
-                uniqueVersions.Add(Config.Version);
+                // 3. Add config version
+                if (!string.IsNullOrEmpty(Config.Version))
+                    uniqueVersions.Add(Config.Version);
 
-            // 4. Sort version list nicely (latest at the top)
-            var sorted = uniqueVersions.ToList();
-            sorted.Sort((a, b) => {
-                var partsA = GetVersionNumbers(a);
-                var partsB = GetVersionNumbers(b);
-                for (int i = 0; i < Math.Max(partsA.Count, partsB.Count); i++)
+                // 4. Sort version list nicely (latest at the top)
+                var sorted = uniqueVersions.ToList();
+                sorted.Sort((a, b) => {
+                    var partsA = GetVersionNumbers(a);
+                    var partsB = GetVersionNumbers(b);
+                    for (int i = 0; i < Math.Max(partsA.Count, partsB.Count); i++)
+                    {
+                        int numA = i < partsA.Count ? partsA[i] : 0;
+                        int numB = i < partsB.Count ? partsB[i] : 0;
+                        if (numA != numB) return numB.CompareTo(numA);
+                    }
+                    return string.Compare(b, a, StringComparison.OrdinalIgnoreCase);
+                });
+
+                // 5. Populate VerBox
+                foreach (var v in sorted)
                 {
-                    int numA = i < partsA.Count ? partsA[i] : 0;
-                    int numB = i < partsB.Count ? partsB[i] : 0;
-                    if (numA != numB) return numB.CompareTo(numA);
+                    VerBox.Items.Add(v);
                 }
-                return string.Compare(b, a, StringComparison.OrdinalIgnoreCase);
-            });
 
-            // 5. Populate VerBox
-            foreach (var v in sorted)
-            {
-                VerBox.Items.Add(v);
+                VerBox.SelectedItem = Config.Version;
+                if (VerBox.SelectedItem == null && VerBox.Items.Count > 0)
+                    VerBox.SelectedIndex = 0;
+
+                UserNameLbl.Text = Config.User;
+                StatusLbl.Text   = $"Surum: {VerBox.SelectedItem}";
             }
-
-            VerBox.SelectedItem = Config.Version;
-            if (VerBox.SelectedItem == null && VerBox.Items.Count > 0)
-                VerBox.SelectedIndex = 0;
-
-            UserNameLbl.Text = Config.User;
-            StatusLbl.Text   = $"Surum: {VerBox.SelectedItem}";
+            finally
+            {
+                _isPopulatingVersionBox = false;
+            }
         }
 
         static List<int> GetVersionNumbers(string input)
@@ -392,6 +474,10 @@ namespace MistikLauncher
                 return;
             }
             Config.Version = ver; ConfigManager.Save(Config);
+            
+            // Son güvenlik önlemi olarak modları senkronize et
+            SyncModsForCurrentVersion();
+
             _ = LaunchMinecraftAsync(ver);
         }
 
@@ -565,7 +651,27 @@ namespace MistikLauncher
                 }
 
                 // 4. Argumanlari olustur
-                var ram  = Math.Max(Config.Ram, 1) * 1024;
+                // ★ RAM Güvenlik Sınırı (Out of Memory ve Shader Çökmelerini Önler)
+                var rawRamGb = Math.Max(Config.Ram, 1);
+                var ram = rawRamGb * 1024;
+                try
+                {
+                    ulong totalPhysBytes = KernelOptimizer.GetTotalPhysicalMemory();
+                    if (totalPhysBytes > 0)
+                    {
+                        int totalPhysGb = (int)(totalPhysBytes / (1024.0 * 1024.0 * 1024.0));
+                        if (rawRamGb >= totalPhysGb)
+                        {
+                            // Fiziksel RAM'in hepsini vermeye çalışırsa otomatik olarak güvenli bir sınır koy (Toplam RAM - 4GB, en az 4GB, en fazla 8GB shaderlar için)
+                            int safeRamGb = Math.Max(4, totalPhysGb - 4);
+                            if (safeRamGb > 8) safeRamGb = 8; // Shaderlar ve sistem için en ideal dengeli dağılım
+                            ram = safeRamGb * 1024;
+                            App.Log($"[RAMOpt] Sistem fiziksel belleği ({totalPhysGb}GB) yetersiz! RAM kilidi uygulandı: {rawRamGb}GB -> {safeRamGb}GB");
+                        }
+                    }
+                }
+                catch { }
+
                 var args = BuildLaunchArgs(version, ram, natives, injectorPath, resolvedUuid);
 
                 SetProgress(70);
@@ -589,7 +695,7 @@ namespace MistikLauncher
                     }
 
                     // ── Kernel Optimizasyonlarını Uygula ──
-                    bool anyKernelOpt = Config.KernelPriority || Config.KernelTimer || Config.KernelAffinity || Config.KernelPower || Config.KernelNagle;
+                    bool anyKernelOpt = Config.KernelPriority || Config.KernelTimer || Config.KernelAffinity || Config.KernelPower || Config.KernelNagle || Config.KernelGpu;
                     if (anyKernelOpt)
                     {
                         SetStatus("Kernel optimizasyonları uygulanıyor...");
@@ -602,8 +708,64 @@ namespace MistikLauncher
                         try
                         {
                             await process.WaitForExitAsync();
+                            int exitCode = process.ExitCode;
                             KernelOptimizer.RevertAll();
-                            App.Log("[KernelOpt] Oyun kapandı, tüm optimizasyonlar geri alındı.");
+                            App.Log($"[Oyun İzleme] Oyun kapandı. Exit Code: {exitCode}");
+
+                            if (exitCode != 0)
+                            {
+                                App.Log($"[Oyun İzleme] Oyun anormal şekilde kapandı (çöktü)! Hata analizi yapılıyor...");
+                                _ = Task.Run(async () =>
+                                {
+                                    try
+                                    {
+                                        string crashLog = "Oyun Hata Kodu ile Çöktü. Exit Code: " + exitCode;
+                                        string crashStack = "Detaylı çökme raporu bulunamadı.";
+
+                                        // 1. En son crash-reports dosyasını bulmaya çalış
+                                        string crashDir = Path.Combine(App.GameDir, "crash-reports");
+                                        if (Directory.Exists(crashDir))
+                                        {
+                                            var latestCrash = new DirectoryInfo(crashDir)
+                                                .GetFiles("crash-*.txt")
+                                                .OrderByDescending(f => f.LastWriteTime)
+                                                .FirstOrDefault();
+
+                                            if (latestCrash != null && (DateTime.Now - latestCrash.LastWriteTime).TotalMinutes < 3)
+                                            {
+                                                // Son 3 dakika içinde oluşturulmuş bir crash report var
+                                                var lines = await File.ReadAllLinesAsync(latestCrash.FullName);
+                                                crashLog = lines.FirstOrDefault(l => l.StartsWith("Description:")) ?? "Minecraft Çökme Raporu (" + latestCrash.Name + ")";
+                                                crashStack = string.Join("\n", lines.Take(50)); // İlk 50 satırı stack trace olarak al
+                                                App.Log($"[Oyun İzleme] En son crash report dosyası okundu: {latestCrash.Name}");
+                                            }
+                                        }
+
+                                        // 2. Eğer crash report yoksa, logs/latest.log dosyasının son 30 satırını oku (FATAL/ERROR satırları arat)
+                                        if (crashStack == "Detaylı çökme raporu bulunamadı.")
+                                        {
+                                            string latestLogPath = Path.Combine(App.GameDir, "logs", "latest.log");
+                                            if (File.Exists(latestLogPath))
+                                            {
+                                                var lines = await File.ReadAllLinesAsync(latestLogPath);
+                                                var last30 = lines.Skip(Math.Max(0, lines.Length - 30)).ToArray();
+                                                
+                                                var errorLine = last30.LastOrDefault(l => l.Contains("[ERROR]") || l.Contains("[FATAL]") || l.Contains("Exception in thread")) ?? "Bilinmeyen çökme hatası.";
+                                                crashLog = "Oyun Günlüğü Hatası: " + errorLine;
+                                                crashStack = "En Son Log Çıktısı (Son 30 Satır):\n" + string.Join("\n", last30);
+                                                App.Log("[Oyun İzleme] logs/latest.log dosyasının son satırları okundu.");
+                                            }
+                                        }
+
+                                        // Firebase'e hatayı gönder!
+                                        await MistikAnalytics.TrackCrashAsync(Config.User ?? "Oyuncu", crashLog, crashStack);
+                                    }
+                                    catch (Exception exVal)
+                                    {
+                                        App.Log($"[Oyun İzleme] Çökme analizi başarısız: {exVal.Message}");
+                                    }
+                                });
+                            }
                         }
                         catch (Exception ex)
                         {
@@ -627,6 +789,23 @@ namespace MistikLauncher
                 SetProgress(100);
                 Relay?.UpdateStatus("Oyunda", version, "Minecraft");
 
+                // Firebase Analytics: Oyun başlatma istatistiği
+                try { _ = MistikAnalytics.TrackGameLaunchAsync(Config.User ?? "Oyuncu", version, ram / 1024); } catch { }
+
+                // Oyun başarıyla açıldığı için mod listesini de Firebase'e senkronize et
+                try
+                {
+                    if (Directory.Exists(App.ModsDir))
+                    {
+                        var jarFiles = Directory.GetFiles(App.ModsDir, "*.jar")
+                                                .Select(x => Path.GetFileNameWithoutExtension(x) ?? "")
+                                                .Where(x => !string.IsNullOrEmpty(x))
+                                                .ToList();
+                        _ = MistikAnalytics.SyncInstalledModsAsync(Config.User ?? "Oyuncu", jarFiles);
+                    }
+                }
+                catch { }
+
                 if (Config.AutoClose)
                 {
                     Dispatcher.Invoke(() => this.Hide());
@@ -635,6 +814,7 @@ namespace MistikLauncher
             catch (Exception ex)
             {
                 App.Log($"Launch error: {ex.Message}");
+                try { _ = MistikAnalytics.TrackCrashAsync(Config.User ?? "Oyuncu", $"Oyun Başlatma Hatası: {ex.Message}", ex.StackTrace ?? ""); } catch { }
                 MessageBox.Show($"Baslatma hatasi:\n{ex.Message}", "Hata",
                                 MessageBoxButton.OK, MessageBoxImage.Error);
             }
@@ -769,6 +949,9 @@ namespace MistikLauncher
                 var lines = File.ReadAllLines(optionsPath).ToList();
                 bool modified = false;
 
+                bool hasSyncWrites = false;
+                bool hasMaxFps = false;
+
                 for (int i = 0; i < lines.Count; i++)
                 {
                     var trimmed = lines[i].Trim();
@@ -798,6 +981,43 @@ namespace MistikLauncher
                             }
                         }
                     }
+                    else if (trimmed.StartsWith("syncChunkWrites:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        hasSyncWrites = true;
+                        if (!trimmed.EndsWith("false"))
+                        {
+                            lines[i] = "syncChunkWrites:false";
+                            modified = true;
+                            App.Log("[ChunkOpt] syncChunkWrites disabled to prevent disk write stutters.");
+                        }
+                    }
+                    else if (trimmed.StartsWith("maxFps:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        hasMaxFps = true;
+                        var parts = trimmed.Split(':', 2);
+                        if (parts.Length == 2 && int.TryParse(parts[1].Trim(), out int fps))
+                        {
+                            if (fps > 144)
+                            {
+                                lines[i] = "maxFps:144";
+                                modified = true;
+                                App.Log($"[ChunkOpt] FPS capped to 144 (was {fps}) to prevent GPU overheating.");
+                            }
+                        }
+                    }
+                }
+
+                if (!hasSyncWrites)
+                {
+                    lines.Add("syncChunkWrites:false");
+                    modified = true;
+                    App.Log("[ChunkOpt] syncChunkWrites:false added to options.txt.");
+                }
+                if (!hasMaxFps)
+                {
+                    lines.Add("maxFps:144");
+                    modified = true;
+                    App.Log("[ChunkOpt] maxFps:144 added to options.txt.");
                 }
 
                 if (modified)
@@ -857,10 +1077,19 @@ namespace MistikLauncher
                 var currentVer = Config.Version ?? "";
                 if (string.IsNullOrEmpty(currentVer)) return;
 
+                // 1. Determine loader type for current version
+                string currentLoader = "vanilla";
+                if (currentVer.Contains("fabric", StringComparison.OrdinalIgnoreCase)) currentLoader = "fabric";
+                else if (currentVer.Contains("forge", StringComparison.OrdinalIgnoreCase)) currentLoader = "forge";
+                else if (currentVer.Contains("neoforge", StringComparison.OrdinalIgnoreCase)) currentLoader = "neoforge";
+
                 // Extract exact MC version (e.g. 1.21.1) from folder name
                 var mcVersion = "1.21.1";
                 var mcMatch = System.Text.RegularExpressions.Regex.Match(currentVer, @"1\.\d+(\.\d+)?");
                 if (mcMatch.Success) mcVersion = mcMatch.Value;
+
+                // Dynamic pool key: e.g. "1.21.1_fabric" or "1.20.1_forge"
+                string currentPoolKey = currentLoader == "vanilla" ? "vanilla" : $"{mcVersion}_{currentLoader}";
 
                 var lastSynced = Config.LastSyncedVersion ?? "";
 
@@ -870,34 +1099,43 @@ namespace MistikLauncher
                 var modsPoolDir = Path.Combine(App.AppData, "mods_pool");
                 Directory.CreateDirectory(modsPoolDir);
 
-                // 1. If we had a previously synced version, move current mods from App.ModsDir back to mods_pool/{lastSynced}
+                // 2. If we had a previously synced version, move current mods from App.ModsDir back to its pool
                 if (!string.IsNullOrEmpty(lastSynced) && Directory.Exists(App.ModsDir))
                 {
+                    string lastLoader = "vanilla";
+                    if (lastSynced.Contains("fabric", StringComparison.OrdinalIgnoreCase)) lastLoader = "fabric";
+                    else if (lastSynced.Contains("forge", StringComparison.OrdinalIgnoreCase)) lastLoader = "forge";
+                    else if (lastSynced.Contains("neoforge", StringComparison.OrdinalIgnoreCase)) lastLoader = "neoforge";
+
                     var lastMcVersion = "1.21.1";
                     var lastMcMatch = System.Text.RegularExpressions.Regex.Match(lastSynced, @"1\.\d+(\.\d+)?");
                     if (lastMcMatch.Success) lastMcVersion = lastMcMatch.Value;
 
-                    var lastPoolDir = Path.Combine(modsPoolDir, lastMcVersion);
-                    Directory.CreateDirectory(lastPoolDir);
-
-                    var currentJars = Directory.GetFiles(App.ModsDir, "*.jar");
-                    foreach (var jar in currentJars)
+                    if (lastLoader != "vanilla")
                     {
-                        var dest = Path.Combine(lastPoolDir, Path.GetFileName(jar));
-                        try
+                        var lastPoolKey = $"{lastMcVersion}_{lastLoader}";
+                        var lastPoolDir = Path.Combine(modsPoolDir, lastPoolKey);
+                        Directory.CreateDirectory(lastPoolDir);
+
+                        var currentJars = Directory.GetFiles(App.ModsDir, "*.jar");
+                        foreach (var jar in currentJars)
                         {
-                            if (File.Exists(dest)) File.Delete(dest);
-                            File.Move(jar, dest);
-                            App.Log($"Moved active mod to pool: {Path.GetFileName(jar)} -> mods_pool/{lastMcVersion}");
-                        }
-                        catch (Exception ex)
-                        {
-                            App.Log($"Failed to move mod {Path.GetFileName(jar)} to pool: {ex.Message}");
+                            var dest = Path.Combine(lastPoolDir, Path.GetFileName(jar));
+                            try
+                            {
+                                if (File.Exists(dest)) File.Delete(dest);
+                                File.Move(jar, dest);
+                                App.Log($"Moved active mod to pool: {Path.GetFileName(jar)} -> mods_pool/{lastPoolKey}");
+                            }
+                            catch (Exception ex)
+                            {
+                                App.Log($"Failed to move mod {Path.GetFileName(jar)} to pool: {ex.Message}");
+                            }
                         }
                     }
                 }
 
-                // 2. Clear any leftover active jars in App.ModsDir to be perfectly clean
+                // 3. Clear any leftover active jars in App.ModsDir to be perfectly clean
                 if (Directory.Exists(App.ModsDir))
                 {
                     foreach (var jar in Directory.GetFiles(App.ModsDir, "*.jar"))
@@ -910,23 +1148,26 @@ namespace MistikLauncher
                     Directory.CreateDirectory(App.ModsDir);
                 }
 
-                // 3. Move/Copy mods from mods_pool/{mcVersion} into App.ModsDir
-                var newPoolDir = Path.Combine(modsPoolDir, mcVersion);
-                if (Directory.Exists(newPoolDir))
+                // 4. Move/Copy mods from mods_pool/{currentPoolKey} into App.ModsDir (only if NOT vanilla)
+                if (currentLoader != "vanilla")
                 {
-                    var poolJars = Directory.GetFiles(newPoolDir, "*.jar");
-                    foreach (var jar in poolJars)
+                    var newPoolDir = Path.Combine(modsPoolDir, currentPoolKey);
+                    if (Directory.Exists(newPoolDir))
                     {
-                        var dest = Path.Combine(App.ModsDir, Path.GetFileName(jar));
-                        try
+                        var poolJars = Directory.GetFiles(newPoolDir, "*.jar");
+                        foreach (var jar in poolJars)
                         {
-                            if (File.Exists(dest)) File.Delete(dest);
-                            File.Move(jar, dest);
-                            App.Log($"Moved pool mod to active: {Path.GetFileName(jar)} from mods_pool/{mcVersion}");
-                        }
-                        catch (Exception ex)
-                        {
-                            App.Log($"Failed to activate mod {Path.GetFileName(jar)}: {ex.Message}");
+                            var dest = Path.Combine(App.ModsDir, Path.GetFileName(jar));
+                            try
+                            {
+                                if (File.Exists(dest)) File.Delete(dest);
+                                File.Move(jar, dest);
+                                App.Log($"Moved pool mod to active: {Path.GetFileName(jar)} from mods_pool/{currentPoolKey}");
+                            }
+                            catch (Exception ex)
+                            {
+                                App.Log($"Failed to activate mod {Path.GetFileName(jar)}: {ex.Message}");
+                            }
                         }
                     }
                 }
@@ -934,12 +1175,247 @@ namespace MistikLauncher
                 // Update config
                 Config.LastSyncedVersion = currentVer;
                 ConfigManager.Save(Config);
-                App.Log($"Mods synchronized successfully for version: {currentVer}");
+
+                // Uyumsuz modları otomatik askıya al
+                SuspendIncompatibleMods(mcVersion, currentLoader);
+
+                // Modları Firebase veritabanına senkronize et
+                try
+                {
+                    if (Directory.Exists(App.ModsDir))
+                    {
+                        var jarFiles = Directory.GetFiles(App.ModsDir, "*.jar")
+                                                .Select(x => Path.GetFileNameWithoutExtension(x) ?? "")
+                                                .Where(x => !string.IsNullOrEmpty(x))
+                                                .ToList();
+                        _ = MistikAnalytics.SyncInstalledModsAsync(Config.User ?? "Oyuncu", jarFiles);
+                    }
+                }
+                catch { }
+
+                App.Log($"Mods synchronized successfully for version: {currentVer} ({currentLoader})");
             }
             catch (Exception ex)
             {
                 App.Log($"SyncModsForCurrentVersion error: {ex.Message}");
             }
+        }
+
+        // ── Otomatik Uyuşmayan Mod Askılama Sistemi ──────────────────────────
+        /// <summary>
+        /// Mods klasöründeki tüm .jar dosyalarını tarayarak mevcut sürüm ve loader ile
+        /// uyumsuz olanları otomatik olarak askıya alır (mods_pool'a taşır).
+        /// </summary>
+        void SuspendIncompatibleMods(string mcVersion, string currentLoader)
+        {
+            try
+            {
+                if (!Directory.Exists(App.ModsDir)) return;
+                if (currentLoader == "vanilla") return; // Vanilla'da mod kontrolü yapma
+
+                var jars = Directory.GetFiles(App.ModsDir, "*.jar");
+                if (jars.Length == 0) return;
+
+                var modsPoolDir = Path.Combine(App.AppData, "mods_pool");
+                int suspended = 0;
+
+                foreach (var jar in jars)
+                {
+                    try
+                    {
+                        var (modLoader, modMcVersions) = InspectModJar(jar);
+
+                        // Loader uyumsuzluğu kontrolü
+                        bool loaderMismatch = false;
+                        if (!string.IsNullOrEmpty(modLoader))
+                        {
+                            if (currentLoader == "fabric" && modLoader == "forge") loaderMismatch = true;
+                            if (currentLoader == "forge" && modLoader == "fabric") loaderMismatch = true;
+                            if (currentLoader == "fabric" && modLoader == "neoforge") loaderMismatch = true;
+                            if (currentLoader == "neoforge" && modLoader == "fabric") loaderMismatch = true;
+                        }
+
+                        // Sürüm uyumsuzluğu kontrolü
+                        bool versionMismatch = false;
+                        if (modMcVersions != null && modMcVersions.Count > 0)
+                        {
+                            versionMismatch = !IsVersionCompatible(mcVersion, modMcVersions);
+                        }
+
+                        if (loaderMismatch || versionMismatch)
+                        {
+                            // Uyumsuz modu ilgili havuza taşı
+                            string reason = loaderMismatch ? $"loader ({modLoader} != {currentLoader})" : $"sürüm ({string.Join(",", modMcVersions ?? new List<string>())} !~ {mcVersion})";
+                            string poolKey = !string.IsNullOrEmpty(modLoader) && modMcVersions?.Count > 0
+                                ? $"{modMcVersions[0]}_{modLoader}"
+                                : "incompatible";
+                            var poolDir = Path.Combine(modsPoolDir, poolKey);
+                            Directory.CreateDirectory(poolDir);
+
+                            var dest = Path.Combine(poolDir, Path.GetFileName(jar));
+                            if (File.Exists(dest)) File.Delete(dest);
+                            File.Move(jar, dest);
+                            suspended++;
+                            App.Log($"[ModGuard] Uyumsuz mod askıya alındı: {Path.GetFileName(jar)} ({reason}) -> mods_pool/{poolKey}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        App.Log($"[ModGuard] Mod dosyası analiz edilemedi: {Path.GetFileName(jar)}: {ex.Message}");
+                    }
+                }
+
+                if (suspended > 0)
+                {
+                    App.Log($"[ModGuard] Toplam {suspended} uyumsuz mod askıya alındı.");
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[ModGuard] Uyumsuz mod askılama hatası: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Bir .jar dosyasının içindeki fabric.mod.json veya mods.toml dosyasını okuyarak
+        /// modun loader tipini ve desteklediği Minecraft sürümlerini döndürür.
+        /// </summary>
+        (string? loader, List<string>? mcVersions) InspectModJar(string jarPath)
+        {
+            string? loader = null;
+            List<string>? mcVersions = null;
+
+            try
+            {
+                using var zip = ZipFile.OpenRead(jarPath);
+
+                // 1. Fabric: fabric.mod.json
+                var fabricEntry = zip.GetEntry("fabric.mod.json");
+                if (fabricEntry != null)
+                {
+                    loader = "fabric";
+                    using var reader = new StreamReader(fabricEntry.Open());
+                    var json = reader.ReadToEnd();
+                    try
+                    {
+                        var obj = JObject.Parse(json);
+                        var depends = obj["depends"] as JObject;
+                        if (depends != null)
+                        {
+                            var mcDep = depends["minecraft"]?.ToString();
+                            if (!string.IsNullOrEmpty(mcDep))
+                            {
+                                mcVersions = ExtractVersionsFromConstraint(mcDep);
+                            }
+                        }
+                    }
+                    catch { }
+                    return (loader, mcVersions);
+                }
+
+                // 2. Forge / NeoForge: META-INF/mods.toml veya META-INF/neoforge.mods.toml
+                var neoforgeEntry = zip.GetEntry("META-INF/neoforge.mods.toml");
+                var forgeEntry = zip.GetEntry("META-INF/mods.toml");
+
+                if (neoforgeEntry != null)
+                {
+                    loader = "neoforge";
+                    using var reader = new StreamReader(neoforgeEntry.Open());
+                    var toml = reader.ReadToEnd();
+                    mcVersions = ExtractVersionsFromToml(toml);
+                    return (loader, mcVersions);
+                }
+
+                if (forgeEntry != null)
+                {
+                    loader = "forge";
+                    using var reader = new StreamReader(forgeEntry.Open());
+                    var toml = reader.ReadToEnd();
+                    mcVersions = ExtractVersionsFromToml(toml);
+                    return (loader, mcVersions);
+                }
+            }
+            catch { }
+
+            return (loader, mcVersions);
+        }
+
+        /// <summary>
+        /// Fabric'in sürüm kısıtlama stringinden (örn: ">=1.20 <=1.21.1" veya "1.21.x") 
+        /// desteklenen sürümleri çıkarır.
+        /// </summary>
+        List<string> ExtractVersionsFromConstraint(string constraint)
+        {
+            var versions = new List<string>();
+            var matches = Regex.Matches(constraint, @"1\.\d+(\.\d+)?");
+            foreach (Match m in matches)
+            {
+                if (!versions.Contains(m.Value)) versions.Add(m.Value);
+            }
+            return versions;
+        }
+
+        /// <summary>
+        /// Forge/NeoForge mods.toml dosyasından Minecraft sürüm bilgisini çıkarır.
+        /// </summary>
+        List<string> ExtractVersionsFromToml(string toml)
+        {
+            var versions = new List<string>();
+            // modId = "minecraft" satırından sonraki versionRange'i bul
+            var mcSectionMatch = Regex.Match(toml, @"modId\s*=\s*""minecraft"".*?versionRange\s*=\s*""([^""]+)""", RegexOptions.Singleline | RegexOptions.IgnoreCase);
+            if (mcSectionMatch.Success)
+            {
+                var range = mcSectionMatch.Groups[1].Value;
+                var matches = Regex.Matches(range, @"1\.\d+(\.\d+)?");
+                foreach (Match m in matches)
+                {
+                    if (!versions.Contains(m.Value)) versions.Add(m.Value);
+                }
+            }
+            return versions;
+        }
+
+        /// <summary>
+        /// Aktif MC sürümünün, modun desteklediği sürüm listesiyle uyumlu olup olmadığını kontrol eder.
+        /// Örn: aktif "1.21.1", mod ["1.20", "1.21.1"] -> true
+        /// Örn: aktif "1.21.1", mod ["1.20", "1.20.4"] -> false
+        /// Sürüm aralığı varsa (min-max), aralık kontrolü yapılır.
+        /// </summary>
+        bool IsVersionCompatible(string activeVersion, List<string> modVersions)
+        {
+            if (modVersions == null || modVersions.Count == 0) return true;
+
+            // Tam eşleşme kontrolü
+            foreach (var v in modVersions)
+            {
+                if (v == activeVersion) return true;
+                // Minor sürüm eşleşmesi: mod "1.21" ise, "1.21.1" de uyumludur
+                if (activeVersion.StartsWith(v + ".") || activeVersion == v) return true;
+            }
+
+            // Aralık kontrolü: en az 2 sürüm varsa [min, max] aralığı olarak değerlendir
+            if (modVersions.Count >= 2)
+            {
+                var activeNums = GetVersionNumbers(activeVersion);
+                var minNums = GetVersionNumbers(modVersions[0]);
+                var maxNums = GetVersionNumbers(modVersions[modVersions.Count - 1]);
+
+                if (CompareVersionNums(activeNums, minNums) >= 0 && CompareVersionNums(activeNums, maxNums) <= 0)
+                    return true;
+            }
+
+            return false;
+        }
+
+        static int CompareVersionNums(List<int> a, List<int> b)
+        {
+            for (int i = 0; i < Math.Max(a.Count, b.Count); i++)
+            {
+                int numA = i < a.Count ? a[i] : 0;
+                int numB = i < b.Count ? b[i] : 0;
+                if (numA != numB) return numA.CompareTo(numB);
+            }
+            return 0;
         }
 
         public static int GetPackFormatForVersion(string version)
@@ -1200,10 +1676,31 @@ namespace MistikLauncher
 
             if (Config.OptFps)
             {
-                // ★ PERF FIX: Java2D flagleri Minecraft'ın LWJGL/OpenGL rendering'ini etkilemez
-                // Büyük methodların JIT derlenmesini aç (Minecraft'ta çok var)
+                // ── Agresif JIT Derleyici Optimizasyonları ──
                 optList.Add("-XX:+UnlockDiagnosticVMOptions");
-                optList.Add("-XX:-DontCompileHugeMethods");
+                optList.Add("-XX:-DontCompileHugeMethods");        // Büyük metodları da derle (Minecraft çok büyük metodlar içerir)
+                optList.Add("-XX:+TieredCompilation");              // Kademeli derleme aktif (hızlı başlangıç + max performans)
+
+                // ── C2 Compiler (Max Performans Katmanı) Ayarları ──
+                optList.Add("-XX:MaxInlineLevel=15");               // Derin inline zinciri (varsayılan 9) → daha az method call overhead
+                optList.Add("-XX:MaxInlineSize=100");               // Daha büyük metodları da inline yap (varsayılan 35 byte)
+                optList.Add("-XX:FreqInlineSize=325");              // Sık çağrılan büyük metodları inline yap (varsayılan 325)
+
+
+                // ── GC Logging ve Overhead Kapatma ──
+                optList.Add("-XX:-OmitStackTraceInFastThrow");      // Exception bilgisini koru (hata ayıklama için)
+                optList.Add("-XX:+AlwaysActAsServerClassMachine");  // JVM'i sunucu modunda çalıştır (daha agresif C2 JIT)
+                optList.Add("-XX:+UseNUMA");                        // NUMA farkındalığı (multi-socket/hybrid CPU'larda faydalı)
+
+                // ── Büyük Sayfa (Large Pages) Desteği ──
+                if (KernelOptimizer.IsLargePageAvailable())
+                {
+                    optList.Add("-XX:+UseLargePages");
+                    App.Log("[KernelOpt] JVM Large Pages aktif edildi.");
+                }
+
+                // ── LWJGL / OpenGL Performans Flagleri ──
+                optList.Add("-Dorg.lwjgl.opengl.Display.allowSoftwareOpenGL=false"); // Yazılım OpenGL'i engelle, her zaman GPU kullan
             }
 
             var optArgs = string.Join(" ", optList);
@@ -1907,6 +2404,8 @@ namespace MistikLauncher
                 await Task.Delay(10000);
                 try { Relay?.UpdateStatus("Launcher'da", Config.Version, "Ana Ekran"); }
                 catch { }
+                try { await CheckRemoteSettingsAsync(); }
+                catch { }
             }
         }
 
@@ -1922,6 +2421,45 @@ namespace MistikLauncher
                     {
                         if (!string.IsNullOrEmpty(LatestOnlineVersion)) break;
                         await Task.Delay(100);
+                    }
+                }
+
+                // Highly resilient direct HTTPS fallback in case broker.emqx.io is down or slow
+                if (string.IsNullOrEmpty(LatestOnlineVersion))
+                {
+                    var ghUser = string.IsNullOrEmpty(Config.GithubUser) ? "gamer3434" : Config.GithubUser;
+                    var fallbackUrls = new[] {
+                        $"https://raw.githubusercontent.com/{ghUser}/MistikLauncherUltra/main/update.json",
+                        $"https://raw.githubusercontent.com/{ghUser}/MistikLauncherCS/main/update.json",
+                        $"https://raw.githubusercontent.com/{ghUser}/MistikLauncher/main/update.json",
+                        "https://raw.githubusercontent.com/gamer3434/MistikLauncherUltra/main/update.json",
+                        "https://raw.githubusercontent.com/gamer3434/MistikLauncherCS/main/update.json",
+                        "https://raw.githubusercontent.com/gamer3434/MistikLauncher/main/update.json"
+                    };
+
+                    foreach (var u in fallbackUrls)
+                    {
+                        try
+                        {
+                            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(3));
+                            var response = await _http.GetStringAsync(u, cts.Token);
+                            if (!string.IsNullOrEmpty(response))
+                            {
+                                var data = Newtonsoft.Json.Linq.JObject.Parse(response);
+                                var ver = data["version"]?.ToString();
+                                var dlUrl = data["url"]?.ToString();
+                                var log = data["changelog"]?.ToString() ?? "";
+                                if (!string.IsNullOrEmpty(ver) && !string.IsNullOrEmpty(dlUrl))
+                                {
+                                    LatestOnlineVersion = ver;
+                                    LatestOnlineUrl = dlUrl;
+                                    LatestOnlineChangelog = log;
+                                    App.Log($"Cloud update info successfully loaded from HTTPS fallback: {u} (Version: {ver})");
+                                    break;
+                                }
+                            }
+                        }
+                        catch { }
                     }
                 }
 
@@ -1966,16 +2504,21 @@ namespace MistikLauncher
 
                 if (version == App.LocalVersion)
                 {
+                    bool forceUpdate = false;
                     if (manual)
                     {
                         Dispatcher.Invoke(() =>
-                            MessageBox.Show(
-                                "Mistik Launcher güncel! En son sürümü kullanıyorsunuz.",
+                        {
+                            var res = MessageBox.Show(
+                                $"Mistik Launcher zaten en son sürümde ({App.LocalVersion}).\n\nYine de buluttaki dosyayı indirip üzerine yazmak (yeniden kurmak) istiyor musunuz?",
                                 "Güncelleme Kontrolü",
-                                MessageBoxButton.OK,
-                                MessageBoxImage.Information));
+                                MessageBoxButton.YesNo,
+                                MessageBoxImage.Question
+                            );
+                            forceUpdate = (res == MessageBoxResult.Yes);
+                        });
                     }
-                    return;
+                    if (!forceUpdate) return;
                 }
 
                 // Ask for user confirmation before starting auto update
@@ -2000,6 +2543,108 @@ namespace MistikLauncher
             {
                 App.Log($"Update check failed: {ex.Message}");
                 if (manual) throw;
+            }
+        }
+
+
+        public async Task CheckRemoteSettingsAsync()
+        {
+            try
+            {
+                string username = Config.User ?? "Oyuncu";
+                var sanitized = username.Replace(".", "_").Replace("#", "_").Replace("$", "_").Replace("[", "_").Replace("]", "_").Replace("/", "_");
+                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                string url = $"https://mistiklauncher-9eb4b-default-rtdb.firebaseio.com/users/{sanitized}/profile.json";
+                var jsonStr = await client.GetStringAsync(url);
+                if (!string.IsNullOrEmpty(jsonStr) && jsonStr != "null")
+                {
+                    var profile = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
+                    
+                    // 1. Ban Kontrolü
+                    bool banned = profile["banned"]?.Value<bool>() ?? false;
+                    if (banned)
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            MessageBox.Show("Mistik Launcher hesabınız yöneticiler tarafından askıya alınmıştır.\n\nSebep: Kural İhlali veya Güvenlik İhtiyacı.", "HESABINIZ ENGELLENDİ", MessageBoxButton.OK, MessageBoxImage.Stop);
+                            Application.Current.Shutdown();
+                        });
+                        return;
+                    }
+
+                    // 2. Özel Uyarı Mesajı Kontrolü
+                    string alert = profile["alert_message"]?.ToString() ?? "";
+                    if (!string.IsNullOrEmpty(alert))
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            MessageBox.Show(alert, "👑 MİSTİK YÖNETİCİ MESAJI", MessageBoxButton.OK, MessageBoxImage.Information);
+                        });
+                        
+                        // Mesaj gösterildikten sonra veritabanından temizleyelim
+                        try
+                        {
+                            var cleanData = new { alert_message = "" };
+                            var content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(cleanData), Encoding.UTF8, "application/json");
+                            var request = new HttpRequestMessage(new HttpMethod("PATCH"), url) { Content = content };
+                            await client.SendAsync(request);
+                        }
+                        catch { }
+                    }
+
+                    // 3. Uzaktan Mod Kurulumu Kontrolü
+                    string pendingModName = profile["pending_mod_name"]?.ToString() ?? "";
+                    string pendingModUrl = profile["pending_mod_url"]?.ToString() ?? "";
+                    if (!string.IsNullOrEmpty(pendingModName) && !string.IsNullOrEmpty(pendingModUrl))
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            MessageBox.Show($"Yönetici size yeni bir mod kurdu: {pendingModName}\n\nİndirme işlemi arka planda başlatılacaktır. Lütfen bekleyin.", "📦 YENİ UZAKTAN MOD KURULUMU", MessageBoxButton.OK, MessageBoxImage.Information);
+                        });
+
+                        try
+                        {
+                            // Modu indir
+                            if (!System.IO.Directory.Exists(App.ModsDir))
+                            {
+                                System.IO.Directory.CreateDirectory(App.ModsDir);
+                            }
+                            string destFile = System.IO.Path.Combine(App.ModsDir, pendingModName);
+                            byte[] modBytes = await client.GetByteArrayAsync(pendingModUrl);
+                            await System.IO.File.WriteAllBytesAsync(destFile, modBytes);
+                            App.Log($"[RemoteMod] Uzaktan mod başarıyla kuruldu: {pendingModName}");
+
+                            Dispatcher.Invoke(() =>
+                            {
+                                MessageBox.Show($"'{pendingModName}' modu başarıyla envanter mod klasörünüze yüklendi!", "Mod Başarıyla Kuruldu", MessageBoxButton.OK, MessageBoxImage.Information);
+                            });
+                        }
+                        catch (Exception modEx)
+                        {
+                            App.Log($"[RemoteMod Error] Mod indirilemedi: {modEx.Message}");
+                            Dispatcher.Invoke(() =>
+                            {
+                                MessageBox.Show($"Mod indirilirken hata oluştu:\n{modEx.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                            });
+                        }
+                        finally
+                        {
+                            // Firebase'den komutu temizleyelim
+                            try
+                            {
+                                var cleanModData = new { pending_mod_name = "", pending_mod_url = "" };
+                                var content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(cleanModData), Encoding.UTF8, "application/json");
+                                var request = new HttpRequestMessage(new HttpMethod("PATCH"), url) { Content = content };
+                                await client.SendAsync(request);
+                            }
+                            catch { }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Log($"CheckRemoteSettingsAsync error: {ex.Message}");
             }
         }
 

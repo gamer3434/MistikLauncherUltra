@@ -79,10 +79,19 @@ namespace MistikLauncher
 
             base.OnStartup(e);
 
+            EnsureNvidiaAndWindowsRegistration();
+
             // Global hata yakalayıcı — crash log yazar
             DispatcherUnhandledException += (_, ex) =>
             {
                 WriteCrash(ex.Exception);
+                try
+                {
+                    string user = "Oyuncu";
+                    try { user = ConfigManager.Load().User ?? "Oyuncu"; } catch { }
+                    _ = MistikAnalytics.TrackCrashAsync(user, "Global WPF Hata: " + ex.Exception.Message, ex.Exception.StackTrace ?? "");
+                }
+                catch { }
                 ex.Handled = true;
                 MessageBox.Show($"Hata:\n{ex.Exception.Message}\n\nDetay: Desktop\\mistik_crash.log",
                     "Mistik Launcher Hatası", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -90,7 +99,18 @@ namespace MistikLauncher
 
             AppDomain.CurrentDomain.UnhandledException += (_, ex) =>
             {
-                WriteCrash(ex.ExceptionObject as Exception);
+                var exception = ex.ExceptionObject as Exception;
+                WriteCrash(exception);
+                if (exception != null)
+                {
+                    try
+                    {
+                        string user = "Oyuncu";
+                        try { user = ConfigManager.Load().User ?? "Oyuncu"; } catch { }
+                        _ = MistikAnalytics.TrackCrashAsync(user, "Global AppDomain Hata: " + exception.Message, exception.StackTrace ?? "");
+                    }
+                    catch { }
+                }
             };
         }
 
@@ -100,6 +120,99 @@ namespace MistikLauncher
             {
                 string log = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "mistik_crash.log");
                 File.AppendAllText(log, $"\n=== {DateTime.Now} ===\n{ex}\n");
+            }
+            catch { }
+        }
+
+        private static void CreateShortcut(string folderPath, string linkName, string targetPath, string workDir)
+        {
+            try
+            {
+                string linkPath = Path.Combine(folderPath, linkName);
+                if (File.Exists(linkPath)) return;
+
+                Type? shellType = Type.GetTypeFromProgID("WScript.Shell");
+                if (shellType != null)
+                {
+                    dynamic shell = Activator.CreateInstance(shellType)!;
+                    dynamic shortcut = shell.CreateShortcut(linkPath);
+                    shortcut.TargetPath = targetPath;
+                    shortcut.WorkingDirectory = workDir;
+                    shortcut.IconLocation = targetPath + ",0";
+                    shortcut.Save();
+                }
+            }
+            catch { }
+        }
+
+        private static void EnsureNvidiaAndWindowsRegistration()
+        {
+            try
+            {
+                string appDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".mistik_ultra");
+                string officialExePath = Path.Combine(appDataFolder, "MistikLauncher.exe");
+                string currentExePath = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                
+                string exeToRegister = File.Exists(officialExePath) ? officialExePath : currentExePath;
+                string dirToRegister = File.Exists(officialExePath) ? appDataFolder : Path.GetDirectoryName(currentExePath) ?? appDataFolder;
+
+                // 1. Windows Uninstall Kayıt Defteri (NVIDIA App & GeForce Experience tespiti için en kritik kısım)
+                using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\MistikClient"))
+                {
+                    if (key != null)
+                    {
+                        key.SetValue("DisplayName", "Mistik Launcher", Microsoft.Win32.RegistryValueKind.String);
+                        key.SetValue("DisplayIcon", exeToRegister + ",0", Microsoft.Win32.RegistryValueKind.String);
+                        key.SetValue("DisplayVersion", "5.0.0", Microsoft.Win32.RegistryValueKind.String);
+                        key.SetValue("Publisher", "Mistik", Microsoft.Win32.RegistryValueKind.String);
+                        key.SetValue("InstallLocation", dirToRegister, Microsoft.Win32.RegistryValueKind.String);
+                        key.SetValue("UninstallString", $"\"{exeToRegister}\" --uninstall", Microsoft.Win32.RegistryValueKind.String);
+                        key.SetValue("NoModify", 1, Microsoft.Win32.RegistryValueKind.DWord);
+                        key.SetValue("NoRepair", 1, Microsoft.Win32.RegistryValueKind.DWord);
+                    }
+                }
+
+                // 1.5. Windows App Paths Kayıt Defteri (NVIDIA App'in doğrudan yürütülebilir dosyaları keşfetmesini sağlar)
+                try
+                {
+                    using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\App Paths\MistikLauncher.exe"))
+                    {
+                        if (key != null)
+                        {
+                            key.SetValue("", exeToRegister, Microsoft.Win32.RegistryValueKind.String);
+                            key.SetValue("Path", dirToRegister, Microsoft.Win32.RegistryValueKind.String);
+                        }
+                    }
+                    using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\App Paths\MistikLauncherUltra.exe"))
+                    {
+                        if (key != null)
+                        {
+                            key.SetValue("", exeToRegister, Microsoft.Win32.RegistryValueKind.String);
+                            key.SetValue("Path", dirToRegister, Microsoft.Win32.RegistryValueKind.String);
+                        }
+                    }
+                }
+                catch { }
+
+                // 2. Kısayollar (NVIDIA App klasör taramasının bulabilmesi için masaüstü ve başlat menüsü)
+                string desktopFolder = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                string programsFolder = Environment.GetFolderPath(Environment.SpecialFolder.Programs);
+                
+                CreateShortcut(desktopFolder, "Mistik Launcher.lnk", exeToRegister, dirToRegister);
+                CreateShortcut(programsFolder, "Mistik Launcher.lnk", exeToRegister, dirToRegister);
+
+                // 3. DirectX GPU Yüksek Performans Tercihi (Başlatıcının kendisi için de NVIDIA zorlaması)
+                using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\DirectX\UserGpuPreferences"))
+                {
+                    if (key != null)
+                    {
+                        key.SetValue(exeToRegister, "GpuPreference=2;", Microsoft.Win32.RegistryValueKind.String);
+                        if (!currentExePath.Equals(exeToRegister, StringComparison.OrdinalIgnoreCase))
+                        {
+                            key.SetValue(currentExePath, "GpuPreference=2;", Microsoft.Win32.RegistryValueKind.String);
+                        }
+                    }
+                }
             }
             catch { }
         }
