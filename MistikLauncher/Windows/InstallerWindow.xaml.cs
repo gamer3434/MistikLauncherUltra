@@ -64,8 +64,21 @@ namespace MistikLauncher.Windows
 
             Directory.CreateDirectory(appDataFolder);
 
-            UpdateProgress("Dosyalar kopyalanıyor...", 20);
-            
+            // Kill existing launcher processes to avoid file locks
+            try
+            {
+                foreach (var proc in System.Diagnostics.Process.GetProcessesByName("MistikLauncher"))
+                {
+                    try { if (proc.Id != Environment.ProcessId) proc.Kill(); } catch { }
+                }
+                foreach (var proc in System.Diagnostics.Process.GetProcessesByName("MistikLauncherUltra"))
+                {
+                    try { if (proc.Id != Environment.ProcessId) proc.Kill(); } catch { }
+                }
+                System.Threading.Thread.Sleep(500);
+            }
+            catch { }
+
             // 1. Copy executable
             if (!currentExePath.Equals(officialExePath, StringComparison.OrdinalIgnoreCase))
             {
