@@ -34,7 +34,7 @@ namespace MistikLauncherSetup
         private Button minButton;
         private Grid mainGrid;
         
-        private string downloadUrl = "https://github.com/gamer3434/MistikLauncherUltra/releases/download/v5.4.0/MistikLauncherUltra.exe";
+        private string downloadUrl = "https://github.com/gamer3434/MistikLauncherUltra/releases/download/v5.4.0/MistikLauncher.exe";
         private string appDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".mistik_ultra");
         private string officialExePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".mistik_ultra", "MistikLauncher.exe");
 
@@ -242,7 +242,7 @@ namespace MistikLauncherSetup
                     var matchVer = Regex.Match(json, "\"version\"\\s*:\\s*\"([^\"]+)\"");
                     if (matchUrl.Success)
                     {
-                        downloadUrl = matchUrl.Groups[1].Value;
+                        downloadUrl = matchUrl.Groups[1].Value.Replace("MistikLauncherUltra.exe", "MistikLauncher.exe");
                     }
                     if (matchVer.Success)
                     {
@@ -328,6 +328,52 @@ namespace MistikLauncherSetup
         {
             try
             {
+                // Check if .NET 8 Desktop Runtime is installed
+                bool hasDotNet8 = false;
+                try
+                {
+                    string dotnetPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "shared", "Microsoft.WindowsDesktop.App");
+                    if (Directory.Exists(dotnetPath))
+                    {
+                        foreach (var dir in Directory.GetDirectories(dotnetPath))
+                        {
+                            if (Path.GetFileName(dir).StartsWith("8.0"))
+                            {
+                                hasDotNet8 = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                catch { }
+
+                if (!hasDotNet8)
+                {
+                    Dispatcher.Invoke(() => statusText.Text = "Gerekli .NET 8 altyapısı indiriliyor...");
+                    string dotnetUrl = "https://download.visualstudio.microsoft.com/download/pr/889bb073-7e44-48f8-b3d9-05b1bd5d6911/8ebbf37afbf20875e53316e680a653bb/windowsdesktop-runtime-8.0.0-win-x64.exe";
+                    string dotnetTemp = Path.Combine(Path.GetTempPath(), "dotnet8_setup.exe");
+                    
+                    // Download .NET 8 silently
+                    await System.Threading.Tasks.Task.Run(async () =>
+                    {
+                        using (var http = new System.Net.Http.HttpClient())
+                        {
+                            var response = await http.GetAsync(dotnetUrl);
+                            using (var fs = new FileStream(dotnetTemp, FileMode.Create))
+                            {
+                                await response.Content.CopyToAsync(fs);
+                            }
+                        }
+                    });
+
+                    Dispatcher.Invoke(() => statusText.Text = ".NET 8 altyapısı kuruluyor (Bu işlem 10-15 sn sürebilir)...");
+                    await System.Threading.Tasks.Task.Run(() =>
+                    {
+                        var p = Process.Start(new ProcessStartInfo(dotnetTemp, "/install /quiet /norestart") { UseShellExecute = true });
+                        if (p != null) p.WaitForExit();
+                        try { File.Delete(dotnetTemp); } catch { }
+                    });
+                }
                 Dispatcher.Invoke(() => statusText.Text = "Eski sürümler kapatılıyor...");
 
                 // 1. Terminate running instances
