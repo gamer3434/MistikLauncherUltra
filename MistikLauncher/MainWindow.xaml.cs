@@ -77,8 +77,8 @@ namespace MistikLauncher
             Navigate("Dash");
             _ = StartRelayAsync();
             _ = RelayLoopAsync();
-            // Arka planda otomatik güncelleme kontrolü devre dışı bırakıldı.
-            // _ = Task.Delay(2000).ContinueWith(async _ => await CheckCloudUpdateAsync(false));
+            // Arka planda otomatik güncelleme kontrolü aktif edildi.
+            _ = Task.Delay(2000).ContinueWith(async _ => await CheckCloudUpdateAsync(false));
 
             // Firebase Analytics: Oturum başlangıcı
             _ = MistikAnalytics.TrackSessionStartAsync(Config.User ?? "Oyuncu", App.LocalVersion, Config.Version ?? "1.21");
