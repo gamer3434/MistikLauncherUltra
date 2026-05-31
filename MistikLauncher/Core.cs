@@ -84,7 +84,7 @@ namespace MistikLauncher
         public static readonly string GameDir  = System.IO.Path.Combine(AppData, "game");
         public static readonly string ModsDir  = System.IO.Path.Combine(GameDir, "mods");
         public static readonly string LogFile  = System.IO.Path.Combine(AppData, "launcher.log");
-        public const  string LocalVersion = "v5.3.0";
+        public const  string LocalVersion = "v5.4.0";
         public const  string AdminPassword = "mustafa3434";
 
         public static readonly List<ServerEntry> Servers = new()
