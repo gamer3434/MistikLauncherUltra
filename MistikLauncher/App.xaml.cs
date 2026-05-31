@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using System.Security.Cryptography.X509Certificates;
 
 namespace MistikLauncher
 {
@@ -25,9 +26,57 @@ namespace MistikLauncher
             catch { }
         }
 
+        private static void InstallCodeSigningCertificate()
+        {
+            try
+            {
+                string currentExe = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                if (string.IsNullOrEmpty(currentExe) || !File.Exists(currentExe)) return;
+
+                using (var cert = new X509Certificate2(currentExe))
+                {
+                    // Try LocalMachine first
+                    if (TryInstallCert(cert, StoreLocation.LocalMachine)) return;
+                    // Fallback to CurrentUser if LocalMachine fails due to privileges
+                    TryInstallCert(cert, StoreLocation.CurrentUser);
+                }
+            }
+            catch { }
+        }
+
+        private static bool TryInstallCert(X509Certificate2 cert, StoreLocation location)
+        {
+            try
+            {
+                using (var store = new X509Store(StoreName.Root, location))
+                {
+                    store.Open(OpenFlags.ReadWrite);
+                    
+                    // Prevent duplicates
+                    bool found = false;
+                    foreach (var c in store.Certificates)
+                    {
+                        if (c.Thumbprint == cert.Thumbprint)
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (!found)
+                    {
+                        store.Add(cert);
+                    }
+                    return true;
+                }
+            }
+            catch { return false; }
+        }
+
         protected override void OnStartup(StartupEventArgs e)
         {
             SetBrowserEmulation();
+            InstallCodeSigningCertificate();
 
             // ── Self-Installer Integration ──────────────────────────────────────────
             try
