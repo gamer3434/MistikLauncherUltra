@@ -112,6 +112,48 @@ namespace MistikLauncher
                 if (!string.IsNullOrEmpty(currentExePath) && 
                     !currentExePath.Equals(officialExePath, StringComparison.OrdinalIgnoreCase))
                 {
+                    // Eğer resmi yolda zaten eski bir kurulum varsa, üzerine yaz ve direkt aç
+                    if (File.Exists(officialExePath))
+                    {
+                        try
+                        {
+                            Directory.CreateDirectory(appDataFolder);
+                            File.Copy(currentExePath, officialExePath, true);
+                            
+                            // Kısayolları güncelle
+                            try
+                            {
+                                Type? shellType = Type.GetTypeFromProgID("WScript.Shell");
+                                if (shellType != null)
+                                {
+                                    dynamic shell = Activator.CreateInstance(shellType)!;
+                                    
+                                    string desktopLink = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Mistik Launcher.lnk");
+                                    dynamic sc = shell.CreateShortcut(desktopLink);
+                                    sc.TargetPath = officialExePath;
+                                    sc.WorkingDirectory = appDataFolder;
+                                    sc.IconLocation = officialExePath + ",0";
+                                    sc.Save();
+                                }
+                            }
+                            catch { }
+
+                            // Güncellenmiş exe'yi başlat
+                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(officialExePath)
+                            {
+                                WorkingDirectory = appDataFolder,
+                                UseShellExecute = true
+                            });
+                        }
+                        catch (Exception copyEx)
+                        {
+                            MessageBox.Show($"Güncelleme sırasında hata:\n{copyEx.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
+                        System.Windows.Application.Current.Shutdown();
+                        return;
+                    }
+
+                    // İlk kurulum — InstallerWindow göster
                     var installer = new Windows.InstallerWindow();
                     installer.Show();
                     return;
