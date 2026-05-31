@@ -109,79 +109,13 @@ namespace MistikLauncher
                 string officialExePath = Path.Combine(appDataFolder, "MistikLauncher.exe");
                 string currentExePath = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
 
-                // Arka planda sessiz kurulum — UI'ı bloklamadan AppData'ya kopyala ve kısayol oluştur
+                // Eğer resmi yolda değilse, Kurulum ekranını (InstallerWindow) aç ve return et!
                 if (!string.IsNullOrEmpty(currentExePath) && 
                     !currentExePath.Equals(officialExePath, StringComparison.OrdinalIgnoreCase))
                 {
-                    _ = System.Threading.Tasks.Task.Run(() =>
-                    {
-                        try
-                        {
-                            // Eski process'leri öldür
-                            foreach (var proc in System.Diagnostics.Process.GetProcessesByName("MistikLauncher"))
-                            {
-                                try { if (proc.Id != Environment.ProcessId) proc.Kill(); } catch { }
-                            }
-                            foreach (var proc in System.Diagnostics.Process.GetProcessesByName("MistikLauncherUltra"))
-                            {
-                                try { if (proc.Id != Environment.ProcessId) proc.Kill(); } catch { }
-                            }
-                            System.Threading.Thread.Sleep(500);
-
-                            Directory.CreateDirectory(appDataFolder);
-                            
-                            // Kopyala (5 deneme)
-                            for (int i = 0; i < 5; i++)
-                            {
-                                try { File.Copy(currentExePath, officialExePath, true); break; }
-                                catch { System.Threading.Thread.Sleep(500); }
-                            }
-
-                            // Kısayol oluştur (Running directly on background thread, no Dispatcher.Invoke needed!)
-                            try
-                            {
-                                Type? shellType = Type.GetTypeFromProgID("WScript.Shell");
-                                if (shellType != null)
-                                {
-                                    dynamic shell = Activator.CreateInstance(shellType)!;
-                                    
-                                    string desktopLink = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Mistik Launcher.lnk");
-                                    dynamic sc = shell.CreateShortcut(desktopLink);
-                                    sc.TargetPath = officialExePath;
-                                    sc.WorkingDirectory = appDataFolder;
-                                    sc.IconLocation = officialExePath + ",0";
-                                    sc.Save();
-
-                                    string startLink = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Mistik Launcher.lnk");
-                                    dynamic sc2 = shell.CreateShortcut(startLink);
-                                    sc2.TargetPath = officialExePath;
-                                    sc2.WorkingDirectory = appDataFolder;
-                                    sc2.IconLocation = officialExePath + ",0";
-                                    sc2.Save();
-                                }
-                            }
-                            catch { }
-
-                            // Uninstall kaydı
-                            try
-                            {
-                                using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\MistikClient");
-                                if (key != null)
-                                {
-                                    key.SetValue("DisplayName", "Mistik Launcher");
-                                    key.SetValue("DisplayIcon", officialExePath + ",0");
-                                    key.SetValue("DisplayVersion", "5.4.0");
-                                    key.SetValue("Publisher", "Mistik");
-                                    key.SetValue("InstallLocation", appDataFolder);
-                                    key.SetValue("UninstallString", $"\"{officialExePath}\" --uninstall");
-                                    key.SetValue("NoModify", 1);
-                                    key.SetValue("NoRepair", 1);
-                                }
-                            }
-                            catch { }
-                        }
-                        catch { }
-                    });
+                    var installer = new Windows.InstallerWindow();
+                    installer.Show();
+                    return;
                 }
             }
             catch (Exception ex)
