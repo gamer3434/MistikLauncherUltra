@@ -28,3 +28,9 @@ obj/
 
 ## Log files
 *.log
+
+## Publish and Temp Directories
+publish/
+publish_ultra/
+test_publish/
+test_publish_no_compression/
