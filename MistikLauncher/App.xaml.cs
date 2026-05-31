@@ -48,7 +48,8 @@ namespace MistikLauncher
                     return;
                 }
 
-                if (e.Args.Length > 0 && e.Args[0] == "--uninstall")
+                string currentExeName = Path.GetFileName(Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "").ToLower();
+                if ((e.Args.Length > 0 && e.Args[0] == "--uninstall") || currentExeName.Contains("unins") || currentExeName.Contains("kaldır"))
                 {
                     var uninstaller = new Windows.UninstallerWindow();
                     uninstaller.Show();
