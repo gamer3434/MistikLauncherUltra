@@ -13,23 +13,7 @@ namespace MistikLauncherUninstaller
         [STAThread]
         public static void Main(string[] args)
         {
-            // 1. Yönetici Yetkisi Kontrolü (UAC)
-            if (!IsAdministrator())
-            {
-                try
-                {
-                    string exePath = Process.GetCurrentProcess().MainModule.FileName;
-                    var psi = new ProcessStartInfo(exePath)
-                    {
-                        UseShellExecute = true,
-                        Verb = "runas",
-                        Arguments = string.Join(" ", args)
-                    };
-                    Process.Start(psi);
-                }
-                catch { }
-                return;
-            }
+
 
             // 2. TEMP Klasöründen Çalışma Kontrolü (Dizini silebilmek için kilit aşımı)
             string currentExe = Process.GetCurrentProcess().MainModule.FileName;
@@ -63,12 +47,6 @@ namespace MistikLauncherUninstaller
             app.Run(win);
         }
 
-        private static bool IsAdministrator()
-        {
-            var identity = WindowsIdentity.GetCurrent();
-            var principal = new WindowsPrincipal(identity);
-            return principal.IsInRole(WindowsBuiltInRole.Administrator);
-        }
     }
 
     public class UninstallerWindow : Window

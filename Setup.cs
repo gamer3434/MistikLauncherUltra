@@ -19,33 +19,9 @@ namespace MistikLauncherSetup
             // Enable TLS 1.1, 1.2, and 1.3 for secure downloads from GitHub
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072 | (SecurityProtocolType)12288 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
 
-            // 1. Yönetici Yetkisi Kontrolü (UAC) - .NET 8 ve Kayıt Defteri için kritik önemdedir
-            if (!IsAdministrator())
-            {
-                try
-                {
-                    string exePath = Process.GetCurrentProcess().MainModule.FileName;
-                    var psi = new ProcessStartInfo(exePath)
-                    {
-                        UseShellExecute = true,
-                        Verb = "runas"
-                    };
-                    Process.Start(psi);
-                }
-                catch { }
-                return;
-            }
-
             var app = new App();
             var win = new SetupWindow();
             app.Run(win);
-        }
-
-        private static bool IsAdministrator()
-        {
-            var identity = WindowsIdentity.GetCurrent();
-            var principal = new WindowsPrincipal(identity);
-            return principal.IsInRole(WindowsBuiltInRole.Administrator);
         }
     }
 
@@ -353,52 +329,7 @@ namespace MistikLauncherSetup
         {
             try
             {
-                // 1. .NET 8 Runtime kontrolü
-                bool hasDotNet8 = false;
-                try
-                {
-                    string dotnetPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "shared", "Microsoft.WindowsDesktop.App");
-                    if (Directory.Exists(dotnetPath))
-                    {
-                        foreach (var dir in Directory.GetDirectories(dotnetPath))
-                        {
-                            if (Path.GetFileName(dir).StartsWith("8.0"))
-                            {
-                                hasDotNet8 = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                catch { }
 
-                if (!hasDotNet8)
-                {
-                    Dispatcher.Invoke(() => statusText.Text = "Gerekli .NET 8 altyapısı indiriliyor...");
-                    string dotnetUrl = "https://download.visualstudio.microsoft.com/download/pr/889bb073-7e44-48f8-b3d9-05b1bd5d6911/8ebbf37afbf20875e53316e680a653bb/windowsdesktop-runtime-8.0.0-win-x64.exe";
-                    string dotnetTemp = Path.Combine(Path.GetTempPath(), "dotnet8_setup.exe");
-                    
-                    await System.Threading.Tasks.Task.Run(async () =>
-                    {
-                        using (var http = new System.Net.Http.HttpClient())
-                        {
-                            var response = await http.GetAsync(dotnetUrl);
-                            using (var fs = new FileStream(dotnetTemp, FileMode.Create))
-                            {
-                                await response.Content.CopyToAsync(fs);
-                            }
-                        }
-                    });
-
-                    Dispatcher.Invoke(() => statusText.Text = ".NET 8 altyapısı kuruluyor (Bu işlem 10-15 sn sürebilir)...");
-                    await System.Threading.Tasks.Task.Run(() =>
-                    {
-                        // UAC yetkisiyle kurulacağı için sessiz kurulum hatasız çalışacaktır
-                        var p = Process.Start(new ProcessStartInfo(dotnetTemp, "/install /quiet /norestart") { UseShellExecute = true });
-                        if (p != null) p.WaitForExit();
-                        try { File.Delete(dotnetTemp); } catch { }
-                    });
-                }
 
                 // Kaldırıcıyı (MistikUninstaller.exe) indir
                 Dispatcher.Invoke(() => statusText.Text = "Kaldırıcı bileşenleri indiriliyor...");
