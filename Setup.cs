@@ -59,9 +59,9 @@ namespace MistikLauncherSetup
         private Button minButton;
         private Grid mainGrid;
         
-        private string downloadUrl = "https://github.com/gamer3434/MistikLauncherUltra/releases/download/v5.4.0/MistikLauncher.exe";
+        private string downloadUrl = "https://github.com/gamer3434/MistikLauncherUltra/releases/download/v5.4.0/MistikLauncherUltra.exe";
         private string appDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".mistik_ultra");
-        private string officialExePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".mistik_ultra", "MistikLauncher.exe");
+        private string officialExePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".mistik_ultra", "MistikLauncherUltra.exe");
 
         public SetupWindow()
         {
@@ -268,7 +268,7 @@ namespace MistikLauncherSetup
                     var matchVer = Regex.Match(json, "\"version\"\\s*:\\s*\"([^\"]+)\"");
                     if (matchUrl.Success)
                     {
-                        downloadUrl = matchUrl.Groups[1].Value.Replace("MistikLauncherUltra.exe", "MistikLauncher.exe");
+                        downloadUrl = matchUrl.Groups[1].Value;
                     }
                     if (matchVer.Success)
                     {
@@ -403,7 +403,7 @@ namespace MistikLauncherSetup
                 // Kaldırıcıyı (MistikUninstaller.exe) indir
                 Dispatcher.Invoke(() => statusText.Text = "Kaldırıcı bileşenleri indiriliyor...");
                 string uninsTemp = Path.Combine(Path.GetTempPath(), "MistikUninstaller_Setup.tmp");
-                string uninsUrl = downloadUrl.Replace("MistikLauncher.exe", "MistikUninstaller.exe");
+                string uninsUrl = downloadUrl.Replace("MistikLauncherUltra.exe", "MistikUninstaller.exe");
                 
                 await System.Threading.Tasks.Task.Run(async () =>
                 {

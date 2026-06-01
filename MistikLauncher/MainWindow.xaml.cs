@@ -2706,20 +2706,19 @@ namespace MistikLauncher
 
                 SetProgress(95, "Güncelleme kuruluyor...");
 
-                // Write the batch script
+                // Write the batch script using .bak hot-swap strategy
                 var batPath = Path.Combine(tempDir, "mistik_updater.bat");
+                var currentDir = Path.GetDirectoryName(currentExe);
+                var exeName = Path.GetFileName(currentExe);
                 var batContent = $@"@echo off
 chcp 65001 > nul
 title Mistik Launcher Guncelleyici
 echo Mistik Launcher güncelleniyor, lütfen bekleyin...
-timeout /t 2 /nobreak > nul
-:copy_loop
+timeout /t 1 /nobreak > nul
+cd /d ""{currentDir}""
+if exist ""{exeName}.bak"" del ""{exeName}.bak""
+ren ""{exeName}"" ""{exeName}.bak""
 copy /y ""{newExe}"" ""{currentExe}"" > nul
-if errorlevel 1 (
-    echo Launcher hala kapaniyor, tekrar deneniyor...
-    timeout /t 1 /nobreak > nul
-    goto copy_loop
-)
 start """" ""{currentExe}""
 del ""{newExe}""
 del ""%~f0""
