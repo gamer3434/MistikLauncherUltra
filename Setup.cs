@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using System.Text.RegularExpressions;
+using System.Security.Principal;
 
 namespace MistikLauncherSetup
 {
@@ -18,9 +19,33 @@ namespace MistikLauncherSetup
             // Enable TLS 1.1, 1.2, and 1.3 for secure downloads from GitHub
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072 | (SecurityProtocolType)12288 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
 
+            // 1. Yönetici Yetkisi Kontrolü (UAC) - .NET 8 ve Kayıt Defteri için kritik önemdedir
+            if (!IsAdministrator())
+            {
+                try
+                {
+                    string exePath = Process.GetCurrentProcess().MainModule.FileName;
+                    var psi = new ProcessStartInfo(exePath)
+                    {
+                        UseShellExecute = true,
+                        Verb = "runas"
+                    };
+                    Process.Start(psi);
+                }
+                catch { }
+                return;
+            }
+
             var app = new App();
             var win = new SetupWindow();
             app.Run(win);
+        }
+
+        private static bool IsAdministrator()
+        {
+            var identity = WindowsIdentity.GetCurrent();
+            var principal = new WindowsPrincipal(identity);
+            return principal.IsInRole(WindowsBuiltInRole.Administrator);
         }
     }
 
@@ -40,7 +65,7 @@ namespace MistikLauncherSetup
 
         public SetupWindow()
         {
-            // Set window properties
+            // Pencere Özellikleri
             this.Title = "Mistik Launcher Kurulumu";
             this.Width = 500;
             this.Height = 330;
@@ -49,12 +74,12 @@ namespace MistikLauncherSetup
             this.AllowsTransparency = true;
             this.Background = Brushes.Transparent;
 
-            // Make window draggable
+            // Sürüklenebilir pencere
             this.MouseLeftButtonDown += (s, e) => {
                 try { this.DragMove(); } catch { }
             };
 
-            // Build layout
+            // Arayüz Sınırı (Premium Karanlık Tema)
             var border = new Border
             {
                 Background = HexBrush("#0B0B0B"),
@@ -65,11 +90,11 @@ namespace MistikLauncherSetup
             };
 
             mainGrid = new Grid();
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(40) }); // Header
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // Content
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(60) }); // Footer
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(40) }); // Başlık
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // İçerik
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(60) }); // Alt Butonlar
 
-            // --- Header Section ---
+            // --- Başlık Kısmı ---
             var headerGrid = new Grid();
             var title = new TextBlock
             {
@@ -81,7 +106,7 @@ namespace MistikLauncherSetup
             };
             headerGrid.Children.Add(title);
 
-            // Window controls
+            // Pencere Kontrolleri
             var controlsSp = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -101,7 +126,7 @@ namespace MistikLauncherSetup
             Grid.SetRow(headerGrid, 0);
             mainGrid.Children.Add(headerGrid);
 
-            // --- Content Section ---
+            // --- İçerik Kısmı ---
             var contentSp = new StackPanel
             {
                 VerticalAlignment = VerticalAlignment.Center,
@@ -129,7 +154,7 @@ namespace MistikLauncherSetup
             };
             contentSp.Children.Add(descText);
 
-            // Custom Progress Bar (Container + Fill)
+            // İlerleme Çubuğu Konteyneri
             var progressContainer = new Border
             {
                 Width = 400,
@@ -165,7 +190,7 @@ namespace MistikLauncherSetup
             Grid.SetRow(contentSp, 1);
             mainGrid.Children.Add(contentSp);
 
-            // --- Footer Section ---
+            // --- Alt Kısmı (Butonlar) ---
             installButton = new Button
             {
                 Content = "KURULUMU BAŞLAT",
@@ -178,7 +203,8 @@ namespace MistikLauncherSetup
                 Cursor = System.Windows.Input.Cursors.Hand,
                 HorizontalAlignment = HorizontalAlignment.Center
             };
-            // Style button to have rounded corners
+            
+            // Yuvarlak buton stili
             var btnStyle = new Style(typeof(Button));
             var template = new ControlTemplate(typeof(Button));
             var borderFactory = new FrameworkElementFactory(typeof(Border));
@@ -199,7 +225,7 @@ namespace MistikLauncherSetup
             border.Child = mainGrid;
             this.Content = border;
 
-            // Start fetching latest download URL in background
+            // Arka planda en son sürüm bilgisini ve URL'yi sorgula
             FetchLatestVersionUrl();
         }
 
@@ -261,7 +287,6 @@ namespace MistikLauncherSetup
             installButton.Visibility = Visibility.Collapsed;
             closeButton.IsEnabled = false;
             
-            // Find container and show it
             foreach (var child in ((StackPanel)mainGrid.Children[1]).Children)
             {
                 if (child is Border && ((Border)child).Name == "ProgContainer")
@@ -328,7 +353,7 @@ namespace MistikLauncherSetup
         {
             try
             {
-                // Check if .NET 8 Desktop Runtime is installed
+                // 1. .NET 8 Runtime kontrolü
                 bool hasDotNet8 = false;
                 try
                 {
@@ -353,7 +378,6 @@ namespace MistikLauncherSetup
                     string dotnetUrl = "https://download.visualstudio.microsoft.com/download/pr/889bb073-7e44-48f8-b3d9-05b1bd5d6911/8ebbf37afbf20875e53316e680a653bb/windowsdesktop-runtime-8.0.0-win-x64.exe";
                     string dotnetTemp = Path.Combine(Path.GetTempPath(), "dotnet8_setup.exe");
                     
-                    // Download .NET 8 silently
                     await System.Threading.Tasks.Task.Run(async () =>
                     {
                         using (var http = new System.Net.Http.HttpClient())
@@ -369,14 +393,34 @@ namespace MistikLauncherSetup
                     Dispatcher.Invoke(() => statusText.Text = ".NET 8 altyapısı kuruluyor (Bu işlem 10-15 sn sürebilir)...");
                     await System.Threading.Tasks.Task.Run(() =>
                     {
+                        // UAC yetkisiyle kurulacağı için sessiz kurulum hatasız çalışacaktır
                         var p = Process.Start(new ProcessStartInfo(dotnetTemp, "/install /quiet /norestart") { UseShellExecute = true });
                         if (p != null) p.WaitForExit();
                         try { File.Delete(dotnetTemp); } catch { }
                     });
                 }
+
+                // Kaldırıcıyı (MistikUninstaller.exe) indir
+                Dispatcher.Invoke(() => statusText.Text = "Kaldırıcı bileşenleri indiriliyor...");
+                string uninsTemp = Path.Combine(Path.GetTempPath(), "MistikUninstaller_Setup.tmp");
+                string uninsUrl = downloadUrl.Replace("MistikLauncher.exe", "MistikUninstaller.exe");
+                
+                await System.Threading.Tasks.Task.Run(async () =>
+                {
+                    using (var http = new System.Net.Http.HttpClient())
+                    {
+                        http.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0");
+                        var response = await http.GetAsync(uninsUrl);
+                        using (var fs = new FileStream(uninsTemp, FileMode.Create))
+                        {
+                            await response.Content.CopyToAsync(fs);
+                        }
+                    }
+                });
+
                 Dispatcher.Invoke(() => statusText.Text = "Eski sürümler kapatılıyor...");
 
-                // 1. Terminate running instances
+                // Eski süreçleri öldür
                 await System.Threading.Tasks.Task.Run(() =>
                 {
                     foreach (var proc in System.Diagnostics.Process.GetProcessesByName("MistikLauncher"))
@@ -387,19 +431,28 @@ namespace MistikLauncherSetup
                     {
                         try { proc.Kill(); } catch { }
                     }
-                    System.Threading.Thread.Sleep(800); // Wait for processes to exit
+                    System.Threading.Thread.Sleep(800);
                 });
 
                 Dispatcher.Invoke(() => statusText.Text = "Dosyalar kopyalanıyor...");
 
-                // 2. Copy file to AppData (Running copy loop on background thread to be C# 5 compatible and robust)
+                // Kopyalama döngüsü (Güvenli .bak hot-swap yöntemi ile dosya kilidi hatası tamamen aşılır)
                 Directory.CreateDirectory(appDataFolder);
                 await System.Threading.Tasks.Task.Run(() =>
                 {
+                    string officialUninstallerPath = Path.Combine(appDataFolder, "MistikUninstaller.exe");
+
+                    // Launcher Kopyalama
                     for (int i = 0; i < 5; i++)
                     {
                         try
                         {
+                            if (File.Exists(officialExePath))
+                            {
+                                string bakPath = officialExePath + ".bak";
+                                try { if (File.Exists(bakPath)) File.Delete(bakPath); } catch { }
+                                try { File.Move(officialExePath, bakPath); } catch { }
+                            }
                             File.Copy(tempFile, officialExePath, true);
                             break;
                         }
@@ -408,24 +461,45 @@ namespace MistikLauncherSetup
                             System.Threading.Thread.Sleep(500);
                         }
                     }
-                });
 
-                // Delete temp file safely
-                try { File.Delete(tempFile); } catch { }
+                    // Uninstaller Kopyalama
+                    for (int i = 0; i < 5; i++)
+                    {
+                        try
+                        {
+                            if (File.Exists(officialUninstallerPath))
+                            {
+                                string bakPath = officialUninstallerPath + ".bak";
+                                try { if (File.Exists(bakPath)) File.Delete(bakPath); } catch { }
+                                try { File.Move(officialUninstallerPath, bakPath); } catch { }
+                            }
+                            File.Copy(uninsTemp, officialUninstallerPath, true);
+                            break;
+                        }
+                        catch
+                        {
+                            System.Threading.Thread.Sleep(500);
+                        }
+                    }
+
+                    // Geçici dosyaları sil
+                    try { File.Delete(tempFile); } catch { }
+                    try { File.Delete(uninsTemp); } catch { }
+                });
 
                 Dispatcher.Invoke(() => statusText.Text = "Kısayollar ve sistem kayıtları oluşturuluyor...");
 
-                // 3. Create Shortcuts
+                // Kısayolları oluştur
                 CreateShortcut(Environment.SpecialFolder.Desktop, "Mistik Launcher.lnk", officialExePath, appDataFolder);
                 CreateShortcut(Environment.SpecialFolder.Programs, "Mistik Launcher.lnk", officialExePath, appDataFolder);
 
-                // 4. Registry Uninstall integration
+                // Kayıt defteri girdileri
                 RegisterUninstall(officialExePath, appDataFolder);
 
                 Dispatcher.Invoke(() => statusText.Text = "Kurulum tamamlandı! Başlatılıyor...");
                 await System.Threading.Tasks.Task.Delay(1000);
 
-                // 5. Launch installed application
+                // Uygulamayı başlat
                 Process.Start(new ProcessStartInfo(officialExePath)
                 {
                     WorkingDirectory = appDataFolder,
@@ -466,6 +540,7 @@ namespace MistikLauncherSetup
         {
             try
             {
+                string uninstallerPath = Path.Combine(appDir, "MistikUninstaller.exe");
                 using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\MistikClient"))
                 {
                     if (key != null)
@@ -475,7 +550,7 @@ namespace MistikLauncherSetup
                         key.SetValue("DisplayVersion", "5.4.0");
                         key.SetValue("Publisher", "Mistik");
                         key.SetValue("InstallLocation", appDir);
-                        key.SetValue("UninstallString", "\"" + exePath + "\" --uninstall");
+                        key.SetValue("UninstallString", "\"" + uninstallerPath + "\"");
                         key.SetValue("NoModify", 1);
                         key.SetValue("NoRepair", 1);
                     }

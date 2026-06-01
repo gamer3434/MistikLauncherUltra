@@ -130,11 +130,24 @@ namespace MistikLauncher
 
                             Directory.CreateDirectory(appDataFolder);
                             
-                            // Kopyala (5 deneme)
+                            // Kopyala (5 deneme) - Güvenli .bak hot-swap yöntemi ile dosya kilidi hatası tamamen aşılır
                             for (int i = 0; i < 5; i++)
                             {
-                                try { File.Copy(currentExePath, officialExePath, true); break; }
-                                catch { System.Threading.Thread.Sleep(500); }
+                                try
+                                {
+                                    if (File.Exists(officialExePath))
+                                    {
+                                        string bakPath = officialExePath + ".bak";
+                                        try { if (File.Exists(bakPath)) File.Delete(bakPath); } catch { }
+                                        try { File.Move(officialExePath, bakPath); } catch { }
+                                    }
+                                    File.Copy(currentExePath, officialExePath, true);
+                                    break;
+                                }
+                                catch
+                                {
+                                    System.Threading.Thread.Sleep(500);
+                                }
                             }
 
                             // Kısayol oluştur (Running directly on background thread, no Dispatcher.Invoke needed!)
@@ -158,26 +171,27 @@ namespace MistikLauncher
                                     sc2.WorkingDirectory = appDataFolder;
                                     sc2.IconLocation = officialExePath + ",0";
                                     sc2.Save();
-                                }
-                            }
-                            catch { }
-
-                            // Uninstall kaydı
-                            try
-                            {
-                                using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\MistikClient"))
-                                {
-                                    if (key != null)
+                                    
+                                    // Uninstall kaydı
+                                    try
                                     {
-                                        key.SetValue("DisplayName", "Mistik Launcher");
-                                        key.SetValue("DisplayIcon", officialExePath + ",0");
-                                        key.SetValue("DisplayVersion", "5.4.0");
-                                        key.SetValue("Publisher", "Mistik");
-                                        key.SetValue("InstallLocation", appDataFolder);
-                                        key.SetValue("UninstallString", "\"" + officialExePath + "\" --uninstall");
-                                        key.SetValue("NoModify", 1);
-                                        key.SetValue("NoRepair", 1);
+                                        string officialUninstallerPath = Path.Combine(appDataFolder, "MistikUninstaller.exe");
+                                        using (var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\MistikClient"))
+                                        {
+                                            if (key != null)
+                                            {
+                                                key.SetValue("DisplayName", "Mistik Launcher");
+                                                key.SetValue("DisplayIcon", officialExePath + ",0");
+                                                key.SetValue("DisplayVersion", "5.4.0");
+                                                key.SetValue("Publisher", "Mistik");
+                                                key.SetValue("InstallLocation", appDataFolder);
+                                                key.SetValue("UninstallString", "\"" + officialUninstallerPath + "\"");
+                                                key.SetValue("NoModify", 1);
+                                                key.SetValue("NoRepair", 1);
+                                            }
+                                        }
                                     }
+                                    catch { }
                                 }
                             }
                             catch { }
@@ -284,12 +298,15 @@ namespace MistikLauncher
                 {
                     if (key != null)
                     {
+                        string officialUninstallerPath = Path.Combine(appDataFolder, "MistikUninstaller.exe");
+                        string uninstallerToRegister = File.Exists(officialUninstallerPath) ? officialUninstallerPath : Path.Combine(dirToRegister, "MistikUninstaller.exe");
+
                         key.SetValue("DisplayName", "Mistik Launcher", Microsoft.Win32.RegistryValueKind.String);
                         key.SetValue("DisplayIcon", exeToRegister + ",0", Microsoft.Win32.RegistryValueKind.String);
                         key.SetValue("DisplayVersion", "5.0.0", Microsoft.Win32.RegistryValueKind.String);
                         key.SetValue("Publisher", "Mistik", Microsoft.Win32.RegistryValueKind.String);
                         key.SetValue("InstallLocation", dirToRegister, Microsoft.Win32.RegistryValueKind.String);
-                        key.SetValue("UninstallString", $"\"{exeToRegister}\" --uninstall", Microsoft.Win32.RegistryValueKind.String);
+                        key.SetValue("UninstallString", $"\"{uninstallerToRegister}\"", Microsoft.Win32.RegistryValueKind.String);
                         key.SetValue("NoModify", 1, Microsoft.Win32.RegistryValueKind.DWord);
                         key.SetValue("NoRepair", 1, Microsoft.Win32.RegistryValueKind.DWord);
                     }
