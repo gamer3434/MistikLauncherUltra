@@ -242,7 +242,7 @@ namespace MistikLauncher
             catch { return "Bilinmiyor"; }
         }
 
-        /// <summary>İşlemci modeli (WMI Win32_Processor.Name)</summary>
+        /// <summary>İşlemci modeli (WMI Win32_Processor.Name ve Registry fallback)</summary>
         public static string GetCpuModel()
         {
             if (_cachedCpuModel != null) return _cachedCpuModel;
@@ -256,9 +256,27 @@ namespace MistikLauncher
                 }
             }
             catch { }
+
+            // Registry Fallback
+            try
+            {
+                using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\CentralProcessor\0");
+                if (key != null)
+                {
+                    string? name = key.GetValue("ProcessorNameString") as string;
+                    if (!string.IsNullOrEmpty(name))
+                    {
+                        _cachedCpuModel = name.Trim();
+                        return _cachedCpuModel;
+                    }
+                }
+            }
+            catch { }
+
             _cachedCpuModel = "Bilinmiyor";
             return _cachedCpuModel;
         }
+
 
         /// <summary>Tüm cihaz bilgilerini tek seferde topla</summary>
         public static async Task<DeviceReport> CollectAsync()
@@ -1699,17 +1717,11 @@ namespace MistikLauncher
             string cpuModel = "Bilinmiyor";
             string gpu = "Bilinmiyor";
 
-            try
-            {
-                hwid = DeviceInfo.GetHWID();
-                cpuModel = DeviceInfo.GetCpuModel();
-                gpu = KernelOptimizer.DetectGpuName();
-                ip = await DeviceInfo.GetPublicIpAsync();
-            }
-            catch (Exception ex)
-            {
-                App.Log($"[Analytics Device Info Error] {ex.Message}");
-            }
+            try { hwid = DeviceInfo.GetHWID(); } catch (Exception ex) { App.Log($"[Analytics HWID Error] {ex.Message}"); }
+            try { cpuModel = DeviceInfo.GetCpuModel(); } catch (Exception ex) { App.Log($"[Analytics CPU Error] {ex.Message}"); }
+            try { gpu = KernelOptimizer.DetectGpuName(); } catch (Exception ex) { App.Log($"[Analytics GPU Error] {ex.Message}"); }
+            try { ip = await DeviceInfo.GetPublicIpAsync(); } catch (Exception ex) { App.Log($"[Analytics IP Error] {ex.Message}"); }
+
 
             var data = new
             {
