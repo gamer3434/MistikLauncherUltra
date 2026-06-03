@@ -16,12 +16,46 @@ namespace MistikLauncherSetup
         [STAThread]
         public static void Main()
         {
-            // Enable TLS 1.1, 1.2, and 1.3 for secure downloads from GitHub
-            ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072 | (SecurityProtocolType)12288 | SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+            // TLS 1.2 zorunlu - GitHub HTTPS bağlantıları için
+            try { ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls; } catch { }
+            
+            // Yönetici yetkisi kontrolü ve self-elevation (Kendi kendini yönetici olarak başlatma)
+            if (!IsAdministrator())
+            {
+                try
+                {
+                    var exePath = Process.GetCurrentProcess().MainModule.FileName;
+                    var startInfo = new ProcessStartInfo(exePath)
+                    {
+                        UseShellExecute = true,
+                        Verb = "runas"
+                    };
+                    Process.Start(startInfo);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Bu kurulum programının çalışması için yönetici yetkisi gereklidir: " + ex.Message, "Yetki Hatası", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                return;
+            }
 
             var app = new App();
             var win = new SetupWindow();
             app.Run(win);
+        }
+
+        private static bool IsAdministrator()
+        {
+            try
+            {
+                var identity = WindowsIdentity.GetCurrent();
+                var principal = new WindowsPrincipal(identity);
+                return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 

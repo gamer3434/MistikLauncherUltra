@@ -34,3 +34,10 @@ publish/
 publish_ultra/
 test_publish/
 test_publish_no_compression/
+
+## PowerShell Scripts and Deployed Executables (Local Only)
+*.ps1
+MistikLauncherUltra.exe
+MistikLauncher.exe
+MistikSetup.exe
+MistikUninstaller.exe

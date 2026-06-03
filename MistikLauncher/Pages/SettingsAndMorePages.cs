@@ -1634,12 +1634,18 @@ namespace MistikLauncher.Pages
             string openCount = profile?["open_count"]?.ToString() ?? "1";
             string lVer = profile?["launcher_version"]?.ToString() ?? "?";
             string gVer = profile?["game_version"]?.ToString() ?? "?";
+            string cpuModel = profile?["cpu_model"]?.ToString() ?? "Bilinmiyor";
+            string hwid = profile?["hwid"]?.ToString() ?? "Bilinmiyor";
+            string ip = profile?["ip"]?.ToString() ?? "Bilinmiyor";
             
             headerSp.Children.Add(PageHelpers.Lbl($"• İşletim Sistemi: {os}", 11, "#CCCCCC"));
+            headerSp.Children.Add(PageHelpers.Lbl($"• İşlemci: {cpuModel}", 11, "#CCCCCC", pad: new Thickness(0, 3, 0, 0)));
             headerSp.Children.Add(PageHelpers.Lbl($"• RAM Kapasitesi: {ram} GB", 11, "#CCCCCC", pad: new Thickness(0, 3, 0, 0)));
             headerSp.Children.Add(PageHelpers.Lbl($"• Başlatıcı Sürümü: {lVer}", 11, "#CCCCCC", pad: new Thickness(0, 3, 0, 0)));
             headerSp.Children.Add(PageHelpers.Lbl($"• Seçili Sürüm: {gVer}", 11, "#CCCCCC", pad: new Thickness(0, 3, 0, 0)));
             headerSp.Children.Add(PageHelpers.Lbl($"• Toplam Launcher Açılışı: {openCount} kez", 11, "#CCCCCC", pad: new Thickness(0, 3, 0, 0)));
+            headerSp.Children.Add(PageHelpers.Lbl($"• Donanım Kimliği (HWID): {hwid}", 11, "#CCCCCC", pad: new Thickness(0, 3, 0, 0)));
+            headerSp.Children.Add(PageHelpers.Lbl($"• IP Adresi: {ip}", 11, "#CCCCCC", pad: new Thickness(0, 3, 0, 0)));
 
             // GPU bilgisi
             string gpuName = profile?["gpu"]?.ToString() ?? "Bilinmiyor";
