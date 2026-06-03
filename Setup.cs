@@ -274,7 +274,8 @@ namespace MistikLauncherSetup
 
             statusText.Text = "Mistik Launcher indiriliyor...";
             
-            string tempFile = Path.Combine(Path.GetTempPath(), "MistikLauncherUltraSetup.tmp");
+            try { Directory.CreateDirectory(appDataFolder); } catch { }
+            string tempFile = Path.Combine(appDataFolder, "MistikLauncherUltraSetup.tmp");
             StartDownload(tempFile);
         }
 
@@ -333,7 +334,7 @@ namespace MistikLauncherSetup
 
                 // Kaldırıcıyı (MistikUninstaller.exe) indir
                 Dispatcher.Invoke(() => statusText.Text = "Kaldırıcı bileşenleri indiriliyor...");
-                string uninsTemp = Path.Combine(Path.GetTempPath(), "MistikUninstaller_Setup.tmp");
+                string uninsTemp = Path.Combine(appDataFolder, "MistikUninstaller_Setup.tmp");
                 string uninsUrl = downloadUrl.Replace("MistikLauncherUltra.exe", "MistikUninstaller.exe");
                 
                 await System.Threading.Tasks.Task.Run(async () =>
