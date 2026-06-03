@@ -136,6 +136,161 @@ namespace MistikLauncher
         }
     }
 
+    // ── HWID / IP Cihaz Bilgisi ──────────────────────────────────────────────
+    public static class DeviceInfo
+    {
+        static string? _cachedHwid;
+        static string? _cachedPublicIp;
+        static string? _cachedMachineName;
+        static string? _cachedCpuModel;
+
+        /// <summary>Donanıma özgü benzersiz kimlik (MotherBoard SN + CPU ID hash)</summary>
+        public static string GetHWID()
+        {
+            if (_cachedHwid != null) return _cachedHwid;
+            try
+            {
+                string raw = "";
+                // Anakart seri numarası
+                try
+                {
+                    using var mbSearcher = new System.Management.ManagementObjectSearcher("SELECT SerialNumber FROM Win32_BaseBoard");
+                    foreach (var obj in mbSearcher.Get())
+                        raw += obj["SerialNumber"]?.ToString() ?? "";
+                }
+                catch { }
+
+                // İşlemci ID
+                try
+                {
+                    using var cpuSearcher = new System.Management.ManagementObjectSearcher("SELECT ProcessorId FROM Win32_Processor");
+                    foreach (var obj in cpuSearcher.Get())
+                        raw += obj["ProcessorId"]?.ToString() ?? "";
+                }
+                catch { }
+
+                // Disk seri numarası (yedek)
+                try
+                {
+                    using var diskSearcher = new System.Management.ManagementObjectSearcher("SELECT SerialNumber FROM Win32_DiskDrive WHERE Index=0");
+                    foreach (var obj in diskSearcher.Get())
+                        raw += obj["SerialNumber"]?.ToString()?.Trim() ?? "";
+                }
+                catch { }
+
+                if (string.IsNullOrWhiteSpace(raw))
+                    raw = Environment.MachineName + Environment.UserName;
+
+                var hash = System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(raw));
+                _cachedHwid = BitConverter.ToString(hash).Replace("-", "")[..16].ToUpper();
+            }
+            catch
+            {
+                _cachedHwid = "UNKNOWN";
+            }
+            return _cachedHwid;
+        }
+
+        /// <summary>Public IP adresi (ipify.org API)</summary>
+        public static async Task<string> GetPublicIpAsync()
+        {
+            if (_cachedPublicIp != null) return _cachedPublicIp;
+            try
+            {
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                // Birden fazla servis dene
+                string[] apis = {
+                    "https://api.ipify.org",
+                    "https://icanhazip.com",
+                    "https://ifconfig.me/ip"
+                };
+                foreach (var api in apis)
+                {
+                    try
+                    {
+                        _cachedPublicIp = (await http.GetStringAsync(api)).Trim();
+                        if (!string.IsNullOrEmpty(_cachedPublicIp)) return _cachedPublicIp;
+                    }
+                    catch { continue; }
+                }
+            }
+            catch { }
+            _cachedPublicIp = "Bilinmiyor";
+            return _cachedPublicIp;
+        }
+
+        /// <summary>Bilgisayar adı</summary>
+        public static string GetMachineName()
+        {
+            if (_cachedMachineName != null) return _cachedMachineName;
+            try { _cachedMachineName = Environment.MachineName; }
+            catch { _cachedMachineName = "Bilinmiyor"; }
+            return _cachedMachineName;
+        }
+
+        /// <summary>İşletim sistemi sürümü</summary>
+        public static string GetOSVersion()
+        {
+            try { return Environment.OSVersion.ToString(); }
+            catch { return "Bilinmiyor"; }
+        }
+
+        /// <summary>Windows kullanıcı adı</summary>
+        public static string GetWindowsUser()
+        {
+            try { return Environment.UserName; }
+            catch { return "Bilinmiyor"; }
+        }
+
+        /// <summary>İşlemci modeli (WMI Win32_Processor.Name)</summary>
+        public static string GetCpuModel()
+        {
+            if (_cachedCpuModel != null) return _cachedCpuModel;
+            try
+            {
+                using var searcher = new System.Management.ManagementObjectSearcher("SELECT Name FROM Win32_Processor");
+                foreach (var obj in searcher.Get())
+                {
+                    _cachedCpuModel = obj["Name"]?.ToString()?.Trim() ?? "";
+                    if (!string.IsNullOrEmpty(_cachedCpuModel)) return _cachedCpuModel;
+                }
+            }
+            catch { }
+            _cachedCpuModel = "Bilinmiyor";
+            return _cachedCpuModel;
+        }
+
+        /// <summary>Tüm cihaz bilgilerini tek seferde topla</summary>
+        public static async Task<DeviceReport> CollectAsync()
+        {
+            var hwid = GetHWID();
+            var ip = await GetPublicIpAsync();
+            return new DeviceReport
+            {
+                HWID = hwid,
+                PublicIP = ip,
+                MachineName = GetMachineName(),
+                WindowsUser = GetWindowsUser(),
+                OSVersion = GetOSVersion(),
+                CpuModel = GetCpuModel(),
+                LauncherVersion = App.LocalVersion,
+                CollectedAt = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC")
+            };
+        }
+    }
+
+    public class DeviceReport
+    {
+        [JsonProperty("hwid")]             public string HWID            { get; set; } = "";
+        [JsonProperty("public_ip")]        public string PublicIP        { get; set; } = "";
+        [JsonProperty("machine_name")]     public string MachineName     { get; set; } = "";
+        [JsonProperty("windows_user")]     public string WindowsUser     { get; set; } = "";
+        [JsonProperty("os_version")]       public string OSVersion       { get; set; } = "";
+        [JsonProperty("cpu_model")]        public string CpuModel        { get; set; } = "";
+        [JsonProperty("launcher_version")] public string LauncherVersion { get; set; } = "";
+        [JsonProperty("collected_at")]     public string CollectedAt     { get; set; } = "";
+    }
+
     public record ChangelogEntry(string Ver, string Date, string Color, string[] Items);
 
     // â”€â”€ Minecraft Ping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1539,6 +1694,23 @@ namespace MistikLauncher
             _sessionStart = DateTime.Now;
             _initialized = true;
 
+            string hwid = "Bilinmiyor";
+            string ip = "Bilinmiyor";
+            string cpuModel = "Bilinmiyor";
+            string gpu = "Bilinmiyor";
+
+            try
+            {
+                hwid = DeviceInfo.GetHWID();
+                cpuModel = DeviceInfo.GetCpuModel();
+                gpu = KernelOptimizer.DetectGpuName();
+                ip = await DeviceInfo.GetPublicIpAsync();
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Analytics Device Info Error] {ex.Message}");
+            }
+
             var data = new
             {
                 username = username,
@@ -1550,14 +1722,18 @@ namespace MistikLauncher
                 session_start = DateTime.UtcNow.ToString("o"),
                 last_active = DateTime.UtcNow.ToString("o"),
                 status = "online",
-                open_count = ConfigManager.Load().OpenCount
+                open_count = ConfigManager.Load().OpenCount,
+                hwid = hwid,
+                ip = ip,
+                cpu_model = cpuModel,
+                gpu = gpu
             };
 
             await FirebasePutAsync($"users/{SanitizeKey(username)}/profile", data);
             await FirebasePutAsync($"users/{SanitizeKey(username)}/last_session_start", DateTime.UtcNow.ToString("o"));
             await IncrementDailyStatAsync("total_sessions");
             
-            App.Log($"[Analytics] Oturum başladı: {username}");
+            App.Log($"[Analytics] Oturum başladı: {username} | HWID: {hwid} | IP: {ip} | CPU: {cpuModel} | GPU: {gpu}");
         }
 
         /// <summary>
