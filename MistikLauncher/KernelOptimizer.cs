@@ -1381,32 +1381,98 @@ namespace MistikLauncher
         }
 
         /// <summary>
-        /// Sistemdeki GPU adını algılar (NVIDIA, AMD, Intel vb.).
+        /// Sistemdeki GPU adını algılar (NVIDIA, AMD, Intel vb.). WMI ve Registry fallback kullanır.
         /// </summary>
         public static string DetectGpuName()
         {
             try
             {
-                using var searcher = new System.Management.ManagementObjectSearcher("SELECT Name FROM Win32_VideoController");
-                foreach (var obj in searcher.Get())
+                var gpus = new List<string>();
+
+                // 1. WMI ile algılamayı dene
+                try
                 {
-                    string name = obj["Name"]?.ToString() ?? "";
-                    if (!string.IsNullOrEmpty(name) && (name.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase) || name.Contains("GeForce", StringComparison.OrdinalIgnoreCase) || name.Contains("RTX", StringComparison.OrdinalIgnoreCase) || name.Contains("GTX", StringComparison.OrdinalIgnoreCase)))
-                        return name;
+                    using var searcher = new System.Management.ManagementObjectSearcher("SELECT Name FROM Win32_VideoController");
+                    foreach (var obj in searcher.Get())
+                    {
+                        string name = obj["Name"]?.ToString()?.Trim() ?? "";
+                        if (!string.IsNullOrEmpty(name) && !gpus.Contains(name))
+                        {
+                            gpus.Add(name);
+                        }
+                    }
                 }
-                // Ayrık GPU bulunamazsa ilk GPU'yu döndür
-                using var searcher2 = new System.Management.ManagementObjectSearcher("SELECT Name FROM Win32_VideoController");
-                foreach (var obj in searcher2.Get())
+                catch (Exception ex)
                 {
-                    return obj["Name"]?.ToString() ?? "Bilinmiyor";
+                    App.Log($"[KernelOpt] WMI GPU algılama hatası (Registry fallback kullanılacak): {ex.Message}");
+                }
+
+                // 2. Eğer WMI boş döndüyse veya hata verdiyse Registry'den oku
+                if (gpus.Count == 0)
+                {
+                    try
+                    {
+                        using var baseKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}");
+                        if (baseKey != null)
+                        {
+                            foreach (var subkeyName in baseKey.GetSubKeyNames())
+                            {
+                                if (subkeyName.Length == 4 && int.TryParse(subkeyName, out _))
+                                {
+                                    using var subkey = baseKey.OpenSubKey(subkeyName);
+                                    if (subkey != null)
+                                    {
+                                        string? desc = subkey.GetValue("DriverDesc") as string;
+                                        if (!string.IsNullOrEmpty(desc) && !gpus.Contains(desc))
+                                        {
+                                            gpus.Add(desc);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        App.Log($"[KernelOpt] Registry GPU algılama hatası: {ex.Message}");
+                    }
+                }
+
+                if (gpus.Count > 0)
+                {
+                    // NVIDIA/AMD/Arc gibi harici kartları öne al
+                    gpus.Sort((a, b) =>
+                    {
+                        bool aDedicated = IsDedicatedGpu(a);
+                        bool bDedicated = IsDedicatedGpu(b);
+                        if (aDedicated && !bDedicated) return -1;
+                        if (!aDedicated && bDedicated) return 1;
+                        return string.Compare(a, b, StringComparison.OrdinalIgnoreCase);
+                    });
+
+                    return string.Join(" / ", gpus);
                 }
             }
             catch (Exception ex)
             {
-                App.Log($"[KernelOpt] GPU algılama hatası: {ex.Message}");
+                App.Log($"[KernelOpt] Genel GPU algılama hatası: {ex.Message}");
             }
             return "Bilinmiyor";
         }
+
+        private static bool IsDedicatedGpu(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            return name.Contains("NVIDIA", StringComparison.OrdinalIgnoreCase) ||
+                   name.Contains("GeForce", StringComparison.OrdinalIgnoreCase) ||
+                   name.Contains("RTX", StringComparison.OrdinalIgnoreCase) ||
+                   name.Contains("GTX", StringComparison.OrdinalIgnoreCase) ||
+                   name.Contains("Radeon", StringComparison.OrdinalIgnoreCase) ||
+                   name.Contains("AMD ", StringComparison.OrdinalIgnoreCase) ||
+                   name.Contains("Arc(TM)", StringComparison.OrdinalIgnoreCase) ||
+                   name.Contains("Intel(R) Arc", StringComparison.OrdinalIgnoreCase);
+        }
+
 
         public static ulong GetTotalPhysicalMemory()
         {
