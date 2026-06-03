@@ -182,7 +182,7 @@ namespace MistikLauncher
                                             {
                                                 key.SetValue("DisplayName", "Mistik Launcher");
                                                 key.SetValue("DisplayIcon", officialExePath + ",0");
-                                                key.SetValue("DisplayVersion", "5.4.0");
+                                                key.SetValue("DisplayVersion", App.LocalVersion.TrimStart('v'));
                                                 key.SetValue("Publisher", "Mistik");
                                                 key.SetValue("InstallLocation", appDataFolder);
                                                 key.SetValue("UninstallString", "\"" + officialUninstallerPath + "\"");
@@ -303,7 +303,7 @@ namespace MistikLauncher
 
                         key.SetValue("DisplayName", "Mistik Launcher", Microsoft.Win32.RegistryValueKind.String);
                         key.SetValue("DisplayIcon", exeToRegister + ",0", Microsoft.Win32.RegistryValueKind.String);
-                        key.SetValue("DisplayVersion", "5.0.0", Microsoft.Win32.RegistryValueKind.String);
+                        key.SetValue("DisplayVersion", App.LocalVersion.TrimStart('v'), Microsoft.Win32.RegistryValueKind.String);
                         key.SetValue("Publisher", "Mistik", Microsoft.Win32.RegistryValueKind.String);
                         key.SetValue("InstallLocation", dirToRegister, Microsoft.Win32.RegistryValueKind.String);
                         key.SetValue("UninstallString", $"\"{uninstallerToRegister}\"", Microsoft.Win32.RegistryValueKind.String);

@@ -35,9 +35,9 @@ namespace MistikLauncherSetup
         private Button minButton;
         private Grid mainGrid;
         
-        private string downloadUrl = "https://github.com/gamer3434/MistikLauncherUltra/releases/download/v5.4.0/MistikLauncherUltra.exe";
+        private string downloadUrl = "https://github.com/gamer3434/MistikLauncherUltra/releases/download/v5.5.0/MistikLauncherUltra.exe";
         private string appDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".mistik_ultra");
-        private string officialExePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".mistik_ultra", "MistikLauncherUltra.exe");
+        private string officialExePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".mistik_ultra", "MistikLauncher.exe");
 
         public SetupWindow()
         {
@@ -111,7 +111,7 @@ namespace MistikLauncherSetup
 
             titleText = new TextBlock
             {
-                Text = "Mistik Launcher v5.4.0 Kurulumu",
+                Text = "Mistik Launcher v5.5.0 Kurulumu",
                 Foreground = HexBrush("#FF6B00"),
                 FontSize = 20,
                 FontWeight = FontWeights.Bold,
@@ -430,6 +430,12 @@ namespace MistikLauncherSetup
                 Dispatcher.Invoke(() => statusText.Text = "Kurulum tamamlandı! Başlatılıyor...");
                 await System.Threading.Tasks.Task.Delay(1000);
 
+                // Temizlik: Single-file extraction hatalarını önlemek için temp .net klasörünü temizle
+                try {
+                    string dotNetTemp = Path.Combine(Path.GetTempPath(), ".net", "MistikLauncherUltra");
+                    if (Directory.Exists(dotNetTemp)) Directory.Delete(dotNetTemp, true);
+                } catch { }
+
                 // Uygulamayı başlat
                 Process.Start(new ProcessStartInfo(officialExePath)
                 {
@@ -478,7 +484,7 @@ namespace MistikLauncherSetup
                     {
                         key.SetValue("DisplayName", "Mistik Launcher");
                         key.SetValue("DisplayIcon", exePath + ",0");
-                        key.SetValue("DisplayVersion", "5.4.0");
+                        key.SetValue("DisplayVersion", "5.5.0");
                         key.SetValue("Publisher", "Mistik");
                         key.SetValue("InstallLocation", appDir);
                         key.SetValue("UninstallString", "\"" + uninstallerPath + "\"");

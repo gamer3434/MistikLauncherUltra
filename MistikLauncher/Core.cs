@@ -31,7 +31,7 @@ namespace MistikLauncher
         [JsonProperty("auto_close")] public bool   AutoClose  { get; set; } = true;
         [JsonProperty("friends")]    public List<string> Friends     { get; set; } = new();
         [JsonProperty("friend_codes")] public List<string> FriendCodes { get; set; } = new();
-        [JsonProperty("version_code")] public string VersionCode { get; set; } = "v5.2.1";
+        [JsonProperty("version_code")] public string VersionCode { get; set; } = "v5.5.0";
         [JsonProperty("open_count")]   public int OpenCount   { get; set; } = 0;
         [JsonProperty("github_user")]  public string GithubUser { get; set; } = "Musta";
         [JsonProperty("tunnel_gateway")] public int TunnelGateway { get; set; } = 0; // 0=bore.pub 1=Özel SSH
@@ -84,7 +84,7 @@ namespace MistikLauncher
         public static readonly string GameDir  = System.IO.Path.Combine(AppData, "game");
         public static readonly string ModsDir  = System.IO.Path.Combine(GameDir, "mods");
         public static readonly string LogFile  = System.IO.Path.Combine(AppData, "launcher.log");
-        public const  string LocalVersion = "v5.4.0";
+        public const  string LocalVersion = "v5.5.0";
         public const  string AdminPassword = "mustafa3434";
 
         public static readonly List<ServerEntry> Servers = new()
@@ -100,6 +100,17 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v5.5.0","2026-06-03","#FF6B00", new[]{ 
+                "Otomatik sertifika kurulumu eklendi (SmartScreen uyarısı kaldırıldı)",
+                "Güncelleme kısır döngüsü düzeltildi",
+                "Kararlı sürüm yayınlandı",
+                "Gelişmiş NVIDIA App ve optimizasyon entegrasyonu"
+            }),
+            new("v5.4.0","2026-06-01","#00FFCC", new[]{ 
+                "Bağımsız .NET Framework 4.8 Kaldırıcısı (Uninstaller) eklendi",
+                "Kilitli dosya güncelleme çakışmaları çözüldü",
+                "Hızlı ve sessiz AppData kurulumu entegre edildi"
+            }),
             new("v5.3.0","2026-05-27","#2EB82E", new[]{ 
                 "Toplu Mod Sürüm Taşıyıcı (Bulk Mod Migrator) eklendi – Kurulu modları tek tıkla farklı sürümlere taşır",
                 "Sürüm değiştirince modların askıdan indirilmemesi hatası tamamen giderildi",

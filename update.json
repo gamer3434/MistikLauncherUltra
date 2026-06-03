@@ -1,5 +1,5 @@
 {
   "version": "v5.5.0",
   "url": "https://github.com/gamer3434/MistikLauncherUltra/releases/download/v5.5.0/MistikLauncherUltra.exe",
-  "changelog": "• Otomatik sertifika kurulumu eklendi (SmartScreen uyarisi kaldirildi).\n• Kurulum hatalari tamamen giderildi.\n• Kararli surum yayinlandi.\n• Gelismis NVIDIA App ve optimizasyon entegrasyonu."
+  "changelog": "• Otomatik sertifika kurulumu eklendi (SmartScreen uyarısı kaldırıldı).\n• Güncelleme kısır döngüsü düzeltildi.\n• Kararlı sürüm yayınlandı.\n• Gelişmiş NVIDIA App ve optimizasyon entegrasyonu."
 }

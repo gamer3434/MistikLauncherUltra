@@ -21,7 +21,7 @@ namespace MistikLauncher.Pages
 
             // Announcement
             var ann = PageHelpers.Card("#122c1b", 12, "#2EB82E"); ann.Margin = new Thickness(0, 14, 0, 0);
-            ann.Child = PageHelpers.Lbl("Mistik Launcher Ultra v5.0 - C# WPF - Antivirus sorunu yok!", 13, "#2EB82E", true, new Thickness(20, 14, 20, 14));
+            ann.Child = PageHelpers.Lbl($"Mistik Launcher Ultra {App.LocalVersion} - C# WPF - Antivirus sorunu yok!", 13, "#2EB82E", true, new Thickness(20, 14, 20, 14));
             sp.Children.Add(ann);
 
             // Stats row
