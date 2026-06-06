@@ -87,6 +87,7 @@ namespace MistikLauncher.Pages
                     string downloadUrl = "https://github.com/gamer3434/MistikLauncherUltra/releases/download/v5.3.0/auto-mcs.exe";
                     
                     using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+                    client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 MistikLauncher");
                     
                     // Progress bar veya durumu güncellemek için indirme işlemi
                     await Task.Run(async () =>

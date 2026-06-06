@@ -64,20 +64,17 @@ namespace MistikLauncher.Pages
             var autoMcsBtn = PageHelpers.MkBtn("Sunucu Kur (Auto-MCS)", "#222222");
             autoMcsBtn.Margin = new Thickness(0, 0, 8, 8);
             autoMcsBtn.Click += async (_, _) => {
+                string exePath = System.IO.Path.Combine(App.GameDir, "auto-mcs.exe");
+                if (!System.IO.File.Exists(exePath)) {
+                    MessageBox.Show("Auto-MCS henüz kurulmamış. İndirme ve kurulum sayfasına yönlendiriliyorsunuz...", "Kurulum Gerekli", MessageBoxButton.OK, MessageBoxImage.Information);
+                    main.Navigate("Server");
+                    return;
+                }
+
                 try {
                     autoMcsBtn.IsEnabled = false;
                     autoMcsBtn.Content = "Açılıyor...";
                     await Task.Run(() => {
-                        string exePath = System.IO.Path.Combine(App.GameDir, "auto-mcs.exe");
-                        if (!System.IO.File.Exists(exePath)) {
-                            using var stream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("MistikLauncher.Resources.auto-mcs.exe");
-                            if (stream != null) {
-                                using var fs = System.IO.File.Create(exePath);
-                                stream.CopyTo(fs);
-                            } else {
-                                throw new Exception("Gömülü auto-mcs.exe dosyası bulunamadı!");
-                            }
-                        }
                         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo {
                             FileName = exePath,
                             UseShellExecute = true

@@ -287,6 +287,77 @@ namespace MistikLauncher.Pages
             elyCard.Child = elySp;
             sp.Children.Add(elyCard);
 
+            // ⚡ CustomSkinLoader (Cilt Yaması) Kartı
+            var cslCard = PageHelpers.Card("#16121e", 12, "#A349A4", new Thickness(0, 10, 0, 0));
+            var cslSp = new StackPanel { Margin = new Thickness(20) };
+            cslSp.Children.Add(PageHelpers.Lbl("⚡ CustomSkinLoader (Cilt Yaması)", 15, "#A349A4", true));
+            cslSp.Children.Add(PageHelpers.Lbl("Arkadaşlarınızın skinlerini oyunda görebilmek ve kendi skininizi diğer oyunculara gösterebilmek için CustomSkinLoader yaması gereklidir. Aşağıdaki butona tıklayarak sürümünüze uygun CustomSkinLoader modunu tek tıkla kurabilirsiniz.", 11, "#CCCCCC", wrap: TextWrapping.Wrap));
+            
+            var cslBtnRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) };
+            var cslInstallBtn = PageHelpers.MkBtn("⚡ CustomSkinLoader Modunu Kur", "#A349A4", 240);
+            cslInstallBtn.Height = 35;
+            
+            cslInstallBtn.Click += async (_, _) => {
+                var currentVer = main.Config.Version ?? "";
+                var mcVersion = "1.21.1";
+                var mcMatch = System.Text.RegularExpressions.Regex.Match(currentVer, @"1\.\d+(\.\d+)?");
+                if (mcMatch.Success) mcVersion = mcMatch.Value;
+
+                var isFabric = currentVer.Contains("fabric", StringComparison.OrdinalIgnoreCase);
+                var isForge = currentVer.Contains("forge", StringComparison.OrdinalIgnoreCase);
+                
+                if (!isFabric && !isForge)
+                {
+                    MessageBox.Show("CustomSkinLoader yamasını kurabilmek için öncelikle Fabric veya Forge tabanlı bir sürüm seçmelisiniz.\n\nLütfen sol menüden 'Sürüm İndir' sayfasına giderek bir Fabric veya Forge sürümü yükleyin ve seçin.", "Uyumsuz Sürüm", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                cslInstallBtn.IsEnabled = false;
+                cslInstallBtn.Content = "Kuruluyor...";
+
+                try
+                {
+                    using var http = new HttpClient();
+                    http.DefaultRequestHeaders.Add("User-Agent", "MistikLauncher/5.0");
+                    var resp = await http.GetStringAsync("https://api.modrinth.com/v2/project/customskinloader/version");
+                    var versions = Newtonsoft.Json.Linq.JArray.Parse(resp);
+
+                    var targetVersionObj = ModManagerPage.FindCompatibleVersionSmart(versions, mcVersion, isFabric, isForge);
+                    if (targetVersionObj != null)
+                    {
+                        var fileUrl = targetVersionObj["files"]?[0]?["url"]?.ToString();
+                        var fname   = targetVersionObj["files"]?[0]?["filename"]?.ToString() ?? "CustomSkinLoader.jar";
+                        if (string.IsNullOrEmpty(fileUrl)) throw new Exception("İndirme adresi (URL) bulunamadı!");
+
+                        Directory.CreateDirectory(App.ModsDir);
+                        var destFile = Path.Combine(App.ModsDir, fname);
+
+                        var bytes = await http.GetByteArrayAsync(fileUrl);
+                        await File.WriteAllBytesAsync(destFile, bytes);
+
+                        MessageBox.Show($"CustomSkinLoader ({fname}) başarıyla indirildi ve mod klasörünüze kuruldu!\n\nArtık oyunda diğer oyuncuların skinlerini görebilirsiniz.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Şu anki oyun sürümünüz ({mcVersion}) veya mod yükleyiciniz ({ (isFabric ? "Fabric" : "Forge") }) için uyumlu bir CustomSkinLoader sürümü Modrinth üzerinde bulunamadı!", "Uyumsuz Sürüm", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Kurulum sırasında bir hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                finally
+                {
+                    cslInstallBtn.IsEnabled = true;
+                    cslInstallBtn.Content = "⚡ CustomSkinLoader Modunu Kur";
+                }
+            };
+
+            cslBtnRow.Children.Add(cslInstallBtn);
+            cslSp.Children.Add(cslBtnRow);
+            cslCard.Child = cslSp;
+            sp.Children.Add(cslCard);
+
             Content = new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         }
 

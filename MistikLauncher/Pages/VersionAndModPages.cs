@@ -1526,7 +1526,7 @@ namespace MistikLauncher.Pages
             }
         }
 
-        private static JToken? FindCompatibleVersion(JArray versions, string mcVersion, bool isFabric, bool isForge)
+        internal static JToken? FindCompatibleVersion(JArray versions, string mcVersion, bool isFabric, bool isForge)
         {
             // Pass 1: Release only — tam sürüm eşleşmesi
             foreach (var v in versions)
@@ -1560,7 +1560,7 @@ namespace MistikLauncher.Pages
         /// en yakın patch sürümünü deneyerek en uyumlu versiyonu bulur.
         /// Asla yanlış sürüm indirmez!
         /// </summary>
-        private static JToken? FindCompatibleVersionSmart(JArray versions, string mcVersion, bool isFabric, bool isForge)
+        internal static JToken? FindCompatibleVersionSmart(JArray versions, string mcVersion, bool isFabric, bool isForge)
         {
             // 1. Tam eşleşme (normal yol)
             var exact = FindCompatibleVersion(versions, mcVersion, isFabric, isForge);
@@ -1605,7 +1605,7 @@ namespace MistikLauncher.Pages
             return null;
         }
 
-        private static bool CheckCompatibility(JToken versionObj, string mcVersion, bool isFabric, bool isForge)
+        internal static bool CheckCompatibility(JToken versionObj, string mcVersion, bool isFabric, bool isForge)
         {
             var gameVers = versionObj["game_versions"] as JArray;
             var loaders = versionObj["loaders"] as JArray;
