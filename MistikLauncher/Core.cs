@@ -31,7 +31,7 @@ namespace MistikLauncher
         [JsonProperty("auto_close")] public bool   AutoClose  { get; set; } = true;
         [JsonProperty("friends")]    public List<string> Friends     { get; set; } = new();
         [JsonProperty("friend_codes")] public List<string> FriendCodes { get; set; } = new();
-        [JsonProperty("version_code")] public string VersionCode { get; set; } = "v5.5.0";
+        [JsonProperty("version_code")] public string VersionCode { get; set; } = "v5.5.1";
         [JsonProperty("open_count")]   public int OpenCount   { get; set; } = 0;
         [JsonProperty("github_user")]  public string GithubUser { get; set; } = "Musta";
         [JsonProperty("tunnel_gateway")] public int TunnelGateway { get; set; } = 0; // 0=bore.pub 1=Özel SSH
@@ -84,7 +84,7 @@ namespace MistikLauncher
         public static readonly string GameDir  = System.IO.Path.Combine(AppData, "game");
         public static readonly string ModsDir  = System.IO.Path.Combine(GameDir, "mods");
         public static readonly string LogFile  = System.IO.Path.Combine(AppData, "launcher.log");
-        public const  string LocalVersion = "v5.5.0";
+        public const  string LocalVersion = "v5.5.1";
         public const  string AdminPassword = "mustafa3434";
 
         public static readonly List<ServerEntry> Servers = new()
@@ -100,7 +100,12 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
-            new("v5.5.0","2026-06-03","#FF6B00", new[]{ 
+            new("v5.5.1","2026-06-07","#FF6B00", new[]{ 
+                "CustomSkinLoader Cilt Yaması entegrasyonu Karakter Odasına eklendi",
+                "Mod Sürüm Taşıyıcı hedef sürüm çakışmaları ve sürüm listesi düzeltildi",
+                "Auto-MCS sunucu indiricisi GitHub 403 engellemeleri tamamen çözüldü"
+            }),
+            new("v5.5.0","2026-06-03","#00FFCC", new[]{ 
                 "Otomatik sertifika kurulumu eklendi (SmartScreen uyarısı kaldırıldı)",
                 "Güncelleme kısır döngüsü düzeltildi",
                 "Kararlı sürüm yayınlandı",
