@@ -28,6 +28,7 @@ namespace MistikLauncher.Pages
             skinInfoSp.Children.Add(PageHelpers.Lbl("• Oyununuz Açıkken Değiştirme: Oyun açıkken skin değiştirdiyseniz, oyun içinde F3 + T tuşlarına basarak kaynak paketlerini yenileyin veya oyunu yeniden başlatın.", 10, "#CCCCCC", wrap: TextWrapping.Wrap));
             skinInfoSp.Children.Add(PageHelpers.Lbl("• Çok Oyunculu Sunucular: Özel skin eklentisi (SkinsRestorer vb.) olan sunucularda sunucu taraflı skin sistemi geçerlidir. Mistik Skin Sistemi, Tek Oyunculu dünyalarda ve normal yerel ağ sunucularında çalışır.", 10, "#CCCCCC", wrap: TextWrapping.Wrap));
             skinInfoSp.Children.Add(PageHelpers.Lbl("• Paket Kontrolü: Oyun içinde Ayarlar > Kaynak Paketleri menüsünden 'Mistik Launcher Ozel Skin' paketinin aktif ve listede en üstte olduğundan emin olun.", 10, "#CCCCCC", wrap: TextWrapping.Wrap));
+            skinInfoSp.Children.Add(PageHelpers.Lbl("• Çok Oyunculu & Arkadaş Skin Çakışması: Çevrimdışı (offline) modda skin kurduğunuzda, oyun tüm varsayılan Steve/Alex modellerini sizin skininizle değiştirir (arkadaşınız da sizde kendi skininizle görünür). Bunu çözmek için 'Ayarlar' sayfasından Giriş Türü'nü Ely.by (Önerilen) olarak ayarlayabilir veya aşağıdaki 'CustomSkinLoader' modunu kurabilirsiniz.", 10, "#FFD200", wrap: TextWrapping.Wrap, bold: true));
             skinInfoCard.Child = skinInfoSp;
             sp.Children.Add(skinInfoCard);
 
@@ -365,6 +366,7 @@ namespace MistikLauncher.Pages
         {
             try {
                 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                http.DefaultRequestHeaders.Add("User-Agent", "MistikLauncher/5.0");
                 byte[]? skinBytes = null;
 
                 // Önce Ely.by'den JSON texture verisi çekmeyi dene

@@ -929,7 +929,7 @@ namespace MistikLauncher.Pages
                 Background = Brushes.White, Foreground = Brushes.Black, FontWeight = FontWeights.Bold
             };
             
-            var uniqueMcVersions = new HashSet<string> { "1.26", "1.25", "1.24", "1.23", "1.22" };
+            var uniqueMcVersions = new HashSet<string>();
             foreach (var item in _main.VerBox.Items)
             {
                 var itemStr = item?.ToString() ?? "";
@@ -966,12 +966,26 @@ namespace MistikLauncher.Pages
             if (targetVerCombo.Items.Count > 0)
             {
                 targetVerCombo.SelectedIndex = 0;
+                
+                var activeVer = _main.Config.Version ?? "";
+                var activeMcMatch = System.Text.RegularExpressions.Regex.Match(activeVer, @"1\.\d+(\.\d+)?");
+                if (activeMcMatch.Success && targetVerCombo.Items.Contains(activeMcMatch.Value))
+                {
+                    targetVerCombo.SelectedItem = activeMcMatch.Value;
+                }
             }
             else
             {
                 var migVersions = new[] { "1.21.1", "1.20.1", "1.19.2", "1.18.2", "1.16.5", "1.12.2" };
                 foreach (var v in migVersions) targetVerCombo.Items.Add(v);
                 targetVerCombo.SelectedIndex = 0;
+                
+                var activeVer = _main.Config.Version ?? "";
+                var activeMcMatch = System.Text.RegularExpressions.Regex.Match(activeVer, @"1\.\d+(\.\d+)?");
+                if (activeMcMatch.Success && targetVerCombo.Items.Contains(activeMcMatch.Value))
+                {
+                    targetVerCombo.SelectedItem = activeMcMatch.Value;
+                }
             }
             migControls.Children.Add(targetVerCombo);
 
