@@ -1,5 +1,5 @@
 {
-  "version": "v5.5.1",
-  "url": "https://github.com/gamer3434/MistikLauncherUltra/releases/download/v5.5.1/MistikLauncherUltra.exe",
-  "changelog": "• CustomSkinLoader Cilt Yaması entegrasyonu Karakter Odasına eklendi.\n• Mod Sürüm Taşıyıcı hedef sürüm çakışmaları ve sürüm listesi düzeltildi.\n• Auto-MCS sunucu indiricisi GitHub 403 engellemeleri tamamen çözüldü."
+  "version": "v5.5.2",
+  "url": "https://github.com/gamer3434/MistikLauncherUltra/releases/download/v5.5.2/MistikLauncherUltra.exe",
+  "changelog": "• Karakter cilt (skin) kilitleme hataları düzeltildi.\n• Minecraft açıkken skin değiştirmede uyarı penceresi eklendi.\n• CustomSkinLoader ve Ely.by skin çakışması uyarısı detaylandırıldı."
 }
