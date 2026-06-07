@@ -1489,7 +1489,7 @@ namespace MistikLauncher
             return 1;
         }
 
-        public async Task PrepareSkinPackAsync(string version)
+        public async Task<bool> PrepareSkinPackAsync(string version)
         {
             try
             {
@@ -1505,7 +1505,7 @@ namespace MistikLauncher
                     if (string.IsNullOrEmpty(user) || user == "Oyuncu")
                     {
                         EnsureMistikSkinPackEnabled(false);
-                        return;
+                        return true;
                     }
 
                     // Clear cached avatar files so the bottom circular preview updates immediately!
@@ -1543,7 +1543,10 @@ namespace MistikLauncher
                     {
                         if (Directory.Exists(packDir))
                         {
-                            try { Directory.Delete(packDir, true); } catch { }
+                            try { Directory.Delete(packDir, true); } 
+                            catch { 
+                                // Directory delete failed (locked by game), but we'll try to write files directly
+                            }
                         }
                         Directory.CreateDirectory(textureDirOld);
                         Directory.CreateDirectory(textureDirNewWide);
@@ -1560,6 +1563,7 @@ namespace MistikLauncher
 
                         EnsureMistikSkinPackEnabled(true);
                         App.Log($"Skin for '{user}' successfully downloaded and applied with pack_format {format}.");
+                        return true;
                     }
                     else
                     {
@@ -1569,6 +1573,7 @@ namespace MistikLauncher
                         {
                             try { Directory.Delete(packDir, true); } catch { }
                         }
+                        return false;
                     }
                 }
                 else if (Config.SkinType == "local")
@@ -1578,7 +1583,10 @@ namespace MistikLauncher
                     {
                         if (Directory.Exists(packDir))
                         {
-                            try { Directory.Delete(packDir, true); } catch { }
+                            try { Directory.Delete(packDir, true); } 
+                            catch { 
+                                // Directory delete failed, try to copy files directly
+                            }
                         }
                         Directory.CreateDirectory(textureDirOld);
                         Directory.CreateDirectory(textureDirNewWide);
@@ -1595,10 +1603,12 @@ namespace MistikLauncher
 
                         EnsureMistikSkinPackEnabled(true);
                         App.Log($"Local skin applied successfully from: {filePath} with pack_format {format}.");
+                        return true;
                     }
                     else
                     {
                         App.Log($"Local skin file does not exist: {filePath}");
+                        return false;
                     }
                 }
                 else
@@ -1608,11 +1618,13 @@ namespace MistikLauncher
                     {
                         try { Directory.Delete(packDir, true); } catch { }
                     }
+                    return true;
                 }
             }
             catch (Exception ex)
             {
                 App.Log($"PrepareSkinPackAsync error: {ex.Message}");
+                return false;
             }
         }
 

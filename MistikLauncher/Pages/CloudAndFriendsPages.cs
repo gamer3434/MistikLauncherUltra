@@ -106,8 +106,15 @@ namespace MistikLauncher.Pages
                 {
                     main.Config.User = n; main.Config.SkinType = "username"; main.Config.SkinUser = n;
                     ConfigManager.Save(main.Config); main.ReloadConfig();
-                    await main.PrepareSkinPackAsync(main.Config.Version);
-                    MessageBox.Show($"Karakteriniz '{n}' skini başarıyla indirildi ve kuruldu!\n\nEğer oyununuz açıksa F3 + T tuşlarına basarak kaynak paketini yenileyin.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                    bool success = await main.PrepareSkinPackAsync(main.Config.Version);
+                    if (success)
+                    {
+                        MessageBox.Show($"Karakteriniz '{n}' skini başarıyla indirildi ve kuruldu!\n\nEğer oyununuz açıkken değiştirdiyseniz, oyun içinde F3 + T tuşlarına basarak kaynak paketini yenileyin.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Karakter kurulamadı. İnternet bağlantınızı kontrol edin veya oyununuz (Minecraft) şu an açık ve skin dosyasını kilitliyor olabilir. Lütfen oyunu kapatıp tekrar deneyin.", "Hata", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -130,8 +137,15 @@ namespace MistikLauncher.Pages
                 updateBtn.Content = "Güncelleniyor...";
                 try
                 {
-                    await main.PrepareSkinPackAsync(main.Config.Version);
-                    MessageBox.Show("Karakter skininiz başarıyla güncellendi ve yeniden uygulandı!\n\nEğer oyununuz açıksa F3 + T tuşlarına basarak kaynak paketini yenileyebilirsiniz.", "Güncellendi", MessageBoxButton.OK, MessageBoxImage.Information);
+                    bool success = await main.PrepareSkinPackAsync(main.Config.Version);
+                    if (success)
+                    {
+                        MessageBox.Show("Karakter skininiz başarıyla güncellendi ve yeniden uygulandı!\n\nEğer oyununuz açıksa F3 + T tuşlarına basarak kaynak paketini yenileyebilirsiniz.", "Güncellendi", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Skin güncellenemedi. Oyununuz (Minecraft) şu an açık ve skin dosyasını kilitliyor olabilir. Lütfen oyunu kapatıp tekrar deneyin.", "Hata", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -431,10 +445,17 @@ namespace MistikLauncher.Pages
                 ConfigManager.Save(main.Config); main.ReloadConfig();
 
                 // Ortak skin paketi hazirlama mantigini cagir (boylece dinamik pack_format ve en yuksek oncelik kurallari uygulanir)
-                await main.PrepareSkinPackAsync(main.Config.Version);
+                bool success = await main.PrepareSkinPackAsync(main.Config.Version);
                 main.LoadAvatar();
 
-                MessageBox.Show("Ozel skininiz basariyla 'Mistik Ozel Skin' kaynak paketi olarak yuklendi ve aktif edildi!\n\nOyuna girdiginizde karakteriniz otomatik olarak hazir olacaktir!", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
+                if (success)
+                {
+                    MessageBox.Show("Ozel skininiz basariyla 'Mistik Ozel Skin' kaynak paketi olarak yuklendi ve aktif edildi!\n\nOyuna girdiginizde karakteriniz otomatik olarak hazir olacaktir!", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show("Özel skin kaynak paketi hazırlanamadı. Oyununuz (Minecraft) şu an açık ve skin dosyasını kilitliyor olabilir. Lütfen oyunu kapatıp tekrar deneyin.", "Hata", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
             } catch (Exception ex) {
                 MessageBox.Show($"Skin yuklenirken hata olustu: {ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
             }
