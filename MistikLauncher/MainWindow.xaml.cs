@@ -318,6 +318,8 @@ namespace MistikLauncher
             }
 
             page.Resources[typeof(ComboBox)]=FindResource(typeof(ComboBox));
+            foreach(var resource in ColorThemes.Resources) page.Resources[resource.Key]=resource.Value;
+            page.Resources["ThemeActionText"]=ColorThemes.ActionText;
             if(page is ILanguagePage localized) localized.RefreshLanguage();
             MainFrame.Navigate(page);
         }
