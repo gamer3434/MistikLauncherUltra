@@ -156,11 +156,35 @@ public class ModernSettingsPage : Page, ILanguagePage
         var windowContent=new StackPanel();
         windowContent.Children.Add(PageHelpers.Lbl(Localization.T("windowStyleTitle"),18,"#EFF5FF",true));
         windowContent.Children.Add(PageHelpers.Lbl(Localization.T("windowStyleHelp"),13,"#ADBED6",pad:new Thickness(0,8,0,12),wrap:TextWrapping.Wrap));
-        var styleChoice=new ComboBox { ItemsSource=MainWindow.WindowButtonStyles.Select(name=>Localization.T("style"+name)).ToArray(),SelectedIndex=Math.Max(0,Array.IndexOf(MainWindow.WindowButtonStyles,main.Config.WindowButtons)),MinHeight=40 };
-        styleChoice.SelectionChanged+=(_,_)=> {
-            if(styleChoice.SelectedIndex>=0) main.SetWindowButtons(MainWindow.WindowButtonStyles[styleChoice.SelectedIndex]);
-        };
-        windowContent.Children.Add(styleChoice); windowCard.Child=windowContent; stack.Children.Insert(3,windowCard);
+        var styleGrid=new System.Windows.Controls.Primitives.UniformGrid { Columns=4 };
+        var styleTiles=new List<(string style,Border tile,TextBlock tick)>();
+        void UpdateWindowSelection() {
+            foreach(var entry in styleTiles) {
+                bool selected=main.Config.WindowButtons==entry.style;
+                entry.tile.BorderBrush=selected?ColorThemes.Brush("#00A3FF"):PageHelpers.HexBrush("#36363C");
+                entry.tile.BorderThickness=new Thickness(selected?2:1);
+                entry.tile.Background=selected?ColorThemes.Brush("#274565"):ColorThemes.Brush("#0D1727");
+                entry.tick.Visibility=selected?Visibility.Visible:Visibility.Hidden;
+            }
+        }
+        foreach(var style in MainWindow.WindowButtonStyles) {
+            var preview=new StackPanel { Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,4,0,14),IsHitTestVisible=false };
+            foreach(var action in new[]{"minimize","close"}) {
+                var sample=MainWindow.WindowButtonPreview(style,action); sample.Margin=new Thickness(3); preview.Children.Add(sample);
+            }
+            var content=new StackPanel { Margin=new Thickness(8,14,8,14) }; content.Children.Add(preview);
+            var title=PageHelpers.Lbl(Localization.T("style"+style),13,"#EFF5FF",true,wrap:TextWrapping.Wrap); title.TextAlignment=TextAlignment.Center; content.Children.Add(title);
+            var help=PageHelpers.Lbl(Localization.T("styleHelp"+style),12,"#ADBED6",pad:new Thickness(0,8,0,0),wrap:TextWrapping.Wrap); help.TextAlignment=TextAlignment.Center; content.Children.Add(help);
+            help.FontWeight=FontWeights.Normal;
+            var grid=new Grid(); grid.Children.Add(content);
+            var tick=PageHelpers.Lbl("✓",14,"#FFFFFF",true); tick.HorizontalAlignment=HorizontalAlignment.Right; tick.VerticalAlignment=VerticalAlignment.Top; tick.Margin=new Thickness(6); grid.Children.Add(tick);
+            var tile=new Border { Child=grid,CornerRadius=new CornerRadius(14),MinHeight=164 };
+            var button=PageHelpers.MkBtn("","#0D1727"); button.Content=tile; button.Padding=new Thickness(0); button.Template=((Button)swatches.Children[0]).Template; button.Margin=new Thickness(0,0,10,10);
+            System.Windows.Automation.AutomationProperties.SetName(button,Localization.T("style"+style));
+            button.Click+=(_,_)=> { main.SetWindowButtons(style); UpdateWindowSelection(); };
+            styleTiles.Add((style,tile,tick)); styleGrid.Children.Add(button);
+        }
+        UpdateWindowSelection(); windowContent.Children.Add(styleGrid); windowCard.Child=windowContent; stack.Children.Insert(3,windowCard);
         Label("username"); user=PageHelpers.DarkTextBox(main.Config.User); user.MaxLength=16; stack.Children.Add(user);
         stack.Children.Add(PageHelpers.Lbl(Localization.T("usernameHelp"),13,"#BDCAD8",wrap:TextWrapping.Wrap));
         Label("memory"); ram=PageHelpers.DarkTextBox(main.Config.Ram.ToString()); stack.Children.Add(ram);
