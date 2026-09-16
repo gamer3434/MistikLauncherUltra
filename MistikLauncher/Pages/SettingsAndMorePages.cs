@@ -17,7 +17,7 @@ namespace MistikLauncher.Pages
         public static SolidColorBrush HexBrush(string hex) => new(HexColor(hex));
 
         public static TextBlock Lbl(string text, double size = 13, string color = "#FFFFFF",
-            bool bold = false, Thickness? pad = null, TextWrapping wrap = TextWrapping.NoWrap)
+            bool bold = false, Thickness? pad = null, TextWrapping wrap = TextWrapping.Wrap)
         {
             var tb = new TextBlock {
                 Text = text, FontSize = size, Foreground = HexBrush(color),
@@ -51,15 +51,8 @@ namespace MistikLauncher.Pages
 
         static ControlTemplate RoundedTemplate(string color)
         {
-            var tpl = new ControlTemplate(typeof(Button));
-            var f = new FrameworkElementFactory(typeof(Border));
-            f.SetValue(Border.BackgroundProperty, HexBrush(color));
-            f.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
-            var cp = new FrameworkElementFactory(typeof(ContentPresenter));
-            cp.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-            cp.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
-            f.AppendChild(cp); tpl.VisualTree = f;
-            return tpl;
+            const string xaml = "<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border Name='border' Background='{TemplateBinding Background}' CornerRadius='8' Padding='{TemplateBinding Padding}' BorderThickness='2' BorderBrush='Transparent'><ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='border' Property='BorderBrush' Value='White'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='border' Property='Opacity' Value='0.85'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter TargetName='border' Property='Opacity' Value='0.45'/></Trigger></ControlTemplate.Triggers></ControlTemplate>";
+            return (ControlTemplate)System.Windows.Markup.XamlReader.Parse(xaml);
         }
 
         public static TextBox DarkTextBox(string placeholder = "", double height = 36)
@@ -70,7 +63,7 @@ namespace MistikLauncher.Pages
                 FontSize = 13, Height = height, Text = placeholder,
                 VerticalContentAlignment = VerticalAlignment.Center };
 
-        public static TextBlock SectionTitle(string text) => Lbl(text.ToUpper(), 11, "#666666", true);
+        public static TextBlock SectionTitle(string text) => Lbl(text, 14, "#BDCAD8", true);
     }
 
     // Settings Page
@@ -239,7 +232,7 @@ namespace MistikLauncher.Pages
             var pwdBtn = PageHelpers.MkBtn("Kilidi Aç", "#A349A4", 100);
             pwdBtn.HorizontalAlignment = HorizontalAlignment.Left;
             pwdBtn.Click += (_, _) => {
-                if (pwdBox.Password == "mistik34") // Gizli Şifre
+                if (App.AdminAccessEnabled) // Gizli Şifre
                 {
                     secretCard.Visibility = Visibility.Collapsed;
                     adminCard.Visibility = Visibility.Visible;
@@ -853,7 +846,7 @@ namespace MistikLauncher.Pages
             verifyBtn.Margin = new Thickness(0, 12, 0, 0); verifyBtn.HorizontalAlignment = HorizontalAlignment.Left;
             
             verifyBtn.Click += (_, _) => {
-                if (pwdBox.Password == App.AdminPassword)
+                if (App.AdminAccessEnabled)
                 {
                     _mainContainer.Children.Remove(pwdCard);
                     BuildAdminConsole();

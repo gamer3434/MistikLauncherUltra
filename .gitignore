@@ -41,3 +41,7 @@ MistikLauncherUltra.exe
 MistikLauncher.exe
 MistikSetup.exe
 MistikUninstaller.exe
+
+# Reproducible release output and private obfuscation maps
+artifacts/
+!scripts/*.ps1

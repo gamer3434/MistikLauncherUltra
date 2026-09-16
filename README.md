@@ -1,79 +1,91 @@
-# 🚀 Mistik Launcher
+# Mistik Launcher 6 — Modernization preview / Modernizasyon önizlemesi
 
-[Türkçe](#türkçe) | [English](#english)
+**Preview, not a completed stable replacement.** Home, settings and navigation are bilingual. Full legacy-page translation and actual Minecraft/mod/server verification remain outstanding. GitHub write access was unavailable during validation.
 
----
+**Önizleme; kararlı sürümün tamamlanmış yeni versiyonu değildir.** Ana panel, ayarlar ve gezinme iki dillidir. Eski sayfaların tam çevirisi ile gerçek oyun/mod/sunucu testleri henüz tamamlanmadı. Doğrulama sırasında GitHub yazma erişimi yoktu.
 
 ## Türkçe
 
-Mistik Launcher, modern C# ve WPF (Windows Presentation Foundation) kullanılarak geliştirilmiş, **Riot Vanguard** anti-hile sistemleriyle %100 uyumlu, yüksek performanslı ve premium tasarıma sahip yeni nesil bir Minecraft başlatıcısıdır (Launcher).
+Yeni ana panel oyuncu profili, sürüm, bellek ve hızlı işlemleri gösterir. Ayarlarda oyuncu adı, 1–32 GB bellek, cilt sağlayıcısı, renk ve otomatik kapanma seçilir. Dil listesi anında Türkçe / English geçişi sağlar ve tercih kaydedilir. Sayfa araması, oyun klasörü ve günlük kısayolları eklendi. Slate-blue renkler, Segoe UI yazı tipi, kaydırılabilir sayfalar ve görünür klavye odağı kullanılır.
 
-### 🌟 Öne Çıkan Özellikler
+Ayarlar atomik kaydedilir; önceki değerler `.bak` dosyasından kurtarılır. Donanım/IP telemetrisi ve kimlik doğrulamasız Firebase uzaktan yönetimi kaldırıldı. Sabit yönetici şifreleri ve imzasız otomatik EXE değiştirme devre dışı bırakıldı. Açılışta sessiz kurulum, diğer başlatıcı işlemlerini sonlandırma ve otomatik sistem müdahaleleri kaldırıldı. MQTT için TLS yapılandırıldı; başlangıçta otomatik bağlantı kaldırıldı. Topluluk aktarımının güvenlik/kullanılabilirlik incelemesi sürüyor.
 
-* **🛡️ Vanguard Uyumlu Kurulum Sistemi:** Kısayol oluşturma ve dosya işlemlerinde hiçbir PowerShell betiği kullanılmaz, doğrudan yerel C# kütüphaneleri çalışır. Riot Vanguard anti-hile sistemi tarafından hile/virüs olarak algılanmaz.
-* **🧹 Sahte Sürümlerden Arındırılmış Yapı:** Listede kafa karıştırıcı veya indirilemeyen geçici sürümler (1.26.x vb.) yer almaz. Sadece oynanabilir gerçek Mojang ve Fabric sürümlerini gösterir.
-* **🔄 Dinamik Sürüm Güncelleme:** Arayüze entegre edilmiş **Yenile** butonu ile Mojang ve Fabric API'lerine anında bağlanıp en son çıkan sürümleri (örneğin en yeni Fabric sürümlerini) anında listeye çeker.
-* **🗑️ Güvenli Kaldırma (Anti-Heuristic):** Uygulamayı kaldırmak istediğinde, Windows güvenlik duvarlarını ve anti-virüs sistemlerini tetikleyecek arka plan komut istemleri (`cmd.exe`) çalıştırmak yerine kendini geçici `%TEMP%` dizinine taşıyıp oradan güvenle ve tamamen kaldırır.
-* **🔑 Dijital Sertifikalı & İmzalı Güvenlik:** Tüm `.exe` dosyaları geçerli bir yerel dijital sertifika ile imzalanmıştır, böylece Windows SmartScreen engellerine takılmaz.
+### Çalıştırma
 
-### 🛠️ Kurulum Kılavuzu (Nasıl Yüklenir?)
+Windows x64 için `artifacts/MistikLauncher-6-preview-win-x64.zip` paketini ayrı bir klasöre çıkartıp `MistikLauncher.exe` dosyasını açın. Paket kendi .NET çalışma zamanını içerir. **Paketin tüm dosyalarını bir arada tutun.** Bu önizleme taşınabilirdir; kurulum, kaldırma ve sertifika güven deposuna ekleme işlemleri kapalıdır. Veriler `%APPDATA%\.mistik_ultra` içinde kalır. Denemeden önce oyun klasörünü ve ayarları yedekleyin.
 
-Mistik Launcher'ın kurulumu son derece basittir:
+1. Kenar çubuğunda Türkçe veya English seçin.
+2. Ayarlar sayfasında oyuncu adını ve belleği girip Değişiklikleri kaydet düğmesine basın.
+3. Sürümler sayfasından oyun sürümünü indirin, alt çubukta seçin.
+4. Uyumlu modları seçip Oyunu başlat düğmesini kullanın.
 
-1. **İndirme:** GitHub deposunda bulunan **`MistikLauncher.zip`** dosyasını indir ve içindeki dosyayı klasöre çıkart.
-2. **Kurulum Sihirbazı:** Çıkarttığın `MistikLauncher.exe` dosyasına çift tıkla. Karşına modern, özel tasarımlı **Mistik Launcher Yükleme Sihirbazı** çıkacaktır.
-3. **Yükle Butonu:** Sihirbaz üzerindeki **Yükle** butonuna tıkla. Sistem arka planda:
-   * Gerekli dosyaları hazırlayacak,
-   * Masaüstüne ve Başlat Menüsüne güvenli kısayollar (`Mistik Launcher.lnk`) yerleştirecek,
-   * Denetim Masası "Program Ekle veya Kaldır" ekranına uygulamayı başarıyla kaydedecektir.
-4. **Oyuna Giriş:** Kurulum bittikten sonra masaüstündeki kısayolu kullanarak Launcher'ı açabilir ve dilediğin sürümle Minecraft keyfine başlayabilirsin!
+Gerçek oyun indirme/başlatma, mod taşıma, cilt ve sunucu çalıştırma bu değişiklikte uçtan uca test edilmedi. Microsoft hesabı kimlik doğrulaması eklenmedi. Minecraft ve mod lisanslarına uyun.
 
-### 🎮 Kullanım Rehberi
+### Derleme ve doğrulama
 
-* **Sürüm Listeleme:** Sürüm listesinin en güncel Mojang ve Fabric sürümlerini içermesi için sürüm başlığının hemen yanındaki **🔄 Yenile** butonuna tıklayabilirsin. Bu işlem listeyi anında günceller.
-* **Programı Kaldırma (Uninstaller):** Uygulamayı bilgisayarından tamamen silmek istersen, Windows "Program Ekle veya Kaldır" ekranından **Mistik Launcher** programını bulup **Kaldır** butonuna basman yeterlidir.
+Windows ve .NET 8 SDK gerekir:
 
-### ❓ Sıkça Sorulan Sorular (S.S.S)
+```powershell
+dotnet build MistikLauncher/MistikLauncher.csproj -c Release
+dotnet run --project Validation -c Release -- artifacts/screenshots-ordinary
+./scripts/Build-Protected.ps1
+```
 
-* **"MistikLauncherCS" klasörünün programın çalışması için bilgisayarımda kalması zorunlu mu?**
-  **Hayır, kesinlikle gerekli değildir.** `MistikLauncherCS` klasörü geliştirici kaynak kodlarıdır. Çalışan sürüm için tek başına kurulu `MistikLauncher.exe` yeterlidir.
-* **Neden masaüstündeki tüm dosyaları depoya yüklemiyoruz?**
-  Masaüstün kişisel oyunların ve mouse/ses sürücülerinle doludur. GitHub sayfana sadece bu projeye özel tertemiz kaynak kodlarını ve derlenmiş Launcher dosyalarını yükleyerek profesyonel bir depo oluşturduk.
-
----
+Koruma betiği sabit sürümlü aracı yükler, taşınabilir sürümü derler, korumalı DLL ile doğrulamayı çalıştırır ve ZIP üretir. Özel eşleme ve PDB dosyaları pakete eklenmez. `checksums.json` bozulma tespiti içindir; dijital imza değildir.
 
 ## English
 
-Mistik Launcher is a next-generation Minecraft launcher featuring a high-performance, premium design built using modern C# and WPF (Windows Presentation Foundation). It is designed to be 100% compliant with **Riot Vanguard** anti-cheat systems.
+The redesigned home shows player, version, memory and quick actions. Settings validate player names and 1–32 GB RAM, and offer skin provider, accent and automatic closing. The Turkish / English selector updates at runtime and persists the preference. Navigation search, game-folder and log shortcuts, scrollable layouts, Segoe UI typography and visible keyboard focus improve everyday use.
 
-### 🌟 Key Features
+Configuration writes are atomic with recovery from the previous backup. Hardware/IP telemetry and unauthenticated Firebase administration were removed. Hardcoded administrator access and unsigned automatic executable replacement are disabled. Startup no longer silently installs, terminates other launcher processes or changes system preferences. MQTT uses TLS; automatic startup connection was removed. Community relay security/usability review remains outstanding.
 
-* **🛡️ Vanguard-Compliant Installation:** Uses native C# COM libraries for creating shortcuts and registry management instead of PowerShell scripts. This completely bypasses any heuristic warnings or anti-cheat flags from Riot Vanguard.
-* **🧹 Clean Version Fetching:** Devoid of any fake, non-existent, or buggy versions (e.g., 1.26.x). It only displays authentic, playable Mojang and Fabric versions.
-* **🔄 Dynamic Version Updates:** Features a **Refresh** button integrated into the UI to instantly query Mojang and Fabric APIs, refreshing the version list on-the-fly.
-* **🗑️ Safe Uninstallation (Anti-Heuristic):** To prevent false-positives from anti-virus programs that flag silent CMD scripts, the uninstaller copies itself to the Windows `%TEMP%` directory, fully wipes the install directory, and cleanly terminates.
-* **🔑 Digitally Signed Executables:** All `.exe` files are digitally signed with a local developer certificate, preventing Windows SmartScreen blocks.
+### Run
 
-### 🛠️ Installation Guide (How to Install)
+Extract `artifacts/MistikLauncher-6-preview-win-x64.zip` to a dedicated Windows x64 folder and run `MistikLauncher.exe`. It includes its .NET runtime. **Keep all package files together.** Installation, uninstall execution and certificate trust changes are disabled in this portable preview. Data remains under `%APPDATA%\.mistik_ultra`. Back up settings and game files before trying it.
 
-Mistik Launcher installation is straightforward:
+1. Select Türkçe or English in the sidebar.
+2. Enter player name and RAM in Settings, then Save changes.
+3. Download a version under Versions and select it in the bottom bar.
+4. Choose compatible mods and select Launch game.
 
-1. **Download:** Download **`MistikLauncher.zip`** from this repository and extract it.
-2. **Setup Wizard:** Double-click the extracted `MistikLauncher.exe` file. You will be greeted by the custom-designed, sleek **Mistik Launcher Setup Wizard**.
-3. **Install:** Click the **Install** button. The installer will:
-   * Deploy all target application files,
-   * Safely create desktop and Start Menu shortcuts (`Mistik Launcher.lnk`),
-   * Register the application under Windows Control Panel (Add/Remove Programs).
-4. **Play:** Use the desktop shortcut to start the launcher, select your preferred version, and jump into Minecraft!
+Actual game downloads/launches, mod migration, skins and server execution were not tested end to end. Microsoft account authentication was not added. Respect Minecraft and mod licenses.
 
-### 🎮 Usage Guide
+### Build
 
-* **Updating Versions:** Click the **🔄 Refresh** button next to the version header to dynamically query Mojang and Fabric servers for the latest game versions.
-* **Uninstalling:** Search for "Add or Remove Programs" in Windows, find **Mistik Launcher**, and click **Uninstall**. The custom red/black UI will guide you through a clean wipe.
+Use the three commands above with .NET 8 SDK on Windows. The protection script restores Obfuscar 2.2.49, publishes a self-contained portable build, validates the protected DLL and packages it. Private obfuscation maps and debug symbols are excluded.
 
-### ❓ FAQ
+## Language resources / Dil kaynakları
 
-* **Is the "MistikLauncherCS" folder required to run the launcher?**
-  **No, absolutely not.** The source code directory is only for development and backup. The compiled and installed `MistikLauncher.exe` is completely self-contained and standalone.
-* **Why aren't we committing the whole desktop?**
-  The desktop contains personal shortcuts, video files, games, and unrelated drivers. Pushing it would clutter your repo. We only track the dedicated launcher source code and its official compiled executables.
+Embedded `MistikLauncher/Locales/tr.json` and `en.json` share identical keys. `Localization.T("play")` returns **Oyunu başlat** / **Launch game**. New pages respond immediately to language events. Catalogued legacy strings are updated without recreating running server controllers. Full legacy-page translation remains incomplete.
+
+Gömülü kaynakların anahtarları aynıdır. Yeni sayfalar dil değişikliğine anında yanıt verir; eski sayfaların tam çevirisi sürüyor. Eksik metinler [envanterde](docs/localization-remaining.txt) listelenir.
+
+## Protection limits / Koruma sınırları
+
+Eligible private member names and string constants are obfuscated. WPF entry points and JSON names are preserved. String hiding is reversible; it is not strong encryption and cannot secure embedded secrets. Public source remains readable. This preview is not Authenticode signed; SmartScreen and antivirus behavior cannot be guaranteed.
+
+Özel üyeler ve metin sabitleri gizlenir; WPF/JSON adları korunur. Gizleme geri çevrilebilir; güçlü şifreleme değildir. Açık kaynak okunabilir kalır. Bu önizleme Authenticode imzası taşımaz; antivirüs veya SmartScreen garantisi yoktur.
+
+## Screenshots / Ekran görüntüleri
+
+Real off-screen WPF renders, not a running Minecraft session. / Gerçek WPF görüntüleri; açık Minecraft oturumu değildir.
+
+![English home](docs/screenshots/home-en.png)
+![Türkçe ayarlar](docs/screenshots/settings-tr.png)
+
+## Files / Dosyalar
+
+| File | Purpose / Amaç |
+|---|---|
+| `MistikLauncher/Core.cs` | Config recovery, normalization, telemetry removal, TLS / Ayarlar ve güvenlik |
+| `MistikLauncher/App.xaml.cs` | Portable startup / Taşınabilir açılış |
+| `MistikLauncher/MainWindow.xaml` | Shell, search, language, focus / Ana pencere |
+| `MistikLauncher/MainWindow.xaml.cs` | Runtime switching and navigation / Dil değiştirme |
+| `MistikLauncher/Pages/ModernPages.cs` | Bilingual home and settings / İki dilli sayfalar |
+| `MistikLauncher/Localization.cs` | Embedded resource loader / Dil kaynakları |
+| `MistikLauncher/ReleaseSecurity.cs` | Update and uninstall safeguards / Güvenlik |
+| `scripts/Build-Protected.ps1` | Protected package / Korumalı paket |
+| `Validation/Program.cs` | Twelve checks and WPF renders / On iki denetim |
+| `.github/workflows/validate.yml` | Windows CI / Windows doğrulama |
+
+See [audit and outstanding work](docs/AUDIT.md). / [Denetim ve kalan işler](docs/AUDIT.md).

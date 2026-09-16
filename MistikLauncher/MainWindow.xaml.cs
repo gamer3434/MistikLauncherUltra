@@ -30,20 +30,15 @@ namespace MistikLauncher
         readonly Dictionary<string, Page> _pageCache = new();
         readonly HttpClient _http = new();
         string _accent = "#00A3FF";
+        string _currentNav = "Dash";
         bool _isPopulatingVersionBox = false;
 
         public MainWindow()
         {
-            SetBrowserEmulation();
+
             InitializeComponent();
             Config = ConfigManager.Load();
             Config.OpenCount++;
-            // Clean up and validate config version to prevent launching fake versions like 26.1.1
-            if (!string.IsNullOrEmpty(Config.Version) && (Config.Version.Contains("26.") || Config.Version.Contains("1.26")))
-            {
-                Config.Version = "fabric-loader-0.19.2-1.21.1";
-                Config.LastSyncedVersion = "fabric-loader-0.19.2-1.21.1";
-            }
             ConfigManager.Save(Config);
 
             _accent = Config.Accent switch {
@@ -71,25 +66,65 @@ namespace MistikLauncher
             };
 
             BtnLaunch.Click  += (_, _) => HandleLaunch();
-            BtnDiscord.Click += (_, _) => Open("https://discord.gg/");
-            BtnYoutube.Click += (_, _) => Open("https://www.youtube.com/@kardoeditx99");
+            BtnDiscord.Content = "GitHub";
+            BtnDiscord.Click += (_, _) => Open("https://github.com/gamer3434/MistikLauncherUltra");
+            BtnYoutube.Click += (_, _) => Open("https://github.com/gamer3434/MistikLauncherUltra/releases");
 
+            Localization.SetLanguage(Config.Lang);
+            LanguageBox.SelectedIndex = Localization.Language == "en" ? 1 : 0;
+            LanguageBox.SelectionChanged += (_,_) => SwitchLanguage(LanguageBox.SelectedIndex == 1 ? "English" : "Turkce");
+            NavSearch.TextChanged += (_,_) => FilterNavigation();
+            Localization.Changed += RefreshLanguage;
+            MainFrame.LoadCompleted += (_,_) => Localization.TranslateTree(MainFrame);
+            var languageTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            languageTimer.Tick += (_,_) => Localization.TranslateTree(MainFrame);
+            languageTimer.Start();
+            Closed += (_,_) => { languageTimer.Stop(); Localization.Changed -= RefreshLanguage; _http.Dispose(); };
+            RefreshLanguage();
             Navigate("Dash");
-            _ = StartRelayAsync();
+            // Relay is started only by an explicit user action.
             _ = RelayLoopAsync();
             // Arka planda otomatik güncelleme kontrolü aktif edildi.
-            _ = Task.Delay(2000).ContinueWith(async _ => await CheckCloudUpdateAsync(false));
+
 
             // Firebase Analytics: Oturum başlangıcı
             _ = MistikAnalytics.TrackSessionStartAsync(Config.User ?? "Oyuncu", App.LocalVersion, Config.Version ?? "1.21");
             _ = CheckRemoteSettingsAsync();
-            InitializeStartupOptimizationsAsync();
+
 
             // Kapanışta oturum kaydı
             Closing += async (s, e) =>
             {
                 try { await MistikAnalytics.TrackSessionEndAsync(Config.User ?? "Oyuncu"); } catch { }
             };
+        }
+
+        public void SwitchLanguage(string code)
+        {
+            Config.Lang = code == "English" || code == "en" ? "English" : "Turkce";
+            ConfigManager.Save(Config);
+            Localization.SetLanguage(Config.Lang);
+        }
+        void RefreshLanguage()
+        {
+            BuildNav();
+            BtnLaunch.Content = Localization.T("play");
+            BtnYoutube.Content = Localization.T("releases");
+            SearchLabel.Text = Localization.T("search");
+            SelectNav(_currentNav);
+            NavSearch.ToolTip = Localization.T("search");
+            System.Windows.Automation.AutomationProperties.SetName(NavSearch, Localization.T("search"));
+            StatusLbl.Text = Localization.T("version") + ": " + Config.Version;
+            Localization.TranslateTree(MainFrame);
+            var index = Localization.Language == "en" ? 1 : 0;
+            if (LanguageBox.SelectedIndex != index) LanguageBox.SelectedIndex = index;
+            FilterNavigation();
+        }
+        void FilterNavigation()
+        {
+            foreach (var pair in _navBtns)
+                pair.Value.Visibility = (pair.Value.Content?.ToString() ?? "").Contains(NavSearch.Text, StringComparison.CurrentCultureIgnoreCase)
+                    ? Visibility.Visible : Visibility.Collapsed;
         }
 
         static void Open(string url) =>
@@ -177,14 +212,14 @@ namespace MistikLauncher
             AddNav("Skin",      "👕  Karakter Cildi");
             AddNav("Server",    "🌐  Sunucu Kur");
             AddNav("Opt",       "🚀  Optimizasyon");
-            if (Config.Role == "Yonetici")
+            if (App.AdminAccessEnabled)
                 AddNav("Admin", "👑  Yönetici Paneli");
             AddNav("Settings",  "⚙️  Ayarlar");
         }
 
         void AddNav(string key, string label)
         {
-            var btn = new Button { Content = label, Style = (Style)FindResource("NavBtn") };
+            var btn = new Button { Content = Localization.T(label), Style = (Style)FindResource("NavBtn") };
             btn.Click += (_, _) => Navigate(key);
             NavPanel.Children.Add(btn);
             _navBtns[key] = btn;
@@ -198,6 +233,8 @@ namespace MistikLauncher
 
         public void Navigate(string key)
         {
+            if (key == "Admin") key = "Settings";
+            _currentNav = key;
             SelectNav(key);
 
             // Server sayfası her zaman cache'den gelsin — sunucu kapanmasın!
@@ -205,7 +242,7 @@ namespace MistikLauncher
             if (!_pageCache.TryGetValue(key, out Page? page) || page == null)
             {
                 page = key switch {
-                    "Dash"      => new Pages.DashboardPage(this),
+                    "Dash"      => new Pages.ModernHomePage(this),
                     "Vers"      => new Pages.VersionManagerPage(this),
                     "Mods"      => new Pages.ModManagerPage(this),
                     "Skin"      => new Pages.SkinPage(this),
@@ -216,9 +253,9 @@ namespace MistikLauncher
                     "Admin"     => new Pages.AdminPanelPage(this),
                     "Opt"       => new Pages.OptimizationPage(this),
                     "Guide"     => new Pages.GuidePage(this),
-                    "Settings"  => new Pages.SettingsPage(this),
+                    "Settings"  => new Pages.ModernSettingsPage(this),
                     "Licenses"  => new Pages.LicensesPage(this),
-                    _           => new Pages.DashboardPage(this)
+                    _           => new Pages.ModernHomePage(this)
                 };
                 _pageCache[key] = page;
             }
@@ -2564,107 +2601,7 @@ namespace MistikLauncher
         }
 
 
-        public async Task CheckRemoteSettingsAsync()
-        {
-            try
-            {
-                string username = Config.User ?? "Oyuncu";
-                var sanitized = username.Replace(".", "_").Replace("#", "_").Replace("$", "_").Replace("[", "_").Replace("]", "_").Replace("/", "_");
-                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-                string url = $"https://mistiklauncher-9eb4b-default-rtdb.firebaseio.com/users/{sanitized}/profile.json";
-                var jsonStr = await client.GetStringAsync(url);
-                if (!string.IsNullOrEmpty(jsonStr) && jsonStr != "null")
-                {
-                    var profile = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
-                    
-                    // 1. Ban Kontrolü
-                    bool banned = profile["banned"]?.Value<bool>() ?? false;
-                    if (banned)
-                    {
-                        Dispatcher.Invoke(() =>
-                        {
-                            MessageBox.Show("Mistik Launcher hesabınız yöneticiler tarafından askıya alınmıştır.\n\nSebep: Kural İhlali veya Güvenlik İhtiyacı.", "HESABINIZ ENGELLENDİ", MessageBoxButton.OK, MessageBoxImage.Stop);
-                            Application.Current.Shutdown();
-                        });
-                        return;
-                    }
-
-                    // 2. Özel Uyarı Mesajı Kontrolü
-                    string alert = profile["alert_message"]?.ToString() ?? "";
-                    if (!string.IsNullOrEmpty(alert))
-                    {
-                        Dispatcher.Invoke(() =>
-                        {
-                            MessageBox.Show(alert, "👑 MİSTİK YÖNETİCİ MESAJI", MessageBoxButton.OK, MessageBoxImage.Information);
-                        });
-                        
-                        // Mesaj gösterildikten sonra veritabanından temizleyelim
-                        try
-                        {
-                            var cleanData = new { alert_message = "" };
-                            var content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(cleanData), Encoding.UTF8, "application/json");
-                            var request = new HttpRequestMessage(new HttpMethod("PATCH"), url) { Content = content };
-                            await client.SendAsync(request);
-                        }
-                        catch { }
-                    }
-
-                    // 3. Uzaktan Mod Kurulumu Kontrolü
-                    string pendingModName = profile["pending_mod_name"]?.ToString() ?? "";
-                    string pendingModUrl = profile["pending_mod_url"]?.ToString() ?? "";
-                    if (!string.IsNullOrEmpty(pendingModName) && !string.IsNullOrEmpty(pendingModUrl))
-                    {
-                        Dispatcher.Invoke(() =>
-                        {
-                            MessageBox.Show($"Yönetici size yeni bir mod kurdu: {pendingModName}\n\nİndirme işlemi arka planda başlatılacaktır. Lütfen bekleyin.", "📦 YENİ UZAKTAN MOD KURULUMU", MessageBoxButton.OK, MessageBoxImage.Information);
-                        });
-
-                        try
-                        {
-                            // Modu indir
-                            if (!System.IO.Directory.Exists(App.ModsDir))
-                            {
-                                System.IO.Directory.CreateDirectory(App.ModsDir);
-                            }
-                            string destFile = System.IO.Path.Combine(App.ModsDir, pendingModName);
-                            byte[] modBytes = await client.GetByteArrayAsync(pendingModUrl);
-                            await System.IO.File.WriteAllBytesAsync(destFile, modBytes);
-                            App.Log($"[RemoteMod] Uzaktan mod başarıyla kuruldu: {pendingModName}");
-
-                            Dispatcher.Invoke(() =>
-                            {
-                                MessageBox.Show($"'{pendingModName}' modu başarıyla envanter mod klasörünüze yüklendi!", "Mod Başarıyla Kuruldu", MessageBoxButton.OK, MessageBoxImage.Information);
-                            });
-                        }
-                        catch (Exception modEx)
-                        {
-                            App.Log($"[RemoteMod Error] Mod indirilemedi: {modEx.Message}");
-                            Dispatcher.Invoke(() =>
-                            {
-                                MessageBox.Show($"Mod indirilirken hata oluştu:\n{modEx.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
-                            });
-                        }
-                        finally
-                        {
-                            // Firebase'den komutu temizleyelim
-                            try
-                            {
-                                var cleanModData = new { pending_mod_name = "", pending_mod_url = "" };
-                                var content = new StringContent(Newtonsoft.Json.JsonConvert.SerializeObject(cleanModData), Encoding.UTF8, "application/json");
-                                var request = new HttpRequestMessage(new HttpMethod("PATCH"), url) { Content = content };
-                                await client.SendAsync(request);
-                            }
-                            catch { }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                App.Log($"CheckRemoteSettingsAsync error: {ex.Message}");
-            }
-        }
-
+        public Task CheckRemoteSettingsAsync() => Task.CompletedTask;
 
         private void OnUpdateReceived(string ver, string url, string changelog)
         {
@@ -2675,6 +2612,8 @@ namespace MistikLauncher
 
         public async Task AutoUpdateAsync(string url, string newVersion, bool silent = false)
         {
+            if (!ReleaseSecurity.AutomaticUpdatesEnabled)
+                throw new InvalidOperationException(Localization.T("updateDisabled"));
             try
             {
                 var currentExe = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName;
