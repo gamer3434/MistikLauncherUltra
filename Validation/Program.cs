@@ -67,11 +67,40 @@ class Program
             Check(turkish.Values.All(v=>!string.IsNullOrWhiteSpace(v)) && english.Values.All(v=>!string.IsNullOrWhiteSpace(v)), "no empty translations");
             var application=new MistikLauncher.Application(); application.InitializeComponent();
             var window=new MainWindow { Width=1200, Height=820 };
+            foreach(var style in MainWindow.WindowButtonStyles) {
+                window.SetWindowButtons(style);
+                Check(ConfigManager.Load().WindowButtons==style && ((StackPanel)window.FindName("CaptionButtons")).Children.Count==3,"window button style renders and persists: "+style);
+            }
+            window.SetWindowButtons("MacOS");
+            var caption=(StackPanel)window.FindName("CaptionButtons");
+            ((Button)caption.Children[1]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(window.WindowState==WindowState.Minimized,"custom window button minimizes");
+            window.WindowState=WindowState.Normal;
+            ((Button)caption.Children[2]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(window.WindowState==WindowState.Maximized,"custom window button maximizes");
+            ((Button)caption.Children[2]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(window.WindowState==WindowState.Normal,"custom window button restores");
+            var bar=(System.Windows.Controls.WrapPanel)window.FindName("QuickBarPanel");
+            Check(bar.Children.Count==6,"top bar exposes six bilingual shortcuts by default");
+            window.Config.QuickLinks=new(){"Dash","Settings"}; ConfigManager.Save(window.Config); window.BuildQuickBar();
+            Check(bar.Children.Count==2 && ConfigManager.Load().QuickLinks.SequenceEqual(new[]{"Dash","Settings"}),"shortcut customization persists");
+            ((Button)bar.Children[1]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Flush(window);
+            Check(((Frame)window.FindName("MainFrame")).Content is MistikLauncher.Pages.ModernSettingsPage,"top shortcut navigates to requested page");
+            window.Config.QuickLinks.Clear(); window.BuildQuickBar();
+            Check(((Border)window.FindName("QuickBarHost")).Visibility==Visibility.Collapsed,"empty top bar hides without reserving space");
+            window.Config.QuickLinks=new(){"Dash","Vers","Mods","Skin","Server","Settings"}; ConfigManager.Save(window.Config); window.BuildQuickBar();
             foreach(var name in ColorThemes.Names)
             {
                 var surface=ColorThemes.Brush("#192C46"); var previous=surface.Color;
                 window.SetColorTheme(name);
                 Check(ConfigManager.Load().Accent==name && !surface.IsFrozen,"runtime theme persists and remains mutable: "+name);
+                double Luminance(Color color) {
+                    double Linear(byte c) { double v=c/255.0; return v<=0.04045?v/12.92:Math.Pow((v+0.055)/1.055,2.4); }
+                    return Linear(color.R)*0.2126+Linear(color.G)*0.7152+Linear(color.B)*0.0722;
+                }
+                double background=Luminance(ColorThemes.Brush("#00A3FF").Color), foreground=Luminance(((SolidColorBrush)ColorThemes.ActionText).Color);
+                Check((Math.Max(background,foreground)+0.05)/(Math.Min(background,foreground)+0.05)>=4.5,"primary action text contrast meets 4.5:1: "+name);
                 window.Navigate("Dash");
             }
             window.SetColorTheme("Amber");
@@ -117,14 +146,18 @@ class Program
     }
     static void Capture(Window window,string path)
     {
-        var frame=new DispatcherFrame();
-        window.Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle,new Action(()=>frame.Continue=false));
-        Dispatcher.PushFrame(frame);
+        Flush(window);
         var root=(FrameworkElement)window.Content;
         root.Measure(new Size(1200,820)); root.Arrange(new Rect(0,0,1200,820)); root.UpdateLayout();
         var bitmap=new RenderTargetBitmap(1200,820,96,96,PixelFormats.Pbgra32); bitmap.Render(root);
         var encoder=new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var file=File.Create(path); encoder.Save(file);
+    }
+    static void Flush(Window window)
+    {
+        var frame=new DispatcherFrame();
+        window.Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle,new Action(()=>frame.Continue=false));
+        Dispatcher.PushFrame(frame);
     }
 }
 

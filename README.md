@@ -130,6 +130,10 @@ Gece laciverti `#0D1727`, yüzey `#192C46`, açık metin `#EFF5FF`, ikincil meti
 Midnight navy, blue surfaces, turquoise accents, consistent typography and a Minecraft block illustration unify the home, shell and settings. Shared legacy cards inherit the new palette. Settings keep Save changes in a fixed footer. Cached bilingual pages are explicitly refreshed and validated.
 # Forge ve renk temaları / Forge and color themes
 
+Üst kısayol çubuğunu ve 16 pencere düğmesi görünümünü Ayarlardan kişiselleştirebilirsiniz. Temalar üst çubuğa, yan menüye ve başlatma alanına uygulanır. [Pencere ve üst çubuk rehberi](docs/WINDOW-AND-TOOLBAR.md).
+
+Customize the top shortcut bar and 16 window control appearances in Settings. Themes coordinate toolbar, sidebar and launch actions. [Window and toolbar guide](docs/WINDOW-AND-TOOLBAR.md).
+
 Forge profillerinin görünmemesi ve seçim kaydının başarısız olması düzeltildi. Kurulum artık resmî Forge yükleyicisini kullanır. Ayarlardan 20 uyumlu renk temasını anında seçebilirsiniz. Ayrıntılar, test kapsamı ve Java gereksinimleri: [Forge ve tema notları](docs/FORGE-AND-THEMES.md).
 
 Official inherited Forge profiles are now selectable and selection persists. Installation uses the official Forge installer. Settings offers 20 coordinated, immediately applied color themes. See [Forge and theme notes](docs/FORGE-AND-THEMES.md) for validation limits and Java requirements.

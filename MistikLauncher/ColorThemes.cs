@@ -38,7 +38,11 @@ public static class ColorThemes
     {
         var accent=(Color)ColorConverter.ConvertFromString(Preview(Selected));
         Color Shade(double amount)=>Color.FromRgb((byte)(accent.R*amount),(byte)(accent.G*amount),(byte)(accent.B*amount));
-        if(source=="#ACTIONTEXT") return accent.R*0.2126+accent.G*0.7152+accent.B*0.0722>145 ? Colors.Black : Colors.White;
+        if(source=="#ACTIONTEXT") {
+            double Linear(byte channel) { double value=channel/255.0; return value<=0.04045?value/12.92:Math.Pow((value+0.055)/1.055,2.4); }
+            double luminance=Linear(accent.R)*0.2126+Linear(accent.G)*0.7152+Linear(accent.B)*0.0722;
+            return luminance>0.179?Colors.Black:Colors.White;
+        }
         if(source=="#274565") return Shade(0.19);
         if(source=="#00A3FF" || source=="#226DA0") return accent;
         if(source=="#77D8D0") return accent;

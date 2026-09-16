@@ -45,7 +45,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="8" Margin="8,2">
                             <ContentPresenter VerticalAlignment="Center"
                                               Margin="{TemplateBinding Padding}"/>
@@ -96,6 +96,13 @@
         </Style>
     </Window.Resources>
 
+    <DockPanel>
+        <Border x:Name="CaptionHost" DockPanel.Dock="Top" Height="42" Background="{DynamicResource Theme0D1727}" BorderBrush="{DynamicResource Theme365574}" BorderThickness="0,0,0,1">
+            <DockPanel>
+                <StackPanel x:Name="CaptionButtons" Orientation="Horizontal" Margin="12,0" VerticalAlignment="Center"/>
+                <TextBlock Text="MISTIK LAUNCHER" Foreground="#A5A5B0" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="12,0"/>
+            </DockPanel>
+        </Border>
     <Grid Background="{DynamicResource Theme0D1727}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="250"/>
@@ -153,8 +160,13 @@
         </Border>
 
         <!-- ═══ CONTENT ═══════════════════════════════════════════════════════ -->
-        <Frame x:Name="MainFrame" Grid.Column="1" Grid.Row="0"
+        <DockPanel Grid.Column="1" Grid.Row="0">
+            <Border x:Name="QuickBarHost" DockPanel.Dock="Top" Background="{DynamicResource Theme0D1727}" BorderBrush="{DynamicResource Theme365574}" BorderThickness="0,0,0,1" Padding="12,8">
+                <WrapPanel x:Name="QuickBarPanel"/>
+            </Border>
+        <Frame x:Name="MainFrame"
                Background="Transparent" NavigationUIVisibility="Hidden"/>
+        </DockPanel>
 
         <!-- ═══ PROGRESS ══════════════════════════════════════════════════════ -->
         <ProgressBar x:Name="GlobalProgress" Grid.Column="1" Grid.Row="1"
@@ -226,4 +238,5 @@
             </Grid>
         </Border>
     </Grid>
+    </DockPanel>
 </Window>

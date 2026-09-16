@@ -17,9 +17,10 @@ namespace MistikLauncher.Pages
         public static SolidColorBrush HexBrush(string hex)
         {
             hex=hex.ToUpperInvariant() switch {
-                "#181818" or "#141414" or "#20364B"=>"#192C46",
+                "#181818" or "#141414" or "#20364B" or "#13253C"=>"#192C46",
                 "#121212" or "#0A0A0A" or "#142333"=>"#0D1727",
-                "#222222" or "#222"=>"#203853", "#333333" or "#333"=>"#365574",
+                "#222222" or "#222" or "#28445E"=>"#203853", "#333333" or "#333" or "#35546E"=>"#365574",
+                "#65C6E8"=>"#00A3FF",
                 "#666666" or "#A0A0A0" or "#BDCAD8"=>"#ADBED6", "#FFFFFF"=>"#EFF5FF", _=>hex.ToUpperInvariant()
             };
             return ColorThemes.IsThemed(hex)?ColorThemes.Brush(hex):new(HexColor(hex));
