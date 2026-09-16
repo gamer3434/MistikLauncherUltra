@@ -83,14 +83,9 @@ MistikLauncher\Pages\MapManagerPage.cs:98 | • Haritalar indirildikten sonra ar
 MistikLauncher\Pages\MapManagerPage.cs:99 | • İndirme bittiğinde Minecraft'ı açıp 'Tek Oyunculu' (Singleplayer) ekranına girmeniz yeterlidir. Haritayı dünya listenizde göreceksiniz.
 MistikLauncher\Pages\MapManagerPage.cs:100 | • Harita yükleme hızı internet bağlantınıza bağlı olarak birkaç saniye sürebilir, yükleme esnasında launcher'ı kapatmayın.
 MistikLauncher\Pages\ModernPages.cs:91 | 
-MistikLauncher\Pages\ServerManagerPage.cs:26 | 🤖  Mistik Sunucu Kurucu (Auto-MCS)
-MistikLauncher\Pages\ServerManagerPage.cs:27 | Auto-MCS ile kendi bilgisayarınızda tek tıkla yüksek performanslı Minecraft sunucuları kurun, yönetin ve arkadaşlarınızla paylaşın.
-MistikLauncher\Pages\ServerManagerPage.cs:32 | ⚡ Auto-MCS Özellikleri
-MistikLauncher\Pages\ServerManagerPage.cs:33 | • Tek Tıkla Kurulum: Paper, Fabric, Forge, Vanilla ve NeoForge sunucularını saniyeler içinde kurun.
-MistikLauncher\Pages\ServerManagerPage.cs:34 | • Entegre Eklenti (Plugin) Marketi: Spigot/Paper sunucularınız için binlerce popüler eklentiyi tek tıkla yükleyin.
-MistikLauncher\Pages\ServerManagerPage.cs:35 | • Gelişmiş Tünelleme: Port açma derdi olmadan arkadaşlarınızın sunucunuza katılabilmesi için tüneli otomatik başlatır.
-MistikLauncher\Pages\ServerManagerPage.cs:36 | • Güvenli Sesli Sohbet (Simple Voice Chat): Sunucuya özel 3D konum tabanlı sesli sohbet desteği kurar.
-MistikLauncher\Pages\ServerManagerPage.cs:60 | Auto-MCS arka planda otomatik olarak başlatılıyor...
+MistikLauncher\Pages\ServerManagerPage.cs:29 | Auto-MCS
+MistikLauncher\Pages\ServerManagerPage.cs:35 | —
+MistikLauncher\Pages\ServerManagerPage.cs:46 | 
 MistikLauncher\Pages\SettingsAndMorePages.cs:88 | Genel & Hesap
 MistikLauncher\Pages\SettingsAndMorePages.cs:93 | Giriş & Karakter Sistemi
 MistikLauncher\Pages\SettingsAndMorePages.cs:106 | Ely.by Bağlantısını Test Et
