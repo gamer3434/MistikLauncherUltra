@@ -17,6 +17,8 @@ namespace MistikLauncher
     // â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     public class LauncherConfig
     {
+        [JsonProperty("quick_links",ObjectCreationHandling=ObjectCreationHandling.Replace)] public List<string> QuickLinks { get; set; } = new() { "Dash","Vers","Mods","Skin","Server","Settings" };
+        [JsonProperty("window_buttons")] public string WindowButtons { get; set; } = "MacOS";
         [JsonProperty("launcher_auto_update")] public bool LauncherAutoUpdate { get; set; } = true;
         [JsonProperty("auto_mcs_update")] public bool AutoMcsAutoUpdate { get; set; } = true;
         [JsonProperty("user")]       public string User       { get; set; } = "Oyuncu";
@@ -63,6 +65,7 @@ namespace MistikLauncher
             cfg.TunnelPort = Math.Clamp(cfg.TunnelPort, 1, 65535);
             cfg.User = Regex.IsMatch(cfg.User ?? "", @"^[A-Za-z0-9_]{3,16}$") ? cfg.User! : "Player";
             cfg.Friends ??= new(); cfg.FriendCodes ??= new();
+            cfg.QuickLinks=(cfg.QuickLinks ?? new()).Where(x=>new[]{"Dash","Vers","Mods","Skin","Server","Settings"}.Contains(x)).Distinct().Take(6).ToList();
             cfg.Role = "User";
             return cfg;
         }

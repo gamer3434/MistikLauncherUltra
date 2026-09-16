@@ -136,6 +136,31 @@ public class ModernSettingsPage : Page, ILanguagePage
             tiles.Add((name,tile,mark)); swatches.Children.Add(choice);
         }
         UpdateSelection(); themeContent.Children.Add(swatches); themeCard.Child=themeContent; stack.Children.Insert(2,themeCard);
+        var barCard=new Border { Background=PageHelpers.HexBrush("#192C46"),Padding=new Thickness(20),CornerRadius=new CornerRadius(14),Margin=new Thickness(0,12,0,0) };
+        var barContent=new StackPanel();
+        barContent.Children.Add(PageHelpers.Lbl(Localization.T("barTitle"),18,"#EFF5FF",true));
+        barContent.Children.Add(PageHelpers.Lbl(Localization.T("barHelp"),13,"#ADBED6",pad:new Thickness(0,8,0,12),wrap:TextWrapping.Wrap));
+        var options=new WrapPanel();
+        foreach(var item in new[]{("Dash","home"),("Vers","versions"),("Mods","mods"),("Skin","skin"),("Server","server"),("Settings","settings")})
+        {
+            var option=new CheckBox { Content=Localization.T(item.Item2),IsChecked=main.Config.QuickLinks.Contains(item.Item1),Foreground=PageHelpers.HexBrush("#EFF5FF"),MinHeight=44,MinWidth=140,VerticalContentAlignment=VerticalAlignment.Center };
+            option.Click+=(_,_)=> {
+                if(option.IsChecked==true && !main.Config.QuickLinks.Contains(item.Item1)) main.Config.QuickLinks.Add(item.Item1);
+                else if(option.IsChecked!=true) main.Config.QuickLinks.Remove(item.Item1);
+                ConfigManager.Save(main.Config); main.BuildQuickBar();
+            };
+            options.Children.Add(option);
+        }
+        barContent.Children.Add(options); barCard.Child=barContent; stack.Children.Insert(2,barCard);
+        var windowCard=new Border { Background=PageHelpers.HexBrush("#192C46"),Padding=new Thickness(20),CornerRadius=new CornerRadius(14),Margin=new Thickness(0,12,0,12) };
+        var windowContent=new StackPanel();
+        windowContent.Children.Add(PageHelpers.Lbl(Localization.T("windowStyleTitle"),18,"#EFF5FF",true));
+        windowContent.Children.Add(PageHelpers.Lbl(Localization.T("windowStyleHelp"),13,"#ADBED6",pad:new Thickness(0,8,0,12),wrap:TextWrapping.Wrap));
+        var styleChoice=new ComboBox { ItemsSource=MainWindow.WindowButtonStyles.Select(name=>Localization.T("style"+name)).ToArray(),SelectedIndex=Math.Max(0,Array.IndexOf(MainWindow.WindowButtonStyles,main.Config.WindowButtons)),MinHeight=40 };
+        styleChoice.SelectionChanged+=(_,_)=> {
+            if(styleChoice.SelectedIndex>=0) main.SetWindowButtons(MainWindow.WindowButtonStyles[styleChoice.SelectedIndex]);
+        };
+        windowContent.Children.Add(styleChoice); windowCard.Child=windowContent; stack.Children.Insert(3,windowCard);
         Label("username"); user=PageHelpers.DarkTextBox(main.Config.User); user.MaxLength=16; stack.Children.Add(user);
         stack.Children.Add(PageHelpers.Lbl(Localization.T("usernameHelp"),13,"#BDCAD8",wrap:TextWrapping.Wrap));
         Label("memory"); ram=PageHelpers.DarkTextBox(main.Config.Ram.ToString()); stack.Children.Add(ram);

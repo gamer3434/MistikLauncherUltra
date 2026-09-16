@@ -127,6 +127,7 @@ namespace MistikLauncher
         }
         void RefreshLanguage()
         {
+            ApplyWindowAppearance();
             BuildNav();
             BtnLaunch.Content = Localization.T("play");
             BtnYoutube.Content = Localization.T("releases");
@@ -205,6 +206,7 @@ namespace MistikLauncher
             BtnLaunch.Background = ColorThemes.Brush("#00A3FF");
             BtnLaunch.Foreground = ColorThemes.ActionText;
             GlobalProgress.Foreground = new SolidColorBrush(c);
+            ApplyWindowAppearance();
         }
 
         public void SetColorTheme(string name)
@@ -236,11 +238,36 @@ namespace MistikLauncher
             if (App.AdminAccessEnabled)
                 AddNav("Admin", "👑  Yönetici Paneli");
             AddNav("Settings",  "⚙️  Ayarlar");
+            BuildQuickBar();
+        }
+
+        readonly Dictionary<string,Button> quickButtons=new();
+        public void BuildQuickBar()
+        {
+            QuickBarPanel.Children.Clear(); quickButtons.Clear();
+            foreach(var item in new[]{("Dash","home","\uE80F"),("Vers","versions","\uE7FC"),("Mods","mods","\uE74C"),("Skin","skin","\uE77B"),("Server","server","\uE968"),("Settings","settings","\uE713")})
+            {
+                if(!Config.QuickLinks.Contains(item.Item1)) continue;
+                var content=new StackPanel { Orientation=Orientation.Horizontal };
+                content.Children.Add(new TextBlock { Text=item.Item3,FontFamily=new FontFamily("Segoe MDL2 Assets"),FontSize=16,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,8,0) });
+                content.Children.Add(new TextBlock { Text=Localization.T(item.Item2),VerticalAlignment=VerticalAlignment.Center });
+                var button=new Button { Content=content,Style=(Style)FindResource("NavBtn"),Height=44,Padding=new Thickness(12,0,12,0),MinWidth=100 };
+                System.Windows.Automation.AutomationProperties.SetName(button,Localization.T(item.Item2));
+                button.Click+=(_,_)=>Navigate(item.Item1); quickButtons[item.Item1]=button; QuickBarPanel.Children.Add(button);
+            }
+            QuickBarHost.Visibility=quickButtons.Count==0?Visibility.Collapsed:Visibility.Visible;
+            SelectNav(_currentNav);
         }
 
         void AddNav(string key, string label)
         {
-            var btn = new Button { Content = Localization.T(label), Style = (Style)FindResource("NavBtn") };
+            var title=Regex.Replace(Localization.T(label),@"^[^\p{L}]+","");
+            var content=new StackPanel { Orientation=Orientation.Horizontal };
+            string glyph=key switch { "Dash"=>"\uE80F","Vers"=>"\uE7FC","Mods"=>"\uE74C","Skin"=>"\uE77B","Server"=>"\uE968","Opt"=>"\uE9D9",_=>"\uE713" };
+            content.Children.Add(new TextBlock { Text=glyph,FontFamily=new FontFamily("Segoe MDL2 Assets"),FontSize=16,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,12,0) });
+            content.Children.Add(new TextBlock { Text=title,VerticalAlignment=VerticalAlignment.Center });
+            var btn = new Button { Content = content, Style = (Style)FindResource("NavBtn") };
+            System.Windows.Automation.AutomationProperties.SetName(btn,title);
             btn.Click += (_, _) => Navigate(key);
             NavPanel.Children.Add(btn);
             _navBtns[key] = btn;
@@ -251,6 +278,13 @@ namespace MistikLauncher
             foreach (var b in _navBtns.Values) { b.Background=Brushes.Transparent; b.Foreground=HexBrush("#ADBED6"); }
             if (_navBtns.TryGetValue(key, out var btn)) {
                 btn.Background=ColorThemes.Brush("#274565"); btn.Foreground=ColorThemes.Brush("#00A3FF");
+            }
+            foreach(var item in quickButtons) {
+                bool selected=item.Key==key;
+                item.Value.Background=selected?ColorThemes.Brush("#274565"):Brushes.Transparent;
+                item.Value.Foreground=selected?ColorThemes.Brush("#00A3FF"):HexBrush("#ADBED6");
+                item.Value.BorderBrush=selected?ColorThemes.Brush("#00A3FF"):Brushes.Transparent;
+                item.Value.BorderThickness=new Thickness(selected?1:0);
             }
         }
 
@@ -283,6 +317,7 @@ namespace MistikLauncher
                 _pageCache[key] = page;
             }
 
+            page.Resources[typeof(ComboBox)]=FindResource(typeof(ComboBox));
             if(page is ILanguagePage localized) localized.RefreshLanguage();
             MainFrame.Navigate(page);
         }
