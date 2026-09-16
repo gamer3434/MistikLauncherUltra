@@ -1220,7 +1220,7 @@ namespace MistikLauncher
                         var lastPoolDir = Path.Combine(modsPoolDir, lastPoolKey);
                         Directory.CreateDirectory(lastPoolDir);
 
-                        var currentJars = Directory.GetFiles(App.ModsDir, "*.jar");
+                        var currentJars = ModFiles.List(App.ModsDir);
                         foreach (var jar in currentJars)
                         {
                             var dest = Path.Combine(lastPoolDir, Path.GetFileName(jar));
@@ -1257,7 +1257,7 @@ namespace MistikLauncher
                     var newPoolDir = Path.Combine(modsPoolDir, currentPoolKey);
                     if (Directory.Exists(newPoolDir))
                     {
-                        var poolJars = Directory.GetFiles(newPoolDir, "*.jar");
+                        var poolJars = ModFiles.List(newPoolDir);
                         foreach (var jar in poolJars)
                         {
                             var dest = Path.Combine(App.ModsDir, Path.GetFileName(jar));

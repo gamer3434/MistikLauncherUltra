@@ -662,12 +662,14 @@ namespace MistikLauncher.Pages
     }
 
     // Mod Manager
-    public class ModManagerPage : Page
+    public class ModManagerPage : Page, ILanguagePage
     {
         readonly MainWindow _main;
         TextBox _searchBox = null!;
         StackPanel _resultsPanel = null!;
         StackPanel _installedPanel = null!;
+        TextBlock installedHelp=null!;
+        public void RefreshLanguage() { installedHelp.Text=Localization.T("modToggleHelp"); RenderInstalledMods(); }
         static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
 
         public ModManagerPage(MainWindow main)
@@ -977,7 +979,7 @@ namespace MistikLauncher.Pages
             instHeader.Children.Add(cleanBtn);
             sp.Children.Add(instHeader);
 
-            sp.Children.Add(PageHelpers.Lbl("Mods klasöründeki tüm .jar dosyaları — yanındaki butona tıklayarak silebilirsin.", 11, "#A0A0A0", wrap: TextWrapping.Wrap));
+            installedHelp=PageHelpers.Lbl(Localization.T("modToggleHelp"), 13, "#ADBED6", wrap: TextWrapping.Wrap); sp.Children.Add(installedHelp);
             _installedPanel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
             sp.Children.Add(_installedPanel);
 
@@ -1074,7 +1076,7 @@ namespace MistikLauncher.Pages
         {
             if (!Directory.Exists(App.ModsDir)) return false;
 
-            var files = Directory.GetFiles(App.ModsDir, "*.jar");
+            var files = ModFiles.List(App.ModsDir);
             foreach (var file in files)
             {
                 var filename = Path.GetFileName(file).ToLower();
@@ -1394,20 +1396,21 @@ namespace MistikLauncher.Pages
 
             if (!Directory.Exists(App.ModsDir))
             {
-                _installedPanel.Children.Add(PageHelpers.Lbl("Henüz hiçbir mod yüklü değil.", 12, "#555555"));
+                _installedPanel.Children.Add(PageHelpers.Lbl(Localization.T("modsEmpty"), 12, "#555555"));
                 return;
             }
 
-            var jars = Directory.GetFiles(App.ModsDir, "*.jar");
+            var jars = ModFiles.List(App.ModsDir).ToArray();
             if (jars.Length == 0)
             {
-                _installedPanel.Children.Add(PageHelpers.Lbl("Henüz hiçbir mod yüklü değil.", 12, "#555555"));
+                _installedPanel.Children.Add(PageHelpers.Lbl(Localization.T("modsEmpty"), 12, "#555555"));
                 return;
             }
 
             foreach (var jarPath in jars.OrderBy(f => Path.GetFileName(f)))
             {
-                var fileName = Path.GetFileName(jarPath);
+                bool enabled=ModFiles.Enabled(jarPath);
+                var fileName = Path.GetFileName(enabled?jarPath:jarPath[..^9]);
                 var filePath = jarPath; // capture for lambda
 
                 // Format file size
@@ -1417,7 +1420,7 @@ namespace MistikLauncher.Pages
                     ? $"{bytes / 1_048_576.0:F1} MB"
                     : $"{bytes / 1024.0:F0} KB";
 
-                var card = PageHelpers.Card("#131318", 10, "#2a2a3a");
+                var card = PageHelpers.Card("#192C46", 10, "#365574");
                 card.Margin = new Thickness(0, 4, 0, 4);
 
                 var grid = new Grid { Margin = new Thickness(14, 10, 14, 10) };
@@ -1435,12 +1438,26 @@ namespace MistikLauncher.Pages
                 Grid.SetColumn(sizeLbl, 1);
                 grid.Children.Add(sizeLbl);
 
-                var delBtn = PageHelpers.MkBtn("🗑 SİL", "#CC2222", 80);
+                var controls=new StackPanel { Orientation=Orientation.Horizontal };
+                var toggle=PageHelpers.MkBtn(Localization.T(enabled?"modDisable":"modEnable"),"#226DA0",120); toggle.Margin=new Thickness(0,0,8,0);
+                toggle.ToolTip=Localization.T("modToggleHelp");
+                toggle.Click+=(_,_)=> {
+                    try { ModFiles.Toggle(App.ModsDir,filePath); RenderInstalledMods(); }
+                    catch(Exception ex) { MessageBox.Show(Localization.T("modToggleFailed")+"\n"+ex.Message,Localization.T("error")); }
+                };
+                controls.Children.Add(toggle);
+                nameLbl.Text= (enabled?"● ":"○ ")+fileName;
+                nameLbl.ToolTip=Localization.T(enabled?"modEnabled":"modDisabled");
+                grid.Children.Remove(nameLbl);
+                var nameContent=new StackPanel(); nameContent.Children.Add(nameLbl);
+                nameContent.Children.Add(PageHelpers.Lbl(Localization.T(enabled?"modEnabled":"modDisabled"),12,"#ADBED6",pad:new Thickness(0,4,0,0)));
+                grid.Children.Add(nameContent);
+                var delBtn = PageHelpers.MkBtn(Localization.T("modDelete"), "#CC2222", 80);
                 delBtn.Click += (_, _) =>
                 {
                     var confirm = MessageBox.Show(
-                        $"Bu modu kalıcı olarak silmek istiyor musun?\n\n{fileName}",
-                        "Modu Sil", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                        Localization.T("modDeleteConfirm")+"\n\n"+fileName,
+                        Localization.T("modDelete"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
                     if (confirm == MessageBoxResult.Yes)
                     {
                         try
@@ -1455,8 +1472,8 @@ namespace MistikLauncher.Pages
                         RenderInstalledMods();
                     }
                 };
-                Grid.SetColumn(delBtn, 2);
-                grid.Children.Add(delBtn);
+                controls.Children.Add(delBtn);
+                Grid.SetColumn(controls, 2); grid.Children.Add(controls);
 
                 card.Child = grid;
                 _installedPanel.Children.Add(card);

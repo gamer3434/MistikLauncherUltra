@@ -21,6 +21,7 @@ class Program
             string testRoot = Path.Combine(Path.GetTempPath(), "MistikValidation", Guid.NewGuid().ToString("N"));
             Environment.SetEnvironmentVariable("MISTIK_DATA_DIR", testRoot);
             Directory.CreateDirectory(testRoot);
+            checks += ModToggleTests.Run(Path.Combine(testRoot,"mod-toggle"));
             checks += ForgeTests.Run(Path.Combine(testRoot,"forge-tests"));
             checks += AutoMcsTests.Run(testRoot).GetAwaiter().GetResult();
             checks += LauncherUpdateTests.Run(testRoot).GetAwaiter().GetResult();
@@ -67,6 +68,19 @@ class Program
             Check(turkish.Values.All(v=>!string.IsNullOrWhiteSpace(v)) && english.Values.All(v=>!string.IsNullOrWhiteSpace(v)), "no empty translations");
             var application=new MistikLauncher.Application(); application.InitializeComponent();
             var window=new MainWindow { Width=1200, Height=820 };
+            Directory.CreateDirectory(App.ModsDir);
+            string disabledMod=Path.Combine(App.ModsDir,"kept.jar.disabled"); File.WriteAllText(disabledMod,"kept bytes");
+            window.Config.LastSyncedVersion="1.20.1-forge-47.4.10"; window.Config.Version="1.19.2-forge-43.5.0"; window.SyncModsForCurrentVersion();
+            Check(File.Exists(Path.Combine(testRoot,"mods_pool","1.20.1_forge","kept.jar.disabled")),"disabled mod state follows original version pool");
+            window.Config.Version="1.20.1-forge-47.4.10"; window.SyncModsForCurrentVersion();
+            Check(File.ReadAllText(disabledMod)=="kept bytes" && !File.Exists(disabledMod[..^9]),"returning to a version preserves disabled mod state");
+            var modPage=new MistikLauncher.Pages.ModManagerPage(window);
+            var installedMods=((StackPanel)((ScrollViewer)modPage.Content).Content).Children.OfType<StackPanel>().Last();
+            Button ModToggleButton() => (Button)((Grid)((Border)installedMods.Children[0]).Child).Children.OfType<StackPanel>().Last().Children[0];
+            ModToggleButton().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(File.Exists(disabledMod[..^9]) && !File.Exists(disabledMod),"installed mod Enable button applies immediately");
+            ModToggleButton().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(File.Exists(disabledMod) && File.ReadAllText(disabledMod)=="kept bytes","installed mod Disable button preserves file and refreshes row");
             foreach(var style in MainWindow.WindowButtonStyles) {
                 window.SetWindowButtons(style);
                 Check(ConfigManager.Load().WindowButtons==style && ((StackPanel)window.FindName("CaptionButtons")).Children.Count==3,"window button style renders and persists: "+style);
@@ -129,6 +143,10 @@ class Program
                 Check(Texts(window.Content as DependencyObject).Contains(Localization.T("welcome")),"cached home language " + code);
                 window.Navigate("Settings"); Capture(window,Path.Combine(output,"settings-"+code+".png"));
                 Check(Texts(window.Content as DependencyObject).Contains(Localization.T("luTitle")+" · "+window.LauncherUpdates.CurrentVersion),"cached settings language " + code);
+                var settingsPage=(MistikLauncher.Pages.ModernSettingsPage)((Frame)window.FindName("MainFrame")).Content;
+                var settingsScroll=((DockPanel)settingsPage.Content).Children.OfType<ScrollViewer>().Single();
+                settingsScroll.ScrollToVerticalOffset(300); Capture(window,Path.Combine(output,"window-styles-"+code+".png"));
+                settingsScroll.ScrollToTop();
                 window.Navigate("Server"); Capture(window,Path.Combine(output,"server-"+code+".png"));
             }
             window.Close();
