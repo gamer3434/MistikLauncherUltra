@@ -40,7 +40,7 @@ namespace MistikLauncher.Pages
         public static Button MkBtn(string text, string color = "#00A3FF", double width = 0)
         {
             var btn = new Button {
-                Content = text, Background = HexBrush(color), Foreground = Brushes.White,
+                Content = text, MinHeight = 38, Background = HexBrush(color), Foreground = Brushes.White,
                 BorderThickness = new Thickness(0), FontFamily = new FontFamily("Segoe UI"),
                 FontSize = 12, FontWeight = FontWeights.Bold,
                 Padding = new Thickness(14, 7, 14, 7), Cursor = System.Windows.Input.Cursors.Hand };

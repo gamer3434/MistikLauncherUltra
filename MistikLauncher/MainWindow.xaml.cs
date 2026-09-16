@@ -22,6 +22,7 @@ namespace MistikLauncher
     public partial class MainWindow : Window
     {
         public LauncherConfig Config;
+        public AutoMcsUpdater AutoMcs { get; } = new();
         public MistikRelay?   Relay;
         public string? LatestOnlineVersion;
         public string? LatestOnlineUrl;
@@ -81,6 +82,7 @@ namespace MistikLauncher
             languageTimer.Start();
             Closed += (_,_) => { languageTimer.Stop(); Localization.Changed -= RefreshLanguage; _http.Dispose(); };
             RefreshLanguage();
+            Loaded += async (_,_) => await AutoMcs.CheckAsync(Config.AutoMcsAutoUpdate && File.Exists(AutoMcs.ExecutablePath));
             Navigate("Dash");
             // Relay is started only by an explicit user action.
             _ = RelayLoopAsync();

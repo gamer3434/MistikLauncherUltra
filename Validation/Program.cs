@@ -21,6 +21,13 @@ class Program
             string testRoot = Path.Combine(Path.GetTempPath(), "MistikValidation", Guid.NewGuid().ToString("N"));
             Environment.SetEnvironmentVariable("MISTIK_DATA_DIR", testRoot);
             Directory.CreateDirectory(testRoot);
+            checks += AutoMcsTests.Run(testRoot).GetAwaiter().GetResult();
+            if(args.Contains("--live-mcs"))
+            {
+                var official=new AutoMcsUpdater(dataDirectory:Path.Combine(testRoot,"official-auto-mcs"),running:()=>false);
+                Check(official.CheckAsync(true,true).GetAwaiter().GetResult(),"live official package download, digest and extraction");
+                Console.WriteLine("Official installed version: "+official.InstalledVersion);
+            }
             var config = new LauncherConfig { User="../bad", Ram=200, Lang="English", TunnelPort=-1, Role="Yonetici" };
             ConfigManager.Save(config);
             var loaded = ConfigManager.Load();
@@ -59,6 +66,7 @@ class Program
                 Check(ConfigManager.Load().Lang==(code=="tr"?"Turkce":"English"), "language persistence " + code);
                 window.Navigate("Dash"); Capture(window,Path.Combine(output,"home-"+code+".png"));
                 window.Navigate("Settings"); Capture(window,Path.Combine(output,"settings-"+code+".png"));
+                window.Navigate("Server"); Capture(window,Path.Combine(output,"server-"+code+".png"));
             }
             window.Close();
             Console.WriteLine($"{checks} checks passed. Test data: {testRoot}");

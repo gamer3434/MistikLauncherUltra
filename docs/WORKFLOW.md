@@ -61,3 +61,11 @@ git credential-manager github login --username gamer3434 --browser
 
 GitHub sayfasında doğru hesabı seçin, iki aşamalı doğrulamayı ve Git Credential Manager yetkilendirmesini tamamlayın. Tarayıcı açılmazsa `--browser` yerine `--device` kullanın; geçici kodu yalnızca komutun gösterdiği GitHub sayfasına girin. Parola/tokenı sohbete göndermeyin.
 
+
+
+## Auto-MCS follow-up
+
+Implemented the user-requested manual update button, persisted automatic updates at launcher startup, official stable Windows release discovery, SHA-256 verification, atomic replacement and running-process deferral. Redesigned the server workspace in Turkish and English. Protected validation passes 24 checks; optional live ordinary validation passes 25, including official v2.3.9 download without execution.
+
+![Turkish server workspace](screenshots/server-tr.png)
+![English server workspace](screenshots/server-en.png)

@@ -52,3 +52,13 @@ Metin gizleme geri çevrilebilir; açık kaynak görünürdür. WPF/JSON istisna
 ## Follow-up: server authentication / Sunucu kimlik doğrulaması
 
 Removed automatic recursive rewriting of `online-mode=false` during tunnel startup. Added a regression test proving `server.properties` stays byte-for-byte unchanged. / Tünel açılışında otomatik kimlik doğrulama kapatma kaldırıldı; dosyanın değişmediği test edildi.
+
+## Auto-MCS updater follow-up
+
+- Replaced pinned mirrored v5.3.0 EXE with official stable-release discovery.
+- Added manual update, persisted startup auto-update, progress/version/status and bilingual redesigned server page.
+- Twenty-four offline/ordinary checks; optional live official v2.3.9 download/digest/extraction adds the twenty-fifth check. The third-party program was not executed by validation.
+- Cases cover check-only, install, no repeat download, repair, digest failure, staging cleanup, running process, offline failure and untrusted/missing-digest metadata.
+- Existing server/game data is preserved; updates replace only auto-mcs.exe and its version receipt.
+
+Türkçe: Sabit indirme kaldırıldı; resmî sürüm, manuel/otomatik güncelleme, SHA-256 doğrulama ve iki dilli sunucu tasarımı eklendi. Gerçek paket indirildi/doğrulandı; uygulama test sırasında çalıştırılmadı.
