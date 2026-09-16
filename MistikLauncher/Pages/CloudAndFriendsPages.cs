@@ -654,7 +654,7 @@ namespace MistikLauncher.Pages
             sessionSp.Children.Add(aterTitle); sessionSp.Children.Add(aterDesc);
 
             // Automatic Protection notice
-            var autoNotice = PageHelpers.Lbl("⚡ Otomatik Koruma: Mistik Tünel Motoru, tüneli başlattığınızda yerel sunucu dosyalarınızı otomatik olarak tarayıp offline moda hazırlar!", 10, "#00FFCC", bold: true);
+            var autoNotice = PageHelpers.Lbl("Tünel açmak sunucu kimlik doğrulamasını değiştirmez. Güvenlik ayarlarını sunucu yöneticisi belirler.", 10, "#00FFCC", bold: true);
             autoNotice.Margin = new Thickness(0, 4, 0, 0);
             sessionSp.Children.Add(autoNotice);
 

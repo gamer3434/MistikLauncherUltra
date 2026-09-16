@@ -35,6 +35,12 @@ class Program
             try { ReleaseSecurity.ValidateUninstallTarget(Path.GetTempPath()); } catch(InvalidOperationException) { rejected=true; }
             Check(rejected, "uninstall rejects arbitrary directory");
             Check(ReleaseSecurity.ValidateUninstallTarget(testRoot)==testRoot, "valid application directory recognized");
+            var serverRoot=Path.Combine(testRoot,"servers","fixture"); Directory.CreateDirectory(serverRoot);
+            var properties=Path.Combine(serverRoot,"server.properties");
+            const string original="online-mode=true\nserver-port=25565\n";
+            File.WriteAllText(properties,original);
+            var relay=new MistikRelay("TestPlayer"); relay.EnforceOfflineModeInProperties();
+            Check(File.ReadAllText(properties)==original, "tunnel preserves server authentication");
             var assembly=typeof(Localization).Assembly;
             using var tr=assembly.GetManifestResourceStream("MistikLauncher.Locales.tr.json")!;
             using var en=assembly.GetManifestResourceStream("MistikLauncher.Locales.en.json")!;

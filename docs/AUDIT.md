@@ -23,14 +23,14 @@ Türkçe: Ayar kurtarma, doğrulama, uzaktan yönetim, gizlilik, taşınabilir a
 ## Verified / Doğrulanan
 
 - Release build: zero warnings/errors.
-- Twelve checks against ordinary and protected assemblies: settings validation, atomic backup, previous-backup recovery, disabled unsafe remote controls, uninstall target rejection/acceptance, locale key parity, nonempty translations, Turkish/English runtime text and persistence.
+- Thirteen checks against ordinary and protected assemblies: settings validation, atomic backup, previous-backup recovery, disabled unsafe remote controls, uninstall target rejection/acceptance, locale key parity, nonempty translations, Turkish/English runtime text and persistence.
 - Home/settings WPF renders in both languages reviewed.
 - NuGet resolved dependencies: no known vulnerable packages reported at validation time.
 - Obfuscar completed; protected resource/WPF/configuration tests passed.
 - Tests isolate data using `MISTIK_DATA_DIR` and temporary directories.
-- GitHub dry-run failed because credentials were unavailable. Remote repository was unchanged.
+- GitHub authentication and write access verified. Preview published on `codex/modernization-preview`; main remains unchanged.
 
-Türkçe: Normal ve korumalı DLL on iki denetimi geçti. Derleme uyarısız/hatasız. İki dilde görüntüler incelendi. NuGet bilinen açık bildirmedi. GitHub oturum bilgisi olmadığından uzak depo değiştirilmedi.
+Türkçe: Normal ve korumalı DLL on üç denetimi geçti. Derleme uyarısız/hatasız. İki dilde görüntüler incelendi. NuGet bilinen açık bildirmedi. GitHub erişimi doğrulandı ve önizleme dalı gönderildi; main değişmedi.
 
 ## Outstanding / Kalan işler
 
@@ -48,3 +48,7 @@ Türkçe: Eski metinlerin tam çevirisi, oyun/mod/sunucu uçtan uca testleri, ak
 String hiding is reversible; public source remains readable. WPF/JSON exclusions preserve functionality. Checksums detect corruption, not publisher identity. No anti-cheat, antivirus or SmartScreen bypass is claimed.
 
 Metin gizleme geri çevrilebilir; açık kaynak görünürdür. WPF/JSON istisnaları uyumluluğu korur. Sağlama toplamı bir yayıncı imzası değildir. Antivirüs veya anti-hile engelini aşma garantisi yoktur.
+
+## Follow-up: server authentication / Sunucu kimlik doğrulaması
+
+Removed automatic recursive rewriting of `online-mode=false` during tunnel startup. Added a regression test proving `server.properties` stays byte-for-byte unchanged. / Tünel açılışında otomatik kimlik doğrulama kapatma kaldırıldı; dosyanın değişmediği test edildi.

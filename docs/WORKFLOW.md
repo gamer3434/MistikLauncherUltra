@@ -1,6 +1,6 @@
 # Modernization workflow report
 
-**Delivered: a tested protected portable preview. The original request is not fully complete.** Full legacy localization, actual gameplay/server testing and GitHub publication remain outstanding.
+**Delivered: a tested protected portable preview. The original request is not fully complete.** Full legacy localization and actual gameplay/server testing remain outstanding; the preview branch is published.
 
 ## Step 1 — Audit and bug fixing
 
@@ -18,13 +18,13 @@
 
 - **Reasoning:** Runtime language selection must persist and must not recreate server controllers.
 - **Implementation:** Embedded paired `Locales/tr.json` and `Locales/en.json`; resource loader and language event in `Localization.cs`; sidebar selector; immediate redraw of new pages; compatibility translation of catalogued legacy strings. Example `play`: **Oyunu başlat** / **Launch game**. Locale parity, nonempty translations and language persistence are tested.
-- **Conclusion:** New home/settings/navigation are bilingual. The legacy translation inventory lists 255 uncatalogued helper literals at generation time, plus dynamic/XAML content that needs separate review. Full application localization is incomplete.
+- **Conclusion:** New home/settings/navigation are bilingual. The legacy translation inventory lists 236 uncatalogued helper literals at generation time, plus dynamic/XAML content that needs separate review. Full application localization is incomplete.
 
 ## Step 4 — Obfuscation
 
 - **Reasoning:** Protect eligible release code while preserving WPF bindings and configuration interoperability; never treat reversible string hiding as secret encryption.
 - **Implementation:** Pinned Obfuscar 2.2.49; private-member renaming, Unicode names and string hiding; deliberate WPF/JSON exclusions; protected validation and ZIP generation in `scripts/Build-Protected.ps1`. Private mappings and PDBs are excluded from the distributed package.
-- **Conclusion:** Protected DLL passes twelve checks and two-language renders. Public source remains readable; this is obfuscation, not strong encryption, and performance has not been benchmarked.
+- **Conclusion:** Protected DLL passes thirteen checks and two-language renders. Public source remains readable; this is obfuscation, not strong encryption, and performance has not been benchmarked.
 
 ## Step 5 — Visual and UX redesign
 
@@ -42,8 +42,8 @@ These are actual off-screen WPF renders with an isolated TestPlayer configuratio
 ## Step 6 — Repository update
 
 - **Reasoning:** Preserve reviewable work without presenting an unfinished preview as the completed stable replacement.
-- **Implementation:** Local preview changes are saved in Git. Authentication dry-run failed with missing GitHub credentials; no remote repository changes were made. A Windows build/validation workflow was added.
-- **Conclusion:** Publication is pending GitHub authentication and completion of the remaining stable-release requirements. Original committed binaries were not replaced.
+- **Implementation:** Local preview changes are saved in Git. GitHub authentication and write access were verified; preview commits were pushed to `codex/modernization-preview`. A Windows build/validation workflow was added.
+- **Conclusion:** The preview branch is published; stable replacement is pending completion of the remaining release requirements. Original committed binaries were not replaced.
 
 ## Step 7 — Review and documentation
 
@@ -60,3 +60,4 @@ git credential-manager github login --username gamer3434 --browser
 ```
 
 GitHub sayfasında doğru hesabı seçin, iki aşamalı doğrulamayı ve Git Credential Manager yetkilendirmesini tamamlayın. Tarayıcı açılmazsa `--browser` yerine `--device` kullanın; geçici kodu yalnızca komutun gösterdiği GitHub sayfasına girin. Parola/tokenı sohbete göndermeyin.
+

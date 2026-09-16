@@ -1,8 +1,8 @@
 # Mistik Launcher 6 — Modernization preview / Modernizasyon önizlemesi
 
-**Preview, not a completed stable replacement.** Home, settings and navigation are bilingual. Full legacy-page translation and actual Minecraft/mod/server verification remain outstanding. GitHub write access was unavailable during validation.
+**Preview, not a completed stable replacement.** Home, settings and navigation are bilingual. Full legacy-page translation and actual Minecraft/mod/server verification remain outstanding. GitHub access is authenticated; the preview is published on `codex/modernization-preview`.
 
-**Önizleme; kararlı sürümün tamamlanmış yeni versiyonu değildir.** Ana panel, ayarlar ve gezinme iki dillidir. Eski sayfaların tam çevirisi ile gerçek oyun/mod/sunucu testleri henüz tamamlanmadı. Doğrulama sırasında GitHub yazma erişimi yoktu.
+**Önizleme; kararlı sürümün tamamlanmış yeni versiyonu değildir.** Ana panel, ayarlar ve gezinme iki dillidir. Eski sayfaların tam çevirisi ile gerçek oyun/mod/sunucu testleri henüz tamamlanmadı. GitHub erişimi doğrulandı; önizleme `codex/modernization-preview` dalına gönderildi.
 
 ## Türkçe
 
@@ -85,7 +85,7 @@ Real off-screen WPF renders, not a running Minecraft session. / Gerçek WPF gör
 | `MistikLauncher/Localization.cs` | Embedded resource loader / Dil kaynakları |
 | `MistikLauncher/ReleaseSecurity.cs` | Update and uninstall safeguards / Güvenlik |
 | `scripts/Build-Protected.ps1` | Protected package / Korumalı paket |
-| `Validation/Program.cs` | Twelve checks and WPF renders / On iki denetim |
+| `Validation/Program.cs` | Thirteen checks and WPF renders / On üç denetim |
 | `.github/workflows/validate.yml` | Windows CI / Windows doğrulama |
 
 See [audit and outstanding work](docs/AUDIT.md). / [Denetim ve kalan işler](docs/AUDIT.md).

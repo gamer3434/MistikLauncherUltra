@@ -1,7 +1,6 @@
 Legacy literal inventory (heuristic; dynamic messages and XAML need separate review).
 Eski metin envanteri (dinamik iletiler ve XAML ayrıca incelenmelidir).
 
-MistikLauncher\Pages\CloudAndFriendsPages.cs:21 | 🎨  Karakter (Skin) Odasi
 MistikLauncher\Pages\CloudAndFriendsPages.cs:22 | Kullanici adi arayip canlı önizleyerek veya bilgisayarinizdan .png skin yukleyerek karakterinizi degistirin
 MistikLauncher\Pages\CloudAndFriendsPages.cs:27 | 💡 Karakter Değişikliği Hakkında Önemli Bilgiler
 MistikLauncher\Pages\CloudAndFriendsPages.cs:28 | • Oyununuz Açıkken Değiştirme: Oyun açıkken skin değiştirdiyseniz, oyun içinde F3 + T tuşlarına basarak kaynak paketlerini yenileyin veya oyunu yeniden başlatın.
@@ -10,31 +9,20 @@ MistikLauncher\Pages\CloudAndFriendsPages.cs:30 | • Paket Kontrolü: Oyun içi
 MistikLauncher\Pages\CloudAndFriendsPages.cs:31 | • Çok Oyunculu & Arkadaş Skin Çakışması: Çevrimdışı (offline) modda skin kurduğunuzda, oyun tüm varsayılan Steve/Alex modellerini sizin skininizle değiştirir (arkadaşınız da sizde kendi skininizle görünür). Bunu çözmek için 'Ayarlar' sayfasından Giriş Türü'nü Ely.by (Önerilen) olarak ayarlayabilir veya aşağıdaki 'CustomSkinLoader' modunu kurabilirsiniz.
 MistikLauncher\Pages\CloudAndFriendsPages.cs:44 | 🔍 Karakter Arama & Canlı Önizleme
 MistikLauncher\Pages\CloudAndFriendsPages.cs:45 | Premium oyuncu adı yazarak karakteri aratın ve önizleyin:
-MistikLauncher\Pages\CloudAndFriendsPages.cs:53 | Ara & Önizle
-MistikLauncher\Pages\CloudAndFriendsPages.cs:79 | Ozel Skin
 MistikLauncher\Pages\CloudAndFriendsPages.cs:80 | Karakter hazır. Oyuna kurmak için aşağıdaki butona basın.
 MistikLauncher\Pages\CloudAndFriendsPages.cs:88 | Karakter hazır. Oyuna kurmak için aşağıdaki butona basın.
-MistikLauncher\Pages\CloudAndFriendsPages.cs:97 | ✨ Karakteri Oyuna Kur
-MistikLauncher\Pages\CloudAndFriendsPages.cs:132 | 🔄 Skini Güncelle / Yenile
-MistikLauncher\Pages\CloudAndFriendsPages.cs:162 | ❌ Skini Sıfırla / Kapat
 MistikLauncher\Pages\CloudAndFriendsPages.cs:200 | 📁 Bilgisayardan Ozel Skin (.png) Yukle
 MistikLauncher\Pages\CloudAndFriendsPages.cs:201 | Kendi indirdiginiz .png skin dosyasini oyuna kaynak paketi olarak yukleyin:
-MistikLauncher\Pages\CloudAndFriendsPages.cs:209 | Gozat
-MistikLauncher\Pages\CloudAndFriendsPages.cs:212 | Uygula
 MistikLauncher\Pages\CloudAndFriendsPages.cs:283 | 🌐 Ely.by Cilt Entegrasyonu
 MistikLauncher\Pages\CloudAndFriendsPages.cs:284 | Ely.by hesabınızdaki skininizi doğrudan yönetin. Yüklediğiniz skinler arkadaşlarınız ve diğer Ely.by kullanıcıları tarafından oyunda otomatik olarak görünür!
-MistikLauncher\Pages\CloudAndFriendsPages.cs:288 | 🌐 Başlatıcı İçinde Aç
-MistikLauncher\Pages\CloudAndFriendsPages.cs:292 | 🌍 Tarayıcıda Aç (Dış)
 MistikLauncher\Pages\CloudAndFriendsPages.cs:308 | ⚡ CustomSkinLoader (Cilt Yaması)
 MistikLauncher\Pages\CloudAndFriendsPages.cs:309 | Arkadaşlarınızın skinlerini oyunda görebilmek ve kendi skininizi diğer oyunculara gösterebilmek için CustomSkinLoader yaması gereklidir. Aşağıdaki butona tıklayarak sürümünüze uygun CustomSkinLoader modunu tek tıkla kurabilirsiniz.
 MistikLauncher\Pages\CloudAndFriendsPages.cs:312 | ⚡ CustomSkinLoader Modunu Kur
 MistikLauncher\Pages\CloudAndFriendsPages.cs:475 | ☁️  Bulut Sunucular
 MistikLauncher\Pages\CloudAndFriendsPages.cs:479 | ● Ping kontrol ediliyor…
-MistikLauncher\Pages\CloudAndFriendsPages.cs:562 | Baglaniyor...
 MistikLauncher\Pages\CloudAndFriendsPages.cs:570 | Benim Oda Kodum (IP paylasılmaz):
 MistikLauncher\Pages\CloudAndFriendsPages.cs:590 | Bu kodu arkadasina Discord/mesaj ile gonder
 MistikLauncher\Pages\CloudAndFriendsPages.cs:594 | Arkadas Kodu Ekle:
-MistikLauncher\Pages\CloudAndFriendsPages.cs:598 | Ekle
 MistikLauncher\Pages\CloudAndFriendsPages.cs:604 | Arkadasinin launcher'inda gorunen 6 haneli kodu gir
 MistikLauncher\Pages\CloudAndFriendsPages.cs:608 | KAYITLI ARKADASLAR
 MistikLauncher\Pages\CloudAndFriendsPages.cs:613 | CANLI / CEVRIMICI
@@ -48,7 +36,6 @@ MistikLauncher\Pages\CloudAndFriendsPages.cs:645 | 💻 2. Kendi Bireysel Sunucu
 MistikLauncher\Pages\CloudAndFriendsPages.cs:646 | • Sunucu klasörünüzdeki 'server.properties' dosyasını açın, 'online-mode=true' satırını 'online-mode=false' olarak değiştirip kaydedin ve sunucunuzu YENİDEN BAŞLATIN.
 MistikLauncher\Pages\CloudAndFriendsPages.cs:651 | ☁️ 3. Aternos Sunucuları İçin:
 MistikLauncher\Pages\CloudAndFriendsPages.cs:652 | • Aternos panelinde Ayarlar (Options) kısmına gidin, 'Korsan (Cracked)' seçeneğini aktif (Yeşil/Açık) konuma getirin ve sunucuyu YENİDEN BAŞLATIN.
-MistikLauncher\Pages\CloudAndFriendsPages.cs:657 | ⚡ Otomatik Koruma: Mistik Tünel Motoru, tüneli başlattığınızda yerel sunucu dosyalarınızı otomatik olarak tarayıp offline moda hazırlar!
 MistikLauncher\Pages\CloudAndFriendsPages.cs:667 | TÜNEL SERVİSİ SEÇ:
 MistikLauncher\Pages\CloudAndFriendsPages.cs:730 | LAN PORT:
 MistikLauncher\Pages\CloudAndFriendsPages.cs:736 |    ← Minecraft sohbetinde görünen port
@@ -56,12 +43,9 @@ MistikLauncher\Pages\CloudAndFriendsPages.cs:742 | SSH Adresi:
 MistikLauncher\Pages\CloudAndFriendsPages.cs:748 |   (user@host:port)
 MistikLauncher\Pages\CloudAndFriendsPages.cs:796 | ● TÜNEL AKTİF
 MistikLauncher\Pages\CloudAndFriendsPages.cs:797 |  — Arkadaşlarınla bu adresi paylaş:
-MistikLauncher\Pages\CloudAndFriendsPages.cs:822 | 📋 Kopyala
-MistikLauncher\Pages\CloudAndFriendsPages.cs:835 | 🔍 Test Et
 MistikLauncher\Pages\CloudAndFriendsPages.cs:841 | 
 MistikLauncher\Pages\CloudAndFriendsPages.cs:1011 | Henuz arkadasin yok. Yukardaki kutudan kod ekle.
 MistikLauncher\Pages\CloudAndFriendsPages.cs:1052 | Simdilik cevrimici kimse yok.
-MistikLauncher\Pages\CloudAndFriendsPages.cs:1090 | Ekle
 MistikLauncher\Pages\CloudAndFriendsPages.cs:1324 | ➔
 MistikLauncher\Pages\CloudAndFriendsPages.cs:1369 | 📜  Son Güncellemeler
 MistikLauncher\Pages\CloudAndFriendsPages.cs:1385 | ●
@@ -218,9 +202,6 @@ MistikLauncher\Pages\SettingsAndMorePages.cs:2266 | 🔄 LİSTEYİ YENİLE
 MistikLauncher\Pages\SettingsAndMorePages.cs:2284 | Henüz yayınlanmış güncelleme geçmişi bulunamadı.
 MistikLauncher\Pages\SettingsAndMorePages.cs:2295 | Geçmiş okunamadı.
 MistikLauncher\Pages\VersionAndModPages.cs:33 | \uD83D\uDD04 Yenile
-MistikLauncher\Pages\VersionAndModPages.cs:297 | Kurulu
-MistikLauncher\Pages\VersionAndModPages.cs:319 | SIL
-MistikLauncher\Pages\VersionAndModPages.cs:332 | INDIR
 MistikLauncher\Pages\VersionAndModPages.cs:755 | Mod Merkezi (Modrinth)
 MistikLauncher\Pages\VersionAndModPages.cs:756 | Modrinth'den binlerce mod - tek tiklama kurulum
 MistikLauncher\Pages\VersionAndModPages.cs:762 | 🚀 Mistik Özel Tek Tıkla Hazır Mod Paketleri
