@@ -4,7 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 namespace MistikLauncher.Pages;
 
-public class ModernHomePage : Page
+public class ModernHomePage : Page, ILanguagePage
 {
     readonly MainWindow main;
     public ModernHomePage(MainWindow window)
@@ -14,21 +14,30 @@ public class ModernHomePage : Page
         Unloaded += (_, _) => Localization.Changed -= Render;
         Render();
     }
+    public void RefreshLanguage() => Render();
     void Render()
     {
         var stack = new StackPanel { Margin = new Thickness(36) };
-        var hero = new Border { Background = PageHelpers.HexBrush("#203F5D"), CornerRadius = new CornerRadius(18), Padding = new Thickness(28) };
+        var hero = new Border { Background = new LinearGradientBrush(ColorThemes.Brush("#203853").Color,ColorThemes.Brush("#152A43").Color,0), CornerRadius = new CornerRadius(18), Padding = new Thickness(28) };
         var copy = new StackPanel();
         copy.Children.Add(PageHelpers.Lbl(Localization.T("welcome"), 30, "#FFFFFF", true, wrap: TextWrapping.Wrap));
         copy.Children.Add(PageHelpers.Lbl(Localization.T("intro"), 15, "#D5E5F2", pad: new Thickness(0,12,0,0), wrap: TextWrapping.Wrap));
-        hero.Child = copy; stack.Children.Add(hero);
+        var heroGrid=new Grid(); heroGrid.ColumnDefinitions.Add(new ColumnDefinition()); heroGrid.ColumnDefinitions.Add(new ColumnDefinition { Width=new GridLength(200) });
+        copy.Margin=new Thickness(0,0,24,0);
+        var explore=PageHelpers.MkBtn(Localization.T("explore"),"#226DA0"); explore.Margin=new Thickness(0,20,0,0); explore.HorizontalAlignment=HorizontalAlignment.Left; explore.Click+=(_,_)=>main.Navigate("Vers"); copy.Children.Add(explore);
+        var scene=new StackPanel { VerticalAlignment=VerticalAlignment.Center };
+        var blocks=new Canvas { Width=150,Height=98,HorizontalAlignment=HorizontalAlignment.Center,IsHitTestVisible=false };
+        void Face(string points,string color) { var polygon=new System.Windows.Shapes.Polygon { Points=PointCollection.Parse(points),Fill=PageHelpers.HexBrush(color) }; blocks.Children.Add(polygon); }
+        Face("75,8 135,38 75,68 15,38","#77D8D0"); Face("15,38 75,68 75,98 15,68","#3486A9"); Face("75,68 135,38 135,68 75,98","#245882");
+        scene.Children.Add(blocks); scene.Children.Add(PageHelpers.Lbl(Localization.T("version"),12,"#BFD5EB",pad:new Thickness(0,16,0,4))); scene.Children.Add(PageHelpers.Lbl(main.Config.Version,17,"#FFFFFF",true,wrap:TextWrapping.Wrap));
+        Grid.SetColumn(scene,1); heroGrid.Children.Add(copy); heroGrid.Children.Add(scene); hero.Child=heroGrid; stack.Children.Add(hero);
         var row = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3 };
         foreach (var item in new[] { ("profile",main.Config.User), ("version",main.Config.Version), ("memory",$"{main.Config.Ram} GB") })
         {
             var section = new StackPanel { Margin = new Thickness(0,20,16,20) };
             section.Children.Add(PageHelpers.Lbl(Localization.T(item.Item1),14,"#BDCAD8"));
             section.Children.Add(PageHelpers.Lbl(item.Item2,22,"#FFFFFF",true,wrap:TextWrapping.Wrap));
-            row.Children.Add(section);
+            row.Children.Add(new Border { Child=section, Background=PageHelpers.HexBrush("#13253C"),CornerRadius=new CornerRadius(10),Padding=new Thickness(18,0,0,0),Margin=new Thickness(0,18,12,24) });
         }
         stack.Children.Add(row);
         stack.Children.Add(PageHelpers.Lbl(Localization.T("quick"),20,"#FFFFFF",true));
@@ -58,39 +67,76 @@ public class ModernHomePage : Page
     }
 }
 
-public class ModernSettingsPage : Page
+public class ModernSettingsPage : Page, ILanguagePage
 {
     readonly MainWindow main;
     TextBox user = null!, ram = null!;
-    ComboBox language = null!, accent = null!, provider = null!;
+    ComboBox language = null!, provider = null!;
     CheckBox close = null!;
-    TextBlock result = null!;
+    TextBlock result = null!, updateStatus = null!;
+    Button updateButton = null!;
     public ModernSettingsPage(MainWindow window)
     {
         main=window;
-        Loaded += (_,_) => { Localization.Changed += Render; Render(); };
-        Unloaded += (_,_) => Localization.Changed -= Render;
+        Loaded += (_,_) => { Localization.Changed += Render; main.LauncherUpdates.Changed += UpdateStatusAsync; Render(); };
+        Unloaded += (_,_) => { Localization.Changed -= Render; main.LauncherUpdates.Changed -= UpdateStatusAsync; };
         Render();
     }
+    public void RefreshLanguage() => Render();
     void Render()
     {
         var stack = new StackPanel { Margin = new Thickness(36), MaxWidth=680, HorizontalAlignment=HorizontalAlignment.Left };
         stack.Children.Add(PageHelpers.Lbl(Localization.T("settings"),28,"#FFFFFF",true));
         stack.Children.Add(PageHelpers.Lbl(Localization.T("settingsIntro"),15,"#BDCAD8",pad:new Thickness(0,8,0,18),wrap:TextWrapping.Wrap));
+        var updateCard=new Border { Background=PageHelpers.HexBrush("#192C46"), CornerRadius=new CornerRadius(14), Padding=new Thickness(20), Margin=new Thickness(0,0,0,12) };
+        var updateContent=new StackPanel();
+        updateContent.Children.Add(PageHelpers.Lbl(Localization.T("luTitle")+" · "+main.LauncherUpdates.CurrentVersion,18,"#EFF5FF",true));
+        var auto=new CheckBox { Content=Localization.T("luAutomatic"), IsChecked=main.Config.LauncherAutoUpdate, Foreground=Brushes.White, Margin=new Thickness(0,12,0,12) };
+        auto.Click += (_,_)=> { main.Config.LauncherAutoUpdate=auto.IsChecked==true; ConfigManager.Save(main.Config); };
+        updateContent.Children.Add(auto);
+        updateButton=PageHelpers.MkBtn(Localization.T("luCheck"),"#226DA0"); updateButton.HorizontalAlignment=HorizontalAlignment.Left;
+        updateButton.Click += async (_,_)=> await main.CheckLauncherUpdatesAsync(true); updateContent.Children.Add(updateButton);
+        updateStatus=PageHelpers.Lbl("",13,"#ADBED6",pad:new Thickness(0,10,0,0),wrap:TextWrapping.Wrap); updateContent.Children.Add(updateStatus);
+        updateCard.Child=updateContent; stack.Children.Add(updateCard); UpdateStatus();
         void Label(string key) => stack.Children.Add(PageHelpers.Lbl(Localization.T(key),15,"#FFFFFF",true,pad:new Thickness(0,16,0,6)));
+        var themeCard=new Border { Background=PageHelpers.HexBrush("#192C46"), Padding=new Thickness(20), CornerRadius=new CornerRadius(14) };
+        var themeContent=new StackPanel();
+        themeContent.Children.Add(PageHelpers.Lbl(Localization.T("themeTitle"),18,"#EFF5FF",true));
+        themeContent.Children.Add(PageHelpers.Lbl(Localization.T("themeHelp"),13,"#ADBED6",pad:new Thickness(0,8,0,12),wrap:TextWrapping.Wrap));
+        var swatches=new System.Windows.Controls.Primitives.UniformGrid { Columns=5 };
+        foreach(var item in new[]{("Blue","#377ACB"),("Green","#237A59"),("Purple","#7950B7"),("Orange","#A65B26"),("Red","#B43F60")})
+        {
+            var choice=PageHelpers.MkBtn(Localization.T(item.Item1),item.Item2);
+            choice.Margin=new Thickness(0,0,8,0); choice.ToolTip=Localization.T("themeTitle")+": "+Localization.T(item.Item1);
+            choice.Click+=(_,_)=> {
+                main.SetColorTheme(item.Item1);
+                result.Text=Localization.T("themeApplied")+" · "+Localization.T(item.Item1);
+            };
+            swatches.Children.Add(choice);
+        }
+        themeContent.Children.Add(swatches); themeCard.Child=themeContent; stack.Children.Add(themeCard);
         Label("username"); user=PageHelpers.DarkTextBox(main.Config.User); user.MaxLength=16; stack.Children.Add(user);
         stack.Children.Add(PageHelpers.Lbl(Localization.T("usernameHelp"),13,"#BDCAD8",wrap:TextWrapping.Wrap));
         Label("memory"); ram=PageHelpers.DarkTextBox(main.Config.Ram.ToString()); stack.Children.Add(ram);
         stack.Children.Add(PageHelpers.Lbl(Localization.T("ramHelp"),13,"#BDCAD8",wrap:TextWrapping.Wrap));
         Label("language"); language=new ComboBox { ItemsSource=new[] { "Türkçe", "English" }, SelectedIndex=Localization.Language=="en"?1:0, MinHeight=36 }; stack.Children.Add(language);
-        Label("accent"); accent=new ComboBox { ItemsSource=new[] { Localization.T("Blue"), Localization.T("Green"), Localization.T("Purple"), Localization.T("Orange"), Localization.T("Red") }, SelectedIndex=Array.IndexOf(new[] { "Blue", "Green", "Purple", "Orange", "Red" },main.Config.Accent), MinHeight=36 }; stack.Children.Add(accent);
         Label("auth"); provider=new ComboBox { ItemsSource=new[] { Localization.T("offline"), "Ely.by" }, SelectedIndex=main.Config.AuthType=="elyby"?1:0, MinHeight=36 }; stack.Children.Add(provider);
         close=new CheckBox { Content=Localization.T("close"), IsChecked=main.Config.AutoClose, Foreground=Brushes.White, Margin=new Thickness(0,20,0,20) }; stack.Children.Add(close);
         var save=PageHelpers.MkBtn(Localization.T("save"),"#226DA0"); save.HorizontalAlignment=HorizontalAlignment.Left;
-        save.Click += (_,_) => Save(); stack.Children.Add(save);
+        save.Click += (_,_) => Save();
         result=PageHelpers.Lbl("",14,"#F0CF84",pad:new Thickness(0,10,0,0),wrap:TextWrapping.Wrap); stack.Children.Add(result);
         Label("privacy"); stack.Children.Add(PageHelpers.Lbl(Localization.T("privacyText"),14,"#BDCAD8",wrap:TextWrapping.Wrap));
-        Content=new ScrollViewer { Content=stack, VerticalScrollBarVisibility=ScrollBarVisibility.Auto };
+        var layout=new DockPanel();
+        var footer=new Border { Background=PageHelpers.HexBrush("#152A43"), Padding=new Thickness(36,16,36,16), BorderBrush=PageHelpers.HexBrush("#365574"), BorderThickness=new Thickness(0,1,0,0) };
+        footer.Child=save; DockPanel.SetDock(footer,Dock.Bottom); layout.Children.Add(footer);
+        layout.Children.Add(new ScrollViewer { Content=stack, VerticalScrollBarVisibility=ScrollBarVisibility.Auto }); Content=layout;
+    }
+    void UpdateStatusAsync() { if(!Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(new Action(UpdateStatus)); }
+    void UpdateStatus()
+    {
+        if(updateStatus==null) return;
+        updateStatus.Text=Localization.T(main.LauncherUpdates.StatusKey)+(main.LauncherUpdates.Busy?$" ({main.LauncherUpdates.Progress:0}%)":"")+(main.LauncherUpdates.Error==null?"":"\n"+main.LauncherUpdates.Error);
+        updateButton.IsEnabled=!main.LauncherUpdates.Busy;
     }
     void Save()
     {
@@ -98,7 +144,6 @@ public class ModernSettingsPage : Page
         { result.Text=Localization.T("invalid"); return; }
         try {
             main.Config.User=user.Text.Trim(); main.Config.Ram=memory;
-            main.Config.Accent=new[] { "Blue", "Green", "Purple", "Orange", "Red" }[Math.Max(0,accent.SelectedIndex)];
             main.Config.AuthType=provider.SelectedIndex==1?"elyby":"offline";
             main.Config.AutoClose=close.IsChecked==true;
             main.Config.Lang=language.SelectedIndex==1?"English":"Turkce";

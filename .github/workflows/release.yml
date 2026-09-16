@@ -1,0 +1,36 @@
+name: Publish protected launcher release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Validate release version
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          [xml]$project = Get-Content MistikLauncher/MistikLauncher.csproj
+          $version = [string]$project.SelectSingleNode("/Project/PropertyGroup/Version").InnerText
+          if ($env:RELEASE_TAG -ne "v$version") { throw 'Tag must match project version' }
+      - name: Build protected package
+        shell: pwsh
+        run: ./scripts/Build-Protected.ps1
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $version = $env:RELEASE_TAG.Substring(1)
+          $arguments = @('release', 'create', $env:RELEASE_TAG, "artifacts/MistikLauncher-$version-win-x64.zip", '--title', "Mistik Launcher $version", '--generate-notes')
+          if ($version.Contains('-')) { $arguments += '--prerelease' }
+          gh @arguments
+          if ($LASTEXITCODE) { throw 'Release publication failed' }

@@ -14,7 +14,16 @@ namespace MistikLauncher.Pages
     public static class PageHelpers
     {
         public static Color HexColor(string hex) => (Color)ColorConverter.ConvertFromString(hex);
-        public static SolidColorBrush HexBrush(string hex) => new(HexColor(hex));
+        public static SolidColorBrush HexBrush(string hex)
+        {
+            hex=hex.ToUpperInvariant() switch {
+                "#181818" or "#141414" or "#20364B"=>"#192C46",
+                "#121212" or "#0A0A0A" or "#142333"=>"#0D1727",
+                "#222222" or "#222"=>"#203853", "#333333" or "#333"=>"#365574",
+                "#666666" or "#A0A0A0" or "#BDCAD8"=>"#ADBED6", "#FFFFFF"=>"#EFF5FF", _=>hex.ToUpperInvariant()
+            };
+            return ColorThemes.IsThemed(hex)?ColorThemes.Brush(hex):new(HexColor(hex));
+        }
 
         public static TextBlock Lbl(string text, double size = 13, string color = "#FFFFFF",
             bool bold = false, Thickness? pad = null, TextWrapping wrap = TextWrapping.Wrap)

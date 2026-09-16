@@ -21,6 +21,7 @@ namespace MistikLauncher.Pages
 
         static JArray? _mojangVersions = null;
         static bool _isLoadingVersions = false;
+        static JObject? _forgePromotions;
 
         public VersionManagerPage(MainWindow main)
         {
@@ -29,7 +30,7 @@ namespace MistikLauncher.Pages
             var sp = new StackPanel { Margin = new Thickness(40, 30, 40, 30) };
             var headerRow = new StackPanel { Orientation = Orientation.Horizontal };
             headerRow.Children.Add(PageHelpers.Lbl("Surum Yoneticisi", 24, "#FFFFFF", true));
-            
+
             var refreshBtn = PageHelpers.MkBtn("\uD83D\uDD04 Yenile", "#00A3FF", 100);
             refreshBtn.Margin = new Thickness(15, 0, 0, 0);
             refreshBtn.Click += (_, _) => {
@@ -63,6 +64,14 @@ namespace MistikLauncher.Pages
 
             // Background load the full list of Mojang releases and snapshots asynchronously
             _ = LoadMojangVersionsAsync();
+            _ = LoadForgeVersionsAsync();
+        }
+
+        async Task LoadForgeVersionsAsync()
+        {
+            try { _forgePromotions=await ForgeInstaller.PromotionsAsync(); }
+            catch(Exception ex) { App.Log("Forge metadata: "+ex.Message); }
+            Dispatcher.Invoke(RenderList);
         }
 
         async Task LoadMojangVersionsAsync()
@@ -75,7 +84,7 @@ namespace MistikLauncher.Pages
                 var manifestStr = await _http.GetStringAsync(url);
                 var mj = JObject.Parse(manifestStr);
                 _mojangVersions = mj["versions"] as JArray;
-                
+
                 // Cache the manifest in case we are offline next time
                 var cachePath = Path.Combine(App.GameDir, "version_manifest_cache.json");
                 Directory.CreateDirectory(App.GameDir);
@@ -117,10 +126,11 @@ namespace MistikLauncher.Pages
 
             if (id.StartsWith("forge-", StringComparison.OrdinalIgnoreCase))
             {
-                var gameVer = id.Substring("forge-".Length);
-                var prefix = $"forge-{gameVer}-";
-                var matched = installed.FirstOrDefault(x => x.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
-                if (matched != null) return matched;
+                var gameVer=id.Substring(6);
+                return installed.Where(x => {
+                    var json=GameProfiles.Read(App.GameDir,x);
+                    return json!=null && GameProfiles.Kind(json)=="Forge" && json["inheritsFrom"]?.ToString()==gameVer;
+                }).OrderByDescending(x=>x,StringComparer.OrdinalIgnoreCase).FirstOrDefault();
             }
 
             return null;
@@ -142,7 +152,7 @@ namespace MistikLauncher.Pages
                     {
                         var jarFile = Path.Combine(d, $"{name}.jar");
                         var jsonFile = Path.Combine(d, $"{name}.json");
-                        if (File.Exists(jarFile) && File.Exists(jsonFile))
+                        if (GameProfiles.IsInstalled(App.GameDir, name))
                         {
                             installedNames.Add(name);
                         }
@@ -153,28 +163,37 @@ namespace MistikLauncher.Pages
             var versionsMap = new Dictionary<string, (string id, string type)>(StringComparer.OrdinalIgnoreCase);
 
             // Populate popular vanilla/snapshot list as instant startup fallback
-            var fallbackVanillas = new[] { 
-                "1.22", "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21", 
-                "1.20.6", "1.20.4", "1.20.1", "1.20", 
+            var fallbackVanillas = new[] {
+                "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21",
+                "1.20.6", "1.20.4", "1.20.1", "1.20",
                 "1.19.4", "1.19.2", "1.18.2", "1.16.5", "1.12.2", "1.8.9"
             };
             foreach (var v in fallbackVanillas) versionsMap[v] = (v, "Vanilla");
 
             // Popular Fabric versions (startup fallback)
-            var fallbackFabrics = new[] { 
-                "fabric-1.22", "fabric-1.21.4", "fabric-1.21.3", "fabric-1.21.2", "fabric-1.21.1", "fabric-1.21", 
-                "fabric-1.20.6", "fabric-1.20.4", "fabric-1.20.1", 
-                "fabric-1.19.4", "fabric-1.19.2", "fabric-1.18.2", "fabric-1.16.5" 
+            var fallbackFabrics = new[] {
+                "fabric-1.21.4", "fabric-1.21.3", "fabric-1.21.2", "fabric-1.21.1", "fabric-1.21",
+                "fabric-1.20.6", "fabric-1.20.4", "fabric-1.20.1",
+                "fabric-1.19.4", "fabric-1.19.2", "fabric-1.18.2", "fabric-1.16.5"
             };
             foreach (var f in fallbackFabrics) versionsMap[f] = (f, "Fabric");
 
             // Popular Forge versions (fully supported)
-            var fallbackForges = new[] { 
-                "forge-1.22", "forge-1.21.4", "forge-1.21.3", "forge-1.21.2", "forge-1.21", "forge-1.20.4", "forge-1.20.1", 
-                "forge-1.19.4", "forge-1.19.2", 
-                "forge-1.18.2", "forge-1.16.5", "forge-1.12.2" 
+            var fallbackForges = new[] {
+                "forge-1.21.4", "forge-1.21.3", "forge-1.21", "forge-1.20.4", "forge-1.20.1",
+                "forge-1.19.4", "forge-1.19.2",
+                "forge-1.18.2", "forge-1.16.5", "forge-1.12.2"
             };
-            foreach (var fg in fallbackForges) versionsMap[fg] = (fg, "Forge");
+            if(_forgePromotions?["promos"] is JObject promos)
+            {
+                foreach(var promo in promos.Properties())
+                {
+                    var game=promo.Name.Replace("-recommended","").Replace("-latest","");
+                    if(game.StartsWith("1.") && Version.TryParse(game,out var v) && v>=new Version(1,8))
+                        versionsMap["forge-"+game]=("forge-"+game,"Forge");
+                }
+            }
+            else foreach (var fg in fallbackForges) versionsMap[fg] = (fg, "Forge");
 
             // If we have dynamic Mojang manifest, use all of them!
             if (_mojangVersions != null)
@@ -186,7 +205,7 @@ namespace MistikLauncher.Pages
                     if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(typeStr)) continue;
 
                     string mappedType = "Vanilla";
-                    if (typeStr.Equals("snapshot", StringComparison.OrdinalIgnoreCase) || 
+                    if (typeStr.Equals("snapshot", StringComparison.OrdinalIgnoreCase) ||
                         typeStr.Equals("old_beta", StringComparison.OrdinalIgnoreCase) ||
                         typeStr.Equals("old_alpha", StringComparison.OrdinalIgnoreCase))
                     {
@@ -216,47 +235,10 @@ namespace MistikLauncher.Pages
             // Ensure all physically installed versions are always shown, even if they aren't in the manifest
             foreach (var name in installedNames)
             {
-                // Check if this installed folder is already represented by a dynamic version card
-                bool alreadyMapped = false;
-                if (name.StartsWith("fabric-loader-", StringComparison.OrdinalIgnoreCase))
-                {
-                    var idx = name.LastIndexOf('-');
-                    if (idx != -1)
-                    {
-                        var gameVer = name.Substring(idx + 1);
-                        if (versionsMap.ContainsKey($"fabric-{gameVer}")) alreadyMapped = true;
-                    }
-                }
-                else if (name.StartsWith("forge-", StringComparison.OrdinalIgnoreCase))
-                {
-                    var parts = name.Split('-');
-                    if (parts.Length >= 2)
-                    {
-                        var gameVer = parts[1];
-                        if (versionsMap.ContainsKey($"forge-{gameVer}")) alreadyMapped = true;
-                    }
-                }
-
-                if (alreadyMapped) continue;
-
-                if (!versionsMap.TryGetValue(name, out var existing))
-                {
-                    string mappedType = "Vanilla";
-                    if (name.StartsWith("fabric-", StringComparison.OrdinalIgnoreCase))
-                    {
-                        mappedType = "Fabric";
-                    }
-                    else if (name.StartsWith("forge-", StringComparison.OrdinalIgnoreCase))
-                    {
-                        mappedType = "Forge";
-                    }
-                    else
-                    {
-                        // Default to Vanilla (installed versions show anyway)
-                        mappedType = "Vanilla";
-                    }
-                    versionsMap[name] = (name, mappedType);
-                }
+                var profile=GameProfiles.Read(App.GameDir,name)!;
+                versionsMap[name]=(name,GameProfiles.Kind(profile));
+                if(GameProfiles.Kind(profile)=="Forge" && profile["inheritsFrom"]!=null)
+                    versionsMap.Remove("forge-"+profile["inheritsFrom"]!.ToString());
             }
 
             // Build final list with accurate installation flag
@@ -333,22 +315,22 @@ namespace MistikLauncher.Pages
                     dlBtn.Click += async (_, _) => {
                         dlBtn.IsEnabled = false; dlBtn.Content = "..."; _main.SetProgress(10, "İndirme başlatılıyor...");
                         var installedId = await DownloadVersionAsync(vid, (p, status) => Dispatcher.Invoke(() => _main.SetProgress(p, status)));
-                        _main.SetProgress(0, installedId != null ? $"Sürüm: {installedId}" : $"Sürüm: {vid}"); 
+                        _main.SetProgress(0, installedId != null ? $"Sürüm: {installedId}" : $"Sürüm: {vid}");
                         dlBtn.Content = "INDIR"; dlBtn.IsEnabled = true;
-                        
+
                         if (!string.IsNullOrEmpty(installedId))
                         {
                             var path = Path.Combine(App.GameDir, "versions", installedId);
                             var jarFile = Path.Combine(path, $"{installedId}.jar");
                             var jsonFile = Path.Combine(path, $"{installedId}.json");
-                            if (File.Exists(jarFile) && File.Exists(jsonFile))
+                            if (GameProfiles.IsInstalled(App.GameDir, installedId))
                             {
                                 _main.Config.Version = installedId;
                                 ConfigManager.Save(_main.Config);
                                 MessageBox.Show($"{installedId} başarıyla kuruldu ve seçildi!", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
                             }
                         }
-                        
+
                         _main.PopulateVersionBox();
                         RenderList();
                     };
@@ -391,7 +373,7 @@ namespace MistikLauncher.Pages
                 var mj = JObject.Parse(manifest);
                 var versions = mj["versions"] as JArray;
                 var ver = versions?.FirstOrDefault(v => v["id"]?.ToString() == version);
-                if (ver == null) 
+                if (ver == null)
                 {
                     Application.Current.Dispatcher.Invoke(() => MessageBox.Show($"{version} henüz Mojang tarafından yayınlanmamış veya bulunamayan bir sürümdür.\n\nLütfen listenin daha aşağılarından şu anki güncel (örn: 1.21.4) bir sürümü seçin.", "Sürüm Bulunamadı", MessageBoxButton.OK, MessageBoxImage.Warning));
                     return null;
@@ -434,7 +416,7 @@ namespace MistikLauncher.Pages
                             var objectsDir = Path.Combine(App.GameDir, "assets", "objects");
                             var entries = objects.Properties().ToList();
                             int total = entries.Count, done = 0;
-                            
+
                             // Using a Semaphore to run up to 8 downloads concurrently
                             var sem = new System.Threading.SemaphoreSlim(8);
                             var tasks = entries.Select(async prop =>
@@ -449,7 +431,7 @@ namespace MistikLauncher.Pages
                                     System.Threading.Interlocked.Increment(ref done);
                                     return;
                                 }
-                                
+
                                 await sem.WaitAsync();
                                 try
                                 {
@@ -512,7 +494,7 @@ namespace MistikLauncher.Pages
             long totalReadBytes = 0L;
             int readBytes;
             var sw = Stopwatch.StartNew();
-            
+
             long lastReportBytes = 0L;
             var lastReportTime = sw.ElapsedMilliseconds;
 
@@ -530,16 +512,16 @@ namespace MistikLauncher.Pages
                     // Speed calculation
                     double elapsedSec = (now - lastReportTime) / 1000.0;
                     if (elapsedSec <= 0) elapsedSec = 0.001;
-                    
+
                     long bytesInInterval = totalReadBytes - lastReportBytes;
                     double bytesPerSec = bytesInInterval / elapsedSec;
                     double mbPerSec = bytesPerSec / (1024.0 * 1024.0);
 
-                    string speedStr = mbPerSec >= 1.0 
-                        ? $"{mbPerSec:F2} MB/s" 
+                    string speedStr = mbPerSec >= 1.0
+                        ? $"{mbPerSec:F2} MB/s"
                         : $"{bytesPerSec / 1024.0:F1} KB/s";
 
-                    string sizeStr = totalBytes > 0 
+                    string sizeStr = totalBytes > 0
                         ? $"{totalReadBytes / (1024.0 * 1024.0):F1} MB / {totalBytes / (1024.0 * 1024.0):F1} MB"
                         : $"{totalReadBytes / (1024.0 * 1024.0):F1} MB";
 
@@ -604,69 +586,10 @@ namespace MistikLauncher.Pages
 
         static async Task<string> InstallForgeAsync(string gameVersion, Action<double, string> progress)
         {
-            try
-            {
-                progress(10, "[Forge] Temel oyun sürümü indiriliyor...");
-                // Ensure vanilla base version is installed first
-                await DownloadVersionAsync(gameVersion, (p, status) => progress(10 + p * 0.45, $"[Forge] {status}")); // takes up to 55%
-
-                progress(60, "[Forge] Forge profil ayarları oluşturuluyor...");
-                var forgeVer = gameVersion switch {
-                    "1.21"   => "51.0.8",
-                    "1.20.4" => "49.0.38",
-                    "1.20.1" => "47.2.0",
-                    "1.19.4" => "45.1.0",
-                    "1.19.2" => "43.2.0",
-                    "1.18.2" => "40.2.0",
-                    "1.16.5" => "36.2.34",
-                    "1.12.2" => "14.23.5.2860",
-                    _        => "47.2.0"
-                };
-
-                var forgeName = $"forge-{gameVersion}-{forgeVer}";
-                var targetDir = Path.Combine(App.GameDir, "versions", forgeName);
-                Directory.CreateDirectory(targetDir);
-
-                progress(75, "[Forge] Forge JSON yapılandırması ayarlanıyor...");
-                var vanillaJsonPath = Path.Combine(App.GameDir, "versions", gameVersion, $"{gameVersion}.json");
-                if (File.Exists(vanillaJsonPath))
-                {
-                    var vanillaJson = JObject.Parse(await File.ReadAllTextAsync(vanillaJsonPath));
-                    vanillaJson["id"] = forgeName;
-                    
-                    if (gameVersion.StartsWith("1.12") || gameVersion.StartsWith("1.8"))
-                    {
-                        vanillaJson["mainClass"] = "net.minecraft.launchwrapper.Launch";
-                        var args = vanillaJson["minecraftArguments"]?.ToString() ?? "";
-                        if (!args.Contains("--tweakClass"))
-                        {
-                            vanillaJson["minecraftArguments"] = args + " --tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker";
-                        }
-                    }
-                    else
-                    {
-                        vanillaJson["mainClass"] = "net.minecraftforge.bootstrap.ForgeBootstrap";
-                    }
-
-                    await File.WriteAllTextAsync(Path.Combine(targetDir, $"{forgeName}.json"), vanillaJson.ToString());
-                }
-
-                // Copy Vanilla Jar to Forge directory
-                var vanillaJar = Path.Combine(App.GameDir, "versions", gameVersion, $"{gameVersion}.jar");
-                if (File.Exists(vanillaJar))
-                {
-                    File.Copy(vanillaJar, Path.Combine(targetDir, $"{forgeName}.jar"), true);
-                }
-
-                progress(100, "[Forge] Kurulum tamamlandı!");
-                App.Log($"Forge {gameVersion} successfully installed: {forgeName}");
-                return forgeName;
-            }
-            catch (Exception ex)
-            {
-                App.Log($"Forge install error: {ex.Message}");
-                throw;
-            }
+            progress(5,Localization.T("forgeBase"));
+            var baseId=await DownloadVersionAsync(gameVersion,(p,status)=>progress(p*0.55,status));
+            if(baseId==null) throw new InvalidOperationException(Localization.T("forgeFailed"));
+            return await ForgeInstaller.InstallAsync(gameVersion,progress);
         }
 
         static List<int> GetVersionNumbers(string input)
@@ -833,7 +756,7 @@ namespace MistikLauncher.Pages
             var optiSp = new StackPanel { Margin = new Thickness(16) };
             optiSp.Children.Add(PageHelpers.Lbl("✨ OptiFine & FPS Optimizasyon Odası", 14, "#FFB100", true));
             optiSp.Children.Add(PageHelpers.Lbl("OptiFine yuklemek son derece kolaydir! Asagidaki rehberi takip ederek saniyeler icinde kurabilirsiniz:", 11, "#CCC", wrap: TextWrapping.Wrap));
-            
+
             var bulletPoints = new[] {
                 "• Forge Surumu icin: Indirdiginiz OptiFine .jar dosyasini dogrudan Mod Klasorune atmaniz yeterlidir.",
                 "• Fabric Surumu icin: Mod Klasorune hem OptiFine .jar dosyasini hem de OptiFabric modunu (asagidaki tusla kurabilirsiniz) atmaniz gerekir.",
@@ -845,10 +768,10 @@ namespace MistikLauncher.Pages
             }
 
             var optiBtns = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) };
-            
+
             var dlOptiBtn = PageHelpers.MkBtn("OptiFine Indir (Resmi Site)", "#FFB100", 180);
             dlOptiBtn.Click += (_, _) => Process.Start(new ProcessStartInfo("https://optifine.net/downloads") { UseShellExecute = true });
-            
+
             var optiFabricBtn = PageHelpers.MkBtn("OptiFabric Modunu Kur", "#A349A4", 170);
             optiFabricBtn.Margin = new Thickness(10, 0, 0, 0);
             optiFabricBtn.Click += async (_, _) => {
@@ -865,7 +788,7 @@ namespace MistikLauncher.Pages
             optiBtns.Children.Add(optiFabricBtn);
             optiBtns.Children.Add(modsFolderBtn);
             optiSp.Children.Add(optiBtns);
-            
+
             optiCard.Child = optiSp;
             sp.Children.Add(optiCard);
 
@@ -915,20 +838,20 @@ namespace MistikLauncher.Pages
             // ── Toplu Mod Sürüm Taşıyıcı (Migrator) Kartı ──
             var migCard = PageHelpers.Card("#121814", 12, "#2EB82E");
             migCard.Margin = new Thickness(0, 10, 0, 10);
-            
+
             var migSp = new StackPanel { Margin = new Thickness(16) };
             migSp.Children.Add(PageHelpers.Lbl("🔄 Toplu Mod Sürüm Taşıyıcı (Mod Migrator)", 15, "#2EB82E", true));
             migSp.Children.Add(PageHelpers.Lbl("Aktif mod klasörünüzdeki modların seçtiğiniz hedef Minecraft sürümü ve Loader türüne uygun olan sürümlerini Modrinth'ten otomatik olarak indirip kurar. Mevcut modlarınız da güvenle yedeklenir (askıya alınır).", 10, "#A0A0A0", wrap: TextWrapping.Wrap));
 
             var migControls = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) };
-            
+
             migControls.Children.Add(PageHelpers.Lbl("Hedef Sürüm:", 11, "#FFFFFF"));
-            
-            var targetVerCombo = new ComboBox { 
+
+            var targetVerCombo = new ComboBox {
                 Width = 100, Height = 28, Margin = new Thickness(6, 0, 16, 0),
                 Background = Brushes.White, Foreground = Brushes.Black, FontWeight = FontWeights.Bold
             };
-            
+
             var uniqueMcVersions = new HashSet<string>();
             foreach (var item in _main.VerBox.Items)
             {
@@ -962,11 +885,11 @@ namespace MistikLauncher.Pages
             {
                 targetVerCombo.Items.Add(v);
             }
-            
+
             if (targetVerCombo.Items.Count > 0)
             {
                 targetVerCombo.SelectedIndex = 0;
-                
+
                 var activeVer = _main.Config.Version ?? "";
                 var activeMcMatch = System.Text.RegularExpressions.Regex.Match(activeVer, @"1\.\d+(\.\d+)?");
                 if (activeMcMatch.Success && targetVerCombo.Items.Contains(activeMcMatch.Value))
@@ -979,7 +902,7 @@ namespace MistikLauncher.Pages
                 var migVersions = new[] { "1.21.1", "1.20.1", "1.19.2", "1.18.2", "1.16.5", "1.12.2" };
                 foreach (var v in migVersions) targetVerCombo.Items.Add(v);
                 targetVerCombo.SelectedIndex = 0;
-                
+
                 var activeVer = _main.Config.Version ?? "";
                 var activeMcMatch = System.Text.RegularExpressions.Regex.Match(activeVer, @"1\.\d+(\.\d+)?");
                 if (activeMcMatch.Success && targetVerCombo.Items.Contains(activeMcMatch.Value))
@@ -990,8 +913,8 @@ namespace MistikLauncher.Pages
             migControls.Children.Add(targetVerCombo);
 
             migControls.Children.Add(PageHelpers.Lbl("Mod Yükleyici:", 11, "#FFFFFF"));
-            
-            var targetLoaderCombo = new ComboBox { 
+
+            var targetLoaderCombo = new ComboBox {
                 Width = 100, Height = 28, Margin = new Thickness(6, 0, 16, 0),
                 Background = Brushes.White, Foreground = Brushes.Black, FontWeight = FontWeights.Bold
             };
@@ -1009,22 +932,22 @@ namespace MistikLauncher.Pages
                 await MigrateAndDownloadMods(targetVer, targetLoader, migBtn);
             };
             migControls.Children.Add(migBtn);
-            
+
             migSp.Children.Add(migControls);
             migCard.Child = migSp;
             sp.Children.Add(migCard);
 
             // ── Kurulu Modlar Bölümü ─────────────────────────────────────────
             sp.Children.Add(new Separator { Background = PageHelpers.HexBrush("#282828"), Margin = new Thickness(0, 24, 0, 10) });
-            
+
             var instHeader = new Grid();
             instHeader.ColumnDefinitions.Add(new ColumnDefinition());
             instHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            
+
             var instTitle = PageHelpers.Lbl("📦 Kurulu Modlar", 18, "#A349A4", true);
             Grid.SetColumn(instTitle, 0);
             instHeader.Children.Add(instTitle);
-            
+
             var cleanBtn = PageHelpers.MkBtn("🗑 Klasörü Temizle", "#CC2222", 140);
             cleanBtn.Click += (_, _) => {
                 var confirm = MessageBox.Show(
@@ -1053,7 +976,7 @@ namespace MistikLauncher.Pages
             Grid.SetColumn(cleanBtn, 1);
             instHeader.Children.Add(cleanBtn);
             sp.Children.Add(instHeader);
-            
+
             sp.Children.Add(PageHelpers.Lbl("Mods klasöründeki tüm .jar dosyaları — yanındaki butona tıklayarak silebilirsin.", 11, "#A0A0A0", wrap: TextWrapping.Wrap));
             _installedPanel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
             sp.Children.Add(_installedPanel);
@@ -1150,18 +1073,18 @@ namespace MistikLauncher.Pages
         bool IsModAlreadyInstalled(string slug, string name)
         {
             if (!Directory.Exists(App.ModsDir)) return false;
-            
+
             var files = Directory.GetFiles(App.ModsDir, "*.jar");
             foreach (var file in files)
             {
                 var filename = Path.GetFileName(file).ToLower();
-                
+
                 // 1. Check slug match (e.g. "fabric-api" in "fabric-api-0.102.0.jar")
                 if (!string.IsNullOrEmpty(slug) && filename.Contains(slug.ToLower()))
                 {
                     return true;
                 }
-                
+
                 // 2. Check clean name match (e.g. "fabric-api" from "Fabric API")
                 var cleanName = name.Replace(" ", "-").Replace("'", "").ToLower();
                 if (!string.IsNullOrEmpty(cleanName) && filename.Contains(cleanName))
@@ -1807,7 +1730,7 @@ namespace MistikLauncher.Pages
 
                 // 6. Sonuçları göster
                 RenderInstalledMods();
-                
+
                 string msg = $"Mod taşıma işlemi tamamlandı!\n\n" +
                              $"🎯 Hedef Sürüm: {matchedVerName} ({loader})\n" +
                              $"✅ Başarıyla İndirilen: {downloadedCount} mod\n";
@@ -1836,7 +1759,7 @@ namespace MistikLauncher.Pages
             try
             {
                 using var archive = System.IO.Compression.ZipFile.OpenRead(jarPath);
-                
+
                 // Try Fabric first
                 var fabricEntry = archive.GetEntry("fabric.mod.json");
                 if (fabricEntry != null)

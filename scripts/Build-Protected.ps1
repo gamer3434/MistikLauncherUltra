@@ -5,7 +5,8 @@ Push-Location $repo
 try {
     & $Dotnet tool restore
     if ($LASTEXITCODE) { throw 'Tool restore failed / Araç yüklenemedi' }
-    & $Dotnet publish MistikLauncher/MistikLauncher.csproj -c Release --self-contained true -p:PublishSingleFile=false -o artifacts/portable
+    $buildRoot = Join-Path $repo artifacts/build
+    & $Dotnet publish MistikLauncher/MistikLauncher.csproj -c Release --self-contained true -p:PublishSingleFile=false "-p:BaseOutputPath=$buildRoot/" -o artifacts/portable
     if ($LASTEXITCODE) { throw 'Build failed / Derleme başarısız' }
     $inputPath = (Resolve-Path artifacts/portable).Path
     $outputPath = Join-Path $repo artifacts/obfuscated
@@ -39,18 +40,30 @@ try {
     $config | Set-Content artifacts/obfuscar.xml -Encoding utf8
     & $Dotnet tool run obfuscar.console artifacts/obfuscar.xml
     if ($LASTEXITCODE) { throw 'Obfuscation failed / Kod koruması başarısız' }
-    & $Dotnet build Validation/Validation.csproj -c Release
+    & $Dotnet build Validation/Validation.csproj -c Release "-p:BaseOutputPath=$buildRoot/"
     if ($LASTEXITCODE) { throw 'Validation build failed / Doğrulama derlenemedi' }
-    $validationBin = Join-Path $repo Validation/bin/Release/net8.0-windows/win-x64
+    $validationBin = Join-Path $buildRoot Release/net8.0-windows/win-x64
     Copy-Item "$outputPath/MistikLauncher.dll" "$validationBin/MistikLauncher.dll" -Force
-    & $Dotnet "$validationBin/Validation.dll" artifacts/screenshots
-    if ($LASTEXITCODE) { throw 'Protected validation failed / Korumalı doğrulama başarısız' }
     Copy-Item "$outputPath/MistikLauncher.dll" "$inputPath/MistikLauncher.dll" -Force
+    & $Dotnet publish Updater/Updater.csproj -c Release -o artifacts/helper
+    if ($LASTEXITCODE) { throw 'Update helper build failed / Güncelleme yardımcısı derlenemedi' }
+    Copy-Item artifacts/helper/MistikUpdater.exe "$inputPath/MistikUpdater.exe" -Force
+    & $Dotnet publish UpdateFixture/UpdateFixture.csproj -c Release -o artifacts/fixture
+    if ($LASTEXITCODE) { throw 'Updater fixture build failed' }
     # Debug symbols and private obfuscation maps are excluded from distributed packages.
     Get-ChildItem $inputPath -Filter '*.pdb' | Remove-Item
-    Get-ChildItem $inputPath -File | Get-FileHash -Algorithm SHA256 |
+    Get-ChildItem $inputPath -File | Where-Object { $_.Name -notin @('checksums.json','update-manifest.json') } | Get-FileHash -Algorithm SHA256 |
         Select-Object @{Name='File'; Expression={Split-Path $_.Path -Leaf}}, Hash |
         ConvertTo-Json | Set-Content "$inputPath/checksums.json" -Encoding utf8
+    [xml]$projectXml = Get-Content MistikLauncher/MistikLauncher.csproj
+    $version = [string]$projectXml.SelectSingleNode("/Project/PropertyGroup/Version").InnerText
+    $files = @(Get-ChildItem $inputPath -File -Recurse | Where-Object { $_.Name -ne 'update-manifest.json' } | ForEach-Object {
+        @{ Path = [IO.Path]::GetRelativePath($inputPath, $_.FullName).Replace('\','/'); Hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash }
+    })
+    @{ Product='MistikLauncher'; Version=$version; Files=$files } | ConvertTo-Json -Depth 5 | Set-Content "$inputPath/update-manifest.json" -Encoding utf8
+    & $Dotnet "$validationBin/Validation.dll" artifacts/screenshots --verify-package $inputPath --helper-smoke artifacts/helper/MistikUpdater.exe artifacts/fixture/MistikLauncher.exe
+    if ($LASTEXITCODE) { throw "Packaged manifest verification failed" }
     Compress-Archive -Path "$inputPath/*" -DestinationPath artifacts/MistikLauncher-6-preview-win-x64.zip -Force
+    Copy-Item artifacts/MistikLauncher-6-preview-win-x64.zip "artifacts/MistikLauncher-$version-win-x64.zip" -Force
     Write-Host 'Protected portable package ready / Korumalı taşınabilir paket hazır.'
 } finally { Pop-Location }

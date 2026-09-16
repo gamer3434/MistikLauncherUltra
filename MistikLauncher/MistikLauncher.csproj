@@ -35,5 +35,6 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Locales/*.json" />
+    <Compile Include="../Updater/UpdateEngine.cs" Link="Updates/UpdateEngine.cs" />
   </ItemGroup>
 </Project>

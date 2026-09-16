@@ -23,6 +23,7 @@ namespace MistikLauncher
     {
         public LauncherConfig Config;
         public AutoMcsUpdater AutoMcs { get; } = new();
+        public LauncherUpdater LauncherUpdates { get; }
         public MistikRelay?   Relay;
         public string? LatestOnlineVersion;
         public string? LatestOnlineUrl;
@@ -39,6 +40,8 @@ namespace MistikLauncher
 
             InitializeComponent();
             Config = ConfigManager.Load();
+            LauncherUpdates = new LauncherUpdater(() => BtnLaunch.IsEnabled && !AutoMcs.Busy && !(GlobalProgress.Value > 0 && GlobalProgress.Value < 100) && System.Windows.Input.Keyboard.FocusedElement is not TextBox);
+            Title = "Mistik Launcher " + LauncherUpdates.CurrentVersion;
             Config.OpenCount++;
             ConfigManager.Save(Config);
 
@@ -82,7 +85,13 @@ namespace MistikLauncher
             languageTimer.Start();
             Closed += (_,_) => { languageTimer.Stop(); Localization.Changed -= RefreshLanguage; _http.Dispose(); };
             RefreshLanguage();
-            Loaded += async (_,_) => await AutoMcs.CheckAsync(Config.AutoMcsAutoUpdate && File.Exists(AutoMcs.ExecutablePath));
+            var updateTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
+            updateTimer.Tick += async (_,_) => await CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate);
+            Loaded += async (_,_) => {
+                updateTimer.Start();
+                await Task.WhenAll(CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate), AutoMcs.CheckAsync(Config.AutoMcsAutoUpdate && File.Exists(AutoMcs.ExecutablePath)));
+            };
+            Closed += (_,_) => updateTimer.Stop();
             Navigate("Dash");
             // Relay is started only by an explicit user action.
             _ = RelayLoopAsync();
@@ -101,6 +110,16 @@ namespace MistikLauncher
             };
         }
 
+        public async Task CheckLauncherUpdatesAsync(bool apply)
+        {
+            try
+            {
+                if(await LauncherUpdates.CheckAsync(apply) && apply && await LauncherUpdates.StartInstallerAsync())
+                    System.Windows.Application.Current.Shutdown();
+            }
+            catch(Exception ex) { App.Log("Update handoff: " + ex.Message); MessageBox.Show(Localization.T("luError")+"\n"+ex.Message,"Mistik Launcher"); }
+        }
+
         public void SwitchLanguage(string code)
         {
             Config.Lang = code == "English" || code == "en" ? "English" : "Turkce";
@@ -117,6 +136,7 @@ namespace MistikLauncher
             NavSearch.ToolTip = Localization.T("search");
             System.Windows.Automation.AutomationProperties.SetName(NavSearch, Localization.T("search"));
             StatusLbl.Text = Localization.T("version") + ": " + Config.Version;
+            if(MainFrame.Content is ILanguagePage currentPage) currentPage.RefreshLanguage();
             Localization.TranslateTree(MainFrame);
             var index = Localization.Language == "en" ? 1 : 0;
             if (LanguageBox.SelectedIndex != index) LanguageBox.SelectedIndex = index;
@@ -188,10 +208,20 @@ namespace MistikLauncher
         // ── Accent ────────────────────────────────────────────────────────────
         void ApplyAccent(string hex)
         {
-            var c = HexColor(hex);
+            ColorThemes.Apply(Config.Accent);
+            _accent=ColorThemes.Accent;
+            foreach(var resource in ColorThemes.Resources) Resources[resource.Key]=resource.Value;
+            var c = ColorThemes.Brush("#00A3FF").Color;
             LogoText.Foreground  = new SolidColorBrush(c);
             BtnLaunch.Background = new SolidColorBrush(c);
             GlobalProgress.Foreground = new SolidColorBrush(c);
+        }
+
+        public void SetColorTheme(string name)
+        {
+            Config.Accent=name; ConfigManager.Save(Config); ApplyAccent(name);
+            foreach(var button in _navBtns.Values)
+                if(button.Background is SolidColorBrush brush && brush.Color.A>0) button.Background=ColorThemes.Brush("#00A3FF");
         }
 
         public static Color HexColor(string hex)
@@ -202,7 +232,7 @@ namespace MistikLauncher
                 Convert.ToByte(hex[2..4], 16),
                 Convert.ToByte(hex[4..6], 16));
         }
-        public static SolidColorBrush HexBrush(string hex) => new(HexColor(hex));
+        public static SolidColorBrush HexBrush(string hex) => ColorThemes.IsThemed(hex)?ColorThemes.Brush(hex):new(HexColor(hex));
 
         // ── Nav ───────────────────────────────────────────────────────────────
         void BuildNav()
@@ -262,6 +292,7 @@ namespace MistikLauncher
                 _pageCache[key] = page;
             }
 
+            if(page is ILanguagePage localized) localized.RefreshLanguage();
             MainFrame.Navigate(page);
         }
 
@@ -291,7 +322,7 @@ namespace MistikLauncher
                             {
                                 var jarFile = Path.Combine(d, $"{name}.jar");
                                 var jsonFile = Path.Combine(d, $"{name}.json");
-                                if (File.Exists(jarFile) && File.Exists(jsonFile))
+                                if (GameProfiles.IsInstalled(App.GameDir, name))
                                 {
                                     uniqueVersions.Add(name);
                                 }
@@ -604,7 +635,7 @@ namespace MistikLauncher
                 // 2. JAR kontrol
                 var versDir = Path.Combine(App.GameDir, "versions", version);
                 var jar     = Path.Combine(versDir, $"{version}.jar");
-                if (!File.Exists(jar))
+                if (!GameProfiles.IsInstalled(App.GameDir,version))
                 {
                     var res = MessageBox.Show(
                         $"Surum dosyasi bulunamadi: {version}\n\nSurum Yoneticisi'nden indirmek ister misiniz?",
@@ -1797,6 +1828,37 @@ namespace MistikLauncher
             catch { }
 
             string launchUuid = !string.IsNullOrEmpty(resolvedUuid) ? resolvedUuid : GetOfflineUUID(Config.User);
+            var profile=GameProfiles.Read(App.GameDir,version);
+            if(profile!=null && GameProfiles.Kind(profile)=="Forge")
+            {
+                // Forge provides its own JVM requirements; speculative tuning can break bootstrap.
+                optArgs="";
+                var values=new Dictionary<string,string> {
+                    ["library_directory"]=Path.Combine(App.GameDir,"libraries"), ["classpath_separator"]=";",
+                    ["classpath"]=libs,["natives_directory"]=natives,["version_name"]=version,
+                    ["launcher_name"]="MistikLauncher",["launcher_version"]=LauncherUpdates.CurrentVersion,
+                    ["auth_player_name"]=Config.User,["auth_uuid"]=launchUuid,["auth_access_token"]="0",
+                    ["game_directory"]=App.GameDir,["assets_root"]=Path.Combine(App.GameDir,"assets"),["assets_index_name"]=assetIndex,
+                    ["user_type"]="legacy",["version_type"]="release",["user_properties"]="{}"
+                };
+                string Expand(string arg) {
+                    foreach(var pair in values) arg=arg.Replace("${"+pair.Key+"}",pair.Value);
+                    if(arg.Contains("${")) throw new InvalidDataException(Localization.T("forgeInvalid"));
+                    return "\""+arg.Replace("\"","\\\"")+"\"";
+                }
+                var forgeJvm=string.Join(" ",GameProfiles.Arguments(profile["arguments"]?["jvm"]).Select(Expand));
+                var forgeGame=string.Join(" ",GameProfiles.Arguments(profile["arguments"]?["game"]).Select(Expand));
+                // Legacy Forge embeds its complete game arguments, including FMLTweaker.
+                if(profile["minecraftArguments"]!=null)
+                {
+                    var legacy=profile["minecraftArguments"]!.ToString();
+                    foreach(var pair in values) legacy=legacy.Replace("${"+pair.Key+"}",pair.Value);
+                    return $"{jvm} {optArgs} -Djava.library.path=\"{natives}\" -cp \"{libs}\" {forgeJvm} {mainClass} {legacy}";
+                }
+                return $"{jvm} {optArgs} -Djava.library.path=\"{natives}\" -cp \"{libs}\" {forgeJvm} {mainClass} " +
+                    $"--username \"{Config.User}\" --version \"{version}\" --gameDir \"{App.GameDir}\" --assetsDir \"{Path.Combine(App.GameDir,"assets")}\" --assetIndex {assetIndex} --accessToken 0 --uuid {launchUuid} {forgeGame}";
+            }
+
             return $"{jvm} {optArgs} " +
                    $"-Djava.library.path=\"{natives}\" " +
                    $"-cp \"{libs}\" {mainClass} " +
@@ -2011,7 +2073,7 @@ namespace MistikLauncher
             }
         }
 
-        static async Task<string?> FindJavaAsync()
+        internal static async Task<string?> FindJavaAsync()
         {
             var candidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
