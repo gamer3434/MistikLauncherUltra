@@ -103,18 +103,39 @@ public class ModernSettingsPage : Page, ILanguagePage
         var themeContent=new StackPanel();
         themeContent.Children.Add(PageHelpers.Lbl(Localization.T("themeTitle"),18,"#EFF5FF",true));
         themeContent.Children.Add(PageHelpers.Lbl(Localization.T("themeHelp"),13,"#ADBED6",pad:new Thickness(0,8,0,12),wrap:TextWrapping.Wrap));
-        var swatches=new System.Windows.Controls.Primitives.UniformGrid { Columns=5 };
-        foreach(var item in new[]{("Blue","#377ACB"),("Green","#237A59"),("Purple","#7950B7"),("Orange","#A65B26"),("Red","#B43F60")})
-        {
-            var choice=PageHelpers.MkBtn(Localization.T(item.Item1),item.Item2);
-            choice.Margin=new Thickness(0,0,8,0); choice.ToolTip=Localization.T("themeTitle")+": "+Localization.T(item.Item1);
-            choice.Click+=(_,_)=> {
-                main.SetColorTheme(item.Item1);
-                result.Text=Localization.T("themeApplied")+" · "+Localization.T(item.Item1);
-            };
-            swatches.Children.Add(choice);
+        var swatches=new System.Windows.Controls.Primitives.UniformGrid { Columns=4 };
+        var tiles=new List<(string name,Border tile,TextBlock mark)>();
+        void UpdateSelection() {
+            foreach(var entry in tiles) {
+                bool selected=main.Config.Accent==entry.name;
+                entry.tile.BorderBrush=selected?ColorThemes.Brush("#00A3FF"):PageHelpers.HexBrush("#29292E");
+                entry.tile.BorderThickness=new Thickness(selected?2:1);
+                entry.tile.Background=selected?ColorThemes.Brush("#274565"):ColorThemes.Brush("#0D1727");
+                entry.mark.Visibility=selected?Visibility.Visible:Visibility.Hidden;
+            }
         }
-        themeContent.Children.Add(swatches); themeCard.Child=themeContent; stack.Children.Add(themeCard);
+        foreach(var name in ColorThemes.Names)
+        {
+            var color=PageHelpers.HexColor(ColorThemes.Preview(name));
+            var shade=Color.FromRgb((byte)(color.R*0.18),(byte)(color.G*0.18),(byte)(color.B*0.18));
+            var tile=new Border { CornerRadius=new CornerRadius(14),Padding=new Thickness(8),MinHeight=116 };
+            var grid=new Grid();
+            var mark=PageHelpers.Lbl("✓",14,"#FFFFFF",true); mark.HorizontalAlignment=HorizontalAlignment.Right; mark.VerticalAlignment=VerticalAlignment.Top;
+            var sample=new Border { Width=46,Height=46,CornerRadius=new CornerRadius(13),Background=new LinearGradientBrush(color,shade,45),Margin=new Thickness(0,4,0,10) };
+            var label=PageHelpers.Lbl(Localization.T("theme"+name),12,"#EFF5FF",wrap:TextWrapping.Wrap); label.TextAlignment=TextAlignment.Center;
+            label.FontWeight=FontWeights.Normal;
+            var content=new StackPanel { VerticalAlignment=VerticalAlignment.Center }; content.Children.Add(sample); content.Children.Add(label); grid.Children.Add(content); grid.Children.Add(mark); tile.Child=grid;
+            var choice=PageHelpers.MkBtn("","#0D1727"); choice.Padding=new Thickness(0); choice.Content=tile; choice.Margin=new Thickness(0,0,10,10);
+            choice.HorizontalContentAlignment=HorizontalAlignment.Stretch;
+            choice.Template=(ControlTemplate)System.Windows.Markup.XamlReader.Parse("<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border Name='focus' BorderThickness='1' BorderBrush='Transparent' CornerRadius='14'><ContentPresenter Content='{TemplateBinding Content}' HorizontalAlignment='Stretch' VerticalAlignment='Stretch'/></Border><ControlTemplate.Triggers><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='focus' Property='BorderBrush' Value='White'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='focus' Property='Opacity' Value='0.85'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
+            System.Windows.Automation.AutomationProperties.SetName(choice,Localization.T("theme"+name));
+            choice.Click+=(_,_)=> {
+                main.SetColorTheme(name); UpdateSelection();
+                result.Text=Localization.T("themeApplied")+" · "+Localization.T("theme"+name);
+            };
+            tiles.Add((name,tile,mark)); swatches.Children.Add(choice);
+        }
+        UpdateSelection(); themeContent.Children.Add(swatches); themeCard.Child=themeContent; stack.Children.Insert(2,themeCard);
         Label("username"); user=PageHelpers.DarkTextBox(main.Config.User); user.MaxLength=16; stack.Children.Add(user);
         stack.Children.Add(PageHelpers.Lbl(Localization.T("usernameHelp"),13,"#BDCAD8",wrap:TextWrapping.Wrap));
         Label("memory"); ram=PageHelpers.DarkTextBox(main.Config.Ram.ToString()); stack.Children.Add(ram);

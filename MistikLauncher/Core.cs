@@ -23,7 +23,7 @@ namespace MistikLauncher
         [JsonProperty("version")]    public string Version    { get; set; } = "1.21";
         [JsonProperty("ram")]        public int    Ram        { get; set; } = 4;
         [JsonProperty("lang")]       public string Lang       { get; set; } = "TÃ¼rkÃ§e";
-        [JsonProperty("accent")]     public string Accent     { get; set; } = "Blue";
+        [JsonProperty("accent")]     public string Accent     { get; set; } = "Amber";
         [JsonProperty("skin_type")]  public string SkinType   { get; set; } = "default";
         [JsonProperty("skin_user")]  public string SkinUser   { get; set; } = "";
         [JsonProperty("auth_type")]  public string AuthType   { get; set; } = "offline";

@@ -74,7 +74,8 @@ class Program
                 Check(ConfigManager.Load().Accent==name && !surface.IsFrozen,"runtime theme persists and remains mutable: "+name);
                 window.Navigate("Dash");
             }
-            window.SetColorTheme("Blue");
+            window.SetColorTheme("Amber");
+            Check(window.FindName("NavSearch")==null && window.FindName("SearchLabel")==null,"unnecessary navigation search removed");
             ForgeTests.Run(App.GameDir);
             window.PopulateVersionBox();
             var versionBox=(ComboBox)window.FindName("VerBox");

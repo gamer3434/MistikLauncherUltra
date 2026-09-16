@@ -4,7 +4,15 @@ using System.Windows.Data;
 namespace MistikLauncher;
 public static class ColorThemes
 {
-    public static readonly string[] Names={"Blue","Green","Purple","Orange","Red"};
+    public static readonly string[] Names={"Red","Purple","Blue","Green","Orange","Teal","Rose","Amber","NeonGreen","Cyan","Magenta","Lava","Indigo","Sunburst","Gold","Platinum","Nebula","Pink","Diamond","Obsidian"};
+    public static string Preview(string name) => name switch {
+        "Red"=>"#DB1633", "Purple"=>"#8045E5", "Blue"=>"#2986E0", "Green"=>"#00BA60",
+        "Orange"=>"#EF730B", "Teal"=>"#00A99C", "Rose"=>"#D72C76", "Amber"=>"#FFB000",
+        "NeonGreen"=>"#20B68B", "Cyan"=>"#159BB1", "Magenta"=>"#B046C5", "Lava"=>"#D6532C",
+        "Indigo"=>"#7550CE", "Sunburst"=>"#E69024", "Gold"=>"#C89529", "Platinum"=>"#B5A2CD",
+        "Nebula"=>"#AA4DCF", "Pink"=>"#D16B9B", "Diamond"=>"#62ADD0", "Obsidian"=>"#B9A345", _=>"#FFB000"
+    };
+    public static Brush ActionText => Brush("#ACTIONTEXT");
     static readonly Dictionary<string,SolidColorBrush> BrushesBySource=new(StringComparer.OrdinalIgnoreCase);
     sealed class ThemeColor : DependencyObject
     {
@@ -28,20 +36,22 @@ public static class ColorThemes
     }
     static Color Map(string source)
     {
-        var palette=Selected switch {
-            "Green"=>new[]{"#0D1C1A","#18332E","#23473E","#3B695D","#142C26","#254D40","#237A59","#7EE5BA","#359B75","#236348"},
-            "Purple"=>new[]{"#171222","#2B2140","#3B2F55","#62507D","#241B37","#423057","#7950B7","#CAB0F5","#9470CD","#644292"},
-            "Orange"=>new[]{"#20170F","#38291D","#4C3928","#765A40","#302116","#513822","#A65B26","#F9C48C","#C88C4E","#925C2D"},
-            "Red"=>new[]{"#211319","#3D232F","#522F3E","#795061","#321C27","#522A3A","#B43F60","#F6ADC2","#C96382","#934361"},
-            _=>new[]{"#0D1727","#192C46","#203853","#365574","#152A43","#274565","#377ACB","#77D8D0","#3486A9","#245882"}
-        };
+        var accent=(Color)ColorConverter.ConvertFromString(Preview(Selected));
+        Color Shade(double amount)=>Color.FromRgb((byte)(accent.R*amount),(byte)(accent.G*amount),(byte)(accent.B*amount));
+        if(source=="#ACTIONTEXT") return accent.R*0.2126+accent.G*0.7152+accent.B*0.0722>145 ? Colors.Black : Colors.White;
+        if(source=="#274565") return Shade(0.19);
+        if(source=="#00A3FF" || source=="#226DA0") return accent;
+        if(source=="#77D8D0") return accent;
+        if(source=="#3486A9") return Shade(0.65);
+        if(source=="#245882") return Shade(0.38);
+        var palette=new[]{"#0C0C0E","#1C1C1F","#242427","#36363C","#161619","#242427","#FFB000","#FFB000","#A96B10","#674512"};
         int index=Array.IndexOf(Sources,source.ToUpperInvariant());
         int slot=index switch { 7=>6,8=>7,9=>8,10=>9,_=>index };
         return (Color)ColorConverter.ConvertFromString(slot>=0?palette[slot]:source);
     }
     public static void Apply(string name)
     {
-        Selected=Names.Contains(name)?name:"Blue";
+        Selected=Names.Contains(name)?name:"Amber";
         foreach(var item in ColorsBySource) item.Value.Value=Map(item.Key);
         var accent=Map("#00A3FF");
         Accent=$"#{accent.R:X2}{accent.G:X2}{accent.B:X2}";

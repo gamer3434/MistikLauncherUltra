@@ -6,6 +6,31 @@
         FontFamily="Segoe UI" UseLayoutRounding="True"
         MinHeight="600" MinWidth="1100">
     <Window.Resources>
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="{DynamicResource Theme203853}"/>
+            <Setter Property="Foreground" Value="#EFF5FF"/>
+            <Setter Property="BorderBrush" Value="#36363C"/>
+            <Setter Property="MinHeight" Value="36"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                          IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" Focusable="False">
+                                <ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="7"/></ControlTemplate></ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" Margin="10,0,30,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                            <TextBlock Text="⌄" Foreground="#ADBED6" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" IsHitTestVisible="False"/>
+                            <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False">
+                                <Border Background="{DynamicResource Theme203853}" BorderBrush="#36363C" BorderThickness="1" CornerRadius="7" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                                    <ScrollViewer MaxHeight="280"><ItemsPresenter/></ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <!-- Nav button style -->
         <Style x:Key="NavBtn" TargetType="Button">
             <Setter Property="Background"                Value="Transparent"/>
@@ -41,7 +66,7 @@
         <!-- Accent button style -->
         <Style x:Key="AccentBtn" TargetType="Button">
             <Setter Property="Background"   Value="{DynamicResource Theme00A3FF}"/>
-            <Setter Property="Foreground"   Value="White"/>
+            <Setter Property="Foreground"   Value="{DynamicResource ThemeActionText}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontWeight"   Value="Bold"/>
             <Setter Property="FontFamily"   Value="Segoe UI"/>
@@ -83,7 +108,7 @@
         </Grid.RowDefinitions>
 
         <!-- ═══ SIDEBAR ═══════════════════════════════════════════════════════ -->
-        <Border Grid.Column="0" Grid.RowSpan="3" Background="#101F34">
+        <Border Grid.Column="0" Grid.RowSpan="3" Background="{DynamicResource Theme0D1727}">
             <DockPanel>
                 <!-- Logo -->
                 <Border DockPanel.Dock="Top" Margin="0,28,0,20">
@@ -108,10 +133,10 @@
                 <StackPanel DockPanel.Dock="Bottom" Margin="12,0,12,14">
                     <Button x:Name="BtnDiscord" Content="Discord"
                             Style="{StaticResource AccentBtn}"
-                            Background="{DynamicResource Theme274565}" Height="32" Margin="0,3"/>
+                            Background="{DynamicResource Theme274565}" Foreground="#EFF5FF" Height="32" Margin="0,3"/>
                     <Button x:Name="BtnYoutube" Content="YouTube"
                             Style="{StaticResource AccentBtn}"
-                            Background="{DynamicResource Theme274565}" Height="32" Margin="0,3"/>
+                            Background="{DynamicResource Theme274565}" Foreground="#EFF5FF" Height="32" Margin="0,3"/>
                 </StackPanel>
 
                 <StackPanel DockPanel.Dock="Top" Margin="18,0,18,18">
@@ -119,8 +144,6 @@
                         <ComboBoxItem Content="Türkçe"/>
                         <ComboBoxItem Content="English"/>
                     </ComboBox>
-                    <TextBlock x:Name="SearchLabel" Foreground="#BDCAD8" Margin="0,0,0,6"/>
-                    <TextBox x:Name="NavSearch" MinHeight="36" Padding="8" Background="{DynamicResource Theme203853}" Foreground="White" CaretBrush="White" AutomationProperties.Name="Search pages"/>
                 </StackPanel>
                 <!-- Nav -->
                 <ScrollViewer VerticalScrollBarVisibility="Hidden">
@@ -165,7 +188,7 @@
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
                             HorizontalAlignment="Right">
                     <ComboBox x:Name="VerBox" Width="200" Height="38" Margin="0,0,14,0"
-                              Background="#EAEAEA" Foreground="Black" FontWeight="Bold" BorderBrush="#D4DFE9" BorderThickness="1">
+                              Background="{DynamicResource Theme203853}" Foreground="#EFF5FF" FontWeight="Bold" BorderBrush="#36363C" BorderThickness="1">
                         <ComboBox.Resources>
                             <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#0D1727" />
                             <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="White" />

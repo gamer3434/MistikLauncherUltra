@@ -77,7 +77,6 @@ namespace MistikLauncher
             Localization.SetLanguage(Config.Lang);
             LanguageBox.SelectedIndex = Localization.Language == "en" ? 1 : 0;
             LanguageBox.SelectionChanged += (_,_) => SwitchLanguage(LanguageBox.SelectedIndex == 1 ? "English" : "Turkce");
-            NavSearch.TextChanged += (_,_) => FilterNavigation();
             Localization.Changed += RefreshLanguage;
             MainFrame.LoadCompleted += (_,_) => Localization.TranslateTree(MainFrame);
             var languageTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -131,24 +130,13 @@ namespace MistikLauncher
             BuildNav();
             BtnLaunch.Content = Localization.T("play");
             BtnYoutube.Content = Localization.T("releases");
-            SearchLabel.Text = Localization.T("search");
             SelectNav(_currentNav);
-            NavSearch.ToolTip = Localization.T("search");
-            System.Windows.Automation.AutomationProperties.SetName(NavSearch, Localization.T("search"));
             StatusLbl.Text = Localization.T("version") + ": " + Config.Version;
             if(MainFrame.Content is ILanguagePage currentPage) currentPage.RefreshLanguage();
             Localization.TranslateTree(MainFrame);
             var index = Localization.Language == "en" ? 1 : 0;
             if (LanguageBox.SelectedIndex != index) LanguageBox.SelectedIndex = index;
-            FilterNavigation();
         }
-        void FilterNavigation()
-        {
-            foreach (var pair in _navBtns)
-                pair.Value.Visibility = (pair.Value.Content?.ToString() ?? "").Contains(NavSearch.Text, StringComparison.CurrentCultureIgnoreCase)
-                    ? Visibility.Visible : Visibility.Collapsed;
-        }
-
         static void Open(string url) =>
             Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
 
@@ -211,17 +199,18 @@ namespace MistikLauncher
             ColorThemes.Apply(Config.Accent);
             _accent=ColorThemes.Accent;
             foreach(var resource in ColorThemes.Resources) Resources[resource.Key]=resource.Value;
+            Resources["ThemeActionText"]=ColorThemes.ActionText;
             var c = ColorThemes.Brush("#00A3FF").Color;
             LogoText.Foreground  = new SolidColorBrush(c);
-            BtnLaunch.Background = new SolidColorBrush(c);
+            BtnLaunch.Background = ColorThemes.Brush("#00A3FF");
+            BtnLaunch.Foreground = ColorThemes.ActionText;
             GlobalProgress.Foreground = new SolidColorBrush(c);
         }
 
         public void SetColorTheme(string name)
         {
             Config.Accent=name; ConfigManager.Save(Config); ApplyAccent(name);
-            foreach(var button in _navBtns.Values)
-                if(button.Background is SolidColorBrush brush && brush.Color.A>0) button.Background=ColorThemes.Brush("#00A3FF");
+            SelectNav(_currentNav);
         }
 
         public static Color HexColor(string hex)
@@ -259,8 +248,10 @@ namespace MistikLauncher
 
         void SelectNav(string key)
         {
-            foreach (var b in _navBtns.Values) b.Background = Brushes.Transparent;
-            if (_navBtns.TryGetValue(key, out var btn)) btn.Background = HexBrush(_accent);
+            foreach (var b in _navBtns.Values) { b.Background=Brushes.Transparent; b.Foreground=HexBrush("#ADBED6"); }
+            if (_navBtns.TryGetValue(key, out var btn)) {
+                btn.Background=ColorThemes.Brush("#274565"); btn.Foreground=ColorThemes.Brush("#00A3FF");
+            }
         }
 
         public void Navigate(string key)

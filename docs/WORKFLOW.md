@@ -75,3 +75,11 @@ Implemented the user-requested manual update button, persisted automatic updates
 - **Reasoning:** Keep installed launcher packages current through authenticated official release metadata while preserving user data and active operations.
 - **Implementation:** Added `LauncherUpdater.cs`, shared `Updater/UpdateEngine.cs`, self-contained helper, settings controls, startup/30-minute checks, verified package manifests, rollback/restart, version-matched release pipeline, unified navy/turquoise palette and bilingual cached-page fix.
 - **Conclusion:** New updater and visuals are implemented; validation includes a real helper lifecycle against an isolated fixture. Stable production publication still awaits the broader outstanding work.
+
+## Reference-driven appearance update / Referansa dayalı görünüm
+
+**Reasoning / Gerekçe:** The supplied RedX Library screenshots establish a charcoal-and-amber palette; navigation search is unnecessary.
+
+**Implementation / Uygulama:** Removed the search controls, handler and filtering method. Added 20 bilingual gradient theme cards with selected outlines, dark selectors and contrast-aware primary text. Shared WPF brushes keep live theme changes small; no new dependencies. Version: 6.0.0-preview.2.
+
+**Conclusion / Sonuç:** 74 checks pass in the protected package, covering all 20 themes, both languages and search removal alongside existing Forge/update checks. Screenshots: `docs/screenshots/settings-tr.png` and `settings-en.png`.
