@@ -1296,80 +1296,10 @@ namespace MistikLauncher
             }
         }
 
+        // Compatibility hook: never weaken server authentication when opening a tunnel.
         public void EnforceOfflineModeInProperties()
         {
-            try
-            {
-                var scanDirs = new List<string>();
-
-                // 1. Mistik AppData directory (.mistik_ultra / App.AppData)
-                if (Directory.Exists(App.AppData))
-                    scanDirs.Add(App.AppData);
-
-                // 2. Current application directory
-                var exeDir = AppDomain.CurrentDomain.BaseDirectory;
-                if (!string.IsNullOrEmpty(exeDir) && Directory.Exists(exeDir))
-                    scanDirs.Add(exeDir);
-
-                OnTunnelLog?.Invoke("[SİSTEM] 🔍 'server.properties' dosyaları taranıyor...");
-                int fixedCount = 0;
-
-                foreach (var dir in scanDirs)
-                {
-                    var files = new List<string>();
-                    SearchPropertiesRecursively(dir, files, 0);
-
-                    foreach (var file in files)
-                    {
-                        try
-                        {
-                            var lines = File.ReadAllLines(file);
-                            bool updated = false;
-                            for (int i = 0; i < lines.Length; i++)
-                            {
-                                if (lines[i].Trim().StartsWith("online-mode", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    if (!lines[i].Contains("false"))
-                                    {
-                                        lines[i] = "online-mode=false";
-                                        updated = true;
-                                    }
-                                }
-                            }
-
-                            if (!updated && !lines.Any(l => l.Trim().StartsWith("online-mode", StringComparison.OrdinalIgnoreCase)))
-                            {
-                                var newLines = new List<string>(lines) { "online-mode=false" };
-                                lines = newLines.ToArray();
-                                updated = true;
-                            }
-
-                            if (updated)
-                            {
-                                File.WriteAllLines(file, lines);
-                                var displayPath = file.Replace(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "~");
-                                OnTunnelLog?.Invoke($"[SİSTEM] 🔧 Sunucu Çevrimdışı Ayarlandı (online-mode=false): {displayPath}");
-                                OnTunnelLog?.Invoke("[İPUCU] Eğer Minecraft sunucunuz zaten açıksa, bu ayarın geçerli olması için sunucuyu kapatıp yeniden açın!");
-                                App.Log($"Automatically set online-mode=false in {file}");
-                                fixedCount++;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            OnTunnelLog?.Invoke($"[UYARI] {Path.GetFileName(file)} düzenlenirken hata: {ex.Message}");
-                        }
-                    }
-                }
-
-                if (fixedCount == 0)
-                {
-                    OnTunnelLog?.Invoke("[SİSTEM] ✅ Aktif 'server.properties' dosyası bulunamadı veya hepsi zaten çevrimdışı modda (online-mode=false).");
-                }
-            }
-            catch (Exception ex)
-            {
-                OnTunnelLog?.Invoke($"[UYARI] 'server.properties' taraması sırasında hata: {ex.Message}");
-            }
+            OnTunnelLog?.Invoke(Localization.T("serverAuthPreserved"));
         }
 
         private void SearchPropertiesRecursively(string currentDir, List<string> foundFiles, int depth)
