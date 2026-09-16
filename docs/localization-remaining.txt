@@ -43,13 +43,13 @@ MistikLauncher\Pages\CloudAndFriendsPages.cs:742 | SSH Adresi:
 MistikLauncher\Pages\CloudAndFriendsPages.cs:748 |   (user@host:port)
 MistikLauncher\Pages\CloudAndFriendsPages.cs:796 | ● TÜNEL AKTİF
 MistikLauncher\Pages\CloudAndFriendsPages.cs:797 |  — Arkadaşlarınla bu adresi paylaş:
-MistikLauncher\Pages\CloudAndFriendsPages.cs:841 | 
+MistikLauncher\Pages\CloudAndFriendsPages.cs:841 |
 MistikLauncher\Pages\CloudAndFriendsPages.cs:1011 | Henuz arkadasin yok. Yukardaki kutudan kod ekle.
 MistikLauncher\Pages\CloudAndFriendsPages.cs:1052 | Simdilik cevrimici kimse yok.
 MistikLauncher\Pages\CloudAndFriendsPages.cs:1324 | ➔
 MistikLauncher\Pages\CloudAndFriendsPages.cs:1369 | 📜  Son Güncellemeler
 MistikLauncher\Pages\CloudAndFriendsPages.cs:1385 | ●
-MistikLauncher\Pages\CloudAndFriendsPages.cs:1386 |   
+MistikLauncher\Pages\CloudAndFriendsPages.cs:1386 |
 MistikLauncher\Pages\DashboardPage.xaml.cs:19 | Surum yonetimi, mod merkezi, arkadaslar ve daha fazlasi.
 MistikLauncher\Pages\DashboardPage.xaml.cs:52 | Hizli Erisim
 MistikLauncher\Pages\DashboardPage.xaml.cs:64 | Sunucu Kur (Auto-MCS)
@@ -82,10 +82,10 @@ MistikLauncher\Pages\MapManagerPage.cs:97 | 💡 Önemli Bilgilendirme
 MistikLauncher\Pages\MapManagerPage.cs:98 | • Haritalar indirildikten sonra arka planda otomatik olarak ayıklanır ve '.minecraft/saves' klasörünüze yerleştirilir.
 MistikLauncher\Pages\MapManagerPage.cs:99 | • İndirme bittiğinde Minecraft'ı açıp 'Tek Oyunculu' (Singleplayer) ekranına girmeniz yeterlidir. Haritayı dünya listenizde göreceksiniz.
 MistikLauncher\Pages\MapManagerPage.cs:100 | • Harita yükleme hızı internet bağlantınıza bağlı olarak birkaç saniye sürebilir, yükleme esnasında launcher'ı kapatmayın.
-MistikLauncher\Pages\ModernPages.cs:91 | 
+MistikLauncher\Pages\ModernPages.cs:91 |
 MistikLauncher\Pages\ServerManagerPage.cs:29 | Auto-MCS
 MistikLauncher\Pages\ServerManagerPage.cs:35 | —
-MistikLauncher\Pages\ServerManagerPage.cs:46 | 
+MistikLauncher\Pages\ServerManagerPage.cs:46 |
 MistikLauncher\Pages\SettingsAndMorePages.cs:88 | Genel & Hesap
 MistikLauncher\Pages\SettingsAndMorePages.cs:93 | Giriş & Karakter Sistemi
 MistikLauncher\Pages\SettingsAndMorePages.cs:106 | Ely.by Bağlantısını Test Et
@@ -103,11 +103,11 @@ MistikLauncher\Pages\SettingsAndMorePages.cs:268 | Masaustune Kisayol Olustur
 MistikLauncher\Pages\SettingsAndMorePages.cs:270 | Baslangica Ekle
 MistikLauncher\Pages\SettingsAndMorePages.cs:280 | ☕ Java 21 Kurulum Merkezi
 MistikLauncher\Pages\SettingsAndMorePages.cs:281 | Minecraft 1.17+ ve tüm Fabric/Forge modları için Java 21 zorunludur. Aşağıdaki butona tıklayarak kalıcı olarak kurun.
-MistikLauncher\Pages\SettingsAndMorePages.cs:282 | 
+MistikLauncher\Pages\SettingsAndMorePages.cs:282 |
 MistikLauncher\Pages\SettingsAndMorePages.cs:284 | ☕ Java 21'i İndir ve Kalıcı Kur
 MistikLauncher\Pages\SettingsAndMorePages.cs:337 | 🔄 Launcher Güncelleme
 MistikLauncher\Pages\SettingsAndMorePages.cs:339 | Launcher'ınızın en son sürümde olup olmadığını kontrol etmek için aşağıdaki butona tıklayın.
-MistikLauncher\Pages\SettingsAndMorePages.cs:341 | 
+MistikLauncher\Pages\SettingsAndMorePages.cs:341 |
 MistikLauncher\Pages\SettingsAndMorePages.cs:344 | 🔄 Güncellemeleri Denetle
 MistikLauncher\Pages\SettingsAndMorePages.cs:376 | ℹ️ Yardım & Ek Bilgiler
 MistikLauncher\Pages\SettingsAndMorePages.cs:377 | Launcher ile ilgili kurulum rehberleri, sürüm güncelleme notları ve lisans detaylarına buradan ulaşabilirsiniz.
@@ -184,7 +184,7 @@ MistikLauncher\Pages\SettingsAndMorePages.cs:2050 | Mod Dosya Adı (Örn: InvMov
 MistikLauncher\Pages\SettingsAndMorePages.cs:2054 | Mod İndirme Linki (Doğrudan .jar İndirme Bağlantısı)
 MistikLauncher\Pages\SettingsAndMorePages.cs:2060 | 📁 VEYA bilgisayarınızdan yerel bir mod (.jar) dosyası seçip yükleyin:
 MistikLauncher\Pages\SettingsAndMorePages.cs:2063 | 📂 YEREL MOD SEÇ & BULUTA YÜKLE
-MistikLauncher\Pages\SettingsAndMorePages.cs:2067 | 
+MistikLauncher\Pages\SettingsAndMorePages.cs:2067 |
 MistikLauncher\Pages\SettingsAndMorePages.cs:2073 | MODU GÖNDER & KUR
 MistikLauncher\Pages\SettingsAndMorePages.cs:2160 | ☁️ BULUTTAN GÜNCELLEME DAĞITIMI
 MistikLauncher\Pages\SettingsAndMorePages.cs:2161 | Aktif olan tüm oyuncuların Launcher'larına anında güncelleme uyarısı gönderin ve dosyayı otomatik indirtin.
