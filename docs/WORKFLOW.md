@@ -69,3 +69,9 @@ Implemented the user-requested manual update button, persisted automatic updates
 
 ![Turkish server workspace](screenshots/server-tr.png)
 ![English server workspace](screenshots/server-en.png)
+
+## Launcher updater and modern colors
+
+- **Reasoning:** Keep installed launcher packages current through authenticated official release metadata while preserving user data and active operations.
+- **Implementation:** Added `LauncherUpdater.cs`, shared `Updater/UpdateEngine.cs`, self-contained helper, settings controls, startup/30-minute checks, verified package manifests, rollback/restart, version-matched release pipeline, unified navy/turquoise palette and bilingual cached-page fix.
+- **Conclusion:** New updater and visuals are implemented; validation includes a real helper lifecycle against an isolated fixture. Stable production publication still awaits the broader outstanding work.

@@ -4,7 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 namespace MistikLauncher.Pages;
-public sealed class ServerManagerPage : Page
+public sealed class ServerManagerPage : Page, ILanguagePage
 {
     readonly MainWindow main;
     readonly AutoMcsUpdater updater;
@@ -18,6 +18,7 @@ public sealed class ServerManagerPage : Page
         Unloaded += (_,_) => { Localization.Changed-=Render; updater.Changed-=RefreshAsync; };
         Render();
     }
+    public void RefreshLanguage() => Render();
     void Render()
     {
         Background=PageHelpers.HexBrush("#142333");

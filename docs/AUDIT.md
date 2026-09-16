@@ -62,3 +62,11 @@ Removed automatic recursive rewriting of `online-mode=false` during tunnel start
 - Existing server/game data is preserved; updates replace only auto-mcs.exe and its version receipt.
 
 Türkçe: Sabit indirme kaldırıldı; resmî sürüm, manuel/otomatik güncelleme, SHA-256 doğrulama ve iki dilli sunucu tasarımı eklendi. Gerçek paket indirildi/doğrulandı; uygulama test sırasında çalıştırılmadı.
+
+## Launcher update and palette follow-up
+
+Added official stable-release discovery, startup/30-minute automatic checks, user preference/manual check, verified complete ZIP manifests, external self-contained update helper, ready handshake, parent identity/exit checks, transactional replacement rollback and restart. Added matching-tag release workflow. No stable release or tag was published by this work. Historical v5.5.2 is ignored as a downgrade.
+
+Tests cover upgrade/downgrade, preview promotion, preparation without target mutation, full payload replacement, settings/world preservation, locked-file rollback, path traversal, protected user-data paths, busy deferral, corrupt package rejection, untrusted host, staging tamper rejection, cached bilingual pages, actual package manifest and real helper handoff/restart with a test fixture. Source update tests do not execute Minecraft.
+
+Türkçe: Launcher otomatik güncelleme ve modern palet eklendi. Gerçek yardımcı program kontrollü test uygulamasını kapattı, dosyaları değiştirdi ve yeniden açtı. Yeni kararlı sürüm/tag yayımlanmadı; önizleme dalı güncellendi.

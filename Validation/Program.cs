@@ -21,7 +21,17 @@ class Program
             string testRoot = Path.Combine(Path.GetTempPath(), "MistikValidation", Guid.NewGuid().ToString("N"));
             Environment.SetEnvironmentVariable("MISTIK_DATA_DIR", testRoot);
             Directory.CreateDirectory(testRoot);
+            checks += ForgeTests.Run(Path.Combine(testRoot,"forge-tests"));
             checks += AutoMcsTests.Run(testRoot).GetAwaiter().GetResult();
+            checks += LauncherUpdateTests.Run(testRoot).GetAwaiter().GetResult();
+            int packageIndex=Array.IndexOf(args,"--verify-package");
+            if(packageIndex>=0) {
+                var packaged=MistikLauncher.Updates.UpdateEngine.Verify(Path.GetFullPath(args[packageIndex+1]));
+                var current=typeof(LauncherUpdater).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute),false).Cast<System.Reflection.AssemblyInformationalVersionAttribute>().Single().InformationalVersion.Split('+')[0];
+                Check(packaged.Version==current,"actual portable manifest matches compiled version and file hashes");
+            }
+            int helperIndex=Array.IndexOf(args,"--helper-smoke");
+            if(helperIndex>=0) { HelperSmoke.Run(testRoot,Path.GetFullPath(args[helperIndex+1]),Path.GetFullPath(args[helperIndex+2])).GetAwaiter().GetResult(); checks++; }
             if(args.Contains("--live-mcs"))
             {
                 var official=new AutoMcsUpdater(dataDirectory:Path.Combine(testRoot,"official-auto-mcs"),running:()=>false);
@@ -57,6 +67,27 @@ class Program
             Check(turkish.Values.All(v=>!string.IsNullOrWhiteSpace(v)) && english.Values.All(v=>!string.IsNullOrWhiteSpace(v)), "no empty translations");
             var application=new MistikLauncher.Application(); application.InitializeComponent();
             var window=new MainWindow { Width=1200, Height=820 };
+            foreach(var name in ColorThemes.Names)
+            {
+                var surface=ColorThemes.Brush("#192C46"); var previous=surface.Color;
+                window.SetColorTheme(name);
+                Check(ConfigManager.Load().Accent==name && !surface.IsFrozen,"runtime theme persists and remains mutable: "+name);
+                window.Navigate("Dash");
+            }
+            window.SetColorTheme("Blue");
+            ForgeTests.Run(App.GameDir);
+            window.PopulateVersionBox();
+            var versionBox=(ComboBox)window.FindName("VerBox");
+            Check(versionBox.Items.Cast<object>().Any(x=>x.ToString()=="1.20.1-forge-47.4.10"),"official Forge appears in launcher version selector");
+            versionBox.SelectedItem="1.20.1-forge-47.4.10";
+            Check(ConfigManager.Load().Version=="1.20.1-forge-47.4.10","Forge selection is saved across restarts");
+            var forgePath=Path.Combine(App.GameDir,"versions","1.20.1-forge-47.4.10","1.20.1-forge-47.4.10.json");
+            var forgeJson=Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(forgePath));
+            forgeJson["mainClass"]="cpw.mods.bootstraplauncher.BootstrapLauncher";
+            forgeJson["arguments"]=Newtonsoft.Json.Linq.JObject.Parse("{\"jvm\":[\"--add-opens\",\"java.base/java.lang=ALL-UNNAMED\",\"-DlibraryDirectory=${library_directory}\"],\"game\":[\"--launchTarget\",\"forgeclient\",\"--fml.forgeVersion\",\"47.4.10\"]}");
+            File.WriteAllText(forgePath,forgeJson.ToString());
+            var launch=(string)typeof(MainWindow).GetMethod("BuildLaunchArgs",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!.Invoke(window,new object?[]{"1.20.1-forge-47.4.10",4096,Path.Combine(App.GameDir,"natives"),null,null})!;
+            Check(launch.Contains("--launchTarget") && launch.Contains("forgeclient") && launch.Contains("--add-opens") && !launch.Contains("${"),"complete Forge launch command retains bootstrap parameters and expands paths");
             string output = args.Length>0 ? Path.GetFullPath(args[0]) : Path.Combine(Environment.CurrentDirectory,"docs","screenshots");
             Directory.CreateDirectory(output);
             foreach (var code in new[] { "tr", "en" })
@@ -65,7 +96,9 @@ class Program
                 Check(Localization.T("play")== (code=="tr"?"Oyunu başlat":"Launch game"), "runtime language " + code);
                 Check(ConfigManager.Load().Lang==(code=="tr"?"Turkce":"English"), "language persistence " + code);
                 window.Navigate("Dash"); Capture(window,Path.Combine(output,"home-"+code+".png"));
+                Check(Texts(window.Content as DependencyObject).Contains(Localization.T("welcome")),"cached home language " + code);
                 window.Navigate("Settings"); Capture(window,Path.Combine(output,"settings-"+code+".png"));
+                Check(Texts(window.Content as DependencyObject).Contains(Localization.T("luTitle")+" · "+window.LauncherUpdates.CurrentVersion),"cached settings language " + code);
                 window.Navigate("Server"); Capture(window,Path.Combine(output,"server-"+code+".png"));
             }
             window.Close();
@@ -73,6 +106,13 @@ class Program
             return 0;
         }
         catch(Exception ex) { Console.Error.WriteLine(ex); return 1; }
+    }
+    static IEnumerable<string> Texts(DependencyObject? node)
+    {
+        if(node==null) yield break;
+        if(node is TextBlock text) yield return text.Text;
+        for(int i=0;i<VisualTreeHelper.GetChildrenCount(node);i++)
+            foreach(var value in Texts(VisualTreeHelper.GetChild(node,i))) yield return value;
     }
     static void Capture(Window window,string path)
     {
