@@ -1,0 +1,21 @@
+name: Validate Windows preview
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Validate ordinary build
+        run: dotnet run --project Validation -c Release -- artifacts/screenshots-ordinary
+      - name: Build and validate protected package
+        shell: pwsh
+        run: ./scripts/Build-Protected.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mistik-portable-preview
+          path: artifacts/MistikLauncher-6-preview-win-x64.zip
