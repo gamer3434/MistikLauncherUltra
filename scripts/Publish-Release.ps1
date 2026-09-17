@@ -24,8 +24,10 @@ try {
         if(!$file -or (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLower() -ne $expected){ throw "Checksum mismatch: $name" }
     }
     $body=Get-Content -LiteralPath docs/RELEASE-PREVIEW-9.md -Raw
-    $release=$null
-    try { $release=Invoke-RestMethod -Uri "$api/releases/tags/$tag" -Headers $headers } catch { if([int]$_.Exception.Response.StatusCode -ne 404){ throw } }
+    # GitHub's by-tag endpoint cannot resolve an unpublished tag in a draft release.
+    $matches=@(Invoke-RestMethod -Uri "$api/releases?per_page=100" -Headers $headers | Where-Object tag_name -eq $tag)
+    if($matches.Count -gt 1){ throw 'Multiple releases use this tag; review before publishing' }
+    $release=if($matches.Count){$matches[0]}else{$null}
     if(!$release){ $payload=@{tag_name=$tag;target_commitish=$head;name="Mistik Launcher $version";body=$body;draft=$true;prerelease=$true} | ConvertTo-Json; $release=Invoke-RestMethod -Uri "$api/releases" -Method Post -Headers $headers -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($payload)) }
     foreach($asset in $assets){
         $name=Split-Path $asset -Leaf; $hash=(Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash.ToLower()
@@ -33,7 +35,21 @@ try {
         if($existing.Count){ if($existing[0].digest -ne "sha256:$hash"){ throw "Existing release asset differs: $name" }; continue }
         if(!$release.draft){ throw 'Do not mutate published release assets' }
         $uri="https://uploads.github.com/repos/gamer3434/MistikLauncherUltra/releases/$($release.id)/assets?name=$([Uri]::EscapeDataString($name))"
-        $uploaded=Invoke-RestMethod -Uri $uri -Method Post -Headers $headers -ContentType 'application/octet-stream' -InFile (Resolve-Path $asset).Path
+        Write-Host "Uploading: $name"
+        $client=[Net.Http.HttpClient]::new()
+        $client.Timeout=[TimeSpan]::FromMinutes(30)
+        $request=[Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::Post,$uri)
+        foreach($header in $headers.GetEnumerator()){ $request.Headers.TryAddWithoutValidation($header.Key,[string]$header.Value) | Out-Null }
+        $stream=[IO.File]::OpenRead((Resolve-Path $asset).Path)
+        $request.Content=[Net.Http.StreamContent]::new($stream)
+        $request.Content.Headers.ContentType=[Net.Http.Headers.MediaTypeHeaderValue]::new('application/octet-stream')
+        $request.Content.Headers.ContentLength=$stream.Length
+        try {
+            $response=$client.SendAsync($request).GetAwaiter().GetResult()
+            $response.EnsureSuccessStatusCode() | Out-Null
+            $uploaded=$response.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
+            $response.Dispose()
+        } finally { $request.Dispose(); $stream.Dispose(); $client.Dispose() }
         if($uploaded.digest -ne "sha256:$hash"){ throw "GitHub digest mismatch: $name" }
         Write-Host "Verified upload: $name ($($uploaded.size) bytes)"
     }
