@@ -13,7 +13,16 @@ try {
     $matching=@($all | Where-Object tag_name -eq "v$version")
     if($matching.Count -ne 1 -or !$matching[0].draft){throw 'Expected one unpublished draft'}
     $release=$matching[0]; $assets=@{}
-    $release.assets=Invoke-RestMethod -Uri "$api/releases/$($release.id)/assets?per_page=100" -Headers $headers
+    function GetAssets {
+        $result=@()
+        for($page=1;$page -le 4;$page++){
+            $items=Invoke-RestMethod -Uri "$api/releases/$($release.id)/assets?per_page=100&page=$page" -Headers $headers
+            $result+=@($items)
+            if(@($items).Count -lt 100){break}
+        }
+        return $result
+    }
+    $release.assets=@(GetAssets)
     foreach($asset in $release.assets){$assets[$asset.name]=$asset}
     $folder=Join-Path $repo 'artifacts/pc-test-release-stage'
     New-Item -ItemType Directory -Force $folder | Out-Null
@@ -35,7 +44,7 @@ try {
             # A timed-out response may still have saved the asset. Resolve it before retrying.
             $live=Invoke-RestMethod -Uri "$api/releases/$($release.id)" -Headers $headers
             if(!$live.draft){throw 'Release is no longer a draft'}
-            $list=Invoke-RestMethod -Uri "$api/releases/$($release.id)/assets?per_page=100" -Headers $headers
+            $list=@(GetAssets)
             $saved=@($list | Where-Object name -eq $name)
             if($saved.Count){
                 if($saved[0].digest -eq "sha256:$hash"){$assets[$name]=$saved[0]; Write-Host "Recovered verified stage: $name"; return}
@@ -61,9 +70,14 @@ try {
         try {
             $buffer=[byte[]]::new(16MB); $index=0
             while($source.Position -lt $source.Length){
+                $partName="stage-$version-$name-$index.part"
+                # Preserve verified earlier 16 MiB pieces; use 4 MiB for new pieces.
+                $wanted=4MB
+                if($assets.ContainsKey($partName) -and $assets[$partName].state -eq 'uploaded' -and $assets[$partName].digest -and $assets[$partName].size -gt 0 -and $assets[$partName].size -le 16MB){$wanted=[int]$assets[$partName].size}
+                $wanted=[int][Math]::Min([long]$wanted,$source.Length-$source.Position)
                 $count=0
-                while($count -lt $buffer.Length -and $source.Position -lt $source.Length){$count+=$source.Read($buffer,$count,$buffer.Length-$count)}
-                $partName="stage-$version-$name-$index.part"; $partPath=Join-Path $folder 'part.bin'
+                while($count -lt $wanted -and $source.Position -lt $source.Length){$count+=$source.Read($buffer,$count,$wanted-$count)}
+                $partPath=Join-Path $folder 'part.bin'
                 $output=[IO.File]::Create($partPath); try {$output.Write($buffer,0,$count)} finally {$output.Dispose()}
                 $record.Parts+=@{Name=$partName;Hash=(Get-FileHash $partPath -Algorithm SHA256).Hash.ToLower()}
                 Upload $partPath $partName; $index++

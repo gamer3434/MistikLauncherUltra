@@ -8,7 +8,16 @@ $tag="v$version"; $api='https://api.github.com/repos/gamer3434/MistikLauncherUlt
 $headers=@{Authorization="Bearer $env:GH_TOKEN";Accept='application/vnd.github+json';'User-Agent'='MistikRelease'}
 $release=Invoke-RestMethod -Uri "$api/releases/$ReleaseId" -Headers $headers
 if(!$release.draft -or $release.tag_name -ne $tag){throw 'Only this version draft can be finalized'}
-$release.assets=Invoke-RestMethod -Uri "$api/releases/$ReleaseId/assets?per_page=100" -Headers $headers
+function GetAssets {
+    $result=@()
+    for($page=1;$page -le 4;$page++){
+        $items=Invoke-RestMethod -Uri "$api/releases/$ReleaseId/assets?per_page=100&page=$page" -Headers $headers
+        $result+=@($items)
+        if(@($items).Count -lt 100){break}
+    }
+    return $result
+}
+$release.assets=@(GetAssets)
 $metadataName="stage-$version-manifest.json"
 $metadataAsset=@($release.assets | Where-Object name -eq $metadataName)
 if($metadataAsset.Count -ne 1){throw 'Missing stage manifest'}
@@ -54,7 +63,7 @@ foreach($file in $manifest.Files){
             $status=([string]$result[-1]).Replace('CURL_STATUS:','')
             $live=Invoke-RestMethod -Uri "$api/releases/$ReleaseId" -Headers $headers
             if(!$live.draft){throw 'Release changed during final upload'}
-            $list=Invoke-RestMethod -Uri "$api/releases/$ReleaseId/assets?per_page=100" -Headers $headers
+            $list=@(GetAssets)
             $saved=@($list | Where-Object name -eq $file.Name)
             if($saved.Count){
                 if($saved[0].digest -eq "sha256:$($file.Hash)"){$result=@(($saved[0] | ConvertTo-Json -Depth 8)); $exit=0; break}
