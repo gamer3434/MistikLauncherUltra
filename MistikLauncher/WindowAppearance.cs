@@ -53,10 +53,11 @@ public partial class MainWindow
                 var color=Config.CloseLighting=="RGB"?Colors.Red:ColorThemes.Brush("#00A3FF").Color;
                 var stroke=new SolidColorBrush(color);
                 var glow=new System.Windows.Media.Effects.DropShadowEffect { Color=color,BlurRadius=7,ShadowDepth=0,Opacity=0.65 };
-                var circle=new System.Windows.Shapes.Ellipse { Width=28,Height=28,Stroke=stroke,StrokeThickness=2,Fill=Brushes.Transparent,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Effect=glow };
-                var glyph=new TextBlock { Text="×",FontFamily=new FontFamily("Segoe UI"),FontSize=16,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center };
-                var content=new Grid(); content.Children.Add(circle); content.Children.Add(glyph);
-                frame.Width=30; frame.Height=30; frame.BorderThickness=new Thickness(0); frame.BorderBrush=stroke;
+                var outline=new Border { Width=38,Height=24,BorderBrush=stroke,BorderThickness=new Thickness(2),CornerRadius=new CornerRadius(5),Background=Brushes.Transparent,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Effect=glow };
+                // A symmetric vector avoids the font's asymmetric multiplication-sign bearings.
+                var glyph=new System.Windows.Shapes.Path { Data=Geometry.Parse("M 0,0 L 8,8 M 8,0 L 0,8"),Stroke=Brushes.White,StrokeThickness=1.5,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Width=8,Height=8,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center };
+                var content=new Grid(); content.Children.Add(outline); content.Children.Add(glyph);
+                frame.Width=38; frame.Height=24; frame.BorderThickness=new Thickness(0); frame.BorderBrush=stroke;
                 frame.Background=Brushes.Transparent; frame.Child=content;
                 if(Config.CloseLighting=="RGB") {
                     var cycle=new System.Windows.Media.Animation.ColorAnimationUsingKeyFrames { Duration=TimeSpan.FromSeconds(8),RepeatBehavior=System.Windows.Media.Animation.RepeatBehavior.Forever };

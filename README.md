@@ -4,17 +4,27 @@
 
 **Önizleme; tamamlanmış kararlı sürüm değildir.** Gerçek Vanilla/Forge oyun ve ayrı sunucu testleri yapıldı. Eski sayfaların tam çevirisi ve daha geniş özellik testleri sürüyor. Kaynak `codex/modernization-preview` dalında.
 
-### Güncel sürüm / Current version — 6.0.0-preview.8
+### Güncel sürüm / Current version — 6.0.0-preview.9
 
-Bulut hesabı oluşturma/giriş arayüzü ve otomatik profil eşitlemesi kaldırıldı. Profil ve ayarlar yerel kaydedilir. Önceki sürümlerin bulut kayıtları silinmedi. Çıkış düğmesi eşit çaplı elipsle çizilir ve ortalanır. Aydınlatma seçenekleri: **Tema**, **RGB · renk geçişi**, **Kapalı**. RGB hem çemberin hem ışığının rengini yumuşak biçimde değiştirir. Ayrı Rainbow ve sabit RGB renk kutusu kaldırıldı; eski Rainbow tercihi RGB'ye taşınır.
+Çıkış düğmesi artık 38×24 ölçülerinde, köşeleri yuvarlatılmış dikdörtgendir. Simetrik vektör çarpı tam ortalanır. **Tema**, **RGB · renk geçişi**, **Kapalı** seçenekleri korunur; RGB yalnızca çıkış çerçevesi ve ışığında yumuşak geçiş yapar. Bulut hesabı arayüzü ve otomatik profil eşitlemesi kaldırılmıştır; eski bulut kayıtları silinmez.
 
-Cloud account creation/sign-in UI and automatic profile synchronization were removed. Profiles/settings stay local; old cloud records were not deleted. The centered close ring uses circular ellipse geometry. Lighting choices: **Theme**, **RGB · color cycle**, **Off**. RGB smoothly animates the ring and glow together. The separate Rainbow choice and static RGB hex field were removed; existing Rainbow preferences migrate to RGB.
+The close control now uses a 38×24 rounded rectangle and a precisely centered symmetric vector cross. **Theme**, **RGB · color cycle**, **Off** remain available; only close gets animated outline/glow. Cloud account UI and automatic profile synchronization remain removed; old cloud records are preserved.
 
 Minecraft startup failure/nonzero exit restores the launcher and displays diagnostics. / Minecraft açılış hatası veya sıfırdan farklı çıkış kodu launcher'ı geri açar ve hata analizini gösterir. Real Vanilla/Forge gameplay results and previous remaining issues: [PC report](docs/PC-TESTS-PREVIEW-7.md).
 
-Protected, SHA-256 locally test-signed portable package / Korumalı, SHA-256 yerel test imzalı paket: `artifacts/MistikLauncher-6.0.0-preview.8-win-x64.zip`. Local test signatures are not publicly trusted and cannot guarantee AV/SmartScreen acceptance. / Yerel test imzası genel yayıncı güveni veya antivirüs uyarısızlık garantisi sağlamaz.
+**Download / İndir:** [6.0.0-preview.9 release](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.0.0-preview.9).
 
-**198 checks passed**, including color change over time and synchronized glow in both languages. / **198 kontrol geçti**; iki dilde zaman içinde renk değişimi ve eşzamanlı ışık doğrulandı. [Current window controls / Güncel pencere kontrolleri](docs/WINDOW-AND-TOOLBAR.md).
+- `MistikSetup-Online-6.0.0-preview.9.exe`: uygulama paketini GitHub'dan indirir ve SHA-256 doğrular / downloads and verifies this version's package from GitHub.
+- `MistikSetup-Offline-6.0.0-preview.9.exe`: uygulama dosyaları içinde bulunur; kurulum için internet gerekmez / embeds the full application; installation needs no internet.
+- `MistikLauncher-6.0.0-preview.9-win-x64.zip`: taşınabilir seçenek / portable option.
+
+Kurulum dili sihirbazın sağ üstünden seçilir. Varsayılan konum `%LOCALAPPDATA%\Programs\MistikLauncherUltra`; yönetici izni gerekmez. Windows uygulama listesinden kaldırılabilir. Ayarlar, modlar ve dünyalar `%APPDATA%\.mistik_ultra` altında korunur. Dolu klasöre kurulum engellenir; mevcut kurulumu uygulamanın güncelleyicisiyle güncelleyin veya önce kaldırın. Launcher için yeni sürümleri otomatik alma ayarı ayrıca kullanılabilir.
+
+Choose installer language at the upper right. Default per-user folder: `%LOCALAPPDATA%\Programs\MistikLauncherUltra`; no administrator rights needed. Uninstall through Windows installed apps. Existing settings, mods and worlds under `%APPDATA%\.mistik_ultra` are preserved. Nonempty destinations are rejected; use the launcher's updater or uninstall first. The launcher separately offers automatic updates for future versions.
+
+**İmza / Signing:** uygulama, güncelleyici, kaldırıcı ve kurulum EXE'leri SHA-256 yerel test imzalıdır. Bu sertifika genel Windows yayıncı güveni sağlamaz; SmartScreen/antivirüs uyarısızlığı garanti edilemez. Özel anahtar dağıtılmaz ve bilgisayarın güven deposu değiştirilmez. / Application, updater, uninstaller and setup executables carry SHA-256 local test signatures. This certificate is not publicly trusted; no warning-free AV/SmartScreen claim is made. Private keys are never distributed and trust stores are untouched.
+
+**209 checks passed** on the protected package, including centered RGB controls in both languages and installer ownership/corruption/cancellation/lock tests. / Korumalı pakette **209 kontrol geçti**; iki dilde ortalı RGB düğmesi ve kurulum güvenliği doğrulandı. [Release details / Yayın ayrıntıları](docs/RELEASE-PREVIEW-9.md). [Current window controls / Güncel pencere kontrolleri](docs/WINDOW-AND-TOOLBAR.md).
 
 Optional signing / İsteğe bağlı imzalama: `./scripts/Build-Protected.ps1 -SigningThumbprint YOUR_CERTIFICATE_THUMBPRINT`. Use `-AllowLocalTestSignature` only for an explicitly untrusted local test certificate in your current-user personal store. Private keys are never copied into the package. / Yalnızca açıkça güvenilir olmayan yerel test sertifikası için `-AllowLocalTestSignature` kullanın. Özel anahtar pakete kopyalanmaz. The local test package is not timestamped / Yerel test paketi zaman damgalı değildir.
 
@@ -55,7 +65,7 @@ Configuration writes are atomic with recovery from the previous backup. Hardware
 
 ### Run
 
-Extract `artifacts/MistikLauncher-6-preview-win-x64.zip` to a dedicated Windows x64 folder and run `MistikLauncher.exe`. It includes its .NET runtime. **Keep all package files together.** Installation, uninstall execution and certificate trust changes are disabled in this portable preview. Data remains under `%APPDATA%\.mistik_ultra`. Back up settings and game files before trying it.
+Extract `artifacts/MistikLauncher-6-preview-win-x64.zip` to a dedicated Windows x64 folder and run `MistikLauncher.exe`, or choose an online/offline setup from the release. The .NET runtime is included. **Keep all package files together.** Legacy in-launcher installation/uninstallation and certificate trust changes remain disabled; the new standalone installer manages its own ownership record. Data remains under `%APPDATA%\.mistik_ultra`.
 
 1. Select Türkçe or English at the top right.
 2. Enter player name and RAM in Settings, then Save changes.

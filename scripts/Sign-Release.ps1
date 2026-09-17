@@ -1,7 +1,9 @@
 param(
     [Parameter(Mandatory)][string]$PackagePath,
     [Parameter(Mandatory)][string]$Thumbprint,
-    [switch]$AllowLocalTestSignature
+    [switch]$AllowLocalTestSignature,
+    [string[]]$FileNames = @('MistikLauncher.exe','MistikLauncher.dll','MistikUpdater.exe','MistikUninstall.exe'),
+    [string]$TimestampServer
 )
 $ErrorActionPreference = 'Stop'
 $package = (Resolve-Path -LiteralPath $PackagePath).Path
@@ -12,10 +14,13 @@ if (!$certificate.HasPrivateKey -or $certificate.NotAfter -le (Get-Date) -or $ce
 if ('1.3.6.1.5.5.7.3.3' -notin @($certificate.EnhancedKeyUsageList | ForEach-Object { [string]$_.ObjectId })) {
     throw 'Certificate is not for code signing / Sertifika kod imzalamaya uygun değil.'
 }
-foreach ($name in @('MistikLauncher.exe','MistikLauncher.dll','MistikUpdater.exe')) {
+$timestamped = $true
+foreach ($name in $FileNames) {
     $file = Join-Path $package $name
     if (!(Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing package file: $name" }
-    $signature = Set-AuthenticodeSignature -LiteralPath $file -Certificate $certificate -HashAlgorithm SHA256
+    $options = @{ LiteralPath=$file; Certificate=$certificate; HashAlgorithm='SHA256' }
+    if ($TimestampServer) { $options.TimestampServer = $TimestampServer }
+    $signature = Set-AuthenticodeSignature @options
     $verified = Get-AuthenticodeSignature -LiteralPath $file
     $chain = [System.Security.Cryptography.X509Certificates.X509Chain]::new()
     $chain.ChainPolicy.RevocationMode = 'NoCheck'
@@ -28,11 +33,13 @@ foreach ($name in @('MistikLauncher.exe','MistikLauncher.dll','MistikUpdater.exe
         throw "Signature verification failed: $name ($($verified.Status)): $($signature.StatusMessage)"
     }
     Write-Host "$name : $($verified.Status)"
+    $timestamped = $timestamped -and $null -ne $verified.TimeStamperCertificate
 }
 Export-Certificate -Cert $certificate -FilePath (Join-Path $package 'publisher.cer') | Out-Null
 @{
     Publisher = $certificate.Subject
     Thumbprint = $certificate.Thumbprint
     Trust = $(if ($AllowLocalTestSignature) { 'Local test only; not publicly trusted / Yalnızca yerel test; genel güven sağlamaz' } else { 'Windows certificate validation passed at build time' })
-    Timestamped = $false
+    Timestamped = $timestamped
+    HashAlgorithm = 'SHA256'
 } | ConvertTo-Json | Set-Content (Join-Path $package 'signing-info.json') -Encoding utf8

@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><RuntimeIdentifier>win-x64</RuntimeIdentifier><SelfContained>true</SelfContained><PublishSingleFile>true</PublishSingleFile><IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract><AssemblyName>MistikUninstall</AssemblyName><ApplicationIcon>../MistikLauncher/mistik_icon.ico</ApplicationIcon></PropertyGroup>
+  <ItemGroup><Compile Include="../Installer/InstallEngine.cs" Link="InstallEngine.cs"/><Compile Include="../Updater/UpdateEngine.cs" Link="UpdateEngine.cs"/></ItemGroup>
+</Project>

@@ -4,5 +4,5 @@
     <UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   </PropertyGroup>
-  <ItemGroup><ProjectReference Include="../MistikLauncher/MistikLauncher.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../MistikLauncher/MistikLauncher.csproj" /><Compile Include="../Installer/InstallEngine.cs" Link="InstallEngine.cs" /></ItemGroup>
 </Project>
