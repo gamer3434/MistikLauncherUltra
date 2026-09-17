@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -73,13 +73,13 @@ public class ModernSettingsPage : Page, ILanguagePage
     TextBox user = null!, ram = null!;
     ComboBox language = null!, provider = null!;
     CheckBox close = null!;
-    TextBlock result = null!, updateStatus = null!, cloudStatus = null!;
+    TextBlock result = null!, updateStatus = null!;
     Button updateButton = null!;
     public ModernSettingsPage(MainWindow window)
     {
         main=window;
-        Loaded += (_,_) => { Localization.Changed += Render; main.LauncherUpdates.Changed += UpdateStatusAsync; main.Cloud.Changed+=UpdateCloudStatus; Render(); };
-        Unloaded += (_,_) => { Localization.Changed -= Render; main.LauncherUpdates.Changed -= UpdateStatusAsync; main.Cloud.Changed-=UpdateCloudStatus; };
+        Loaded += (_,_) => { Localization.Changed += Render; main.LauncherUpdates.Changed += UpdateStatusAsync; Render(); };
+        Unloaded += (_,_) => { Localization.Changed -= Render; main.LauncherUpdates.Changed -= UpdateStatusAsync; };
         Render();
     }
     public void RefreshLanguage() => Render();
@@ -98,32 +98,6 @@ public class ModernSettingsPage : Page, ILanguagePage
         updateButton.Click += async (_,_)=> await main.CheckLauncherUpdatesAsync(true); updateContent.Children.Add(updateButton);
         updateStatus=PageHelpers.Lbl("",13,"#ADBED6",pad:new Thickness(0,10,0,0),wrap:TextWrapping.Wrap); updateContent.Children.Add(updateStatus);
         updateCard.Child=updateContent; stack.Children.Add(updateCard); UpdateStatus();
-        var cloudContent=new StackPanel();
-        cloudContent.Children.Add(PageHelpers.Lbl(Localization.T("cloudTitle"),18,"#EFF5FF",true));
-        cloudContent.Children.Add(PageHelpers.Lbl(Localization.T("cloudHelp"),13,"#ADBED6",wrap:TextWrapping.Wrap));
-        cloudContent.Children.Add(PageHelpers.Lbl(Localization.T("cloudEmail"),14,"#EFF5FF",pad:new Thickness(0,12,0,6)));
-        var email=PageHelpers.DarkTextBox(main.Cloud.Email??""); cloudContent.Children.Add(email);
-        cloudContent.Children.Add(PageHelpers.Lbl(Localization.T("cloudPassword"),14,"#EFF5FF",pad:new Thickness(0,12,0,6)));
-        var password=new PasswordBox { MinHeight=40,Padding=new Thickness(10),Background=PageHelpers.HexBrush("#0D1727"),Foreground=Brushes.White }; cloudContent.Children.Add(password);
-        cloudStatus=PageHelpers.Lbl((main.Cloud.Email??"")+" · "+Localization.T(main.Cloud.Status),13,"#ADBED6",pad:new Thickness(0,12,0,6),wrap:TextWrapping.Wrap); cloudContent.Children.Add(cloudStatus);
-        var cloudButtons=new WrapPanel(); cloudContent.Children.Add(cloudButtons);
-        void CloudButton(string key,Func<Task> action) {
-            var button=PageHelpers.MkBtn(Localization.T(key),"#226DA0"); button.Margin=new Thickness(0,6,8,0); cloudButtons.Children.Add(button);
-            button.Click+=async (_,_)=> {
-                cloudButtons.IsEnabled=false;
-                try { await action(); cloudStatus.Text=(main.Cloud.Email??"")+" · "+Localization.T(main.Cloud.Status); }
-                catch { cloudStatus.Text=Localization.T("cloudFailed"); }
-                finally { password.Clear(); cloudButtons.IsEnabled=true; }
-            };
-        }
-        async Task Login(bool create) {
-            if(string.IsNullOrWhiteSpace(email.Text)||password.Password.Length<6) throw new InvalidOperationException();
-            await main.Cloud.SignInAsync(email.Text.Trim(),password.Password,create); await main.SyncCloudAsync();
-        }
-        CloudButton("cloudLogin",()=>Login(false)); CloudButton("cloudCreate",()=>Login(true));
-        CloudButton("cloudUpload",()=>main.Cloud.UploadAsync(main.Config)); CloudButton("cloudRestore",()=>main.SyncCloudAsync()); CloudButton("cloudLogout",()=>main.Cloud.SignOutAsync());
-        stack.Children.Add(new Border { Child=cloudContent,Background=PageHelpers.HexBrush("#192C46"),Padding=new Thickness(20),CornerRadius=new CornerRadius(14),Margin=new Thickness(0,12,0,12) });
-
         void Label(string key) => stack.Children.Add(PageHelpers.Lbl(Localization.T(key),15,"#FFFFFF",true,pad:new Thickness(0,16,0,6)));
         var themeCard=new Border { Background=PageHelpers.HexBrush("#192C46"), Padding=new Thickness(20), CornerRadius=new CornerRadius(14) };
         var themeContent=new StackPanel();
@@ -213,23 +187,15 @@ public class ModernSettingsPage : Page, ILanguagePage
         UpdateWindowSelection(); windowContent.Children.Add(styleGrid); windowCard.Child=windowContent; stack.Children.Insert(3,windowCard);
         windowContent.Children.Add(PageHelpers.Lbl(Localization.Language=="en"?"Close button lighting":"Çıkış düğmesi aydınlatması",14,"#EFF5FF",true));
         var lightRow=new WrapPanel { Margin=new Thickness(0,8,0,0) };
-        var modes=new[]{"Theme","RGB","Rainbow","Off"};
-        var lighting=new ComboBox { ItemsSource=Localization.Language=="en"?new[]{"Theme","RGB","Rainbow","Off"}:new[]{"Tema","RGB","Gökkuşağı","Kapalı"},SelectedIndex=Array.IndexOf(modes,main.Config.CloseLighting),Width=140,MinHeight=36,Margin=new Thickness(0,0,10,0) };
-        var rgb=PageHelpers.DarkTextBox(main.Config.CloseRgb); rgb.Width=110; rgb.MaxLength=7; rgb.ToolTip="#RRGGBB";
-        var lightStatus=PageHelpers.Lbl("",12,"#F0CF84");
-        lighting.Name="CloseLightingBox"; rgb.Name="CloseRgbBox";
+        var modes=new[]{"Theme","RGB","Off"};
+        var lighting=new ComboBox { Name="CloseLightingBox",ItemsSource=Localization.Language=="en"?new[]{"Theme","RGB · color cycle","Off"}:new[]{"Tema","RGB · renk geçişi","Kapalı"},SelectedIndex=Array.IndexOf(modes,main.Config.CloseLighting),Width=190,MinHeight=36 };
         System.Windows.Automation.AutomationProperties.SetName(lighting,Localization.Language=="en"?"Close button lighting":"Çıkış düğmesi aydınlatması");
-        var applyLight=PageHelpers.MkBtn(Localization.Language=="en"?"Apply":"Uygula","#226DA0"); applyLight.Margin=new Thickness(10,0,0,0);
-        void ApplyLighting() {
-            bool valid=Regex.IsMatch(rgb.Text,"^#[0-9A-Fa-f]{6}$");
-            if(lighting.SelectedIndex==1 && !valid) { lightStatus.Text=Localization.Language=="en"?"Use #RRGGBB, for example #FFB000.":"#RRGGBB kullanın; örneğin #FFB000."; return; }
-            main.Config.CloseLighting=modes[Math.Max(0,lighting.SelectedIndex)]; if(valid) main.Config.CloseRgb=rgb.Text;
-            ConfigManager.Save(main.Config); main.ApplyWindowAppearance(); lightStatus.Text="";
-        }
-        lighting.SelectionChanged+=(_,_)=>ApplyLighting(); applyLight.Click+=(_,_)=>ApplyLighting();
-        rgb.TextChanged+=(_,_)=> { if(lighting.SelectedIndex==1) ApplyLighting(); };
-        lightRow.Children.Add(lighting); lightRow.Children.Add(rgb); lightRow.Children.Add(applyLight);
-        windowContent.Children.Add(lightRow); windowContent.Children.Add(lightStatus);
+        lighting.SelectionChanged+=(_,_)=> {
+            if(lighting.SelectedIndex<0) return;
+            main.Config.CloseLighting=modes[lighting.SelectedIndex]; ConfigManager.Save(main.Config); main.ApplyWindowAppearance();
+        };
+        lightRow.Children.Add(lighting); windowContent.Children.Add(lightRow);
+        windowContent.Children.Add(PageHelpers.Lbl(Localization.Language=="en"?"RGB smoothly cycles through colors. Choose Off to stop the lighting.":"RGB renkler arasında yumuşak geçiş yapar. Aydınlatmayı durdurmak için Kapalı seçin.",12,"#ADBED6",wrap:TextWrapping.Wrap));
         Label("username"); user=PageHelpers.DarkTextBox(main.Config.User); user.MaxLength=16; stack.Children.Add(user);
         stack.Children.Add(PageHelpers.Lbl(Localization.T("usernameHelp"),13,"#BDCAD8",wrap:TextWrapping.Wrap));
         Label("memory"); ram=PageHelpers.DarkTextBox(main.Config.Ram.ToString()); stack.Children.Add(ram);
@@ -247,7 +213,6 @@ public class ModernSettingsPage : Page, ILanguagePage
         layout.Children.Add(new ScrollViewer { Content=stack, VerticalScrollBarVisibility=ScrollBarVisibility.Auto }); Content=layout;
     }
     void UpdateStatusAsync() { if(!Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(new Action(UpdateStatus)); }
-    void UpdateCloudStatus() { if(!Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(new Action(()=> { if(cloudStatus!=null) cloudStatus.Text=(main.Cloud.Email??"")+" · "+Localization.T(main.Cloud.Status); })); }
     void UpdateStatus()
     {
         if(updateStatus==null) return;

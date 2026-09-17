@@ -22,16 +22,6 @@ namespace MistikLauncher
     public partial class MainWindow : Window
     {
         public LauncherConfig Config;
-        public CloudProfiles Cloud { get; } = new();
-        bool cloudReady;
-        void SaveCloud(LauncherConfig cfg) { if(cloudReady) Cloud.Schedule(cfg); }
-        public async Task SyncCloudAsync(bool refreshPage=true) {
-            cloudReady=false;
-            var restored=await Cloud.RestoreAsync(Config);
-            if(restored!=null) { Config=restored; ConfigManager.Save(Config); SwitchLanguage(Config.Lang); ApplyAccent(Config.Accent); PopulateVersionBox(); LoadAvatar(); _pageCache.Clear(); if(refreshPage) Navigate("Settings"); }
-            else await Cloud.UploadAsync(Config);
-            cloudReady=true;
-        }
         public AutoMcsUpdater AutoMcs { get; } = new();
         public LauncherUpdater LauncherUpdates { get; }
         public MistikRelay?   Relay;
@@ -102,12 +92,9 @@ namespace MistikLauncher
             updateTimer.Tick += async (_,_) => await CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate);
             Loaded += async (_,_) => {
                 updateTimer.Start();
-                if(Cloud.SignedIn) { try { await SyncCloudAsync(false); } catch { StatusLbl.Text=Localization.T("cloudFailed"); } }
                 await Task.WhenAll(CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate), AutoMcs.CheckAsync(Config.AutoMcsAutoUpdate && File.Exists(AutoMcs.ExecutablePath)));
             };
             Closed += (_,_) => updateTimer.Stop();
-            ConfigManager.Saved+=SaveCloud;
-            Closed+=(_,_)=>ConfigManager.Saved-=SaveCloud;
             Navigate("Dash");
             // Relay is started only by an explicit user action.
             _ = RelayLoopAsync();

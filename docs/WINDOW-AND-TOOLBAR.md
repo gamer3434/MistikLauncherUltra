@@ -1,5 +1,13 @@
 # Pencere ve üst çubuk / Window and toolbar
 
+## Preview.8 — Güncel aydınlatma / Current lighting
+
+**Gerekçe / Reasoning:** Kullanıcı ayrı Rainbow yerine düzgün dairesel, renk geçişli RGB istedi. / The user requested a true circular RGB color cycle instead of a separate Rainbow mode.
+
+**Uygulama / Implementation:** Eşit çaplı 28×28 elips ve ortalı kapatma simgesi. Tema, RGB · renk geçişi, Kapalı seçenekleri; RGB çember ve ışık için eşzamanlı, sekiz saniyelik yumuşak renk döngüsüdür. Diğer pencere düğmelerinde aydınlatma yoktur. Sabit RGB kutusu ve Rainbow seçeneği kaldırıldı; önceki Rainbow tercihi RGB'ye taşınır. / Equal-diameter ellipse and centered close glyph; Theme, RGB color cycle, Off. Native WPF keyframes animate the ring and glow together. Other caption buttons have no glow.
+
+**Sonuç / Conclusion:** Korumalı yerel test imzalı paket **198** kontrolü geçti; gerçek zaman içinde renk değişimi ve ışık eşleşmesi iki dilde doğrulandı. Bulut hesabı arayüzü ve otomatik profil eşitlemesi kaldırıldı. / Protected locally test-signed package passed 198 checks, including actual color change over time and synchronized glow in both languages. Cloud account UI and automatic profile synchronization were removed.
+
 **Gerekçe / Reasoning:** Kullanıcının RedX ekran görüntüleri koyu, sakin yüzeyler ve renkli seçili öğeler gösteriyor. Üst çubuk, yan menü ve başlatma alanı aynı temayı kullanmalı; kişiselleştirme temel pencere işlevlerini korumalı.
 
 **Uygulama / Implementation:**

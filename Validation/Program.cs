@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -133,7 +133,7 @@ class Program
             foreach(var style in MainWindow.WindowButtonStyles) {
                 window.SetWindowButtons(style);
                 Check(ConfigManager.Load().WindowButtons==style && ((StackPanel)window.FindName("CaptionButtons")).Children.Count==3,"window button style renders and persists: "+style);
-                Check(((StackPanel)window.FindName("CaptionButtons")).Children.OfType<Button>().Count(button=>((Border)button.Content).Effect!=null)==1,"only close has lighting: "+style);
+                Check(((StackPanel)window.FindName("CaptionButtons")).Children.OfType<Button>().Count(CaptionHasGlow)==1,"only close has lighting: "+style);
             }
             var sourceText=new TextBlock { Text="initial" }; var boundText=new TextBlock();
             System.Windows.Data.BindingOperations.SetBinding(boundText,TextBlock.TextProperty,new System.Windows.Data.Binding("Text") { Source=sourceText });
@@ -205,15 +205,23 @@ class Program
                 var settingsPage=(MistikLauncher.Pages.ModernSettingsPage)((Frame)window.FindName("MainFrame")).Content;
                 var settingsScroll=((DockPanel)settingsPage.Content).Children.OfType<ScrollViewer>().Single();
                 var lighting=Nodes(settingsPage).OfType<ComboBox>().Single(box=>box.Name=="CloseLightingBox");
+                Check(!Texts(settingsPage).Contains(Localization.T("cloudTitle")) && !Nodes(settingsPage).OfType<PasswordBox>().Any(),"cloud account UI removed: "+code);
+                Check(lighting.Items.Count==3 && !lighting.Items.Cast<string>().Any(item=>item.Contains("Rainbow") || item.Contains("Gökkuşağı")),"single RGB mode replaces Rainbow: "+code);
                 lighting.SelectedIndex=2; Flush(window); Localization.TranslateTree(settingsPage);
                 lighting.SelectedIndex=1; Flush(window); Localization.TranslateTree(settingsPage); Flush(window);
-                Check(Texts(lighting).Contains("RGB") && window.Config.CloseLighting=="RGB","lighting selector displays new value after translation: "+code);
-                var rgb=Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="CloseRgbBox"); rgb.Text="#00CCFF"; Flush(window);
-                var closeFrame=((StackPanel)window.FindName("CaptionButtons")).Children.OfType<Button>().Select(button=>(Border)button.Content).Single(border=>border.Effect!=null);
-                Check(((SolidColorBrush)closeFrame.BorderBrush).Color==Color.FromRgb(0,204,255) && ConfigManager.Load().CloseRgb=="#00CCFF","RGB edits apply immediately and persist: "+code);
-                lighting.SelectedIndex=3; Flush(window);
-                Check(((StackPanel)window.FindName("CaptionButtons")).Children.OfType<Button>().All(button=>((Border)button.Content).Effect==null),"Off disables caption lighting: "+code);
+                Check(Texts(lighting).Any(text=>text.StartsWith("RGB")) && window.Config.CloseLighting=="RGB","lighting selector displays new value after translation: "+code);
+                var closeFrame=((StackPanel)window.FindName("CaptionButtons")).Children.OfType<Button>().Where(CaptionHasGlow).Select(button=>(Border)button.Content).Single();
+                var circle=((Grid)closeFrame.Child).Children.OfType<System.Windows.Shapes.Ellipse>().Single();
+                Check(circle.Width==circle.Height && circle.StrokeThickness==2 && ((SolidColorBrush)circle.Stroke).HasAnimatedProperties && circle.Effect.HasAnimatedProperties && ConfigManager.Load().CloseLighting=="RGB","round RGB ring and glow both animate and persist: "+code);
+                var before=((SolidColorBrush)circle.Stroke).Color;
+                var animationFrame=new DispatcherFrame();
+                var animationTimer=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(350) };
+                animationTimer.Tick+=(_,_)=> { animationTimer.Stop(); animationFrame.Continue=false; };
+                animationTimer.Start(); Dispatcher.PushFrame(animationFrame);
+                Check(((SolidColorBrush)circle.Stroke).Color!=before && ((System.Windows.Media.Effects.DropShadowEffect)circle.Effect).Color==((SolidColorBrush)circle.Stroke).Color,"RGB changes color over time and glow stays synchronized: "+code);
                 lighting.SelectedIndex=2; Flush(window);
+                Check(((StackPanel)window.FindName("CaptionButtons")).Children.OfType<Button>().All(button=>!CaptionHasGlow(button)),"Off disables caption lighting: "+code);
+                lighting.SelectedIndex=1; Flush(window);
                 settingsScroll.ScrollToVerticalOffset(300); Capture(window,Path.Combine(output,"window-styles-"+code+".png"));
                 settingsScroll.ScrollToTop();
                 window.Navigate("Server"); Capture(window,Path.Combine(output,"server-"+code+".png"));
@@ -231,6 +239,7 @@ class Program
         for(int i=0;i<VisualTreeHelper.GetChildrenCount(node);i++)
             foreach(var value in Texts(VisualTreeHelper.GetChild(node,i))) yield return value;
     }
+    static bool CaptionHasGlow(Button button) => ((Border)button.Content).Effect!=null || ((Border)button.Content).Child is Grid grid && grid.Children.OfType<System.Windows.Shapes.Ellipse>().Any(circle=>circle.Effect!=null);
     static IEnumerable<DependencyObject> Nodes(DependencyObject node)
     {
         yield return node;

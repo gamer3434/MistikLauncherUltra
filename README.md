@@ -4,15 +4,17 @@
 
 **Önizleme; tamamlanmış kararlı sürüm değildir.** Gerçek Vanilla/Forge oyun ve ayrı sunucu testleri yapıldı. Eski sayfaların tam çevirisi ve daha geniş özellik testleri sürüyor. Kaynak `codex/modernization-preview` dalında.
 
-### Güncel sürüm / Current version — 6.0.0-preview.7
+### Güncel sürüm / Current version — 6.0.0-preview.8
 
-Yalnızca çıkış düğmesinde dairesel aydınlatma: Tema, RGB, Gökkuşağı, Kapalı. Ayarlar → Pencere düğmesi stili altında seçin; RGB için `#00CCFF` gibi bir `#RRGGBB` değeri girin. Geçerli renk anında uygulanır. Çeviri sırasında seçim kutularının eski değerde kalmasına neden olan WPF bağlantı hatası düzeltildi. Minecraft açılamazsa veya sıfırdan farklı kodla kapanırsa launcher geri açılıp hata kodu, açıklama ve kanıt bulunan mod/rapor yollarını gösterir. Tek başına çıkış kodu kesin neden sayılmaz.
+Bulut hesabı oluşturma/giriş arayüzü ve otomatik profil eşitlemesi kaldırıldı. Profil ve ayarlar yerel kaydedilir. Önceki sürümlerin bulut kayıtları silinmedi. Çıkış düğmesi eşit çaplı elipsle çizilir ve ortalanır. Aydınlatma seçenekleri: **Tema**, **RGB · renk geçişi**, **Kapalı**. RGB hem çemberin hem ışığının rengini yumuşak biçimde değiştirir. Ayrı Rainbow ve sabit RGB renk kutusu kaldırıldı; eski Rainbow tercihi RGB'ye taşınır.
 
-Circular lighting appears only on close: Theme, RGB, Rainbow, Off. Select it under Settings → Window button style; enter an RGB hex such as `#00CCFF`. Valid color edits apply immediately. Fixed translation breaking live selector bindings. Startup failure/nonzero game exit restores the launcher and displays diagnostics, actionable codes and mod/report paths where evidence exists.
+Cloud account creation/sign-in UI and automatic profile synchronization were removed. Profiles/settings stay local; old cloud records were not deleted. The centered close ring uses circular ellipse geometry. Lighting choices: **Theme**, **RGB · color cycle**, **Off**. RGB smoothly animates the ring and glow together. The separate Rainbow choice and static RGB hex field were removed; existing Rainbow preferences migrate to RGB.
 
-**192** protected-package checks; **199** live Firebase/Modrinth checks. Real Vanilla 1.21.11 and Forge 61.2.0 gameplay passed. Free local test signatures cover own launcher EXE/DLL and updater EXE; **not publicly trusted, no guarantee against AV/SmartScreen warnings**. No root certificate is installed. / Yerel test imzası genel yayıncı güveni sağlamaz; antivirüs uyarılarının kalkacağı garanti edilmez. Güven deposuna sertifika eklenmez.
+Minecraft startup failure/nonzero exit restores the launcher and displays diagnostics. / Minecraft açılış hatası veya sıfırdan farklı çıkış kodu launcher'ı geri açar ve hata analizini gösterir. Real Vanilla/Forge gameplay results and previous remaining issues: [PC report](docs/PC-TESTS-PREVIEW-7.md).
 
-Details, all seven workflow stages and remaining issues / Ayrıntılar, yedi çalışma aşaması ve eksikler: [PC validation and signing report](docs/PC-TESTS-PREVIEW-7.md).
+Protected, SHA-256 locally test-signed portable package / Korumalı, SHA-256 yerel test imzalı paket: `artifacts/MistikLauncher-6.0.0-preview.8-win-x64.zip`. Local test signatures are not publicly trusted and cannot guarantee AV/SmartScreen acceptance. / Yerel test imzası genel yayıncı güveni veya antivirüs uyarısızlık garantisi sağlamaz.
+
+**198 checks passed**, including color change over time and synchronized glow in both languages. / **198 kontrol geçti**; iki dilde zaman içinde renk değişimi ve eşzamanlı ışık doğrulandı. [Current window controls / Güncel pencere kontrolleri](docs/WINDOW-AND-TOOLBAR.md).
 
 Optional signing / İsteğe bağlı imzalama: `./scripts/Build-Protected.ps1 -SigningThumbprint YOUR_CERTIFICATE_THUMBPRINT`. Use `-AllowLocalTestSignature` only for an explicitly untrusted local test certificate in your current-user personal store. Private keys are never copied into the package. / Yalnızca açıkça güvenilir olmayan yerel test sertifikası için `-AllowLocalTestSignature` kullanın. Özel anahtar pakete kopyalanmaz. The local test package is not timestamped / Yerel test paketi zaman damgalı değildir.
 

@@ -1,5 +1,7 @@
 # Bulut profilleri / Cloud profiles — 6.0.0-preview.5
 
+**Historical guide / Eski sürüm kılavuzu:** In preview.8, cloud account UI and automatic profile synchronization were removed at the user's request. Settings now remain local. Existing remote records were not deleted. / Kullanıcının isteğiyle preview.8'de bulut hesabı arayüzü ve otomatik eşitleme kaldırıldı. Ayarlar yerel kalır; eski uzak kayıtlar silinmedi.
+
 ## Türkçe
 
 **Gerekçe:** Kullanıcı profili, skin tercihi ve ayarların cihazlar arasında korunması gerekir. Mevcut `mistiklauncher-9eb4b` Realtime Database ve Firebase Authentication kullanılır; ek sunucu veya istemci bağımlılığı eklenmez.
