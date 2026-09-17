@@ -13,6 +13,10 @@ public static class ForgeTests
             if(jar) File.WriteAllText(Path.Combine(dir,id+".jar"),"fixture");
         }
         Profile("1.20.1","{\"id\":\"1.20.1\"}",true);
+        Profile("1.21.11","{\"javaVersion\":{\"majorVersion\":21}}",true);
+        Profile("26.1","{\"javaVersion\":{\"majorVersion\":25}}",true);
+        Profile("fabric-java21","{\"inheritsFrom\":\"1.21.11\"}");
+        Check(GameProfiles.RequiredJava(root,"1.21.11")==21 && GameProfiles.RequiredJava(root,"fabric-java21")==21 && GameProfiles.RequiredJava(root,"26.1")==25,"Java requirements follow official metadata and inherited profiles, not version-name guesses");
         Profile("1.20.1-forge-47.4.10","{\"id\":\"1.20.1-forge-47.4.10\",\"inheritsFrom\":\"1.20.1\",\"libraries\":[{\"name\":\"net.minecraftforge:forge:1.20.1-47.4.10\"}]}");
         Profile("1.20.1-forge-47.4.23","{\"inheritsFrom\":\"1.20.1\",\"libraries\":[{\"name\":\"net.minecraftforge:fmlloader:1.20.1-47.4.23\"}]}");
         Check(GameProfiles.IsInstalled(root,"1.20.1-forge-47.4.10"),"official Forge profile inherits Vanilla jar without own jar");

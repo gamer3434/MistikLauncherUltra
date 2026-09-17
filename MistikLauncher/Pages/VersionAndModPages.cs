@@ -248,8 +248,20 @@ namespace MistikLauncher.Pages
                 allVers.Add((item.id, item.type, installedFolder));
             }
 
-            // Sort all versions descending beautifully and robustly
+            var releaseDates=new Dictionary<string,DateTimeOffset>(StringComparer.OrdinalIgnoreCase);
+            foreach(var entry in _mojangVersions ?? new JArray())
+                if(entry["id"]?.ToString() is string manifestId && DateTimeOffset.TryParse(entry["releaseTime"]?.ToString(),out var released)) releaseDates[manifestId]=released;
+            DateTimeOffset Released(string id)
+            {
+                string game=id.StartsWith("fabric-")?id[7..]:id.StartsWith("forge-")?id[6..]:id;
+                if(installedNames.Contains(id)) game=GameProfiles.Read(App.GameDir,id)?["inheritsFrom"]?.ToString() ?? game;
+                return releaseDates.GetValueOrDefault(game,DateTimeOffset.MinValue);
+            }
+            var dates=allVers.ToDictionary(v=>v.id,v=>Released(v.id),StringComparer.OrdinalIgnoreCase);
+            // Mojang dates keep old alpha names (rd-20090515) below current releases.
             allVers.Sort((a, b) => {
+                int dateOrder=dates[b.id].CompareTo(dates[a.id]);
+                if(dateOrder!=0) return dateOrder;
                 var partsA = GetVersionNumbers(a.id);
                 var partsB = GetVersionNumbers(b.id);
                 for (int i = 0; i < Math.Max(partsA.Count, partsB.Count); i++)
@@ -295,7 +307,7 @@ namespace MistikLauncher.Pages
                             ConfigManager.Save(_main.Config);
                             _main.PopulateVersionBox();
                             RenderList();
-                            MessageBox.Show($"{vid} secildi.", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
+                            MessageBox.Show(Localization.Language=="en"?$"{vid} selected.":$"{vid} seçildi.", Localization.T("Basarili"), MessageBoxButton.OK, MessageBoxImage.Information);
                         };
                     }
                     var delBtn = PageHelpers.MkBtn("SIL", "#FF4B4B", 60); delBtn.Margin = new Thickness(8, 0, 0, 0);

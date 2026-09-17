@@ -14,6 +14,19 @@ public static class GameProfiles
         (json["libraries"] as JArray)?.Any(x => x["name"]?.ToString().StartsWith("net.minecraftforge:",StringComparison.Ordinal)==true)==true ? "Forge" :
         (json["libraries"] as JArray)?.Any(x => x["name"]?.ToString().StartsWith("net.fabricmc:",StringComparison.Ordinal)==true)==true ? "Fabric" : "Vanilla";
     public static bool IsInstalled(string root,string id) => Installed(root,id,new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+    public static int RequiredJava(string root,string id)
+    {
+        var seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int required=8;
+        while(seen.Count<16 && seen.Add(id))
+        {
+            var json=Read(root,id); if(json==null) break;
+            if(int.TryParse(json["javaVersion"]?["majorVersion"]?.ToString(),out int major) && major>=8 && major<=100) required=Math.Max(required,major);
+            var parent=json["inheritsFrom"]?.ToString(); if(string.IsNullOrEmpty(parent)) break;
+            id=parent;
+        }
+        return required;
+    }
     static bool Installed(string root,string id,HashSet<string> seen)
     {
         if(seen.Count>=16 || !seen.Add(id)) return false;

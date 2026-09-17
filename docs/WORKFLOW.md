@@ -1,6 +1,6 @@
 # Modernization workflow report
 
-**Delivered: a tested protected portable preview. The original request is not fully complete.** Full legacy localization and actual gameplay/server testing remain outstanding; the preview branch is published.
+**Delivered: a tested protected portable preview. The original request is not fully complete.** Vanilla/Forge gameplay and an isolated server were tested; full legacy localization and broader feature checks remain outstanding. Latest seven-stage update: [PC validation, RGB fix and signing — preview.7](PC-TESTS-PREVIEW-7.md). The earlier sections below record historical results.
 
 ## Step 1 — Audit and bug fixing
 

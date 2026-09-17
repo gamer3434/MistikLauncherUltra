@@ -1,8 +1,20 @@
 # Mistik Launcher 6 — Modernization preview / Modernizasyon önizlemesi
 
-**Preview, not a completed stable replacement.** Home, settings and navigation are bilingual. Full legacy-page translation and actual Minecraft/mod/server verification remain outstanding. GitHub access is authenticated; the preview is published on `codex/modernization-preview`.
+**Preview, not a completed stable replacement.** Home, settings and navigation are bilingual. Actual Vanilla/Forge gameplay and an isolated server were tested; full legacy translation and broader feature verification remain outstanding. Preview source is published on `codex/modernization-preview`.
 
-**Önizleme; kararlı sürümün tamamlanmış yeni versiyonu değildir.** Ana panel, ayarlar ve gezinme iki dillidir. Eski sayfaların tam çevirisi ile gerçek oyun/mod/sunucu testleri henüz tamamlanmadı. GitHub erişimi doğrulandı; önizleme `codex/modernization-preview` dalına gönderildi.
+**Önizleme; tamamlanmış kararlı sürüm değildir.** Gerçek Vanilla/Forge oyun ve ayrı sunucu testleri yapıldı. Eski sayfaların tam çevirisi ve daha geniş özellik testleri sürüyor. Kaynak `codex/modernization-preview` dalında.
+
+### Güncel sürüm / Current version — 6.0.0-preview.7
+
+Yalnızca çıkış düğmesinde dairesel aydınlatma: Tema, RGB, Gökkuşağı, Kapalı. Ayarlar → Pencere düğmesi stili altında seçin; RGB için `#00CCFF` gibi bir `#RRGGBB` değeri girin. Geçerli renk anında uygulanır. Çeviri sırasında seçim kutularının eski değerde kalmasına neden olan WPF bağlantı hatası düzeltildi. Minecraft açılamazsa veya sıfırdan farklı kodla kapanırsa launcher geri açılıp hata kodu, açıklama ve kanıt bulunan mod/rapor yollarını gösterir. Tek başına çıkış kodu kesin neden sayılmaz.
+
+Circular lighting appears only on close: Theme, RGB, Rainbow, Off. Select it under Settings → Window button style; enter an RGB hex such as `#00CCFF`. Valid color edits apply immediately. Fixed translation breaking live selector bindings. Startup failure/nonzero game exit restores the launcher and displays diagnostics, actionable codes and mod/report paths where evidence exists.
+
+**192** protected-package checks; **199** live Firebase/Modrinth checks. Real Vanilla 1.21.11 and Forge 61.2.0 gameplay passed. Free local test signatures cover own launcher EXE/DLL and updater EXE; **not publicly trusted, no guarantee against AV/SmartScreen warnings**. No root certificate is installed. / Yerel test imzası genel yayıncı güveni sağlamaz; antivirüs uyarılarının kalkacağı garanti edilmez. Güven deposuna sertifika eklenmez.
+
+Details, all seven workflow stages and remaining issues / Ayrıntılar, yedi çalışma aşaması ve eksikler: [PC validation and signing report](docs/PC-TESTS-PREVIEW-7.md).
+
+Optional signing / İsteğe bağlı imzalama: `./scripts/Build-Protected.ps1 -SigningThumbprint YOUR_CERTIFICATE_THUMBPRINT`. Use `-AllowLocalTestSignature` only for an explicitly untrusted local test certificate in your current-user personal store. Private keys are never copied into the package. / Yalnızca açıkça güvenilir olmayan yerel test sertifikası için `-AllowLocalTestSignature` kullanın. Özel anahtar pakete kopyalanmaz. The local test package is not timestamped / Yerel test paketi zaman damgalı değildir.
 
 ## Türkçe
 
@@ -19,7 +31,7 @@ Windows x64 için `artifacts/MistikLauncher-6-preview-win-x64.zip` paketini ayr�
 3. Sürümler sayfasından oyun sürümünü indirin, alt çubukta seçin.
 4. Uyumlu modları seçip Oyunu başlat düğmesini kullanın.
 
-Gerçek oyun indirme/başlatma, mod taşıma, cilt ve sunucu çalıştırma bu değişiklikte uçtan uca test edilmedi. Microsoft hesabı kimlik doğrulaması eklenmedi. Minecraft ve mod lisanslarına uyun.
+Vanilla/Forge dünya testi ve ayrı yerel sunucu doğrulandı. Her mod kombinasyonu, Microsoft/Ely.by girişi ve genel tüneller test edilmedi; Auto-MCS sunucu oluşturma sihirbazı hata verdi. Microsoft hesabı kimlik doğrulaması eklenmedi. Minecraft ve mod lisanslarına uyun.
 
 ### Derleme ve doğrulama
 
@@ -48,7 +60,7 @@ Extract `artifacts/MistikLauncher-6-preview-win-x64.zip` to a dedicated Windows 
 3. Download a version under Versions and select it in the bottom bar.
 4. Choose compatible mods and select Launch game.
 
-Actual game downloads/launches, mod migration, skins and server execution were not tested end to end. Microsoft account authentication was not added. Respect Minecraft and mod licenses.
+Vanilla/Forge gameplay and an isolated local server were verified. Every mod combination, Microsoft/Ely.by login and public tunnels remain untested; the third-party Auto-MCS server wizard failed. Microsoft account authentication was not added. Respect Minecraft and mod licenses.
 
 ### Build
 

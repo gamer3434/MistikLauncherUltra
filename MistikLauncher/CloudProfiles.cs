@@ -86,7 +86,7 @@ public sealed class CloudProfiles
         }
         return result;
     }
-    static readonly string[] Fields={"user","version","ram","lang","accent","window_buttons","quick_links","skin_type","auth_type","opt_turbo","opt_fps","auto_close","auto_mcs_update","launcher_auto_update"};
+    static readonly string[] Fields={"user","version","ram","lang","accent","window_buttons","close_lighting","close_rgb","quick_links","skin_type","auth_type","opt_turbo","opt_fps","auto_close","auto_mcs_update","launcher_auto_update"};
     public static void ValidateSkin(byte[] bytes)
     {
         if(bytes.Length<33 || bytes.Length>65536 || !bytes.AsSpan(0,8).SequenceEqual(new byte[]{137,80,78,71,13,10,26,10}) || System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(bytes.AsSpan(16,4))!=64 || !new[]{32,64}.Contains(System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(bytes.AsSpan(20,4)))) throw new InvalidDataException(Localization.T("cloudSkinInvalid"));
