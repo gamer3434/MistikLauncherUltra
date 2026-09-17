@@ -9,10 +9,12 @@ try {
     [xml]$projectXml = Get-Content MistikLauncher/MistikLauncher.csproj
     $version = [string]$projectXml.SelectSingleNode("/Project/PropertyGroup/Version").InnerText
     $portableDir = Join-Path $repo "artifacts/portable-$version"
+    if (Test-Path -LiteralPath $portableDir) { Remove-Item -LiteralPath $portableDir -Recurse -Force }
     & $Dotnet publish MistikLauncher/MistikLauncher.csproj -c Release --self-contained true -p:PublishSingleFile=false "-p:BaseOutputPath=$buildRoot/" -o $portableDir
     if ($LASTEXITCODE) { throw 'Build failed / Derleme başarısız' }
     $inputPath = (Resolve-Path $portableDir).Path
     $outputPath = Join-Path $repo artifacts/obfuscated
+    if (Test-Path -LiteralPath $outputPath) { Remove-Item -LiteralPath $outputPath -Recurse -Force }
     New-Item -ItemType Directory -Force $outputPath | Out-Null
     # Find framework directories without assuming a specific SDK patch version.
     $runtimeLines = & $Dotnet --list-runtimes
@@ -62,9 +64,12 @@ try {
         & "$PSScriptRoot/Sign-Release.ps1" -PackagePath $inputPath -Thumbprint $SigningThumbprint -AllowLocalTestSignature:$AllowLocalTestSignature
         Copy-Item "$inputPath/MistikLauncher.dll" "$validationBin/MistikLauncher.dll" -Force
     }
-    Get-ChildItem $inputPath -File | Where-Object { $_.Name -notin @('checksums.json','update-manifest.json') } | Get-FileHash -Algorithm SHA256 |
-        Select-Object @{Name='File'; Expression={Split-Path $_.Path -Leaf}}, Hash |
-        ConvertTo-Json | Set-Content "$inputPath/checksums.json" -Encoding utf8
+    $checksums = @(Get-ChildItem $inputPath -File -Recurse |
+        Where-Object { $_.Name -notin @('checksums.json','update-manifest.json') } |
+        ForEach-Object {
+            @{ File = [IO.Path]::GetRelativePath($inputPath, $_.FullName).Replace('\','/'); Hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash }
+        })
+    $checksums | ConvertTo-Json -Depth 3 | Set-Content "$inputPath/checksums.json" -Encoding utf8
     [xml]$projectXml = Get-Content MistikLauncher/MistikLauncher.csproj
     $version = [string]$projectXml.SelectSingleNode("/Project/PropertyGroup/Version").InnerText
     $files = @(Get-ChildItem $inputPath -File -Recurse | Where-Object { $_.Name -ne 'update-manifest.json' } | ForEach-Object {
@@ -73,7 +78,7 @@ try {
     @{ Product='MistikLauncher'; Version=$version; Files=$files } | ConvertTo-Json -Depth 5 | Set-Content "$inputPath/update-manifest.json" -Encoding utf8
     & $Dotnet "$validationBin/Validation.dll" artifacts/screenshots --verify-package $inputPath --helper-smoke artifacts/helper/MistikUpdater.exe artifacts/fixture/MistikLauncher.exe
     if ($LASTEXITCODE) { throw "Packaged manifest verification failed" }
-    Compress-Archive -Path "$inputPath/*" -DestinationPath artifacts/MistikLauncher-6-preview-win-x64.zip -Force
-    Copy-Item artifacts/MistikLauncher-6-preview-win-x64.zip "artifacts/MistikLauncher-$version-win-x64.zip" -Force
+    $zipPath = "artifacts/MistikLauncher-$version-win-x64.zip"
+    Compress-Archive -Path "$inputPath/*" -DestinationPath $zipPath -Force
     Write-Host 'Protected portable package ready / Korumalı taşınabilir paket hazır.'
 } finally { Pop-Location }

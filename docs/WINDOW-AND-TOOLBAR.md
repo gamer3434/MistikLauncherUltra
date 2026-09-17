@@ -6,7 +6,7 @@
 
 **Uygulama / Implementation:** 38×24 dikdörtgen, 5 piksel köşe yarıçapı ve simetrik vektör çarpı. Tema, RGB · renk geçişi, Kapalı seçenekleri; çerçeve ve ışık eşzamanlı sekiz saniyelik döngü kullanır. Diğer pencere düğmelerinde aydınlatma yoktur. / 38×24 rectangle, radius 5 and symmetric vector cross. Native WPF keyframes animate only the close outline/glow together.
 
-**Sonuç / Conclusion:** Korumalı yerel test imzalı paket **209** kontrolü geçti; gerçek zaman içinde renk değişimi ve ışık eşleşmesi iki dilde doğrulandı. / Protected locally test-signed package passed 209 checks, including actual color change over time and synchronized glow in both languages.
+**Sonuç / Conclusion:** Güncel imzasız korumalı paket **209** kontrolü geçti; gerçek zaman içinde renk değişimi ve ışık eşleşmesi iki dilde doğrulandı. / The current unsigned protected package passed **209** checks, including actual color change over time and synchronized glow in both languages.
 
 **Gerekçe / Reasoning:** Kullanıcının RedX ekran görüntüleri koyu, sakin yüzeyler ve renkli seçili öğeler gösteriyor. Üst çubuk, yan menü ve başlatma alanı aynı temayı kullanmalı; kişiselleştirme temel pencere işlevlerini korumalı.
 
