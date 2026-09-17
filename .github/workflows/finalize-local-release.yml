@@ -1,0 +1,20 @@
+name: Finalize locally signed release
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  assemble:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify, assemble and publish exact locally signed binaries
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+        run: ./scripts/Finalize-LocalRelease.ps1 -ReleaseId $env:RELEASE_ID
