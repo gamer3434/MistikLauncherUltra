@@ -140,6 +140,12 @@ Midnight navy, blue surfaces, turquoise accents, consistent typography and a Min
 
 Protected portable validation: **136 checks** including package hashes and updater process handoff. Protected live Firebase validation: **143 checks** including authenticated upload/restore, cross-user denial and invalid update rejection. Both runs cover Turkish and English UI. Actual Minecraft/Forge gameplay and multiple-monitor taskbar behavior still require manual verification.
 
+**6.0.0-preview.6:** Mod sürüm taşımasındaki dosya kaybı ve çakışmalar, NeoForge algısı, yanlış otomatik askılama, bulut skin/oturum doğrulaması ve eski sürüm etiketi düzeltildi. Mod indirmeleri SHA-512 ile doğrulanır, atomik yüklenir ve önceki dosyalar yedeklenir. Kapalı modun durumu korunur. Oturumlar DPAPI ile şifreli, dağıtım DLL'si ad/metin gizleme ile korumalıdır. [Hata ve koruma raporu](docs/AUDIT-PREVIEW-6.md).
+
+**6.0.0-preview.6:** Fixes destructive mod transfers, collisions, NeoForge classification, false suspension, cloud skin/session validation and stale version labels. Mod downloads require SHA-512 verification and use atomic installation with backups, preserving disabled state. DPAPI encrypts sessions; the distributed DLL uses name/string obfuscation. [Audit and protection report](docs/AUDIT-PREVIEW-6.md).
+
+Latest protected package: **159 checks passed**. Protected live Firebase + official Modrinth installation: **167 checks passed**, without executing the downloaded mod. The broader stable-release limitations above still apply.
+
 Üst kısayol çubuğunu ve 16 pencere düğmesi görünümünü Ayarlardan kişiselleştirebilirsiniz. Temalar üst çubuğa, yan menüye ve başlatma alanına uygulanır. [Pencere ve üst çubuk rehberi](docs/WINDOW-AND-TOOLBAR.md).
 
 Customize the top shortcut bar and 16 window control appearances in Settings. Themes coordinate toolbar, sidebar and launch actions. [Window and toolbar guide](docs/WINDOW-AND-TOOLBAR.md).

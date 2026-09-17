@@ -16,6 +16,9 @@ static class CloudTests
         var secret=Encoding.UTF8.GetBytes("fixture refresh token");
         var encrypted=WindowsSecret.Transform(secret,true);
         Require(!encrypted.SequenceEqual(secret) && WindowsSecret.Transform(encrypted,false).SequenceEqual(secret),"Windows session encryption round trip");
+        var tampered=(byte[])encrypted.Clone(); tampered[^1]^=1; bool tamperRejected=false;
+        try { WindowsSecret.Transform(tampered,false); } catch(System.ComponentModel.Win32Exception) { tamperRejected=true; }
+        Require(tamperRejected,"tampered encrypted session cannot be decrypted");
         var bitmap=BitmapSource.Create(64,64,96,96,PixelFormats.Bgra32,null,new byte[64*64*4],64*4);
         var encoder=new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
         string skin=Path.Combine(root,"skin.png"); using(var stream=File.Create(skin)) encoder.Save(stream);
@@ -26,13 +29,23 @@ static class CloudTests
         profile["role"]="Admin"; profile["server_dir"]="C:\\Windows";
         var restored=client.Apply(profile,new LauncherConfig());
         Require(restored.Role=="User" && restored.Ram==32 && File.ReadAllBytes(restored.SkinUser).SequenceEqual(File.ReadAllBytes(skin)),"cloud restore preserves bounded skin bytes and ignores extra fields");
+        var before=File.ReadAllBytes(restored.SkinUser);
+        File.WriteAllText(restored.SkinUser,"existing local skin"); var invalid=(JObject)profile.DeepClone(); invalid["ram"]=new JObject();
+        bool invalidRejected=false; try { client.Apply(invalid,new LauncherConfig()); } catch { invalidRejected=true; }
+        Require(invalidRejected && File.ReadAllText(restored.SkinUser)=="existing local skin","invalid cloud settings never replace existing local skin");
+        File.WriteAllBytes(restored.SkinUser,before);
+        var damagedSession=Path.Combine(root,"invalid-session"); Directory.CreateDirectory(damagedSession);
+        File.WriteAllBytes(Path.Combine(damagedSession,"cloud-session.dat"),WindowsSecret.Transform(Encoding.UTF8.GetBytes("{\"email\":\"fake@example.invalid\"}"),true));
+        Require(!new CloudProfiles(damagedSession).SignedIn,"incomplete encrypted session remains signed out");
+        var unsafeVersion=new LauncherConfig { Version="../../outside" }; ConfigManager.Normalize(unsafeVersion);
+        Require(unsafeVersion.Version=="1.21","unsafe configuration version cannot escape game directory");
         bool rejected=false; try { CloudProfiles.ValidateSkin(new byte[33]); } catch(InvalidDataException) { rejected=true; }
         Require(rejected,"malformed cloud skin rejected");
         File.Delete(skin);
         Require(CloudProfiles.Snapshot(config)["skin_type"]!.ToString()=="default","missing local skin uses valid default cloud profile");
         config.QuickLinks.Clear();
         Require(client.Apply(CloudProfiles.Snapshot(config),new LauncherConfig()).QuickLinks.Count==0,"empty toolbar survives cloud snapshot and restore");
-        return 6;
+        return 10;
     }
     public static async Task<int> Live(string root)
     {

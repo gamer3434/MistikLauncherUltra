@@ -670,7 +670,7 @@ namespace MistikLauncher.Pages
         StackPanel _installedPanel = null!;
         TextBlock installedHelp=null!;
         public void RefreshLanguage() { installedHelp.Text=Localization.T("modToggleHelp"); RenderInstalledMods(); }
-        static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
+        static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30),MaxResponseContentBufferSize=128*1024*1024 };
 
         public ModManagerPage(MainWindow main)
         {
@@ -1149,8 +1149,8 @@ namespace MistikLauncher.Pages
                 bool alreadyExists = File.Exists(destFile);
                 if (!alreadyExists)
                 {
-                    var bytes = await Http.GetByteArrayAsync(fileUrl);
-                    await File.WriteAllBytesAsync(destFile, bytes);
+                    var bytes = await Http.GetByteArrayAsync(ModFiles.DownloadUrl(fileUrl));
+                    ModFiles.Install(App.ModsDir,fname,bytes,targetVersionObj["files"]?[0]?["hashes"]?["sha512"]?.ToString());
                     App.Log($"Mod installed directly (compatible with {mcVersion}): {fname}");
 
                     // Firebase Analytics: Mod kurulum istatistiği
@@ -1228,14 +1228,15 @@ namespace MistikLauncher.Pages
 
                     var gameVers = latestVersion["game_versions"] as JArray;
                     var targetGameVer = gameVers != null && gameVers.Count > 0 ? gameVers[0].ToString() : "1.20.1";
+                    if(!GameProfiles.SafeId(targetGameVer)) throw new IOException(Localization.T("modToggleInvalid"));
 
                     // Save to compatibility pool under target version directory
                     var poolDir = Path.Combine(App.AppData, "mods_pool", targetGameVer);
                     Directory.CreateDirectory(poolDir);
                     var destFile = Path.Combine(poolDir, fname);
 
-                    var bytes = await Http.GetByteArrayAsync(fileUrl);
-                    await File.WriteAllBytesAsync(destFile, bytes);
+                    var bytes = await Http.GetByteArrayAsync(ModFiles.DownloadUrl(fileUrl));
+                    ModFiles.Install(poolDir,fname,bytes,latestVersion["files"]?[0]?["hashes"]?["sha512"]?.ToString());
                     App.Log($"Mod queued in compatibility pool for {targetGameVer}: {fname}");
 
                     MessageBox.Show($"'{name}' modu şu anki oyun sürümünüz ({mcVersion}) ile uyumsuz!\n\nUyumlu olduğu '{targetGameVer}' sürümünün bekleme klasörüne (mods_pool/{targetGameVer}) indirildi.\n\nOyun sürümünüzü '{targetGameVer}' yaptığınızda otomatik olarak aktif edilecektir!", "Sürüm Beklemeye Alındı", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -1307,8 +1308,8 @@ namespace MistikLauncher.Pages
                         // Zaten kuruluysa atla
                         if (!IsModAlreadyInstalled(slug, name))
                         {
-                            var bytes = await Http.GetByteArrayAsync(fileUrl);
-                            await File.WriteAllBytesAsync(Path.Combine(App.ModsDir, fname), bytes);
+                            var bytes = await Http.GetByteArrayAsync(ModFiles.DownloadUrl(fileUrl));
+                            ModFiles.Install(App.ModsDir,fname,bytes,targetVersionObj["files"]?[0]?["hashes"]?["sha512"]?.ToString());
                             App.Log($"Modpack [{packName}] - Mod kuruldu: {fname} (MC {matchedVer} ile uyumlu)");
                             successCount++;
                         }
@@ -1639,7 +1640,7 @@ namespace MistikLauncher.Pages
                 }
 
                 // 2. Mevcut modları güvenle askıya al (SyncModsForCurrentVersion)
-                _main.SyncModsForCurrentVersion();
+                if(!_main.SyncModsForCurrentVersion()) throw new IOException(Localization.T("modSyncFailed"));
 
                 // 3. Launcher ana sürümünü hedef sürüme geçir (VerBox listesinde arayarak)
                 string matchedVerName = "";
@@ -1657,7 +1658,7 @@ namespace MistikLauncher.Pages
                         }
                         else if (loader.Equals("Forge", StringComparison.OrdinalIgnoreCase))
                         {
-                            if (itemStr.Contains("forge", StringComparison.OrdinalIgnoreCase) && itemStr.Contains(targetVer))
+                            if (itemStr.Contains("forge", StringComparison.OrdinalIgnoreCase) && !itemStr.Contains("neoforge",StringComparison.OrdinalIgnoreCase) && itemStr.Contains(targetVer))
                             {
                                 matchedVerName = itemStr;
                                 break;
@@ -1681,22 +1682,22 @@ namespace MistikLauncher.Pages
 
                     if (string.IsNullOrEmpty(matchedVerName))
                     {
-                        matchedVerName = targetVer; // fallback
+                        throw new IOException(Localization.T("modSyncFailed"));
                     }
 
                     _main.VerBox.SelectedItem = matchedVerName;
+                    var profile=GameProfiles.Read(App.GameDir,matchedVerName);
+                    if(profile==null || GameProfiles.Kind(profile)!=loader) throw new IOException(Localization.T("modSyncFailed"));
                     _main.Config.Version = matchedVerName;
-                    _main.Config.LastSyncedVersion = matchedVerName; // Force sync to this new version
+                    if(!_main.SyncModsForCurrentVersion()) throw new IOException(Localization.T("modSyncFailed"));
                     ConfigManager.Save(_main.Config);
                     _main.StatusLbl.Text = $"Surum: {matchedVerName}";
                 });
 
-                // 4. Mod klasörünü temizle (Sürüm değiştiği için taze indirme)
-                Directory.CreateDirectory(App.ModsDir);
-                foreach (var jar in Directory.GetFiles(App.ModsDir, "*.jar"))
-                {
-                    try { File.Delete(jar); } catch { }
-                }
+                // Preserve the target version's existing set before downloading replacements.
+                var migrationBackup=Path.Combine(App.AppData,"mods_pool","migration-backup-"+Guid.NewGuid().ToString("N"));
+                ModFiles.SyncPools(App.ModsDir,migrationBackup,null);
+                App.Log("Mod migration backup: "+migrationBackup);
 
                 // 5. Her bir mod için Modrinth'ten uyumlu sürümü bul ve indir
                 int downloadedCount = 0;
@@ -1726,8 +1727,8 @@ namespace MistikLauncher.Pages
                             var fname   = targetVersionObj["files"]?[0]?["filename"]?.ToString() ?? $"{id}.jar";
                             if (!string.IsNullOrEmpty(fileUrl))
                             {
-                                var bytes = await Http.GetByteArrayAsync(fileUrl);
-                                await File.WriteAllBytesAsync(Path.Combine(App.ModsDir, fname), bytes);
+                                var bytes = await Http.GetByteArrayAsync(ModFiles.DownloadUrl(fileUrl));
+                                ModFiles.Install(App.ModsDir,fname,bytes,targetVersionObj["files"]?[0]?["hashes"]?["sha512"]?.ToString());
                                 downloadedCount++;
                                 App.Log($"Bulk Migrator: Successfully migrated and installed mod: {fname}");
                             }

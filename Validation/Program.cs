@@ -22,6 +22,7 @@ class Program
             Environment.SetEnvironmentVariable("MISTIK_DATA_DIR", testRoot);
             Directory.CreateDirectory(testRoot);
             checks += ModToggleTests.Run(Path.Combine(testRoot,"mod-toggle"));
+            if(args.Contains("--live-mod")) checks+=ModToggleTests.Live(Path.Combine(testRoot,"official-mod")).GetAwaiter().GetResult();
             checks += ForgeTests.Run(Path.Combine(testRoot,"forge-tests"));
             checks += AutoMcsTests.Run(testRoot).GetAwaiter().GetResult();
             checks += LauncherUpdateTests.Run(testRoot).GetAwaiter().GetResult();
@@ -70,12 +71,18 @@ class Program
             checks+=CloudTests.Run(Path.Combine(testRoot,"cloud-unit"));
             if(args.Contains("--live-cloud")) checks+=CloudTests.Live(Path.Combine(testRoot,"cloud-live")).GetAwaiter().GetResult();
             var window=new MainWindow { Width=1200, Height=820 };
+            Check(MainWindow.SkinTextureUrl("http://textures.minecraft.net/texture/test")=="https://textures.minecraft.net/texture/test" && MainWindow.SkinTextureUrl("https://ely.by.attacker.invalid/test")==null && MainWindow.SkinTextureUrl("file:///C:/Windows/test.png")==null,"skin texture URLs enforce trusted HTTPS hosts");
+            Check(window.FetchAvatarAsync("../../outside").GetAwaiter().GetResult()==null,"avatar username traversal is rejected before network or cache access");
             Directory.CreateDirectory(App.ModsDir);
             string disabledMod=Path.Combine(App.ModsDir,"kept.jar.disabled"); File.WriteAllText(disabledMod,"kept bytes");
             window.Config.LastSyncedVersion="1.20.1-forge-47.4.10"; window.Config.Version="1.19.2-forge-43.5.0"; window.SyncModsForCurrentVersion();
             Check(File.Exists(Path.Combine(testRoot,"mods_pool","1.20.1_forge","kept.jar.disabled")),"disabled mod state follows original version pool");
             window.Config.Version="1.20.1-forge-47.4.10"; window.SyncModsForCurrentVersion();
             Check(File.ReadAllText(disabledMod)=="kept bytes" && !File.Exists(disabledMod[..^9]),"returning to a version preserves disabled mod state");
+            var collision=Path.Combine(testRoot,"mods_pool","1.20.1_forge","kept.jar.disabled"); File.WriteAllText(collision,"existing pool copy");
+            window.Config.Version="1.19.2-forge-43.5.0";
+            Check(!window.SyncModsForCurrentVersion() && window.Config.LastSyncedVersion=="1.20.1-forge-47.4.10" && File.ReadAllText(disabledMod)=="kept bytes" && File.ReadAllText(collision)=="existing pool copy","failed launcher mod sync preserves files and retains previous version state");
+            File.Delete(collision); window.Config.Version="1.20.1-forge-47.4.10";
             var modPage=new MistikLauncher.Pages.ModManagerPage(window);
             var installedMods=((StackPanel)((ScrollViewer)modPage.Content).Content).Children.OfType<StackPanel>().Last();
             Button ModToggleButton() => (Button)((Grid)((Border)installedMods.Children[0]).Child).Children.OfType<StackPanel>().Last().Children[0];
@@ -83,6 +90,20 @@ class Program
             Check(File.Exists(disabledMod[..^9]) && !File.Exists(disabledMod),"installed mod Enable button applies immediately");
             ModToggleButton().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(File.Exists(disabledMod) && File.ReadAllText(disabledMod)=="kept bytes","installed mod Disable button preserves file and refreshes row");
+            void ModFixture(string path,params (string name,string content)[] entries) {
+                using var archive=System.IO.Compression.ZipFile.Open(path,System.IO.Compression.ZipArchiveMode.Create);
+                foreach(var entry in entries) { using var writer=new StreamWriter(archive.CreateEntry(entry.name).Open()); writer.Write(entry.content); }
+            }
+            void Guard(string loader) => typeof(MainWindow).GetMethod("SuspendIncompatibleMods",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!.Invoke(window,new object[]{"1.20.1",loader});
+            var openRange=Path.Combine(App.ModsDir,"open-range.jar");
+            ModFixture(openRange,("fabric.mod.json","{\"depends\":{\"minecraft\":\">=1.19\"}}")); Guard("fabric");
+            Check(File.Exists(openRange),"open-ended version constraints do not falsely suspend compatible mods"); File.Delete(openRange);
+            var universal=Path.Combine(App.ModsDir,"universal.jar");
+            ModFixture(universal,("fabric.mod.json","{}"),("META-INF/mods.toml","modLoader=\"javafml\"")); Guard("forge");
+            Check(File.Exists(universal),"multi-loader mod metadata is preserved instead of guessed"); File.Delete(universal);
+            var neo=Path.Combine(App.ModsDir,"neo-only.jar");
+            ModFixture(neo,("META-INF/neoforge.mods.toml","modLoader=\"javafml\"")); Guard("forge");
+            Check(!File.Exists(neo) && File.Exists(Path.Combine(testRoot,"mods_pool","incompatible","neo-only.jar")),"NeoForge-only mod is safely suspended from Forge without deletion");
             foreach(var style in MainWindow.WindowButtonStyles) {
                 window.SetWindowButtons(style);
                 Check(ConfigManager.Load().WindowButtons==style && ((StackPanel)window.FindName("CaptionButtons")).Children.Count==3,"window button style renders and persists: "+style);
@@ -97,6 +118,7 @@ class Program
             Check(((DockPanel)window.FindName("WindowSurface")).Margin.Left==6 && window.WindowStyle==WindowStyle.None,"maximized window reserves resize frame and uses one title bar");
             ((Button)caption.Children[2]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(window.WindowState==WindowState.Normal,"custom window button restores");
+            Check(App.LocalVersion=="v"+window.LauncherUpdates.CurrentVersion,"all local version labels match actual compiled version");
             Check(((DockPanel)window.FindName("WindowSurface")).Margin.Left==0,"restored window removes maximized frame inset");
             ((Button)window.FindName("ProfileButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
             Check(((Frame)window.FindName("MainFrame")).Content is MistikLauncher.Pages.ModernSettingsPage,"top-right player profile opens settings");
@@ -137,7 +159,7 @@ class Program
             forgeJson["arguments"]=Newtonsoft.Json.Linq.JObject.Parse("{\"jvm\":[\"--add-opens\",\"java.base/java.lang=ALL-UNNAMED\",\"-DlibraryDirectory=${library_directory}\"],\"game\":[\"--launchTarget\",\"forgeclient\",\"--fml.forgeVersion\",\"47.4.10\"]}");
             File.WriteAllText(forgePath,forgeJson.ToString());
             var launch=(string)typeof(MainWindow).GetMethod("BuildLaunchArgs",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!.Invoke(window,new object?[]{"1.20.1-forge-47.4.10",4096,Path.Combine(App.GameDir,"natives"),null,null})!;
-            Check(launch.Contains("--launchTarget") && launch.Contains("forgeclient") && launch.Contains("--add-opens") && !launch.Contains("${"),"complete Forge launch command retains bootstrap parameters and expands paths");
+            Check(launch.Contains("--launchTarget") && launch.Contains("forgeclient") && launch.Contains("--add-opens") && !launch.Contains("${") && !launch.Contains("onlineMode=false") && !launch.Contains("online-mode=false"),"complete Forge launch command retains bootstrap parameters without forcing server authentication off");
             string output = args.Length>0 ? Path.GetFullPath(args[0]) : Path.Combine(Environment.CurrentDirectory,"docs","screenshots");
             Directory.CreateDirectory(output);
             foreach (var code in new[] { "tr", "en" })

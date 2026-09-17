@@ -22,12 +22,26 @@ public sealed class CloudProfiles
     public CloudProfiles(string? dataDirectory=null)
     {
         directory=dataDirectory??App.AppData;
-        try { session=JObject.Parse(Encoding.UTF8.GetString(WindowsSecret.Transform(File.ReadAllBytes(Path.Combine(directory,"cloud-session.dat")),false))); Status="cloudReady"; } catch { }
+        try {
+            string path=Path.Combine(directory,"cloud-session.dat");
+            if(new FileInfo(path).Length>65536) return;
+            byte[] plain=WindowsSecret.Transform(File.ReadAllBytes(path),false);
+            try { var saved=JObject.Parse(Encoding.UTF8.GetString(plain)); ValidateSession(saved); session=saved; Status="cloudReady"; }
+            finally { System.Security.Cryptography.CryptographicOperations.ZeroMemory(plain); }
+        } catch { }
     }
-    void SaveSession()
+    static void ValidateSession(JObject value)
     {
+        if(value["expiresAt"]?.Type!=JTokenType.Integer || !System.Text.RegularExpressions.Regex.IsMatch(value["localId"]?.ToString()??"",@"^[A-Za-z0-9_-]{1,128}$") ||
+            new[]{"idToken","refreshToken"}.Any(k=>value[k]?.Type!=JTokenType.String || string.IsNullOrWhiteSpace(value[k]!.ToString()))) throw new InvalidDataException(Localization.T("cloudSignInNeeded"));
+    }
+    void SaveSession(JObject value)
+    {
+        ValidateSession(value);
         Directory.CreateDirectory(directory); string path=Path.Combine(directory,"cloud-session.dat");
-        File.WriteAllBytes(path+".tmp",WindowsSecret.Transform(Encoding.UTF8.GetBytes(session!.ToString(Formatting.None)),true)); File.Move(path+".tmp",path,true);
+        byte[] plain=Encoding.UTF8.GetBytes(value.ToString(Formatting.None));
+        try { File.WriteAllBytes(path+".tmp",WindowsSecret.Transform(plain,true)); File.Move(path+".tmp",path,true); }
+        finally { System.Security.Cryptography.CryptographicOperations.ZeroMemory(plain); }
     }
     public async Task SignInAsync(string? email,string? password,bool create)
     {
@@ -40,7 +54,7 @@ public sealed class CloudProfiles
             var result=JObject.Parse(await response.Content.ReadAsStringAsync());
             if(!response.IsSuccessStatusCode) throw new InvalidOperationException(Localization.T("cloudAuthFailed"));
             result["expiresAt"]=DateTimeOffset.UtcNow.AddSeconds(int.Parse(result["expiresIn"]!.ToString())-60).ToUnixTimeSeconds();
-            session=result; SaveSession(); Status="cloudReady"; Changed?.Invoke();
+            SaveSession(result); session=result; Status="cloudReady"; Changed?.Invoke();
         } finally { gate.Release(); }
     }
     async Task<string> ProfileUrl()
@@ -50,7 +64,8 @@ public sealed class CloudProfiles
             using var response=await http.PostAsync($"https://securetoken.googleapis.com/v1/token?key={Key}",new FormUrlEncodedContent(new Dictionary<string,string> { ["grant_type"]="refresh_token",["refresh_token"]=session["refreshToken"]!.ToString() }));
             if(!response.IsSuccessStatusCode) throw new InvalidOperationException(Localization.T("cloudSignInNeeded"));
             var result=JObject.Parse(await response.Content.ReadAsStringAsync());
-            session["idToken"]=result["id_token"]; session["refreshToken"]=result["refresh_token"]; session["expiresAt"]=DateTimeOffset.UtcNow.AddSeconds(int.Parse(result["expires_in"]!.ToString())-60).ToUnixTimeSeconds(); SaveSession();
+            var refreshed=(JObject)session.DeepClone();
+            refreshed["idToken"]=result["id_token"]; refreshed["refreshToken"]=result["refresh_token"]; refreshed["expiresAt"]=DateTimeOffset.UtcNow.AddSeconds(int.Parse(result["expires_in"]!.ToString())-60).ToUnixTimeSeconds(); SaveSession(refreshed); session=refreshed;
         }
         return $"{Database}/launcherProfiles/{Uri.EscapeDataString(session["localId"]!.ToString())}.json?auth={Uri.EscapeDataString(session["idToken"]!.ToString())}";
     }
@@ -89,11 +104,16 @@ public sealed class CloudProfiles
         if(profile["quick_links"]?.Type==JTokenType.String) merged["quick_links"]=new JArray(profile["quick_links"]!.ToString().Split(',',StringSplitOptions.RemoveEmptyEntries));
         else if(profile["quick_links"] is JArray links) merged["quick_links"]=links;
         if(profile["skin_type"]?.ToString()=="username") merged["skin_user"]=profile["skin_user"];
+        byte[]? skin=null;
         if(profile["skin_type"]?.ToString()=="local") {
-            byte[] bytes=Convert.FromBase64String(profile["skin_png"]?.ToString()??""); ValidateSkin(bytes);
-            Directory.CreateDirectory(directory); string path=Path.Combine(directory,"cloud-skin.png"); File.WriteAllBytes(path+".tmp",bytes); File.Move(path+".tmp",path,true); merged["skin_user"]=path;
+            string png=profile["skin_png"]?.ToString()??"";
+            if(png.Length>87384) throw new InvalidDataException(Localization.T("cloudSkinInvalid"));
+            skin=Convert.FromBase64String(png); ValidateSkin(skin); merged["skin_user"]=Path.Combine(directory,"cloud-skin.png");
         }
-        return ConfigManager.Normalize(merged.ToObject<LauncherConfig>()!);
+        // Validate the entire profile before replacing any existing skin.
+        var restored=ConfigManager.Normalize(merged.ToObject<LauncherConfig>()!);
+        if(skin!=null) { Directory.CreateDirectory(directory); string path=restored.SkinUser; File.WriteAllBytes(path+".tmp",skin); File.Move(path+".tmp",path,true); }
+        return restored;
     }
     public async Task UploadAsync(LauncherConfig config,CancellationToken cancellation=default)
     {
@@ -124,6 +144,6 @@ public sealed class CloudProfiles
     public async Task SignOutAsync()
     {
         pending?.Cancel(); await gate.WaitAsync();
-        try { session=null; File.Delete(Path.Combine(directory,"cloud-session.dat")); Status="cloudOffline"; Changed?.Invoke(); } finally { gate.Release(); }
+        try { File.Delete(Path.Combine(directory,"cloud-session.dat")); session=null; Status="cloudOffline"; Changed?.Invoke(); } finally { gate.Release(); }
     }
 }

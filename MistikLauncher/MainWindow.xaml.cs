@@ -40,6 +40,7 @@ namespace MistikLauncher
         public string? LatestOnlineChangelog;
         readonly Dictionary<string, Page> _pageCache = new();
         readonly HttpClient _http = new();
+        readonly HttpClient _skinHttp = new() { Timeout=TimeSpan.FromSeconds(6),MaxResponseContentBufferSize=65536 };
         string _accent = "#00A3FF";
         string _currentNav = "Dash";
         bool _isPopulatingVersionBox = false;
@@ -93,7 +94,7 @@ namespace MistikLauncher
             var languageTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             languageTimer.Tick += (_,_) => Localization.TranslateTree(MainFrame);
             languageTimer.Start();
-            Closed += (_,_) => { languageTimer.Stop(); Localization.Changed -= RefreshLanguage; _http.Dispose(); };
+            Closed += (_,_) => { languageTimer.Stop(); Localization.Changed -= RefreshLanguage; _http.Dispose(); _skinHttp.Dispose(); };
             RefreshLanguage();
             var updateTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
             updateTimer.Tick += async (_,_) => await CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate);
@@ -476,11 +477,11 @@ namespace MistikLauncher
                     bool success = false;
                     try {
                         if (!File.Exists(cache) || (DateTime.Now - File.GetLastWriteTime(cache)).TotalDays > 1) {
-                            var jsonStr = await _http.GetStringAsync($"http://skinsystem.ely.by/textures/{uname}");
+                            var jsonStr = await _skinHttp.GetStringAsync($"https://skinsystem.ely.by/textures/{Uri.EscapeDataString(uname)}");
                             var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
-                            var texUrl = jObj["SKIN"]?["url"]?.ToString();
+                            var texUrl = SkinTextureUrl(jObj["SKIN"]?["url"]?.ToString());
                             if (!string.IsNullOrEmpty(texUrl)) {
-                                var bytes = await _http.GetByteArrayAsync(texUrl);
+                                var bytes = await _skinHttp.GetByteArrayAsync(texUrl); CloudProfiles.ValidateSkin(bytes);
                                 Directory.CreateDirectory(App.AppData);
                                 await File.WriteAllBytesAsync(cache, bytes);
                             }
@@ -508,19 +509,28 @@ namespace MistikLauncher
             });
         }
 
+        public static string? SkinTextureUrl(string? raw)
+        {
+            if(!Uri.TryCreate(raw,UriKind.Absolute,out var url) || url.Scheme is not ("http" or "https") || !url.IsDefaultPort || url.UserInfo.Length!=0 ||
+                !(url.Host.Equals("ely.by",StringComparison.OrdinalIgnoreCase) || url.Host.EndsWith(".ely.by",StringComparison.OrdinalIgnoreCase) || url.Host.Equals("textures.minecraft.net",StringComparison.OrdinalIgnoreCase))) return null;
+            return new UriBuilder(url) { Scheme="https",Port=-1 }.Uri.AbsoluteUri;
+        }
         public async Task<System.Windows.Media.ImageSource?> FetchAvatarAsync(string username, int size = 64)
         {
+            username??="";
+            if(!Regex.IsMatch(username,@"^[A-Za-z0-9_]{3,16}$")) return null;
+            size=Math.Clamp(size,16,128);
             var elybyCache = Path.Combine(App.AppData, $"elyby_{username}.png");
             var cache = Path.Combine(App.AppData, $"avatar_{username}_{size}.png");
             try {
                 // Önce Ely.by'den skin denemesi yapalım
                 try {
                     if (!File.Exists(elybyCache) || (DateTime.Now - File.GetLastWriteTime(elybyCache)).TotalDays > 1) {
-                        var jsonStr = await _http.GetStringAsync($"http://skinsystem.ely.by/textures/{Uri.EscapeDataString(username)}");
+                        var jsonStr = await _skinHttp.GetStringAsync($"https://skinsystem.ely.by/textures/{Uri.EscapeDataString(username)}");
                         var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
-                        var texUrl = jObj["SKIN"]?["url"]?.ToString();
+                        var texUrl = SkinTextureUrl(jObj["SKIN"]?["url"]?.ToString());
                         if (!string.IsNullOrEmpty(texUrl)) {
-                            var elyBytes = await _http.GetByteArrayAsync(texUrl);
+                            var elyBytes = await _skinHttp.GetByteArrayAsync(texUrl); CloudProfiles.ValidateSkin(elyBytes);
                             Directory.CreateDirectory(App.AppData);
                             await File.WriteAllBytesAsync(elybyCache, elyBytes);
                         }
@@ -537,9 +547,7 @@ namespace MistikLauncher
                 if (File.Exists(cache))
                     bytes = await File.ReadAllBytesAsync(cache);
                 else {
-                    bytes = await _http.GetByteArrayAsync(
-                        $"https://mc-heads.net/avatar/{Uri.EscapeDataString(username)}/{size}",
-                        new CancellationTokenSource(5000).Token);
+                    bytes = await _skinHttp.GetByteArrayAsync($"https://mc-heads.net/avatar/{Uri.EscapeDataString(username)}/{size}");
                     Directory.CreateDirectory(App.AppData);
                     await File.WriteAllBytesAsync(cache, bytes);
                 }
@@ -563,7 +571,7 @@ namespace MistikLauncher
             Config.Version = ver; ConfigManager.Save(Config);
             
             // Son güvenlik önlemi olarak modları senkronize et
-            SyncModsForCurrentVersion();
+            if(!SyncModsForCurrentVersion()) { MessageBox.Show(Localization.T("modSyncFailed"),"Mistik Launcher",MessageBoxButton.OK,MessageBoxImage.Warning); return; }
 
             _ = LaunchMinecraftAsync(ver);
         }
@@ -1157,18 +1165,18 @@ namespace MistikLauncher
             }
         }
 
-        public void SyncModsForCurrentVersion()
+        public bool SyncModsForCurrentVersion()
         {
             try
             {
                 var currentVer = Config.Version ?? "";
-                if (string.IsNullOrEmpty(currentVer)) return;
+                if (string.IsNullOrEmpty(currentVer)) return false;
 
                 // 1. Determine loader type for current version
                 string currentLoader = "vanilla";
                 if (currentVer.Contains("fabric", StringComparison.OrdinalIgnoreCase)) currentLoader = "fabric";
-                else if (currentVer.Contains("forge", StringComparison.OrdinalIgnoreCase)) currentLoader = "forge";
                 else if (currentVer.Contains("neoforge", StringComparison.OrdinalIgnoreCase)) currentLoader = "neoforge";
+                else if (currentVer.Contains("forge", StringComparison.OrdinalIgnoreCase)) currentLoader = "forge";
 
                 // Extract exact MC version (e.g. 1.21.1) from folder name
                 var mcVersion = "1.21.1";
@@ -1181,83 +1189,18 @@ namespace MistikLauncher
                 var lastSynced = Config.LastSyncedVersion ?? "";
 
                 // If nothing has changed, do not do anything
-                if (lastSynced == currentVer) return;
+                if (lastSynced == currentVer) return true;
 
                 var modsPoolDir = Path.Combine(App.AppData, "mods_pool");
                 Directory.CreateDirectory(modsPoolDir);
 
-                // 2. If we had a previously synced version, move current mods from App.ModsDir back to its pool
-                if (!string.IsNullOrEmpty(lastSynced) && Directory.Exists(App.ModsDir))
-                {
-                    string lastLoader = "vanilla";
-                    if (lastSynced.Contains("fabric", StringComparison.OrdinalIgnoreCase)) lastLoader = "fabric";
-                    else if (lastSynced.Contains("forge", StringComparison.OrdinalIgnoreCase)) lastLoader = "forge";
-                    else if (lastSynced.Contains("neoforge", StringComparison.OrdinalIgnoreCase)) lastLoader = "neoforge";
-
-                    var lastMcVersion = "1.21.1";
-                    var lastMcMatch = System.Text.RegularExpressions.Regex.Match(lastSynced, @"1\.\d+(\.\d+)?");
-                    if (lastMcMatch.Success) lastMcVersion = lastMcMatch.Value;
-
-                    if (lastLoader != "vanilla")
-                    {
-                        var lastPoolKey = $"{lastMcVersion}_{lastLoader}";
-                        var lastPoolDir = Path.Combine(modsPoolDir, lastPoolKey);
-                        Directory.CreateDirectory(lastPoolDir);
-
-                        var currentJars = ModFiles.List(App.ModsDir);
-                        foreach (var jar in currentJars)
-                        {
-                            var dest = Path.Combine(lastPoolDir, Path.GetFileName(jar));
-                            try
-                            {
-                                if (File.Exists(dest)) File.Delete(dest);
-                                File.Move(jar, dest);
-                                App.Log($"Moved active mod to pool: {Path.GetFileName(jar)} -> mods_pool/{lastPoolKey}");
-                            }
-                            catch (Exception ex)
-                            {
-                                App.Log($"Failed to move mod {Path.GetFileName(jar)} to pool: {ex.Message}");
-                            }
-                        }
-                    }
-                }
-
-                // 3. Clear any leftover active jars in App.ModsDir to be perfectly clean
-                if (Directory.Exists(App.ModsDir))
-                {
-                    foreach (var jar in Directory.GetFiles(App.ModsDir, "*.jar"))
-                    {
-                        try { File.Delete(jar); } catch { }
-                    }
-                }
-                else
-                {
-                    Directory.CreateDirectory(App.ModsDir);
-                }
-
-                // 4. Move/Copy mods from mods_pool/{currentPoolKey} into App.ModsDir (only if NOT vanilla)
-                if (currentLoader != "vanilla")
-                {
-                    var newPoolDir = Path.Combine(modsPoolDir, currentPoolKey);
-                    if (Directory.Exists(newPoolDir))
-                    {
-                        var poolJars = ModFiles.List(newPoolDir);
-                        foreach (var jar in poolJars)
-                        {
-                            var dest = Path.Combine(App.ModsDir, Path.GetFileName(jar));
-                            try
-                            {
-                                if (File.Exists(dest)) File.Delete(dest);
-                                File.Move(jar, dest);
-                                App.Log($"Moved pool mod to active: {Path.GetFileName(jar)} from mods_pool/{currentPoolKey}");
-                            }
-                            catch (Exception ex)
-                            {
-                                App.Log($"Failed to activate mod {Path.GetFileName(jar)}: {ex.Message}");
-                            }
-                        }
-                    }
-                }
+                string lastLoader = lastSynced.Contains("neoforge",StringComparison.OrdinalIgnoreCase)?"neoforge":
+                    lastSynced.Contains("forge",StringComparison.OrdinalIgnoreCase)?"forge":
+                    lastSynced.Contains("fabric",StringComparison.OrdinalIgnoreCase)?"fabric":"vanilla";
+                var lastMcMatch=Regex.Match(lastSynced,@"1\.\d+(\.\d+)?");
+                string lastPoolKey=lastLoader=="vanilla"?"vanilla":$"{(lastMcMatch.Success?lastMcMatch.Value:"1.21.1")}_{lastLoader}";
+                // Never clear leftovers: a locked file or collision must preserve both pools and the active set.
+                ModFiles.SyncPools(App.ModsDir,Path.Combine(modsPoolDir,lastPoolKey),currentLoader=="vanilla"?null:Path.Combine(modsPoolDir,currentPoolKey));
 
                 // Update config
                 Config.LastSyncedVersion = currentVer;
@@ -1281,10 +1224,13 @@ namespace MistikLauncher
                 catch { }
 
                 App.Log($"Mods synchronized successfully for version: {currentVer} ({currentLoader})");
+                return true;
             }
             catch (Exception ex)
             {
                 App.Log($"SyncModsForCurrentVersion error: {ex.Message}");
+                StatusLbl.Text=Localization.T("modSyncFailed");
+                return false;
             }
         }
 
@@ -1313,14 +1259,7 @@ namespace MistikLauncher
                         var (modLoader, modMcVersions) = InspectModJar(jar);
 
                         // Loader uyumsuzluğu kontrolü
-                        bool loaderMismatch = false;
-                        if (!string.IsNullOrEmpty(modLoader))
-                        {
-                            if (currentLoader == "fabric" && modLoader == "forge") loaderMismatch = true;
-                            if (currentLoader == "forge" && modLoader == "fabric") loaderMismatch = true;
-                            if (currentLoader == "fabric" && modLoader == "neoforge") loaderMismatch = true;
-                            if (currentLoader == "neoforge" && modLoader == "fabric") loaderMismatch = true;
-                        }
+                        bool loaderMismatch = !string.IsNullOrEmpty(modLoader) && modLoader!=currentLoader;
 
                         // Sürüm uyumsuzluğu kontrolü
                         bool versionMismatch = false;
@@ -1328,19 +1267,21 @@ namespace MistikLauncher
                         {
                             versionMismatch = !IsVersionCompatible(mcVersion, modMcVersions);
                         }
+                        // ponytail: extracted version numbers lose operators and exclusive bounds; warn until a full constraint parser is needed.
+                        if(versionMismatch && !loaderMismatch) { App.Log($"[ModGuard] Check version compatibility manually: {Path.GetFileName(jar)}"); continue; }
 
                         if (loaderMismatch || versionMismatch)
                         {
                             // Uyumsuz modu ilgili havuza taşı
                             string reason = loaderMismatch ? $"loader ({modLoader} != {currentLoader})" : $"sürüm ({string.Join(",", modMcVersions ?? new List<string>())} !~ {mcVersion})";
-                            string poolKey = !string.IsNullOrEmpty(modLoader) && modMcVersions?.Count > 0
-                                ? $"{modMcVersions[0]}_{modLoader}"
+                            var safeVersion=Regex.Match(modMcVersions?.FirstOrDefault()??"",@"^1\.\d+(\.\d+)?$");
+                            string poolKey = new[]{"fabric","forge","neoforge"}.Contains(modLoader) && safeVersion.Success
+                                ? $"{safeVersion.Value}_{modLoader}"
                                 : "incompatible";
                             var poolDir = Path.Combine(modsPoolDir, poolKey);
                             Directory.CreateDirectory(poolDir);
 
                             var dest = Path.Combine(poolDir, Path.GetFileName(jar));
-                            if (File.Exists(dest)) File.Delete(dest);
                             File.Move(jar, dest);
                             suspended++;
                             App.Log($"[ModGuard] Uyumsuz mod askıya alındı: {Path.GetFileName(jar)} ({reason}) -> mods_pool/{poolKey}");
@@ -1378,8 +1319,10 @@ namespace MistikLauncher
 
                 // 1. Fabric: fabric.mod.json
                 var fabricEntry = zip.GetEntry("fabric.mod.json");
+                if(fabricEntry!=null && (zip.GetEntry("META-INF/mods.toml")!=null || zip.GetEntry("META-INF/neoforge.mods.toml")!=null)) return (null,null);
                 if (fabricEntry != null)
                 {
+                    if(fabricEntry.Length>262144) return (null,null);
                     loader = "fabric";
                     using var reader = new StreamReader(fabricEntry.Open());
                     var json = reader.ReadToEnd();
@@ -1406,6 +1349,7 @@ namespace MistikLauncher
 
                 if (neoforgeEntry != null)
                 {
+                    if(neoforgeEntry.Length>262144) return (null,null);
                     loader = "neoforge";
                     using var reader = new StreamReader(neoforgeEntry.Open());
                     var toml = reader.ReadToEnd();
@@ -1415,6 +1359,7 @@ namespace MistikLauncher
 
                 if (forgeEntry != null)
                 {
+                    if(forgeEntry.Length>262144) return (null,null);
                     loader = "forge";
                     using var reader = new StreamReader(forgeEntry.Open());
                     var toml = reader.ReadToEnd();
@@ -1714,7 +1659,7 @@ namespace MistikLauncher
         {
             var libs    = BuildClasspath(version);
             // ★ PERF FIX: Xms = Xmx → G1GC heap resize yok, daha az GC pause
-            var jvm     = $"-Xmx{ramMb}m -Xms{ramMb}m -Dminecraft.server.onlineMode=false -Dminecraft.server.online-mode=false";
+            var jvm     = $"-Xmx{ramMb}m -Xms{ramMb}m";
             if (!string.IsNullOrEmpty(injectorPath) && File.Exists(injectorPath))
             {
                 jvm += $" -javaagent:\"{injectorPath}\"=https://authserver.ely.by/api/authlib-injector";
@@ -1841,7 +1786,7 @@ namespace MistikLauncher
 
             string launchUuid = !string.IsNullOrEmpty(resolvedUuid) ? resolvedUuid : GetOfflineUUID(Config.User);
             var profile=GameProfiles.Read(App.GameDir,version);
-            if(profile!=null && GameProfiles.Kind(profile)=="Forge")
+            if(profile!=null && GameProfiles.Kind(profile) is "Forge" or "NeoForge")
             {
                 // Forge provides its own JVM requirements; speculative tuning can break bootstrap.
                 optArgs="";
