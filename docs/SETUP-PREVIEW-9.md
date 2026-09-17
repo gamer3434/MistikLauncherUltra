@@ -22,7 +22,7 @@ The legacy installer downloaded an obsolete executable and attempted certificate
 | Oyun verisi / Game data | `%APPDATA%\.mistik_ultra`, korunur / preserved |
 | Kaldırma / Uninstall | Windows yüklü uygulamalar; yalnızca kurulum kaydındaki dosyalar / Windows installed apps, recorded files only |
 | Mevcut kurulum / Existing installation | Dolu klasöre kurulum yok; launcher güncelleyicisini kullanın veya önce kaldırın / Nonempty targets rejected; use updater or uninstall first |
-| Sertifika / Certificate | Yerel test imzası, genel yayıncı güveni sağlamaz / local test signature, not publicly trusted |
+| Sertifika / Certificate | Güncel Preview.9 çıktısı imzasız; genel yayıncı güveni yok / current Preview.9 artifact is unsigned; no public publisher trust |
 
 ### Görseller / Previews
 
@@ -36,12 +36,12 @@ English online setup:
 
 ### Yayın bütünlüğü / Release integrity
 
-`Build-Protected.ps1` obfuscation sonrası imzalar ve dosya manifesti üretir. `Build-Installers.ps1` iki setup EXE'sini oluşturup imzalar ve gerçek yerel EXE'de kurulum/kaldırma testi çalıştırır. `Publish-Release.ps1` doğrudan yayınlar; büyük aktarım hatalarında `Stage-LocalRelease.ps1` ve manuel `Finalize locally signed release` iş akışı kullanılabilir. Parçalar ve birleştirilmiş dosyalar SHA-256 ile doğrulanır. Uygulama dosyaları bulutta yeniden derlenmez; özel anahtar aktarılmaz. Geçici parçalar yayımdan önce kaldırılır.
+`Build-Protected.ps1` obfuscation sonrası dosya manifesti üretir; sertifika verilirse maintainer kontrollü imzalama da yapar. `Build-Installers.ps1` iki setup EXE'sini oluşturur ve gerçek yerel EXE'de kurulum/kaldırma testi çalıştırır; sertifika verilirse imzalar. Güncel Preview.9 unsigned build'dir. SHA-256 manifest/checksum dosyaları bütünlük kontrolüdür, yayıncı kimliği değildir. `Publish-Release.ps1` doğrudan yayınlar; remote staging/finalization akışları bu yerel doğrulama tamamlanmadan çalıştırılmamalıdır.
 
-Protection/signing precede manifest generation. The installer build verifies the actual offline EXE's installation/uninstallation lifecycle. Direct publishing has a staged fallback: every part and combined file must match its local SHA-256. Cloud assembly does not rebuild binaries or receive the private signing key. Temporary parts are removed before publication.
+Protection precedes manifest generation; signing is optional and maintainer-controlled. The current Preview.9 build is unsigned. The installer build verifies the actual offline EXE's installation/uninstallation lifecycle. SHA-256 manifests/checksums detect changes but do not establish publisher identity. Remote publishing must wait until local package consistency is verified.
 
 ## Sonuç / Conclusion
 
-Korumalı pakette 209 kontrol geçti. Gerçek yerel kurulum EXE'si 480 dosyayı doğruladı, ayrı test klasörüne kurdu, kendi dosyalarını kaldırdı ve test kullanıcı dosyasını korudu. İki dilde her iki sihirbaz WPF ile oluşturulup görsel olarak incelendi. İmzası değiştirilmiş EXE `HashMismatch` ile reddedildi. Genel Windows yayıncı güveni sağlanmış değildir.
+Korumalı pakette 209 kontrol geçti. Gerçek yerel kurulum EXE'si 478 dosyayı doğruladı, ayrı test klasörüne kurdu, kendi dosyalarını kaldırdı ve test kullanıcı dosyasını korudu. İki dilde her iki sihirbaz WPF ile oluşturulup görsel olarak incelendi. İmzası değiştirilmiş EXE `HashMismatch` ile reddedildi. Güncel çıktı imzasızdır; genel Windows yayıncı güveni sağlanmış değildir.
 
-209 protected-package checks passed. The actual offline setup verified 480 files, installed an isolated fixture, removed owned files and preserved a test user file. Both wizard modes were rendered and visually reviewed in Turkish and English. A modified executable returned `HashMismatch`. Public Windows publisher trust is not provided.
+209 protected-package checks passed. The actual offline setup verified 478 files, installed an isolated fixture, removed owned files and preserved a test user file. Both wizard modes were rendered and visually reviewed in Turkish and English. A modified executable returned `HashMismatch`. The current artifact is unsigned; public Windows publisher trust is not provided.

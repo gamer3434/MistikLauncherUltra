@@ -11,20 +11,20 @@
 ## Step 2 — Feature enhancement
 
 - **Reasoning:** Everyday controls should be discoverable and preferences should reject invalid values before launch.
-- **Implementation:** New player/version/memory overview, quick navigation, searchable sidebar, game-folder/log access, validated settings, skin-provider/accent/automatic-closing preferences and repository/release links. `Pages/ModernPages.cs` and `MainWindow.xaml.cs` implement these changes.
+- **Implementation:** New player/version/memory overview, quick navigation, game-folder/log access, validated settings, skin-provider/accent/automatic-closing preferences and repository/release links. Global launcher search was later removed; page-local search remains. `Pages/ModernPages.cs` and `MainWindow.xaml.cs` implement these changes.
 - **Conclusion:** The new controls are available in Turkish and English. Existing game downloads, mod migration, skins and server execution still require end-to-end verification.
 
 ## Step 3 — Turkish and English
 
 - **Reasoning:** Runtime language selection must persist and must not recreate server controllers.
-- **Implementation:** Embedded paired `Locales/tr.json` and `Locales/en.json`; resource loader and language event in `Localization.cs`; sidebar selector; immediate redraw of new pages; compatibility translation of catalogued legacy strings. Example `play`: **Oyunu başlat** / **Launch game**. Locale parity, nonempty translations and language persistence are tested.
+- **Implementation:** Embedded paired `Locales/tr.json` and `Locales/en.json`; resource loader and language event in `Localization.cs`; top navigation selector; immediate redraw of new pages; compatibility translation of catalogued legacy strings. Example `play`: **Oyunu başlat** / **Launch game**. Locale parity, nonempty translations and language persistence are tested.
 - **Conclusion:** New home/settings/navigation are bilingual. The legacy translation inventory lists 236 uncatalogued helper literals at generation time, plus dynamic/XAML content that needs separate review. Full application localization is incomplete.
 
 ## Step 4 — Obfuscation
 
 - **Reasoning:** Protect eligible release code while preserving WPF bindings and configuration interoperability; never treat reversible string hiding as secret encryption.
 - **Implementation:** Pinned Obfuscar 2.2.49; private-member renaming, Unicode names and string hiding; deliberate WPF/JSON exclusions; protected validation and ZIP generation in `scripts/Build-Protected.ps1`. Private mappings and PDBs are excluded from the distributed package.
-- **Conclusion:** Protected DLL passes thirteen checks and two-language renders. Public source remains readable; this is obfuscation, not strong encryption, and performance has not been benchmarked.
+- **Conclusion:** Historical protected DLL validation passed thirteen checks and two-language renders. Current validation totals are recorded in the Preview.9 release notes. Public source remains readable; this is obfuscation, not strong encryption, and performance has not been benchmarked.
 
 ## Step 5 — Visual and UX redesign
 
@@ -73,24 +73,24 @@ Implemented the user-requested manual update button, persisted automatic updates
 ## Launcher updater and modern colors
 
 - **Reasoning:** Keep installed launcher packages current through authenticated official release metadata while preserving user data and active operations.
-- **Implementation:** Added `LauncherUpdater.cs`, shared `Updater/UpdateEngine.cs`, self-contained helper, settings controls, startup/30-minute checks, verified package manifests, rollback/restart, version-matched release pipeline, unified navy/turquoise palette and bilingual cached-page fix.
+- **Implementation:** Added `LauncherUpdater.cs`, shared `Updater/UpdateEngine.cs`, self-contained helper, settings controls, startup/30-minute checks, verified package manifests, rollback/restart, version-matched release pipeline, unified navy/turquoise palette and bilingual cached-page fix. Current Preview.9 does not use the old cloud profile system.
 - **Conclusion:** New updater and visuals are implemented; validation includes a real helper lifecycle against an isolated fixture. Stable production publication still awaits the broader outstanding work.
 
 ## Reference-driven appearance update / Referansa dayalı görünüm
 
 **Reasoning / Gerekçe:** The supplied RedX Library screenshots establish a charcoal-and-amber palette; navigation search is unnecessary.
 
-**Implementation / Uygulama:** Removed the search controls, handler and filtering method. Added 20 bilingual gradient theme cards with selected outlines, dark selectors and contrast-aware primary text. Shared WPF brushes keep live theme changes small; no new dependencies. Version: 6.0.0-preview.2.
+**Historical implementation / Tarihsel uygulama:** Removed the global navigation search controls, handler and filtering method. Added 20 bilingual gradient theme cards with selected outlines, dark selectors and contrast-aware primary text. Shared WPF brushes keep live theme changes small; no new dependencies. Version: 6.0.0-preview.2.
 
 **Conclusion / Sonuç:** 74 checks pass in the protected package, covering all 20 themes, both languages and search removal alongside existing Forge/update checks. Screenshots: `docs/screenshots/settings-tr.png` and `settings-en.png`.
 
-## Top navigation and Firebase profiles — preview.5
+## Historical: top navigation and Firebase profiles — preview.5
 
 **Reasoning / Gerekçe:** The user requested centered top navigation, a skin/name profile at the right, a maximized-window overlap fix and Firebase sync limited to profiles, skin preferences and settings. Public root database rules could not safely hold private profiles.
 
 **Implementation / Uygulama:** Removed the sidebar and centered icon/label pairs in the existing configurable toolbar. Added a profile button linked to settings. All 16 window styles now share one custom caption with a maximized resize-frame inset. Added `CloudProfiles.cs`, `WindowsSecret.cs` and a bilingual account card. Reused HttpClient, existing JSON support and native Windows DPAPI; no additional client dependencies. Settings changes debounce for 1.5 seconds; startup/sign-in restores the account's cloud profile. Cancellation prevents queued uploads from preceding profile restores or surviving sign-out. Empty toolbar choices round-trip through Realtime Database. PNGs are bounded and decoded before use. Closed public root rules, deployed authenticated UID ownership and field validation to `mistiklauncher-9eb4b`, and enabled email/password Auth with anonymous sign-in disabled. Existing database records were preserved.
 
-**Conclusion / Sonuç:** The protected portable package passes 136 checks including its actual file manifest and real updater handoff. Protected live Firebase validation passes 143 checks, including upload/restore, encrypted restart sessions, foreign-user access denial and invalid update rejection. Test accounts/profiles were removed. Both locales have matching, nonempty keys for cloud controls. Source and updated screenshots are published on the preview branch; a stable release still requires full legacy translation and actual Minecraft/Forge/server verification. Details: [Cloud profiles](CLOUD-PROFILES.md), [window and toolbar](WINDOW-AND-TOOLBAR.md).
+**Historical conclusion / Tarihsel sonuç:** The preview.5 protected portable package passed 136 checks. Protected live Firebase validation passed 143 checks, including upload/restore, encrypted restart sessions, foreign-user access denial and invalid update rejection. These cloud-enabled results do not describe current Preview.9. Details: [archived cloud profiles](CLOUD-PROFILES.md), [window and toolbar](WINDOW-AND-TOOLBAR.md).
 
 ## Error audit and protection — preview.6
 
@@ -98,4 +98,4 @@ Implemented the user-requested manual update button, persisted automatic updates
 
 **Implementation / Uygulama:** Transactional mod pools, atomic SHA-512 verified Modrinth installs with backups and preserved disabled state, safer migration, separate NeoForge recognition, advisory version heuristics, bounded metadata reads, validated encrypted sessions, validation-before-skin-replacement, safe version IDs and HTTPS skin downloads. Removed forced server authentication JVM properties. Rebuilt the DLL with existing private-name/string obfuscation; DPAPI encryption and tamper rejection were verified.
 
-**Conclusion / Sonuç:** Protected package passes 159 checks; protected live Firebase and Modrinth verification passes 167. Release build has zero warnings/errors. Corrections, file references and remaining limits: [preview.6 audit](AUDIT-PREVIEW-6.md).
+**Historical conclusion / Tarihsel sonuç:** Preview.6 protected package passed 159 checks; protected live Firebase and Modrinth verification passed 167. These counts are historical and do not describe current Preview.9. Corrections, file references and remaining limits: [preview.6 audit](AUDIT-PREVIEW-6.md).
