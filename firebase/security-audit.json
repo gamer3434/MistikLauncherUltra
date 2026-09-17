@@ -1,0 +1,5 @@
+{
+  "score": 5,
+  "summary": "Realtime Database rules deny public root access and constrain launcherProfiles to the authenticated owner UID. Field allowlisting and bounded types apply to both creation and update; no client role or owner field grants authority. Live tests confirmed owner operations, cross-user read/write denial, public listing denial and rejection of invalid updates. This assessment covers the committed Realtime Database profile rules, not other Firebase products.",
+  "findings": []
+}

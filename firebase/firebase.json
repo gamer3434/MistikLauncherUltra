@@ -1,0 +1,11 @@
+{
+  "database": {
+    "rules": "database.rules.json"
+  },
+  "auth": {
+    "providers": {
+      "emailPassword": true,
+      "anonymous": false
+    }
+  }
+}

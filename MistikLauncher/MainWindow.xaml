@@ -39,7 +39,7 @@
             <Setter Property="Height"                    Value="42"/>
             <Setter Property="FontSize"                  Value="13"/>
             <Setter Property="FontFamily"                Value="Segoe UI"/>
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="Padding"                   Value="18,0"/>
             <Setter Property="Cursor"                    Value="Hand"/>
             <Setter Property="Template">
@@ -47,7 +47,7 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="8" Margin="8,2">
-                            <ContentPresenter VerticalAlignment="Center"
+                            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"
                                               Margin="{TemplateBinding Padding}"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -96,7 +96,7 @@
         </Style>
     </Window.Resources>
 
-    <DockPanel>
+    <DockPanel x:Name="WindowSurface">
         <Border x:Name="CaptionHost" DockPanel.Dock="Top" Height="42" Background="{DynamicResource Theme0D1727}" BorderBrush="{DynamicResource Theme365574}" BorderThickness="0,0,0,1">
             <DockPanel>
                 <StackPanel x:Name="CaptionButtons" Orientation="Horizontal" Margin="12,0" VerticalAlignment="Center"/>
@@ -105,7 +105,6 @@
         </Border>
     <Grid Background="{DynamicResource Theme0D1727}">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="250"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
@@ -114,87 +113,43 @@
             <RowDefinition Height="86"/>
         </Grid.RowDefinitions>
 
-        <!-- ═══ SIDEBAR ═══════════════════════════════════════════════════════ -->
-        <Border Grid.Column="0" Grid.RowSpan="3" Background="{DynamicResource Theme0D1727}">
-            <DockPanel>
-                <!-- Logo -->
-                <Border DockPanel.Dock="Top" Margin="0,28,0,20">
-                    <StackPanel>
-                        <TextBlock x:Name="LogoText" Text="MISTIK"
-                                   FontSize="30" FontWeight="Black"
-                                   Foreground="{DynamicResource Theme00A3FF}" HorizontalAlignment="Center"
-                                   FontFamily="Segoe UI Black"/>
-                        <TextBlock Text="LAUNCHER"
-                                   FontSize="10" FontWeight="Bold"
-                                   Foreground="#BCCCDD" HorizontalAlignment="Center" Margin="0,3,0,0"/>
-                        <Border Background="#1a1a2e" CornerRadius="10" Margin="20,10,20,0"
-                                Padding="8,4" Visibility="Collapsed">
-                            <TextBlock x:Name="RelayStatusLbl" Text="Relay baglaniyor..."
-                                       FontSize="10" Foreground="#A349A4"
-                                       HorizontalAlignment="Center" FontFamily="Segoe UI"/>
-                        </Border>
-                    </StackPanel>
-                </Border>
-
-                <!-- Social buttons -->
-                <StackPanel DockPanel.Dock="Bottom" Margin="12,0,12,14">
-                    <Button x:Name="BtnDiscord" Content="Discord"
-                            Style="{StaticResource AccentBtn}"
-                            Background="{DynamicResource Theme274565}" Foreground="#EFF5FF" Height="32" Margin="0,3"/>
-                    <Button x:Name="BtnYoutube" Content="YouTube"
-                            Style="{StaticResource AccentBtn}"
-                            Background="{DynamicResource Theme274565}" Foreground="#EFF5FF" Height="32" Margin="0,3"/>
-                </StackPanel>
-
-                <StackPanel DockPanel.Dock="Top" Margin="18,0,18,18">
-                    <ComboBox x:Name="LanguageBox" MinHeight="36" Margin="0,0,0,12" AutomationProperties.Name="Türkçe / English">
-                        <ComboBoxItem Content="Türkçe"/>
-                        <ComboBoxItem Content="English"/>
-                    </ComboBox>
-                </StackPanel>
-                <!-- Nav -->
-                <ScrollViewer VerticalScrollBarVisibility="Hidden">
-                    <StackPanel x:Name="NavPanel" Margin="0,0,0,8"/>
-                </ScrollViewer>
-            </DockPanel>
-        </Border>
-
         <!-- ═══ CONTENT ═══════════════════════════════════════════════════════ -->
-        <DockPanel Grid.Column="1" Grid.Row="0">
+        <DockPanel Grid.Column="0" Grid.Row="0">
+            <Grid DockPanel.Dock="Top" Margin="24,12,24,4">
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="LogoText" Text="MISTIK" FontSize="22" FontWeight="Black" Foreground="{DynamicResource Theme00A3FF}" VerticalAlignment="Center"/>
+                    <Button x:Name="BtnDiscord" Content="GitHub" Style="{StaticResource NavBtn}" Margin="18,0,0,0"/>
+                    <Button x:Name="BtnYoutube" Content="Releases" Style="{StaticResource NavBtn}"/>
+                    <TextBlock x:Name="RelayStatusLbl" Visibility="Collapsed"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ComboBox x:Name="LanguageBox" Width="110" Margin="0,0,14,0" AutomationProperties.Name="Türkçe / English"><ComboBoxItem Content="Türkçe"/><ComboBoxItem Content="English"/></ComboBox>
+                    <Button x:Name="ProfileButton" Style="{StaticResource NavBtn}" Padding="8,0" MinHeight="48" ToolTip="Profile">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Width="36" Height="36" CornerRadius="8" Background="{DynamicResource Theme203853}" ClipToBounds="True" Margin="0,0,10,0"><Image x:Name="AvatarImg" RenderOptions.BitmapScalingMode="NearestNeighbor" Stretch="UniformToFill"/></Border>
+                            <TextBlock x:Name="UserNameLbl" Foreground="#EFF5FF" FontSize="14" FontWeight="SemiBold" MaxWidth="180" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
             <Border x:Name="QuickBarHost" DockPanel.Dock="Top" Background="{DynamicResource Theme0D1727}" BorderBrush="{DynamicResource Theme365574}" BorderThickness="0,0,0,1" Padding="12,8">
-                <WrapPanel x:Name="QuickBarPanel"/>
+                <WrapPanel x:Name="QuickBarPanel" HorizontalAlignment="Center"/>
             </Border>
         <Frame x:Name="MainFrame"
                Background="Transparent" NavigationUIVisibility="Hidden"/>
         </DockPanel>
 
         <!-- ═══ PROGRESS ══════════════════════════════════════════════════════ -->
-        <ProgressBar x:Name="GlobalProgress" Grid.Column="1" Grid.Row="1"
+        <ProgressBar x:Name="GlobalProgress" Grid.Column="0" Grid.Row="1"
                      Minimum="0" Maximum="100" Value="0"
                      Background="{DynamicResource Theme0D1727}" Foreground="{DynamicResource Theme00A3FF}" BorderThickness="0"/>
 
         <!-- ═══ CONTROL BAR ═══════════════════════════════════════════════════ -->
-        <Border Grid.Column="1" Grid.Row="2" Background="{DynamicResource Theme152A43}"
+        <Border Grid.Column="0" Grid.Row="2" Background="{DynamicResource Theme152A43}"
                 BorderBrush="{DynamicResource Theme365574}" BorderThickness="0,1,0,0">
             <Grid Margin="20,0">
-                <!-- Left: avatar + info -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
-                            HorizontalAlignment="Left">
-                    <!-- Circular avatar -->
-                    <Border Width="44" Height="44" CornerRadius="22"
-                            Margin="0,0,14,0" ClipToBounds="True"
-                            Background="#222">
-                        <Image x:Name="AvatarImg" Width="44" Height="44"
-                               RenderOptions.BitmapScalingMode="NearestNeighbor"
-                               Stretch="UniformToFill"/>
-                    </Border>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock x:Name="UserNameLbl" FontSize="16" FontWeight="Bold"
-                                   Foreground="White" FontFamily="Segoe UI"/>
-                        <TextBlock x:Name="StatusLbl" FontSize="10" Foreground="#BCCCDD"
-                                   FontFamily="Segoe UI"/>
-                    </StackPanel>
-                </StackPanel>
+                <TextBlock x:Name="StatusLbl" Foreground="#A5A5B0" FontSize="12" VerticalAlignment="Center"/>
 
                 <!-- Right: version + launch -->
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center"

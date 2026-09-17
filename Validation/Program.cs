@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -67,6 +67,8 @@ class Program
             Check(turkish.Keys.Order().SequenceEqual(english.Keys.Order()), "locale keys match");
             Check(turkish.Values.All(v=>!string.IsNullOrWhiteSpace(v)) && english.Values.All(v=>!string.IsNullOrWhiteSpace(v)), "no empty translations");
             var application=new MistikLauncher.Application(); application.InitializeComponent();
+            checks+=CloudTests.Run(Path.Combine(testRoot,"cloud-unit"));
+            if(args.Contains("--live-cloud")) checks+=CloudTests.Live(Path.Combine(testRoot,"cloud-live")).GetAwaiter().GetResult();
             var window=new MainWindow { Width=1200, Height=820 };
             Directory.CreateDirectory(App.ModsDir);
             string disabledMod=Path.Combine(App.ModsDir,"kept.jar.disabled"); File.WriteAllText(disabledMod,"kept bytes");
@@ -92,12 +94,16 @@ class Program
             window.WindowState=WindowState.Normal;
             ((Button)caption.Children[2]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(window.WindowState==WindowState.Maximized,"custom window button maximizes");
+            Check(((DockPanel)window.FindName("WindowSurface")).Margin.Left==6 && window.WindowStyle==WindowStyle.None,"maximized window reserves resize frame and uses one title bar");
             ((Button)caption.Children[2]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(window.WindowState==WindowState.Normal,"custom window button restores");
+            Check(((DockPanel)window.FindName("WindowSurface")).Margin.Left==0,"restored window removes maximized frame inset");
+            ((Button)window.FindName("ProfileButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
+            Check(((Frame)window.FindName("MainFrame")).Content is MistikLauncher.Pages.ModernSettingsPage,"top-right player profile opens settings");
             var bar=(System.Windows.Controls.WrapPanel)window.FindName("QuickBarPanel");
-            Check(bar.Children.Count==6,"top bar exposes six bilingual shortcuts by default");
+            Check(bar.Children.Count==7,"top bar exposes seven bilingual shortcuts by default");
             window.Config.QuickLinks=new(){"Dash","Settings"}; ConfigManager.Save(window.Config); window.BuildQuickBar();
-            Check(bar.Children.Count==2 && ConfigManager.Load().QuickLinks.SequenceEqual(new[]{"Dash","Settings"}),"shortcut customization persists");
+            Check(bar.Children.Count==3 && ConfigManager.Load().QuickLinks.SequenceEqual(new[]{"Dash","Settings"}),"shortcut customization persists");
             ((Button)bar.Children[1]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Flush(window);
             Check(((Frame)window.FindName("MainFrame")).Content is MistikLauncher.Pages.ModernSettingsPage,"top shortcut navigates to requested page");
