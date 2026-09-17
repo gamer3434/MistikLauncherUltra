@@ -52,6 +52,10 @@ foreach($file in $manifest.Files){
     } finally {$destination.Dispose()}
     if((Get-Item $output).Length -ne $file.Size -or (Get-FileHash $output -Algorithm SHA256).Hash.ToLower() -ne $file.Hash){throw 'Combined file differs from tested local binary'}
     $existing=@($release.assets | Where-Object name -eq $file.Name)
+    if($existing.Count -eq 1 -and $existing[0].state -eq 'starter' -and !$existing[0].digest -and $existing[0].uploader.login -in @('gamer3434','github-actions[bot]')){
+        Invoke-RestMethod -Uri $existing[0].url -Headers $headers -Method Delete | Out-Null
+        $existing=@()
+    }
     if($existing.Count){if($existing[0].digest -ne "sha256:$($file.Hash)"){throw 'Existing final asset differs'}}
     else {
         $configuration=@(('header = "Authorization: Bearer '+$env:GH_TOKEN+'"'),'header = "Accept: application/vnd.github+json"','header = "User-Agent: MistikRelease"','header = "Content-Type: application/octet-stream"') -join "`n"
