@@ -73,7 +73,8 @@ namespace MistikLauncher
               cfg.Role = "User";
               cfg.Accent = ColorThemes.Names.Contains(cfg.Accent) ? cfg.Accent : "Amber";
               cfg.WindowButtons = MainWindow.WindowButtonStyles.Contains(cfg.WindowButtons) ? cfg.WindowButtons : "MacOS";
-              cfg.CloseLighting = new[]{"Theme","RGB","Rainbow","Off"}.Contains(cfg.CloseLighting) ? cfg.CloseLighting : "Theme";
+              if(cfg.CloseLighting=="Rainbow") cfg.CloseLighting="RGB";
+              cfg.CloseLighting = new[]{"Theme","RGB","Off"}.Contains(cfg.CloseLighting) ? cfg.CloseLighting : "Theme";
               cfg.CloseRgb = Regex.IsMatch(cfg.CloseRgb ?? "", "^#[0-9A-Fa-f]{6}$") ? cfg.CloseRgb!.ToUpperInvariant() : "#FFB000";
               cfg.AuthType = cfg.AuthType == "elyby" ? "elyby" : "offline";
               cfg.SkinType = new[]{"local","username","default"}.Contains(cfg.SkinType) ? cfg.SkinType : "default";

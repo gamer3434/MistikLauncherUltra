@@ -50,23 +50,24 @@ public partial class MainWindow
             // Caption lighting belongs exclusively to close, regardless of the selected button style.
             frame.Effect=null;
             if(action=="close" && Config.CloseLighting!="Off") {
-                var color=Config.CloseLighting=="RGB"?(Color)ColorConverter.ConvertFromString(Config.CloseRgb):ColorThemes.Brush("#00A3FF").Color;
-                frame.Width=28; frame.Height=28; frame.CornerRadius=new CornerRadius(14);
-                frame.BorderThickness=new Thickness(2); frame.BorderBrush=new SolidColorBrush(color);
-                frame.Background=Brushes.Transparent;
-                ((TextBlock)frame.Child).Foreground=Brushes.White;
-                if(Config.CloseLighting=="Rainbow") {
-                    var rotation=new RotateTransform(0,0.5,0.5);
-                    var rainbow=new LinearGradientBrush { StartPoint=new Point(0,0),EndPoint=new Point(1,1),RelativeTransform=rotation };
+                var color=Config.CloseLighting=="RGB"?Colors.Red:ColorThemes.Brush("#00A3FF").Color;
+                var stroke=new SolidColorBrush(color);
+                var glow=new System.Windows.Media.Effects.DropShadowEffect { Color=color,BlurRadius=7,ShadowDepth=0,Opacity=0.65 };
+                var circle=new System.Windows.Shapes.Ellipse { Width=28,Height=28,Stroke=stroke,StrokeThickness=2,Fill=Brushes.Transparent,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Effect=glow };
+                var glyph=new TextBlock { Text="×",FontFamily=new FontFamily("Segoe UI"),FontSize=16,Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center };
+                var content=new Grid(); content.Children.Add(circle); content.Children.Add(glyph);
+                frame.Width=30; frame.Height=30; frame.BorderThickness=new Thickness(0); frame.BorderBrush=stroke;
+                frame.Background=Brushes.Transparent; frame.Child=content;
+                if(Config.CloseLighting=="RGB") {
+                    var cycle=new System.Windows.Media.Animation.ColorAnimationUsingKeyFrames { Duration=TimeSpan.FromSeconds(8),RepeatBehavior=System.Windows.Media.Animation.RepeatBehavior.Forever };
                     var colors=new[]{Colors.Red,Colors.Orange,Colors.Yellow,Colors.Lime,Colors.Cyan,Colors.Blue,Colors.Magenta,Colors.Red};
-                    for(int i=0;i<colors.Length;i++) rainbow.GradientStops.Add(new GradientStop(colors[i],i/(double)(colors.Length-1)));
-                    frame.BorderBrush=rainbow;
-                    if(SystemParameters.ClientAreaAnimation) rotation.BeginAnimation(RotateTransform.AngleProperty,new System.Windows.Media.Animation.DoubleAnimation(0,360,TimeSpan.FromSeconds(5)) { RepeatBehavior=System.Windows.Media.Animation.RepeatBehavior.Forever });
+                    for(int i=0;i<colors.Length;i++) cycle.KeyFrames.Add(new System.Windows.Media.Animation.LinearColorKeyFrame(colors[i],System.Windows.Media.Animation.KeyTime.FromTimeSpan(TimeSpan.FromSeconds(i*8.0/(colors.Length-1)))));
+                    stroke.BeginAnimation(SolidColorBrush.ColorProperty,cycle);
+                    glow.BeginAnimation(System.Windows.Media.Effects.DropShadowEffect.ColorProperty,cycle.Clone());
                 }
-                frame.Effect=new System.Windows.Media.Effects.DropShadowEffect { Color=color,BlurRadius=9,ShadowDepth=0,Opacity=0.6 };
             }
             var button=new Button { Content=frame,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(5),MinHeight=36,MinWidth=36,ToolTip=Localization.T("window"+action),Cursor=System.Windows.Input.Cursors.Hand };
-            button.Template=(ControlTemplate)System.Windows.Markup.XamlReader.Parse("<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border Name='focus' Padding='{TemplateBinding Padding}' BorderBrush='Transparent' BorderThickness='1' CornerRadius='5'><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='focus' Property='BorderBrush' Value='White'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='focus' Property='Background' Value='#303035'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
+            button.Template=(ControlTemplate)System.Windows.Markup.XamlReader.Parse("<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border Name='focus' Padding='{TemplateBinding Padding}' BorderBrush='Transparent' BorderThickness='1' CornerRadius='5'><ContentPresenter HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\"/></Border><ControlTemplate.Triggers><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='focus' Property='BorderBrush' Value='White'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='focus' Property='Background' Value='#303035'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
             System.Windows.Automation.AutomationProperties.SetName(button,Localization.T("window"+action));
             button.Click+=(_,_)=> {
                 if(action=="close") Close();
