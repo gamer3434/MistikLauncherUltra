@@ -25,9 +25,10 @@ try {
     }
     $body=Get-Content -LiteralPath docs/RELEASE-PREVIEW-9.md -Raw
     # GitHub's by-tag endpoint cannot resolve an unpublished tag in a draft release.
-    $matches=@(Invoke-RestMethod -Uri "$api/releases?per_page=100" -Headers $headers | Where-Object tag_name -eq $tag)
-    if($matches.Count -gt 1){ throw 'Multiple releases use this tag; review before publishing' }
-    $release=if($matches.Count){$matches[0]}else{$null}
+    $allReleases=Invoke-RestMethod -Uri "$api/releases?per_page=100" -Headers $headers
+    $matchingReleases=@($allReleases | Where-Object tag_name -eq $tag)
+    if($matchingReleases.Count -gt 1){ throw 'Multiple releases use this tag; review before publishing' }
+    $release=if($matchingReleases.Count){$matchingReleases[0]}else{$null}
     if(!$release){ $payload=@{tag_name=$tag;target_commitish=$head;name="Mistik Launcher $version";body=$body;draft=$true;prerelease=$true} | ConvertTo-Json; $release=Invoke-RestMethod -Uri "$api/releases" -Method Post -Headers $headers -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($payload)) }
     foreach($asset in $assets){
         $name=Split-Path $asset -Leaf; $hash=(Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash.ToLower()
