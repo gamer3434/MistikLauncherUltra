@@ -30,10 +30,20 @@ try {
     if($matchingReleases.Count -gt 1){ throw 'Multiple releases use this tag; review before publishing' }
     $release=if($matchingReleases.Count){$matchingReleases[0]}else{$null}
     if(!$release){ $payload=@{tag_name=$tag;target_commitish=$head;name="Mistik Launcher $version";body=$body;draft=$true;prerelease=$true} | ConvertTo-Json; $release=Invoke-RestMethod -Uri "$api/releases" -Method Post -Headers $headers -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($payload)) }
+    if($release.draft){
+        # Draft retries replace stale assets left by interrupted uploads.
+        $release.assets=@(Invoke-RestMethod -Uri "$api/releases/$($release.id)/assets?per_page=100" -Headers $headers)
+    }
     foreach($asset in $assets){
         $name=Split-Path $asset -Leaf; $hash=(Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash.ToLower()
         $existing=@($release.assets | Where-Object name -eq $name)
-        if($existing.Count){ if($existing[0].digest -ne "sha256:$hash"){ throw "Existing release asset differs: $name" }; continue }
+        if($existing.Count){
+            if($existing[0].digest -eq "sha256:$hash"){ continue }
+            if(!$release.draft){ throw 'Do not mutate published release assets' }
+            Write-Host "Replacing stale asset: $name"
+            Invoke-RestMethod -Uri "$api/releases/assets/$($existing[0].id)" -Method Delete -Headers $headers -ErrorAction SilentlyContinue | Out-Null
+            $release.assets=@($release.assets | Where-Object id -ne $existing[0].id)
+        }
         if(!$release.draft){ throw 'Do not mutate published release assets' }
         $uri="https://uploads.github.com/repos/gamer3434/MistikLauncherUltra/releases/$($release.id)/assets?name=$([Uri]::EscapeDataString($name))"
         Write-Host "Uploading: $name"
@@ -44,7 +54,15 @@ try {
         $configuration=@(('header = "Authorization: Bearer '+$credentials.password+'"'),'header = "Accept: application/vnd.github+json"','header = "X-GitHub-Api-Version: 2022-11-28"','header = "User-Agent: MistikRelease"','header = "Content-Type: application/octet-stream"') -join "`n"
         $responseText=$configuration | & $curl --config - --silent --show-error --fail-with-body --http1.1 --connect-timeout 30 --max-time 900 --request POST --data-binary ('@'+(Resolve-Path $asset).Path) $uri
         $configuration=$null
-        if($LASTEXITCODE){ $uploadCode=$LASTEXITCODE; $apiError=''; try { $apiError=(($responseText -join "`n") | ConvertFrom-Json).message } catch { }; throw "Release upload failed: $name (curl $uploadCode): $apiError" }
+        if($LASTEXITCODE){
+            $uploadCode=$LASTEXITCODE; $apiError=''; try { $apiError=(($responseText -join "`n") | ConvertFrom-Json).message } catch { }
+            if($name -eq 'SHA256SUMS.txt' -and $apiError -eq 'Validation Failed'){
+                $current=@(Invoke-RestMethod -Uri "$api/releases/$($release.id)/assets?per_page=100&refresh=$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())" -Headers $headers)
+                $current=@($current | Where-Object name -eq $name)
+                if($current.Count -and $current[0].digest -eq "sha256:$hash"){ $release.assets=$current; continue }
+            }
+            throw "Release upload failed: $name (curl $uploadCode): $apiError"
+        }
         $uploaded=($responseText -join "`n") | ConvertFrom-Json
         if($uploaded.digest -ne "sha256:$hash"){ throw "GitHub digest mismatch: $name" }
         Write-Host "Verified upload: $name ($($uploaded.size) bytes)"

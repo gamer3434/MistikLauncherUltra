@@ -17,7 +17,7 @@ try {
         $result=@()
         for($page=1;$page -le 4;$page++){
             $items=Invoke-RestMethod -Uri "$api/releases/$($release.id)/assets?per_page=100&page=$page" -Headers $headers
-            $result+=@($items)
+            foreach($item in $items){$result+=$item}
             if(@($items).Count -lt 100){break}
         }
         return $result
@@ -87,7 +87,9 @@ try {
     }
     $path=Join-Path $folder 'manifest.json'; $manifest | ConvertTo-Json -Depth 8 | Set-Content $path -Encoding utf8
     Upload $path "stage-$version-manifest.json"
-    $payload=@{ref='main';inputs=@{release_id=[string]$release.id}} | ConvertTo-Json -Depth 3
+    $ref=(git branch --show-current).Trim()
+    if(!$ref){throw 'Current Git branch unavailable'}
+    $payload=@{ref=$ref;inputs=@{release_id=[string]$release.id}} | ConvertTo-Json -Depth 3
     Invoke-RestMethod -Uri "$api/actions/workflows/finalize-local-release.yml/dispatches" -Method Post -Headers $headers -ContentType 'application/json' -Body $payload | Out-Null
     Write-Host "Dispatched signed-release assembly: $($release.id)"
 } finally {$raw=$null;$credentials=$null;$headers=$null;Pop-Location}
