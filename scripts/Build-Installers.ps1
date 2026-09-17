@@ -7,6 +7,7 @@ try {
     $version=$project.SelectSingleNode('/Project/PropertyGroup/Version').InnerText
     $zip=(Resolve-Path "artifacts/MistikLauncher-$version-win-x64.zip").Path
     $output=Join-Path $repo 'artifacts/installers'
+    if (Test-Path -LiteralPath $output) { Remove-Item -LiteralPath $output -Recurse -Force }
     New-Item -ItemType Directory -Force $output | Out-Null
     & $Dotnet publish Installer/Installer.csproj -c Release -t:Rebuild "-p:Version=$version" -p:PayloadZipPath= -o artifacts/online-setup
     if($LASTEXITCODE){ throw 'Online setup build failed' }

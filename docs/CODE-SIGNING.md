@@ -2,11 +2,15 @@
 
 ## Current status / Güncel durum
 
-This preview uses the current-user `MistikLauncherLocalTestSigning` certificate with SHA-256 Authenticode signatures. It is **self-signed and not publicly trusted**. No certificate is installed into Windows trusted roots. Private keys are non-exportable and never uploaded. Build signatures follow obfuscation; manifests/checksums follow signatures. The application, updater, uninstaller and both setup executables are signed. This release has no trusted timestamp.
+The current Preview.9 artifact was built without a signing certificate and is **unsigned**: its application, updater, uninstaller and setup executables carry no Authenticode signature. SHA-256 manifests/checksums detect file changes; they do not establish publisher identity or Windows trust. Optional signing is maintainer-only.
 
-Bu önizleme `MistikLauncherLocalTestSigning` sertifikasıyla SHA-256 Authenticode imzalıdır. Sertifika **yerel test içindir; genel Windows güveni sağlamaz**. Windows güvenilir kök deposu değiştirilmez. Özel anahtar dışarı aktarılmaz veya yüklenmez. Önce obfuscation, sonra imza, sonra dosya manifesti üretilir. Uygulama, güncelleyici, kaldırıcı ve iki kurulum EXE'si imzalanır. Bu yayında güvenilir zaman damgası yoktur.
+Güncel Preview.9 çıktısı sertifika verilmeden üretildi ve **imzasızdır**: uygulama, güncelleyici, kaldırıcı ve kurulum EXE'lerinde Authenticode imzası yoktur. SHA-256 manifest/checksum dosyaları dosya değişikliklerini tespit eder; yayıncı kimliğini veya Windows güvenini kanıtlamaz. İsteğe bağlı imzalama yalnızca maintainer içindir.
 
 An intact self-signed signature can still produce SmartScreen warnings. A publicly trusted certificate also does not guarantee warning-free distribution. / Sağlam bir yerel imza SmartScreen uyarısını kaldırmaz; genel güvenilir imza da uyarısızlığı garanti etmez. [Microsoft documentation / Microsoft belgesi](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation).
+
+## Maintainer-only signing / Yalnızca maintainer imzalama
+
+Use `scripts/Build-Protected.ps1 -SigningThumbprint ...` followed by `scripts/Build-Installers.ps1 -SigningThumbprint ...` only in a controlled maintainer environment. `-AllowLocalTestSignature` is for an explicitly untrusted test certificate in the current-user store; it does not create public trust. Never distribute private keys.
 
 ## Free publicly trusted option / Ücretsiz genel güven seçeneği
 

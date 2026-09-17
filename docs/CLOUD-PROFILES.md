@@ -1,6 +1,10 @@
 # Bulut profilleri / Cloud profiles — 6.0.0-preview.5
 
-**Historical guide / Eski sürüm kılavuzu:** In preview.8, cloud account UI and automatic profile synchronization were removed at the user's request. Settings now remain local. Existing remote records were not deleted. / Kullanıcının isteğiyle preview.8'de bulut hesabı arayüzü ve otomatik eşitleme kaldırıldı. Ayarlar yerel kalır; eski uzak kayıtlar silinmedi.
+**Archive only — not current behavior / Yalnızca arşiv — güncel davranış değildir:** In preview.8, cloud account UI and automatic profile synchronization were removed at the user's request. Preview.9 keeps settings local; existing remote records were not deleted. Do not use the operational sign-in, upload, restore or deployment steps below for the current build. / Kullanıcının isteğiyle preview.8'de bulut hesabı arayüzü ve otomatik eşitleme kaldırıldı. Preview.9 ayarları yerel tutar; eski uzak kayıtlar silinmedi. Aşağıdaki giriş, yükleme, geri yükleme ve dağıtım adımları güncel build için kullanılmamalıdır.
+
+## Historical implementation / Tarihsel uygulama
+
+The following sections document the removed preview.5 implementation for archive purposes only; they are not operating instructions for Preview.9. / Aşağıdaki bölümler yalnızca kaldırılmış preview.5 uygulamasını arşivlemek içindir; Preview.9 için kullanım talimatı değildir.
 
 ## Türkçe
 
@@ -30,7 +34,7 @@ Previously public root rules are now closed. Only the matching authenticated UID
 
 **Conclusion:** Live Firebase checks cover upload/restore, persistent encrypted sessions, cross-user access denial and validation failures. Temporary test users and profiles are cleaned up afterward.
 
-## Code and deployment
+## Historical code and deployment / Tarihsel kod ve dağıtım
 
 - `MistikLauncher/CloudProfiles.cs`: bounded profile mapping, Auth REST, refresh and debounced sync.
 - `MistikLauncher/WindowsSecret.cs`: Windows DPAPI.
