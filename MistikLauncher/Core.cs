@@ -63,7 +63,9 @@ namespace MistikLauncher
             cfg.Lang = cfg.Lang == "English" || cfg.Lang == "en" ? "English" : "Turkce";
             cfg.Ram = Math.Clamp(cfg.Ram, 1, 32);
             cfg.TunnelPort = Math.Clamp(cfg.TunnelPort, 1, 65535);
-            cfg.User = Regex.IsMatch(cfg.User ?? "", @"^[A-Za-z0-9_]{3,16}$") ? cfg.User! : "Player";
+              cfg.User = Regex.IsMatch(cfg.User ?? "", @"^[A-Za-z0-9_]{3,16}$") ? cfg.User! : "Player";
+              cfg.Version ??= "";
+              cfg.Version = GameProfiles.SafeId(cfg.Version) && cfg.Version.Length<=120 ? cfg.Version : "1.21";
             cfg.Friends ??= new(); cfg.FriendCodes ??= new();
             cfg.QuickLinks=(cfg.QuickLinks ?? new()).Where(x=>new[]{"Dash","Vers","Mods","Skin","Server","Settings"}.Contains(x)).Distinct().Take(6).ToList();
               cfg.Role = "User";
@@ -121,7 +123,7 @@ namespace MistikLauncher
         public static readonly string GameDir  = System.IO.Path.Combine(AppData, "game");
         public static readonly string ModsDir  = System.IO.Path.Combine(GameDir, "mods");
         public static readonly string LogFile  = System.IO.Path.Combine(AppData, "launcher.log");
-        public const  string LocalVersion = "v6.0.0-preview.1";
+        public static string LocalVersion => "v" + typeof(App).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute),false).Cast<System.Reflection.AssemblyInformationalVersionAttribute>().Single().InformationalVersion.Split('+')[0];
         public static bool AdminAccessEnabled => false;
 
         public static readonly List<ServerEntry> Servers = new()

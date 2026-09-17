@@ -25,6 +25,8 @@ public static class ForgeTests
         Check(!GameProfiles.IsInstalled(root,"escape"),"profile inheritance traversal rejected");
         var args=JArray.Parse("[\"--launchTarget\",\"forgeclient\",{\"rules\":[{\"action\":\"allow\",\"os\":{\"name\":\"windows\"}}],\"value\":[\"--add-opens\",\"java.base/java.lang=ALL-UNNAMED\"]},{\"rules\":[{\"action\":\"allow\",\"os\":{\"name\":\"linux\"}}],\"value\":\"linux-only\"}]");
         Check(GameProfiles.Arguments(args).SequenceEqual(new[]{"--launchTarget","forgeclient","--add-opens","java.base/java.lang=ALL-UNNAMED"}),"Forge launch arguments and Windows JVM rules retained");
+        Profile("1.20.1-neoforge-47.1.106","{\"inheritsFrom\":\"1.20.1\",\"libraries\":[{\"name\":\"net.neoforged:neoforge:47.1.106\"}]}");
+        Check(GameProfiles.Kind(GameProfiles.Read(root,"1.20.1-neoforge-47.1.106")!)=="NeoForge" && GameProfiles.IsInstalled(root,"1.20.1-neoforge-47.1.106"),"NeoForge profiles remain distinct and selectable");
         return checks;
     }
 }

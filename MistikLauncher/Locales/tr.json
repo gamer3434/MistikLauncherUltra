@@ -254,6 +254,8 @@
   "modsEmpty": "Henüz hiçbir mod yüklü değil.",
   "modDelete": "Sil",
   "modDeleteConfirm": "Bu modu kalıcı olarak silmek istiyor musun?",
+  "modSyncFailed": "Mod taşıması başarısız. Dosyalar korundu. Minecraft'ı kapatıp çakışan dosya adlarını kontrol ederek tekrar deneyin.",
+  "modDownloadInvalid": "Mod doğrulaması başarısız. Dosya adını, indirme boyutunu ve SHA-512 özetini kontrol edin. Mevcut dosyalar korundu.",
   "cloudTitle": "Bulut profili",
   "cloudHelp": "Profil, skin ve ayarlar hesabınıza kaydedilir. Oyun dosyaları yerel kalır.",
   "cloudEmail": "E-posta",

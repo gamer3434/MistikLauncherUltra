@@ -10,7 +10,8 @@ public static class GameProfiles
         if (!SafeId(id)) return null;
         try { return JObject.Parse(File.ReadAllText(Path.Combine(root,"versions",id,id+".json"))); } catch { return null; }
     }
-    public static string Kind(JObject json) => (json["libraries"] as JArray)?.Any(x => x["name"]?.ToString().StartsWith("net.minecraftforge:",StringComparison.Ordinal)==true)==true ? "Forge" :
+    public static string Kind(JObject json) => (json["libraries"] as JArray)?.Any(x => x["name"]?.ToString().StartsWith("net.neoforged:",StringComparison.Ordinal)==true)==true ? "NeoForge" :
+        (json["libraries"] as JArray)?.Any(x => x["name"]?.ToString().StartsWith("net.minecraftforge:",StringComparison.Ordinal)==true)==true ? "Forge" :
         (json["libraries"] as JArray)?.Any(x => x["name"]?.ToString().StartsWith("net.fabricmc:",StringComparison.Ordinal)==true)==true ? "Fabric" : "Vanilla";
     public static bool IsInstalled(string root,string id) => Installed(root,id,new HashSet<string>(StringComparer.OrdinalIgnoreCase));
     static bool Installed(string root,string id,HashSet<string> seen)
@@ -18,7 +19,7 @@ public static class GameProfiles
         if(seen.Count>=16 || !seen.Add(id)) return false;
         var json=Read(root,id); if(json==null) return false;
         // The old installer produced Vanilla copies with a nonexistent Forge bootstrap.
-        if((id.Contains("forge",StringComparison.OrdinalIgnoreCase) || json["mainClass"]?.ToString().Contains("forge",StringComparison.OrdinalIgnoreCase)==true) && Kind(json)!="Forge") return false;
+        if((id.Contains("forge",StringComparison.OrdinalIgnoreCase) || json["mainClass"]?.ToString().Contains("forge",StringComparison.OrdinalIgnoreCase)==true) && Kind(json) is not ("Forge" or "NeoForge")) return false;
         var parent=json["inheritsFrom"]?.ToString();
         return !string.IsNullOrEmpty(parent) ? Installed(root,parent,seen) : File.Exists(Path.Combine(root,"versions",id,id+".jar"));
     }
