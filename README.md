@@ -36,7 +36,7 @@ Ayarlar atomik kaydedilir; önceki değerler `.bak` dosyasından kurtarılır. D
 
 ### Çalıştırma
 
-Windows x64 için `artifacts/MistikLauncher-6-preview-win-x64.zip` paketini ayrı bir klasöre çıkartıp `MistikLauncher.exe` dosyasını açın. Paket kendi .NET çalışma zamanını içerir. **Paketin tüm dosyalarını bir arada tutun.** Bu önizleme taşınabilirdir; kurulum, kaldırma ve sertifika güven deposuna ekleme işlemleri kapalıdır. Veriler `%APPDATA%\.mistik_ultra` içinde kalır. Denemeden önce oyun klasörünü ve ayarları yedekleyin.
+Windows x64 için yayın sayfasından online veya yerel kurulumu seçin; taşınabilir kullanım için ZIP'i ayrı klasöre çıkartıp `MistikLauncher.exe` dosyasını açın. Paket kendi .NET çalışma zamanını içerir. **Paketin tüm dosyalarını bir arada tutun.** Yeni bağımsız kurulum kendi dosya kaydını yönetir; eski uygulama içi kurulum/kaldırma ve sertifika güven deposu değişiklikleri kapalıdır. Veriler `%APPDATA%\.mistik_ultra` içinde kalır.
 
 1. Sağ üstte Türkçe veya English seçin.
 2. Ayarlar sayfasında oyuncu adını ve belleği girip Değişiklikleri kaydet düğmesine basın.
