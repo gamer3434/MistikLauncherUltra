@@ -1,0 +1,70 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "launcherProfiles": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['schema','user','ram','lang'])",
+        "schema": {
+          ".validate": "newData.val() === 1"
+        },
+        "updatedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "user": {
+          ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_]{3,16}$/)"
+        },
+        "version": {
+          ".validate": "newData.isString() && newData.val().length <= 120"
+        },
+        "ram": {
+          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 32"
+        },
+        "lang": {
+          ".validate": "newData.val() === 'Turkce' || newData.val() === 'English'"
+        },
+        "accent": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        },
+        "window_buttons": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        },
+        "skin_type": {
+          ".validate": "newData.val() === 'local' || newData.val() === 'username' || newData.val() === 'default'"
+        },
+        "skin_user": {
+          ".validate": "newData.isString() && newData.val().length <= 16"
+        },
+        "skin_png": {
+          ".validate": "newData.isString() && newData.val().length <= 87384"
+        },
+        "auth_type": {
+          ".validate": "newData.val() === 'offline' || newData.val() === 'elyby'"
+        },
+        "opt_turbo": {
+          ".validate": "newData.isBoolean()"
+        },
+        "opt_fps": {
+          ".validate": "newData.isBoolean()"
+        },
+        "auto_close": {
+          ".validate": "newData.isBoolean()"
+        },
+        "auto_mcs_update": {
+          ".validate": "newData.isBoolean()"
+        },
+        "launcher_auto_update": {
+          ".validate": "newData.isBoolean()"
+        },
+        "quick_links": {
+          ".validate": "newData.isString() && newData.val().length <= 40 && newData.val().matches(/^((Dash|Vers|Mods|Skin|Server|Settings)(,(Dash|Vers|Mods|Skin|Server|Settings))*)?$/)"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    }
+  }
+}

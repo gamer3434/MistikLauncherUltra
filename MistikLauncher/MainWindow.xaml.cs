@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -22,13 +22,22 @@ namespace MistikLauncher
     public partial class MainWindow : Window
     {
         public LauncherConfig Config;
+        public CloudProfiles Cloud { get; } = new();
+        bool cloudReady;
+        void SaveCloud(LauncherConfig cfg) { if(cloudReady) Cloud.Schedule(cfg); }
+        public async Task SyncCloudAsync(bool refreshPage=true) {
+            cloudReady=false;
+            var restored=await Cloud.RestoreAsync(Config);
+            if(restored!=null) { Config=restored; ConfigManager.Save(Config); SwitchLanguage(Config.Lang); ApplyAccent(Config.Accent); PopulateVersionBox(); LoadAvatar(); _pageCache.Clear(); if(refreshPage) Navigate("Settings"); }
+            else await Cloud.UploadAsync(Config);
+            cloudReady=true;
+        }
         public AutoMcsUpdater AutoMcs { get; } = new();
         public LauncherUpdater LauncherUpdates { get; }
         public MistikRelay?   Relay;
         public string? LatestOnlineVersion;
         public string? LatestOnlineUrl;
         public string? LatestOnlineChangelog;
-        readonly Dictionary<string, Button> _navBtns = new();
         readonly Dictionary<string, Page> _pageCache = new();
         readonly HttpClient _http = new();
         string _accent = "#00A3FF";
@@ -56,6 +65,8 @@ namespace MistikLauncher
             BuildNav();
             PopulateVersionBox();
             LoadAvatar();
+            ProfileButton.Click+=(_,_)=>Navigate("Settings");
+            StateChanged+=(_,_)=>ApplyWindowAppearance();
 
             VerBox.SelectionChanged += (s, e) => {
                 if (_isPopulatingVersionBox) return;
@@ -88,9 +99,12 @@ namespace MistikLauncher
             updateTimer.Tick += async (_,_) => await CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate);
             Loaded += async (_,_) => {
                 updateTimer.Start();
+                if(Cloud.SignedIn) { try { await SyncCloudAsync(false); } catch { StatusLbl.Text=Localization.T("cloudFailed"); } }
                 await Task.WhenAll(CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate), AutoMcs.CheckAsync(Config.AutoMcsAutoUpdate && File.Exists(AutoMcs.ExecutablePath)));
             };
             Closed += (_,_) => updateTimer.Stop();
+            ConfigManager.Saved+=SaveCloud;
+            Closed+=(_,_)=>ConfigManager.Saved-=SaveCloud;
             Navigate("Dash");
             // Relay is started only by an explicit user action.
             _ = RelayLoopAsync();
@@ -130,6 +144,7 @@ namespace MistikLauncher
             ApplyWindowAppearance();
             BuildNav();
             BtnLaunch.Content = Localization.T("play");
+            ProfileButton.ToolTip=Localization.T("profile");
             BtnYoutube.Content = Localization.T("releases");
             SelectNav(_currentNav);
             StatusLbl.Text = Localization.T("version") + ": " + Config.Version;
@@ -226,28 +241,15 @@ namespace MistikLauncher
         public static SolidColorBrush HexBrush(string hex) => ColorThemes.IsThemed(hex)?ColorThemes.Brush(hex):new(HexColor(hex));
 
         // ── Nav ───────────────────────────────────────────────────────────────
-        void BuildNav()
-        {
-            NavPanel.Children.Clear(); _navBtns.Clear();
-            AddNav("Dash",      "🏠  Ana Panel");
-            AddNav("Vers",      "🎮  Sürüm Yöneticisi");
-            AddNav("Mods",      "📦  Mod Merkezi");
-            AddNav("Skin",      "👕  Karakter Cildi");
-            AddNav("Server",    "🌐  Sunucu Kur");
-            AddNav("Opt",       "🚀  Optimizasyon");
-            if (App.AdminAccessEnabled)
-                AddNav("Admin", "👑  Yönetici Paneli");
-            AddNav("Settings",  "⚙️  Ayarlar");
-            BuildQuickBar();
-        }
+        void BuildNav() => BuildQuickBar();
 
         readonly Dictionary<string,Button> quickButtons=new();
         public void BuildQuickBar()
         {
             QuickBarPanel.Children.Clear(); quickButtons.Clear();
-            foreach(var item in new[]{("Dash","home","\uE80F"),("Vers","versions","\uE7FC"),("Mods","mods","\uE74C"),("Skin","skin","\uE77B"),("Server","server","\uE968"),("Settings","settings","\uE713")})
+            foreach(var item in new[]{("Dash","home","\uE80F"),("Vers","versions","\uE7FC"),("Mods","mods","\uE74C"),("Skin","skin","\uE77B"),("Server","server","\uE968"),("Settings","settings","\uE713"),("Opt","optimization","\uE9D9")})
             {
-                if(!Config.QuickLinks.Contains(item.Item1)) continue;
+                if(item.Item1!="Opt" && !Config.QuickLinks.Contains(item.Item1)) continue;
                 var content=new StackPanel { Orientation=Orientation.Horizontal };
                 content.Children.Add(new TextBlock { Text=item.Item3,FontFamily=new FontFamily("Segoe MDL2 Assets"),FontSize=16,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,8,0) });
                 content.Children.Add(new TextBlock { Text=Localization.T(item.Item2),VerticalAlignment=VerticalAlignment.Center });
@@ -255,30 +257,12 @@ namespace MistikLauncher
                 System.Windows.Automation.AutomationProperties.SetName(button,Localization.T(item.Item2));
                 button.Click+=(_,_)=>Navigate(item.Item1); quickButtons[item.Item1]=button; QuickBarPanel.Children.Add(button);
             }
-            QuickBarHost.Visibility=quickButtons.Count==0?Visibility.Collapsed:Visibility.Visible;
+            QuickBarHost.Visibility=Config.QuickLinks.Count==0?Visibility.Collapsed:Visibility.Visible;
             SelectNav(_currentNav);
-        }
-
-        void AddNav(string key, string label)
-        {
-            var title=Regex.Replace(Localization.T(label),@"^[^\p{L}]+","");
-            var content=new StackPanel { Orientation=Orientation.Horizontal };
-            string glyph=key switch { "Dash"=>"\uE80F","Vers"=>"\uE7FC","Mods"=>"\uE74C","Skin"=>"\uE77B","Server"=>"\uE968","Opt"=>"\uE9D9",_=>"\uE713" };
-            content.Children.Add(new TextBlock { Text=glyph,FontFamily=new FontFamily("Segoe MDL2 Assets"),FontSize=16,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,12,0) });
-            content.Children.Add(new TextBlock { Text=title,VerticalAlignment=VerticalAlignment.Center });
-            var btn = new Button { Content = content, Style = (Style)FindResource("NavBtn") };
-            System.Windows.Automation.AutomationProperties.SetName(btn,title);
-            btn.Click += (_, _) => Navigate(key);
-            NavPanel.Children.Add(btn);
-            _navBtns[key] = btn;
         }
 
         void SelectNav(string key)
         {
-            foreach (var b in _navBtns.Values) { b.Background=Brushes.Transparent; b.Foreground=HexBrush("#ADBED6"); }
-            if (_navBtns.TryGetValue(key, out var btn)) {
-                btn.Background=ColorThemes.Brush("#274565"); btn.Foreground=ColorThemes.Brush("#00A3FF");
-            }
             foreach(var item in quickButtons) {
                 bool selected=item.Key==key;
                 item.Value.Background=selected?ColorThemes.Brush("#274565"):Brushes.Transparent;

@@ -6,7 +6,7 @@
 
 ## Türkçe
 
-Yeni ana panel oyuncu profili, sürüm, bellek ve hızlı işlemleri gösterir. Ayarlarda oyuncu adı, 1–32 GB bellek, cilt sağlayıcısı, renk ve otomatik kapanma seçilir. Dil listesi anında Türkçe / English geçişi sağlar ve tercih kaydedilir. Sayfa araması, oyun klasörü ve günlük kısayolları eklendi. Slate-blue renkler, Segoe UI yazı tipi, kaydırılabilir sayfalar ve görünür klavye odağı kullanılır.
+Yeni ana panel oyuncu profili, sürüm, bellek ve hızlı işlemleri gösterir. Ayarlarda oyuncu adı, 1–32 GB bellek, skin sağlayıcısı, renk ve otomatik kapanma seçilir. Üst menüdeki dil listesi anında Türkçe / English geçişi sağlar. Arama kaldırıldı; gezinme üstte, oyuncu adı ve skin yüzü sağ üsttedir. RedX referansındaki kömür siyahı yüzeyler, 20 renk seçeneği, Segoe UI ve görünür klavye odağı kullanılır.
 
 Ayarlar atomik kaydedilir; önceki değerler `.bak` dosyasından kurtarılır. Donanım/IP telemetrisi ve kimlik doğrulamasız Firebase uzaktan yönetimi kaldırıldı. Sabit yönetici şifreleri ve eski kontrolsüz EXE değiştirme devre dışı bırakıldı; resmî doğrulanmış paket güncellemeleri yeni sistemle uygulanır. Açılışta sessiz kurulum, diğer başlatıcı işlemlerini sonlandırma ve otomatik sistem müdahaleleri kaldırıldı. MQTT için TLS yapılandırıldı; başlangıçta otomatik bağlantı kaldırıldı. Topluluk aktarımının güvenlik/kullanılabilirlik incelemesi sürüyor.
 
@@ -14,7 +14,7 @@ Ayarlar atomik kaydedilir; önceki değerler `.bak` dosyasından kurtarılır. D
 
 Windows x64 için `artifacts/MistikLauncher-6-preview-win-x64.zip` paketini ayrı bir klasöre çıkartıp `MistikLauncher.exe` dosyasını açın. Paket kendi .NET çalışma zamanını içerir. **Paketin tüm dosyalarını bir arada tutun.** Bu önizleme taşınabilirdir; kurulum, kaldırma ve sertifika güven deposuna ekleme işlemleri kapalıdır. Veriler `%APPDATA%\.mistik_ultra` içinde kalır. Denemeden önce oyun klasörünü ve ayarları yedekleyin.
 
-1. Kenar çubuğunda Türkçe veya English seçin.
+1. Sağ üstte Türkçe veya English seçin.
 2. Ayarlar sayfasında oyuncu adını ve belleği girip Değişiklikleri kaydet düğmesine basın.
 3. Sürümler sayfasından oyun sürümünü indirin, alt çubukta seçin.
 4. Uyumlu modları seçip Oyunu başlat düğmesini kullanın.
@@ -35,7 +35,7 @@ Koruma betiği sabit sürümlü aracı yükler, taşınabilir sürümü derler, 
 
 ## English
 
-The redesigned home shows player, version, memory and quick actions. Settings validate player names and 1–32 GB RAM, and offer skin provider, accent and automatic closing. The Turkish / English selector updates at runtime and persists the preference. Navigation search, game-folder and log shortcuts, scrollable layouts, Segoe UI typography and visible keyboard focus improve everyday use.
+The redesigned home shows player, version, memory and quick actions. Settings validate player names and 1–32 GB RAM, and offer skin provider, accent and automatic closing. The top-right Turkish / English selector updates at runtime. Navigation is centered at the top, with player name and skin face at the right. Search has been removed. Charcoal surfaces, 20 accent palettes, Segoe UI typography and visible keyboard focus follow the supplied RedX references.
 
 Configuration writes are atomic with recovery from the previous backup. Hardware/IP telemetry and unauthenticated Firebase administration were removed. Hardcoded administrator access and legacy arbitrary executable replacement are disabled; verified official package updates now use the new updater. Startup no longer silently installs, terminates other launcher processes or changes system preferences. MQTT uses TLS; automatic startup connection was removed. Community relay security/usability review remains outstanding.
 
@@ -43,7 +43,7 @@ Configuration writes are atomic with recovery from the previous backup. Hardware
 
 Extract `artifacts/MistikLauncher-6-preview-win-x64.zip` to a dedicated Windows x64 folder and run `MistikLauncher.exe`. It includes its .NET runtime. **Keep all package files together.** Installation, uninstall execution and certificate trust changes are disabled in this portable preview. Data remains under `%APPDATA%\.mistik_ultra`. Back up settings and game files before trying it.
 
-1. Select Türkçe or English in the sidebar.
+1. Select Türkçe or English at the top right.
 2. Enter player name and RAM in Settings, then Save changes.
 3. Download a version under Versions and select it in the bottom bar.
 4. Choose compatible mods and select Launch game.
@@ -79,7 +79,7 @@ Real off-screen WPF renders, not a running Minecraft session. / Gerçek WPF gör
 |---|---|
 | `MistikLauncher/Core.cs` | Config recovery, normalization, telemetry removal, TLS / Ayarlar ve güvenlik |
 | `MistikLauncher/App.xaml.cs` | Portable startup / Taşınabilir açılış |
-| `MistikLauncher/MainWindow.xaml` | Shell, search, language, focus / Ana pencere |
+| `MistikLauncher/MainWindow.xaml` | Top navigation, player profile, language, focus / Üst menü ve profil |
 | `MistikLauncher/MainWindow.xaml.cs` | Runtime switching and navigation / Dil değiştirme |
 | `MistikLauncher/Pages/ModernPages.cs` | Bilingual home and settings / İki dilli sayfalar |
 | `MistikLauncher/Localization.cs` | Embedded resource loader / Dil kaynakları |
@@ -133,6 +133,12 @@ Midnight navy, blue surfaces, turquoise accents, consistent typography and a Min
 **6.0.0-preview.4:** Pencere stilleri artık önizlemeli kartlardan seçiliyor. Mod merkezi → Kurulu Modlar altında modları silmeden etkinleştirebilir/devre dışı bırakabilirsiniz; dosyalar korunur ve oyun yeniden açıldığında durum uygulanır. [Kullanım ve doğrulama](docs/MOD-TOGGLES.md).
 
 **6.0.0-preview.4:** Choose window styles from preview cards. Installed mods can be enabled/disabled without deletion; files are preserved and the next game start applies the change. [Usage and validation](docs/MOD-TOGGLES.md).
+
+**6.0.0-preview.5:** Gezinme üst çubuğa taşındı, yazılar ve ikonlar ortalandı. Oyuncu adı ve skin yüzü sağ üsttedir. Tüm pencere stilleri tek özel başlık çubuğu kullanır; büyütülmüş pencerede çerçeve payı ayrılır. Firebase hesapları profil, skin ve ayarları eşitler; oturum Windows DPAPI ile korunur. [Bulut profili kullanımı](docs/CLOUD-PROFILES.md).
+
+**6.0.0-preview.5:** Navigation is centered at the top; player name and skin face appear at the right. All window styles use one custom caption with a maximized frame inset. Firebase accounts sync profiles, skins and settings; Windows DPAPI protects local sessions. [Cloud profile guide](docs/CLOUD-PROFILES.md).
+
+Protected portable validation: **136 checks** including package hashes and updater process handoff. Protected live Firebase validation: **143 checks** including authenticated upload/restore, cross-user denial and invalid update rejection. Both runs cover Turkish and English UI. Actual Minecraft/Forge gameplay and multiple-monitor taskbar behavior still require manual verification.
 
 Üst kısayol çubuğunu ve 16 pencere düğmesi görünümünü Ayarlardan kişiselleştirebilirsiniz. Temalar üst çubuğa, yan menüye ve başlatma alanına uygulanır. [Pencere ve üst çubuk rehberi](docs/WINDOW-AND-TOOLBAR.md).
 

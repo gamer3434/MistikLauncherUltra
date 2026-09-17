@@ -14,10 +14,10 @@ public partial class MainWindow
     public void ApplyWindowAppearance()
     {
         string style=WindowButtonStyles.Contains(Config.WindowButtons)?Config.WindowButtons:"MacOS";
-        bool native=style=="Windows";
-        CaptionHost.Visibility=native?Visibility.Collapsed:Visibility.Visible;
-        WindowChrome.SetWindowChrome(this,native?null:new WindowChrome { CaptionHeight=42,ResizeBorderThickness=new Thickness(6),GlassFrameThickness=new Thickness(0),CornerRadius=new CornerRadius(0),UseAeroCaptionButtons=false });
-        WindowStyle=native?WindowStyle.SingleBorderWindow:WindowStyle.None;
+        CaptionHost.Visibility=Visibility.Visible;
+        WindowSurface.Margin=WindowState==WindowState.Maximized?new Thickness(6):new Thickness(0);
+        WindowChrome.SetWindowChrome(this,new WindowChrome { CaptionHeight=42,ResizeBorderThickness=new Thickness(6),GlassFrameThickness=new Thickness(0),CornerRadius=new CornerRadius(0),UseAeroCaptionButtons=false });
+        if(WindowStyle!=WindowStyle.None) WindowStyle=WindowStyle.None;
         DockPanel.SetDock(CaptionButtons,style=="MacOS"?Dock.Left:Dock.Right);
         WindowChrome.SetIsHitTestVisibleInChrome(CaptionButtons,true);
         CaptionButtons.Children.Clear();

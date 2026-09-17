@@ -253,5 +253,22 @@
   "modToggleFailed": "Mod durumu değiştirilemedi.",
   "modsEmpty": "Henüz hiçbir mod yüklü değil.",
   "modDelete": "Sil",
-  "modDeleteConfirm": "Bu modu kalıcı olarak silmek istiyor musun?"
+  "modDeleteConfirm": "Bu modu kalıcı olarak silmek istiyor musun?",
+  "cloudTitle": "Bulut profili",
+  "cloudHelp": "Profil, skin ve ayarlar hesabınıza kaydedilir. Oyun dosyaları yerel kalır.",
+  "cloudEmail": "E-posta",
+  "cloudPassword": "Parola (en az 6 karakter)",
+  "cloudLogin": "Giriş yap",
+  "cloudCreate": "Hesap oluştur",
+  "cloudUpload": "Buluta kaydet",
+  "cloudRestore": "Buluttan getir",
+  "cloudLogout": "Çıkış yap",
+  "cloudOffline": "Oturum kapalı",
+  "cloudReady": "Bulut hazır",
+  "cloudSaved": "Buluta kaydedildi",
+  "cloudRestored": "Profil geri yüklendi",
+  "cloudFailed": "Bulut işlemi başarısız. Bağlantıyı ve hesap bilgilerini kontrol edin.",
+  "cloudAuthFailed": "Giriş başarısız. Hesap bilgilerini kontrol edin.",
+  "cloudSignInNeeded": "Bulut için giriş yapın.",
+  "cloudSkinInvalid": "Skin, 64×32 veya 64×64 PNG olmalıdır (en fazla 64 KB)."
 }

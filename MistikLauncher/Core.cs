@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
@@ -66,8 +66,13 @@ namespace MistikLauncher
             cfg.User = Regex.IsMatch(cfg.User ?? "", @"^[A-Za-z0-9_]{3,16}$") ? cfg.User! : "Player";
             cfg.Friends ??= new(); cfg.FriendCodes ??= new();
             cfg.QuickLinks=(cfg.QuickLinks ?? new()).Where(x=>new[]{"Dash","Vers","Mods","Skin","Server","Settings"}.Contains(x)).Distinct().Take(6).ToList();
-            cfg.Role = "User";
-            return cfg;
+              cfg.Role = "User";
+              cfg.Accent = ColorThemes.Names.Contains(cfg.Accent) ? cfg.Accent : "Amber";
+              cfg.WindowButtons = MainWindow.WindowButtonStyles.Contains(cfg.WindowButtons) ? cfg.WindowButtons : "MacOS";
+              cfg.AuthType = cfg.AuthType == "elyby" ? "elyby" : "offline";
+              cfg.SkinType = new[]{"local","username","default"}.Contains(cfg.SkinType) ? cfg.SkinType : "default";
+              if(cfg.SkinType=="username" && !Regex.IsMatch(cfg.SkinUser ?? "", @"^[A-Za-z0-9_]{3,16}$")) cfg.SkinUser=cfg.User;
+              return cfg;
         }
         public static LauncherConfig Load()
         {
@@ -90,6 +95,7 @@ namespace MistikLauncher
                 return Normalize(new());
             }
         }
+        public static event Action<LauncherConfig>? Saved;
         public static void Save(LauncherConfig cfg)
         {
             lock (Gate)
@@ -101,6 +107,7 @@ namespace MistikLauncher
                 if (File.Exists(Path)) File.Replace(temporary, Path, Path + ".bak");
                 else File.Move(temporary, Path);
             }
+            Saved?.Invoke(cfg);
         }
     }
 
