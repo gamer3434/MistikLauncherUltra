@@ -10,6 +10,7 @@ permissions:
 jobs:
   assemble:
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Verify, assemble and publish exact locally signed binaries

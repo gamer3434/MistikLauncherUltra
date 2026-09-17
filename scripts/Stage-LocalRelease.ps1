@@ -19,13 +19,34 @@ try {
     New-Item -ItemType Directory -Force $folder | Out-Null
     function Upload([string]$path,[string]$name){
         $hash=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLower()
-        if($assets.ContainsKey($name)){if($assets[$name].digest -ne "sha256:$hash"){throw "Existing staged asset differs: $name"}; return}
+        if($assets.ContainsKey($name)){
+            if($assets[$name].digest -eq "sha256:$hash"){return}
+            if($assets[$name].state -eq 'starter' -and !$assets[$name].digest -and $assets[$name].uploader.login -eq 'gamer3434'){Invoke-RestMethod -Uri $assets[$name].url -Method Delete -Headers $headers | Out-Null; $assets.Remove($name)}
+            else {throw "Existing staged asset differs: $name"}
+        }
         $configuration=@(('header = "Authorization: Bearer '+$credentials.password+'"'),'header = "Accept: application/vnd.github+json"','header = "User-Agent: MistikRelease"','header = "Content-Type: application/octet-stream"') -join "`n"
         $uri="https://uploads.github.com/repos/gamer3434/MistikLauncherUltra/releases/$($release.id)/assets?name=$([Uri]::EscapeDataString($name))"
-        $response=$configuration | & "$env:SystemRoot/System32/curl.exe" --config - --silent --show-error --fail --request POST --data-binary ('@'+$path) --max-time 180 $uri
+        for($attempt=1;$attempt -le 3;$attempt++) {
+            $response=@($configuration | & "$env:SystemRoot/System32/curl.exe" --config - --silent --show-error --fail-with-body --request POST --data-binary ('@'+$path) --max-time 180 --write-out "`nCURL_STATUS:%{http_code}" $uri)
+            $exit=$LASTEXITCODE
+            if(!$exit){break}
+            $status=([string]$response[-1]).Replace('CURL_STATUS:','')
+            if($attempt -eq 3 -or ($status -notin @('408','429','500','502','503','504') -and $exit -notin @(28,52,56))){throw "Part upload failed: $name ($status, curl $exit)"}
+            # A timed-out response may still have saved the asset. Resolve it before retrying.
+            $live=Invoke-RestMethod -Uri "$api/releases/$($release.id)" -Headers $headers
+            if(!$live.draft){throw 'Release is no longer a draft'}
+            $list=Invoke-RestMethod -Uri "$api/releases/$($release.id)/assets?per_page=100" -Headers $headers
+            $saved=@($list | Where-Object name -eq $name)
+            if($saved.Count){
+                if($saved[0].digest -eq "sha256:$hash"){$assets[$name]=$saved[0]; Write-Host "Recovered verified stage: $name"; return}
+                if($saved[0].state -eq 'starter' -and !$saved[0].digest -and $saved[0].uploader.login -eq 'gamer3434'){Invoke-RestMethod -Uri $saved[0].url -Method Delete -Headers $headers | Out-Null}
+                else {throw 'Unexpected asset after interrupted upload'}
+            }
+            Write-Host "Retrying stage: $name (attempt $($attempt+1))"
+            Start-Sleep -Seconds 2
+        }
         $configuration=$null
-        if($LASTEXITCODE){throw "Part upload failed: $name"}
-        $uploaded=($response -join "`n") | ConvertFrom-Json
+        $uploaded=(($response | Where-Object {$_ -notmatch '^CURL_STATUS:'}) -join "`n") | ConvertFrom-Json
         if($uploaded.digest -ne "sha256:$hash"){throw "Part digest mismatch: $name"}
         $assets[$name]=$uploaded; Write-Host "Verified stage: $name"
     }
