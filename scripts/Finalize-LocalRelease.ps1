@@ -12,7 +12,7 @@ function GetAssets {
     $result=@()
     for($page=1;$page -le 4;$page++){
         $items=Invoke-RestMethod -Uri "$api/releases/$ReleaseId/assets?per_page=100&page=$page" -Headers $headers
-        $result+=@($items)
+        foreach($item in $items){$result+=$item}
         if(@($items).Count -lt 100){break}
     }
     return $result
