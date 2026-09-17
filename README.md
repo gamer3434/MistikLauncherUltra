@@ -26,6 +26,8 @@ Choose installer language at the upper right. Default per-user folder: `%LOCALAP
 
 **209 checks passed** on the protected package, including centered RGB controls in both languages and installer ownership/corruption/cancellation/lock tests. / Korumalı pakette **209 kontrol geçti**; iki dilde ortalı RGB düğmesi ve kurulum güvenliği doğrulandı. [Release details / Yayın ayrıntıları](docs/RELEASE-PREVIEW-9.md). [Current window controls / Güncel pencere kontrolleri](docs/WINDOW-AND-TOOLBAR.md).
 
+[Kurulum kılavuzu ve görseller / Setup guide and previews](docs/SETUP-PREVIEW-9.md).
+
 Optional signing / İsteğe bağlı imzalama: `./scripts/Build-Protected.ps1 -SigningThumbprint YOUR_CERTIFICATE_THUMBPRINT`. Use `-AllowLocalTestSignature` only for an explicitly untrusted local test certificate in your current-user personal store. Private keys are never copied into the package. / Yalnızca açıkça güvenilir olmayan yerel test sertifikası için `-AllowLocalTestSignature` kullanın. Özel anahtar pakete kopyalanmaz. The local test package is not timestamped / Yerel test paketi zaman damgalı değildir.
 
 ## Türkçe
