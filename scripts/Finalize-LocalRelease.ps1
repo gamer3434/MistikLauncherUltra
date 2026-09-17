@@ -47,10 +47,26 @@ foreach($file in $manifest.Files){
     else {
         $configuration=@(('header = "Authorization: Bearer '+$env:GH_TOKEN+'"'),'header = "Accept: application/vnd.github+json"','header = "User-Agent: MistikRelease"','header = "Content-Type: application/octet-stream"') -join "`n"
         $uri="https://uploads.github.com/repos/gamer3434/MistikLauncherUltra/releases/$ReleaseId/assets?name=$([Uri]::EscapeDataString($file.Name))"
-        $result=$configuration | & "$env:SystemRoot/System32/curl.exe" --config - --silent --show-error --fail --request POST --data-binary ('@'+$output) $uri
+        for($attempt=1;$attempt -le 3;$attempt++) {
+            $result=@($configuration | & "$env:SystemRoot/System32/curl.exe" --config - --silent --show-error --fail-with-body --request POST --data-binary ('@'+$output) --max-time 180 --write-out "`nCURL_STATUS:%{http_code}" $uri)
+            $exit=$LASTEXITCODE
+            if(!$exit){break}
+            $status=([string]$result[-1]).Replace('CURL_STATUS:','')
+            $live=Invoke-RestMethod -Uri "$api/releases/$ReleaseId" -Headers $headers
+            if(!$live.draft){throw 'Release changed during final upload'}
+            $list=Invoke-RestMethod -Uri "$api/releases/$ReleaseId/assets?per_page=100" -Headers $headers
+            $saved=@($list | Where-Object name -eq $file.Name)
+            if($saved.Count){
+                if($saved[0].digest -eq "sha256:$($file.Hash)"){$result=@(($saved[0] | ConvertTo-Json -Depth 8)); $exit=0; break}
+                if($saved[0].state -eq 'starter' -and !$saved[0].digest -and $saved[0].uploader.login -eq 'github-actions[bot]'){Invoke-RestMethod -Uri $saved[0].url -Headers $headers -Method Delete | Out-Null}
+                else {throw 'Unexpected final asset after interrupted upload'}
+            }
+            if($attempt -eq 3 -or ($status -notin @('408','429','500','502','503','504') -and $exit -notin @(28,52,56))){throw "Final upload failed ($status, curl $exit)"}
+            Start-Sleep -Seconds 2
+        }
         $configuration=$null
-        if($LASTEXITCODE){throw 'Final binary upload failed'}
-        $uploaded=($result -join "`n") | ConvertFrom-Json
+        if($exit){throw 'Final binary upload failed'}
+        $uploaded=(($result | Where-Object {$_ -notmatch '^CURL_STATUS:'}) -join "`n") | ConvertFrom-Json
         if($uploaded.digest -ne "sha256:$($file.Hash)"){throw 'Final GitHub digest mismatch'}
     }
     Write-Host "Verified final binary: $($file.Name)"
