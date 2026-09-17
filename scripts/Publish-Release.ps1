@@ -16,7 +16,7 @@ try {
     $identity=Invoke-RestMethod -Uri 'https://api.github.com/user' -Headers $headers
     if($identity.login -ne 'gamer3434'){ throw 'Expected gamer3434 GitHub account' }
     $head=(git rev-parse HEAD).Trim()
-    $assets=@("artifacts/MistikLauncher-$version-win-x64.zip","artifacts/installers/MistikSetup-Online-$version.exe","artifacts/installers/MistikSetup-Offline-$version.exe",'artifacts/installers/SHA256SUMS.txt')
+    $assets=@('artifacts/installers/SHA256SUMS.txt',"artifacts/MistikLauncher-$version-win-x64.zip","artifacts/installers/MistikSetup-Online-$version.exe","artifacts/installers/MistikSetup-Offline-$version.exe")
     foreach($asset in $assets){ if(!(Test-Path -LiteralPath $asset -PathType Leaf)){ throw "Missing release file: $asset" } }
     foreach($line in Get-Content artifacts/installers/SHA256SUMS.txt){
         if($line -notmatch '^([a-f0-9]{64})  (.+)$'){ throw 'Malformed checksums file' }
@@ -37,20 +37,15 @@ try {
         if(!$release.draft){ throw 'Do not mutate published release assets' }
         $uri="https://uploads.github.com/repos/gamer3434/MistikLauncherUltra/releases/$($release.id)/assets?name=$([Uri]::EscapeDataString($name))"
         Write-Host "Uploading: $name"
-        $client=[Net.Http.HttpClient]::new()
-        $client.Timeout=[TimeSpan]::FromMinutes(30)
-        $request=[Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::Post,$uri)
-        foreach($header in $headers.GetEnumerator()){ $request.Headers.TryAddWithoutValidation($header.Key,[string]$header.Value) | Out-Null }
-        $stream=[IO.File]::OpenRead((Resolve-Path $asset).Path)
-        $request.Content=[Net.Http.StreamContent]::new($stream)
-        $request.Content.Headers.ContentType=[Net.Http.Headers.MediaTypeHeaderValue]::new('application/octet-stream')
-        $request.Content.Headers.ContentLength=$stream.Length
-        try {
-            $response=$client.SendAsync($request).GetAwaiter().GetResult()
-            $response.EnsureSuccessStatusCode() | Out-Null
-            $uploaded=$response.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
-            $response.Dispose()
-        } finally { $request.Dispose(); $stream.Dispose(); $client.Dispose() }
+        # Windows' built-in curl streams large binaries reliably. Credentials travel on
+        # stdin, never in process arguments, disk files, verbose logs or console output.
+        $curl=Join-Path $env:SystemRoot 'System32/curl.exe'
+        if(!(Test-Path -LiteralPath $curl)){ throw 'Windows curl is required for release uploads' }
+        $configuration=@(('header = "Authorization: Bearer '+$credentials.password+'"'),'header = "Accept: application/vnd.github+json"','header = "X-GitHub-Api-Version: 2022-11-28"','header = "User-Agent: MistikRelease"','header = "Content-Type: application/octet-stream"') -join "`n"
+        $responseText=$configuration | & $curl --config - --silent --show-error --fail-with-body --http1.1 --connect-timeout 30 --max-time 900 --request POST --data-binary ('@'+(Resolve-Path $asset).Path) $uri
+        $configuration=$null
+        if($LASTEXITCODE){ $uploadCode=$LASTEXITCODE; $apiError=''; try { $apiError=(($responseText -join "`n") | ConvertFrom-Json).message } catch { }; throw "Release upload failed: $name (curl $uploadCode): $apiError" }
+        $uploaded=($responseText -join "`n") | ConvertFrom-Json
         if($uploaded.digest -ne "sha256:$hash"){ throw "GitHub digest mismatch: $name" }
         Write-Host "Verified upload: $name ($($uploaded.size) bytes)"
     }
