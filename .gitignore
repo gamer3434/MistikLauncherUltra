@@ -41,6 +41,7 @@ MistikLauncherUltra.exe
 MistikLauncher.exe
 MistikSetup.exe
 MistikUninstaller.exe
+MistikCodeSign.cer
 
 # Reproducible release output and private obfuscation maps
 artifacts/

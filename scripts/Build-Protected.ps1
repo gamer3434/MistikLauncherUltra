@@ -6,9 +6,12 @@ try {
     & $Dotnet tool restore
     if ($LASTEXITCODE) { throw 'Tool restore failed / Araç yüklenemedi' }
     $buildRoot = Join-Path $repo artifacts/build
-    & $Dotnet publish MistikLauncher/MistikLauncher.csproj -c Release --self-contained true -p:PublishSingleFile=false "-p:BaseOutputPath=$buildRoot/" -o artifacts/portable
+    [xml]$projectXml = Get-Content MistikLauncher/MistikLauncher.csproj
+    $version = [string]$projectXml.SelectSingleNode("/Project/PropertyGroup/Version").InnerText
+    $portableDir = Join-Path $repo "artifacts/portable-$version"
+    & $Dotnet publish MistikLauncher/MistikLauncher.csproj -c Release --self-contained true -p:PublishSingleFile=false "-p:BaseOutputPath=$buildRoot/" -o $portableDir
     if ($LASTEXITCODE) { throw 'Build failed / Derleme başarısız' }
-    $inputPath = (Resolve-Path artifacts/portable).Path
+    $inputPath = (Resolve-Path $portableDir).Path
     $outputPath = Join-Path $repo artifacts/obfuscated
     New-Item -ItemType Directory -Force $outputPath | Out-Null
     # Find framework directories without assuming a specific SDK patch version.
@@ -48,6 +51,9 @@ try {
     & $Dotnet publish Updater/Updater.csproj -c Release -o artifacts/helper
     if ($LASTEXITCODE) { throw 'Update helper build failed / Güncelleme yardımcısı derlenemedi' }
     Copy-Item artifacts/helper/MistikUpdater.exe "$inputPath/MistikUpdater.exe" -Force
+    & $Dotnet publish Uninstaller/Uninstaller.csproj -c Release -o artifacts/uninstaller
+    if ($LASTEXITCODE) { throw 'Uninstaller build failed / Kaldırıcı derlenemedi' }
+    Copy-Item artifacts/uninstaller/MistikUninstall.exe "$inputPath/MistikUninstall.exe" -Force
     & $Dotnet publish UpdateFixture/UpdateFixture.csproj -c Release -o artifacts/fixture
     if ($LASTEXITCODE) { throw 'Updater fixture build failed' }
     # Debug symbols and private obfuscation maps are excluded from distributed packages.

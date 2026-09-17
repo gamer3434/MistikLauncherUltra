@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained><PublishSingleFile>true</PublishSingleFile><IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <AssemblyName>MistikSetup</AssemblyName><ApplicationIcon>../MistikLauncher/mistik_icon.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup><Compile Include="../Updater/UpdateEngine.cs" Link="UpdateEngine.cs" /></ItemGroup>
+  <ItemGroup Condition="'$(PayloadZipPath)' != ''"><EmbeddedResource Include="$(PayloadZipPath)" LogicalName="MistikPayload.zip" WithCulture="false" /></ItemGroup>
+</Project>

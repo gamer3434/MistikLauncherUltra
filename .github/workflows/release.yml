@@ -23,6 +23,9 @@ jobs:
       - name: Build protected package
         shell: pwsh
         run: ./scripts/Build-Protected.ps1
+      - name: Build online and offline installers
+        shell: pwsh
+        run: ./scripts/Build-Installers.ps1
       - name: Publish release
         shell: pwsh
         env:
@@ -30,7 +33,10 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           $version = $env:RELEASE_TAG.Substring(1)
-          $arguments = @('release', 'create', $env:RELEASE_TAG, "artifacts/MistikLauncher-$version-win-x64.zip", '--title', "Mistik Launcher $version", '--generate-notes')
+          # Locally published signed releases take precedence; never replace existing assets.
+          gh release view $env:RELEASE_TAG *> $null
+          if ($LASTEXITCODE -eq 0) { exit 0 }
+          $arguments = @('release', 'create', $env:RELEASE_TAG, "artifacts/MistikLauncher-$version-win-x64.zip", "artifacts/installers/MistikSetup-Online-$version.exe", "artifacts/installers/MistikSetup-Offline-$version.exe", 'artifacts/installers/SHA256SUMS.txt', '--title', "Mistik Launcher $version", '--generate-notes')
           if ($version.Contains('-')) { $arguments += '--prerelease' }
           gh @arguments
           if ($LASTEXITCODE) { throw 'Release publication failed' }

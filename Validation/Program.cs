@@ -31,6 +31,7 @@ class Program
             string testRoot = Path.Combine(Path.GetTempPath(), "MistikValidation", Guid.NewGuid().ToString("N"));
             Environment.SetEnvironmentVariable("MISTIK_DATA_DIR", testRoot);
             Directory.CreateDirectory(testRoot);
+            InstallerTests.Run(testRoot,Check);
             Check(CrashDiagnostics.Category("java.lang.OutOfMemoryError")=="MLU-MEMORY","memory failure classification");
             Check(CrashDiagnostics.Category("UnsupportedClassVersionError")=="MLU-JAVA","Java failure classification");
             Check(CrashDiagnostics.Category("Incompatible mods found")=="MLU-MOD-DEPENDENCY","mod compatibility failure classification");
@@ -211,14 +212,15 @@ class Program
                 lighting.SelectedIndex=1; Flush(window); Localization.TranslateTree(settingsPage); Flush(window);
                 Check(Texts(lighting).Any(text=>text.StartsWith("RGB")) && window.Config.CloseLighting=="RGB","lighting selector displays new value after translation: "+code);
                 var closeFrame=((StackPanel)window.FindName("CaptionButtons")).Children.OfType<Button>().Where(CaptionHasGlow).Select(button=>(Border)button.Content).Single();
-                var circle=((Grid)closeFrame.Child).Children.OfType<System.Windows.Shapes.Ellipse>().Single();
-                Check(circle.Width==circle.Height && circle.StrokeThickness==2 && ((SolidColorBrush)circle.Stroke).HasAnimatedProperties && circle.Effect.HasAnimatedProperties && ConfigManager.Load().CloseLighting=="RGB","round RGB ring and glow both animate and persist: "+code);
-                var before=((SolidColorBrush)circle.Stroke).Color;
+                var circle=((Grid)closeFrame.Child).Children.OfType<Border>().Single();
+                var cross=((Grid)closeFrame.Child).Children.OfType<System.Windows.Shapes.Path>().Single();
+                Check(circle.Width==38 && circle.Height==24 && circle.CornerRadius.TopLeft==5 && cross.HorizontalAlignment==HorizontalAlignment.Center && cross.VerticalAlignment==VerticalAlignment.Center && ((SolidColorBrush)circle.BorderBrush).HasAnimatedProperties && circle.Effect.HasAnimatedProperties && ConfigManager.Load().CloseLighting=="RGB","centered rounded rectangle RGB outline and glow animate and persist: "+code);
+                var before=((SolidColorBrush)circle.BorderBrush).Color;
                 var animationFrame=new DispatcherFrame();
                 var animationTimer=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(350) };
                 animationTimer.Tick+=(_,_)=> { animationTimer.Stop(); animationFrame.Continue=false; };
                 animationTimer.Start(); Dispatcher.PushFrame(animationFrame);
-                Check(((SolidColorBrush)circle.Stroke).Color!=before && ((System.Windows.Media.Effects.DropShadowEffect)circle.Effect).Color==((SolidColorBrush)circle.Stroke).Color,"RGB changes color over time and glow stays synchronized: "+code);
+                Check(((SolidColorBrush)circle.BorderBrush).Color!=before && ((System.Windows.Media.Effects.DropShadowEffect)circle.Effect).Color==((SolidColorBrush)circle.BorderBrush).Color,"RGB changes color over time and glow stays synchronized: "+code);
                 lighting.SelectedIndex=2; Flush(window);
                 Check(((StackPanel)window.FindName("CaptionButtons")).Children.OfType<Button>().All(button=>!CaptionHasGlow(button)),"Off disables caption lighting: "+code);
                 lighting.SelectedIndex=1; Flush(window);
@@ -239,7 +241,7 @@ class Program
         for(int i=0;i<VisualTreeHelper.GetChildrenCount(node);i++)
             foreach(var value in Texts(VisualTreeHelper.GetChild(node,i))) yield return value;
     }
-    static bool CaptionHasGlow(Button button) => ((Border)button.Content).Effect!=null || ((Border)button.Content).Child is Grid grid && grid.Children.OfType<System.Windows.Shapes.Ellipse>().Any(circle=>circle.Effect!=null);
+    static bool CaptionHasGlow(Button button) => ((Border)button.Content).Effect!=null || ((Border)button.Content).Child is Grid grid && grid.Children.OfType<Border>().Any(outline=>outline.Effect!=null);
     static IEnumerable<DependencyObject> Nodes(DependencyObject node)
     {
         yield return node;
