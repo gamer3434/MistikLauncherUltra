@@ -32,6 +32,9 @@ public static class Localization
     // Handles cached legacy pages without replacing running server controllers.
     public static void TranslateTree(DependencyObject node)
     {
+        // Selection/item visuals are generated from data. Writing their text breaks WPF bindings
+        // and leaves selectors displaying the first value even after a new choice is saved.
+        if(node is ComboBox) return;
         string? current = node switch
         {
             TextBlock text => text.Text,
@@ -44,8 +47,8 @@ public static class Localization
             if (previous != current) node.SetValue(SourceProperty, current);
             var source = node.GetValue(SourceProperty) as string ?? current;
             var translated = T(source);
-            if (node is TextBlock text) text.Text = translated;
-            else if (node is ContentControl control) control.Content = translated;
+            if (node is TextBlock text) text.SetCurrentValue(TextBlock.TextProperty, translated);
+            else if (node is ContentControl control) control.SetCurrentValue(ContentControl.ContentProperty, translated);
             node.SetValue(RenderedProperty, translated);
         }
         if (node is Visual || node is System.Windows.Media.Media3D.Visual3D)

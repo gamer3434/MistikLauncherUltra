@@ -2,9 +2,31 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shell;
+using System.Runtime.InteropServices;
 namespace MistikLauncher;
 public partial class MainWindow
 {
+    [StructLayout(LayoutKind.Sequential)] struct NativePoint { public int X,Y; }
+    [StructLayout(LayoutKind.Sequential)] struct NativeRect { public int Left,Top,Right,Bottom; }
+    [StructLayout(LayoutKind.Sequential)] struct MonitorInfo { public int Size; public NativeRect Monitor,Work; public uint Flags; }
+    [StructLayout(LayoutKind.Sequential)] struct MinMaxInfo { public NativePoint Reserved,MaxSize,MaxPosition,MinTrack,MaxTrack; }
+    [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr window,uint flags);
+    [DllImport("user32.dll",CharSet=CharSet.Auto)] static extern bool GetMonitorInfo(IntPtr monitor,ref MonitorInfo info);
+    static IntPtr ConstrainMaximizedWindow(IntPtr window,int message,IntPtr wParam,IntPtr lParam,ref bool handled)
+    {
+        // Native pixel coordinates keep the taskbar visible on the current monitor, including mixed DPI screens.
+        if(message!=0x0024) return IntPtr.Zero;
+        var info=new MonitorInfo { Size=Marshal.SizeOf<MonitorInfo>() };
+        if(!GetMonitorInfo(MonitorFromWindow(window,2),ref info)) return IntPtr.Zero;
+        var bounds=Marshal.PtrToStructure<MinMaxInfo>(lParam);
+        bounds.MaxPosition.X=info.Work.Left-info.Monitor.Left;
+        bounds.MaxPosition.Y=info.Work.Top-info.Monitor.Top;
+        bounds.MaxSize.X=info.Work.Right-info.Work.Left;
+        bounds.MaxSize.Y=info.Work.Bottom-info.Work.Top;
+        Marshal.StructureToPtr(bounds,lParam,false);
+        handled=true;
+        return IntPtr.Zero;
+    }
     public static readonly string[] WindowButtonStyles={"MacOS","Windows","Minimal","Neon","Retro","Glass","Terminal","Pill","Cyberpunk","Balloon","Aurora","Diamond","NeonOutline","FrostedGlass","Samurai","Hologram"};
     public void SetWindowButtons(string style)
     {
@@ -25,6 +47,24 @@ public partial class MainWindow
         foreach(string action in actions)
         {
             var frame=WindowButtonPreview(style,action,WindowState==WindowState.Maximized);
+            // Caption lighting belongs exclusively to close, regardless of the selected button style.
+            frame.Effect=null;
+            if(action=="close" && Config.CloseLighting!="Off") {
+                var color=Config.CloseLighting=="RGB"?(Color)ColorConverter.ConvertFromString(Config.CloseRgb):ColorThemes.Brush("#00A3FF").Color;
+                frame.Width=28; frame.Height=28; frame.CornerRadius=new CornerRadius(14);
+                frame.BorderThickness=new Thickness(2); frame.BorderBrush=new SolidColorBrush(color);
+                frame.Background=Brushes.Transparent;
+                ((TextBlock)frame.Child).Foreground=Brushes.White;
+                if(Config.CloseLighting=="Rainbow") {
+                    var rotation=new RotateTransform(0,0.5,0.5);
+                    var rainbow=new LinearGradientBrush { StartPoint=new Point(0,0),EndPoint=new Point(1,1),RelativeTransform=rotation };
+                    var colors=new[]{Colors.Red,Colors.Orange,Colors.Yellow,Colors.Lime,Colors.Cyan,Colors.Blue,Colors.Magenta,Colors.Red};
+                    for(int i=0;i<colors.Length;i++) rainbow.GradientStops.Add(new GradientStop(colors[i],i/(double)(colors.Length-1)));
+                    frame.BorderBrush=rainbow;
+                    if(SystemParameters.ClientAreaAnimation) rotation.BeginAnimation(RotateTransform.AngleProperty,new System.Windows.Media.Animation.DoubleAnimation(0,360,TimeSpan.FromSeconds(5)) { RepeatBehavior=System.Windows.Media.Animation.RepeatBehavior.Forever });
+                }
+                frame.Effect=new System.Windows.Media.Effects.DropShadowEffect { Color=color,BlurRadius=9,ShadowDepth=0,Opacity=0.6 };
+            }
             var button=new Button { Content=frame,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(5),MinHeight=36,MinWidth=36,ToolTip=Localization.T("window"+action),Cursor=System.Windows.Input.Cursors.Hand };
             button.Template=(ControlTemplate)System.Windows.Markup.XamlReader.Parse("<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border Name='focus' Padding='{TemplateBinding Padding}' BorderBrush='Transparent' BorderThickness='1' CornerRadius='5'><ContentPresenter/></Border><ControlTemplate.Triggers><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='focus' Property='BorderBrush' Value='White'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='focus' Property='Background' Value='#303035'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
             System.Windows.Automation.AutomationProperties.SetName(button,Localization.T("window"+action));

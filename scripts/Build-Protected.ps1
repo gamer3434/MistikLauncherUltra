@@ -1,4 +1,4 @@
-param([string]$Dotnet = 'dotnet')
+param([string]$Dotnet = 'dotnet', [string]$SigningThumbprint, [switch]$AllowLocalTestSignature)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 Push-Location $repo
@@ -52,6 +52,10 @@ try {
     if ($LASTEXITCODE) { throw 'Updater fixture build failed' }
     # Debug symbols and private obfuscation maps are excluded from distributed packages.
     Get-ChildItem $inputPath -Filter '*.pdb' | Remove-Item
+    if ($SigningThumbprint) {
+        & "$PSScriptRoot/Sign-Release.ps1" -PackagePath $inputPath -Thumbprint $SigningThumbprint -AllowLocalTestSignature:$AllowLocalTestSignature
+        Copy-Item "$inputPath/MistikLauncher.dll" "$validationBin/MistikLauncher.dll" -Force
+    }
     Get-ChildItem $inputPath -File | Where-Object { $_.Name -notin @('checksums.json','update-manifest.json') } | Get-FileHash -Algorithm SHA256 |
         Select-Object @{Name='File'; Expression={Split-Path $_.Path -Leaf}}, Hash |
         ConvertTo-Json | Set-Content "$inputPath/checksums.json" -Encoding utf8

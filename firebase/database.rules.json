@@ -31,6 +31,12 @@
         "window_buttons": {
           ".validate": "newData.isString() && newData.val().length <= 40"
         },
+        "close_lighting": {
+          ".validate": "newData.val() === 'Theme' || newData.val() === 'RGB' || newData.val() === 'Rainbow' || newData.val() === 'Off'"
+        },
+        "close_rgb": {
+          ".validate": "newData.isString() && newData.val().matches(/^#[0-9A-Fa-f]{6}$/)"
+        },
         "skin_type": {
           ".validate": "newData.val() === 'local' || newData.val() === 'username' || newData.val() === 'default'"
         },

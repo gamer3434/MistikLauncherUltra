@@ -18,9 +18,35 @@ class Program
     {
         try
         {
+            if(args.Length==3 && args[0]=="--pc-forge")
+            {
+                var isolated=Path.GetFullPath(args[1]);
+                if(!Path.GetFileName(isolated).StartsWith("pc-test-",StringComparison.Ordinal)) throw new InvalidOperationException("Use a separate pc-test-* data directory.");
+                Environment.SetEnvironmentVariable("MISTIK_DATA_DIR",isolated);
+                Check(GameProfiles.IsInstalled(App.GameDir,args[2]),"isolated official Vanilla base is installed");
+                var forge=ForgeInstaller.InstallAsync(args[2],(_,message)=>Console.WriteLine(message)).GetAwaiter().GetResult();
+                Check(GameProfiles.IsInstalled(App.GameDir,forge),"real official Forge installer produces selectable inherited profile");
+                Console.WriteLine("Installed Forge: "+forge); return 0;
+            }
             string testRoot = Path.Combine(Path.GetTempPath(), "MistikValidation", Guid.NewGuid().ToString("N"));
             Environment.SetEnvironmentVariable("MISTIK_DATA_DIR", testRoot);
             Directory.CreateDirectory(testRoot);
+            Check(CrashDiagnostics.Category("java.lang.OutOfMemoryError")=="MLU-MEMORY","memory failure classification");
+            Check(CrashDiagnostics.Category("UnsupportedClassVersionError")=="MLU-JAVA","Java failure classification");
+            Check(CrashDiagnostics.Category("Incompatible mods found")=="MLU-MOD-DEPENDENCY","mod compatibility failure classification");
+            Check(CrashDiagnostics.Category("exit code 1")=="MLU-EXIT","exit code alone does not blame a mod");
+            Check(CrashDiagnostics.Category("ClassNotFoundException")=="MLU-CLASSPATH","missing class has actionable profile/library guidance");
+            Directory.CreateDirectory(App.ModsDir);
+            File.WriteAllText(Path.Combine(App.ModsDir,"suspect.jar"),"fixture");
+            File.WriteAllText(Path.Combine(App.ModsDir,"innocent.jar"),"fixture");
+            var report=CrashDiagnostics.Report(1,DateTime.UtcNow,"ERROR failed mod file: suspect.jar\nLoaded mods: innocent.jar");
+            Check(report.Contains(Path.Combine(App.ModsDir,"suspect.jar")) && !report.Contains(Path.Combine(App.ModsDir,"innocent.jar")),"only explicit failure evidence identifies a suspect mod path");
+            Directory.CreateDirectory(Path.Combine(App.GameDir,"logs"));
+            var stale=Path.Combine(App.GameDir,"logs","latest.log"); File.WriteAllText(stale,"STALE_CRASH_MARKER"); File.SetLastWriteTimeUtc(stale,DateTime.UtcNow.AddHours(-1));
+            Check(!CrashDiagnostics.Report(1,DateTime.UtcNow,"new failure").Contains("STALE_CRASH_MARKER"),"previous run logs are excluded from new crash analysis");
+            Check(!CrashDiagnostics.Redact("accessToken=secret refresh_token:private").Contains("secret") && !CrashDiagnostics.Redact("accessToken=secret refresh_token:private").Contains("private"),"diagnostic token redaction");
+            var invalidLighting=ConfigManager.Normalize(new LauncherConfig { CloseLighting="bad",CloseRgb="invalid" });
+            Check(invalidLighting.CloseLighting=="Theme" && invalidLighting.CloseRgb=="#FFB000","close lighting settings validation");
             checks += ModToggleTests.Run(Path.Combine(testRoot,"mod-toggle"));
             if(args.Contains("--live-mod")) checks+=ModToggleTests.Live(Path.Combine(testRoot,"official-mod")).GetAwaiter().GetResult();
             checks += ForgeTests.Run(Path.Combine(testRoot,"forge-tests"));
@@ -107,7 +133,12 @@ class Program
             foreach(var style in MainWindow.WindowButtonStyles) {
                 window.SetWindowButtons(style);
                 Check(ConfigManager.Load().WindowButtons==style && ((StackPanel)window.FindName("CaptionButtons")).Children.Count==3,"window button style renders and persists: "+style);
+                Check(((StackPanel)window.FindName("CaptionButtons")).Children.OfType<Button>().Count(button=>((Border)button.Content).Effect!=null)==1,"only close has lighting: "+style);
             }
+            var sourceText=new TextBlock { Text="initial" }; var boundText=new TextBlock();
+            System.Windows.Data.BindingOperations.SetBinding(boundText,TextBlock.TextProperty,new System.Windows.Data.Binding("Text") { Source=sourceText });
+            Localization.TranslateTree(boundText); sourceText.Text="updated"; Flush(window);
+            Check(System.Windows.Data.BindingOperations.IsDataBound(boundText,TextBlock.TextProperty) && boundText.Text=="updated","legacy translation preserves live WPF text bindings");
             window.SetWindowButtons("MacOS");
             var caption=(StackPanel)window.FindName("CaptionButtons");
             ((Button)caption.Children[1]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -173,6 +204,16 @@ class Program
                 Check(Texts(window.Content as DependencyObject).Contains(Localization.T("luTitle")+" · "+window.LauncherUpdates.CurrentVersion),"cached settings language " + code);
                 var settingsPage=(MistikLauncher.Pages.ModernSettingsPage)((Frame)window.FindName("MainFrame")).Content;
                 var settingsScroll=((DockPanel)settingsPage.Content).Children.OfType<ScrollViewer>().Single();
+                var lighting=Nodes(settingsPage).OfType<ComboBox>().Single(box=>box.Name=="CloseLightingBox");
+                lighting.SelectedIndex=2; Flush(window); Localization.TranslateTree(settingsPage);
+                lighting.SelectedIndex=1; Flush(window); Localization.TranslateTree(settingsPage); Flush(window);
+                Check(Texts(lighting).Contains("RGB") && window.Config.CloseLighting=="RGB","lighting selector displays new value after translation: "+code);
+                var rgb=Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="CloseRgbBox"); rgb.Text="#00CCFF"; Flush(window);
+                var closeFrame=((StackPanel)window.FindName("CaptionButtons")).Children.OfType<Button>().Select(button=>(Border)button.Content).Single(border=>border.Effect!=null);
+                Check(((SolidColorBrush)closeFrame.BorderBrush).Color==Color.FromRgb(0,204,255) && ConfigManager.Load().CloseRgb=="#00CCFF","RGB edits apply immediately and persist: "+code);
+                lighting.SelectedIndex=3; Flush(window);
+                Check(((StackPanel)window.FindName("CaptionButtons")).Children.OfType<Button>().All(button=>((Border)button.Content).Effect==null),"Off disables caption lighting: "+code);
+                lighting.SelectedIndex=2; Flush(window);
                 settingsScroll.ScrollToVerticalOffset(300); Capture(window,Path.Combine(output,"window-styles-"+code+".png"));
                 settingsScroll.ScrollToTop();
                 window.Navigate("Server"); Capture(window,Path.Combine(output,"server-"+code+".png"));
@@ -189,6 +230,12 @@ class Program
         if(node is TextBlock text) yield return text.Text;
         for(int i=0;i<VisualTreeHelper.GetChildrenCount(node);i++)
             foreach(var value in Texts(VisualTreeHelper.GetChild(node,i))) yield return value;
+    }
+    static IEnumerable<DependencyObject> Nodes(DependencyObject node)
+    {
+        yield return node;
+        for(int i=0;i<VisualTreeHelper.GetChildrenCount(node);i++)
+            foreach(var child in Nodes(VisualTreeHelper.GetChild(node,i))) yield return child;
     }
     static void Capture(Window window,string path)
     {

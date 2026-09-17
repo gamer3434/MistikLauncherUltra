@@ -19,6 +19,8 @@ namespace MistikLauncher
     {
         [JsonProperty("quick_links",ObjectCreationHandling=ObjectCreationHandling.Replace)] public List<string> QuickLinks { get; set; } = new() { "Dash","Vers","Mods","Skin","Server","Settings" };
         [JsonProperty("window_buttons")] public string WindowButtons { get; set; } = "MacOS";
+        [JsonProperty("close_lighting")] public string CloseLighting { get; set; } = "Theme";
+        [JsonProperty("close_rgb")] public string CloseRgb { get; set; } = "#FFB000";
         [JsonProperty("launcher_auto_update")] public bool LauncherAutoUpdate { get; set; } = true;
         [JsonProperty("auto_mcs_update")] public bool AutoMcsAutoUpdate { get; set; } = true;
         [JsonProperty("user")]       public string User       { get; set; } = "Oyuncu";
@@ -71,6 +73,8 @@ namespace MistikLauncher
               cfg.Role = "User";
               cfg.Accent = ColorThemes.Names.Contains(cfg.Accent) ? cfg.Accent : "Amber";
               cfg.WindowButtons = MainWindow.WindowButtonStyles.Contains(cfg.WindowButtons) ? cfg.WindowButtons : "MacOS";
+              cfg.CloseLighting = new[]{"Theme","RGB","Rainbow","Off"}.Contains(cfg.CloseLighting) ? cfg.CloseLighting : "Theme";
+              cfg.CloseRgb = Regex.IsMatch(cfg.CloseRgb ?? "", "^#[0-9A-Fa-f]{6}$") ? cfg.CloseRgb!.ToUpperInvariant() : "#FFB000";
               cfg.AuthType = cfg.AuthType == "elyby" ? "elyby" : "offline";
               cfg.SkinType = new[]{"local","username","default"}.Contains(cfg.SkinType) ? cfg.SkinType : "default";
               if(cfg.SkinType=="username" && !Regex.IsMatch(cfg.SkinUser ?? "", @"^[A-Za-z0-9_]{3,16}$")) cfg.SkinUser=cfg.User;

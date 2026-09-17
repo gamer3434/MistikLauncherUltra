@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -68,6 +68,7 @@ namespace MistikLauncher
             LoadAvatar();
             ProfileButton.Click+=(_,_)=>Navigate("Settings");
             StateChanged+=(_,_)=>ApplyWindowAppearance();
+            SourceInitialized+=(_,_)=>System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle)?.AddHook(ConstrainMaximizedWindow);
 
             VerBox.SelectionChanged += (s, e) => {
                 if (_isPopulatingVersionBox) return;
@@ -76,8 +77,9 @@ namespace MistikLauncher
                 {
                     Config.Version = selected;
                     ConfigManager.Save(Config);
-                    StatusLbl.Text = $"Surum: {selected}";
+                    StatusLbl.Text = $"{Localization.T("version")}: {selected}";
                     SyncModsForCurrentVersion();
+                    if(MainFrame.Content is Pages.ModernHomePage home) home.RefreshLanguage();
                 }
             };
 
@@ -576,10 +578,15 @@ namespace MistikLauncher
             _ = LaunchMinecraftAsync(ver);
         }
 
+        bool gameRunning;
         async Task LaunchMinecraftAsync(string version)
         {
+            if(gameRunning) return;
+            var started=DateTime.UtcNow;
+            var captured=new System.Text.StringBuilder();
+            var outputGate=new object();
             BtnLaunch.IsEnabled = false;
-            BtnLaunch.Content   = "BASLATILIYOR...";
+            BtnLaunch.Content   = Localization.Language=="en"?"Launching…":"Başlatılıyor…";
             SetProgress(5);
 
             try
@@ -602,7 +609,7 @@ namespace MistikLauncher
                         return;
                     }
                 }
-                else if (IsModernVersion(version))
+                if (javaPath != null)
                 {
                     int javaVer = GetJavaMajorVersion(javaPath);
                     bool req25 = RequiresJava25(version);
@@ -628,10 +635,10 @@ namespace MistikLauncher
                             return;
                         }
                     }
-                    else if (javaVer < 17)
+                    else if (javaVer < GameProfiles.RequiredJava(App.GameDir,version))
                     {
                         var res = MessageBox.Show(
-                            $"Seçtiğiniz sürüm ({version}) için en az Java 17/21 gereklidir. Ancak bilgisayarınızda sadece Java {javaVer} bulundu.\n\nJava 21 otomatik olarak indirilip kurulsun mu?",
+                            $"Seçtiğiniz sürüm ({version}) için en az Java {GameProfiles.RequiredJava(App.GameDir,version)} gereklidir. Ancak bilgisayarınızda sadece Java {javaVer} bulundu.\n\nJava 21 otomatik olarak indirilip kurulsun mu?",
                             "Uyumsuz Java Sürümü", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                         if (res == MessageBoxResult.Yes)
                         {
@@ -652,6 +659,7 @@ namespace MistikLauncher
                     }
                 }
 
+                if(javaPath==null) return;
                 // 2. JAR kontrol
                 var versDir = Path.Combine(App.GameDir, "versions", version);
                 var jar     = Path.Combine(versDir, $"{version}.jar");
@@ -670,42 +678,6 @@ namespace MistikLauncher
                 // 3. Natives klasoru olustur
                 var natives = Path.Combine(versDir, "natives");
                 Directory.CreateDirectory(natives);
-
-                // Oyun klasöründeki veya sunucu klasörlerindeki server.properties dosyalarını çevrimdışı moda zorla
-                try
-                {
-                    if (Relay != null)
-                    {
-                        _ = Task.Run(() => Relay.EnforceOfflineModeInProperties());
-                    }
-                    else
-                    {
-                        // Relay henüz başlatılmadıysa veya null ise manuel olarak sessizce oyun dizinini düzelt
-                        _ = Task.Run(() => {
-                            try {
-                                if (Directory.Exists(App.GameDir)) {
-                                    var files = Directory.GetFiles(App.GameDir, "server.properties", SearchOption.AllDirectories);
-                                    foreach (var file in files) {
-                                        var lines = File.ReadAllLines(file);
-                                        bool updated = false;
-                                        for (int i = 0; i < lines.Length; i++) {
-                                            if (lines[i].Trim().StartsWith("online-mode", StringComparison.OrdinalIgnoreCase)) {
-                                                if (!lines[i].Contains("false")) { lines[i] = "online-mode=false"; updated = true; }
-                                            }
-                                        }
-                                        if (!updated && !lines.Any(l => l.Trim().StartsWith("online-mode", StringComparison.OrdinalIgnoreCase))) {
-                                            var newLines = new List<string>(lines) { "online-mode=false" };
-                                            lines = newLines.ToArray();
-                                            updated = true;
-                                        }
-                                        if (updated) { File.WriteAllLines(file, lines); }
-                                    }
-                                }
-                            } catch { }
-                        });
-                    }
-                }
-                catch { }
 
                 SetStatus("Karakter (Skin) yaması uygulanıyor...");
                 await PrepareSkinPackAsync(version);
@@ -773,114 +745,48 @@ namespace MistikLauncher
                 SetStatus("Minecraft baslatılıyor...");
                 App.Log($"Launch: {javaPath} {args[..Math.Min(args.Length,120)]}...");
 
-                // ★ PERF FIX: stdout/stderr redirect kaldırıldı – pipe buffer overhead yok
                 var psi = new ProcessStartInfo(javaPath, args) {
-                    WorkingDirectory = App.GameDir,
-                    UseShellExecute  = false,
-                    CreateNoWindow = true
+                    WorkingDirectory=App.GameDir, UseShellExecute=false, CreateNoWindow=true,
+                    RedirectStandardOutput=true, RedirectStandardError=true
                 };
-                var process = Process.Start(psi);
-                if (process != null)
-                {
-                    // Wait 1.5 seconds to detect immediate exit or crash
-                    await Task.Delay(1500);
-                    if (process.HasExited)
-                    {
-                        throw new Exception($"Oyun baslatılamadı veya beklenmedik sekilde kapandı. (Exit Code: {process.ExitCode})");
+                var process=Process.Start(psi) ?? throw new InvalidOperationException("Java process could not start.");
+                void Capture(object sender,DataReceivedEventArgs line) {
+                    if(line.Data==null) return;
+                    lock(outputGate) {
+                        captured.AppendLine(line.Data.Length>4096?line.Data[..4096]:line.Data);
+                        if(captured.Length>65536) captured.Remove(0,captured.Length-65536);
                     }
-
-                    // ── Kernel Optimizasyonlarını Uygula ──
-                    bool anyKernelOpt = Config.KernelPriority || Config.KernelTimer || Config.KernelAffinity || Config.KernelPower || Config.KernelNagle || Config.KernelGpu;
-                    if (anyKernelOpt)
-                    {
-                        SetStatus("Kernel optimizasyonları uygulanıyor...");
-                        KernelOptimizer.ApplyAll(process, Config);
-                    }
-
-                    // Oyun kapandığında optimizasyonları geri al ve başlatıcıyı geri aç
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            await process.WaitForExitAsync();
-                            int exitCode = process.ExitCode;
-                            KernelOptimizer.RevertAll();
-                            App.Log($"[Oyun İzleme] Oyun kapandı. Exit Code: {exitCode}");
-
-                            if (exitCode != 0)
-                            {
-                                App.Log($"[Oyun İzleme] Oyun anormal şekilde kapandı (çöktü)! Hata analizi yapılıyor...");
-                                _ = Task.Run(async () =>
-                                {
-                                    try
-                                    {
-                                        string crashLog = "Oyun Hata Kodu ile Çöktü. Exit Code: " + exitCode;
-                                        string crashStack = "Detaylı çökme raporu bulunamadı.";
-
-                                        // 1. En son crash-reports dosyasını bulmaya çalış
-                                        string crashDir = Path.Combine(App.GameDir, "crash-reports");
-                                        if (Directory.Exists(crashDir))
-                                        {
-                                            var latestCrash = new DirectoryInfo(crashDir)
-                                                .GetFiles("crash-*.txt")
-                                                .OrderByDescending(f => f.LastWriteTime)
-                                                .FirstOrDefault();
-
-                                            if (latestCrash != null && (DateTime.Now - latestCrash.LastWriteTime).TotalMinutes < 3)
-                                            {
-                                                // Son 3 dakika içinde oluşturulmuş bir crash report var
-                                                var lines = await File.ReadAllLinesAsync(latestCrash.FullName);
-                                                crashLog = lines.FirstOrDefault(l => l.StartsWith("Description:")) ?? "Minecraft Çökme Raporu (" + latestCrash.Name + ")";
-                                                crashStack = string.Join("\n", lines.Take(50)); // İlk 50 satırı stack trace olarak al
-                                                App.Log($"[Oyun İzleme] En son crash report dosyası okundu: {latestCrash.Name}");
-                                            }
-                                        }
-
-                                        // 2. Eğer crash report yoksa, logs/latest.log dosyasının son 30 satırını oku (FATAL/ERROR satırları arat)
-                                        if (crashStack == "Detaylı çökme raporu bulunamadı.")
-                                        {
-                                            string latestLogPath = Path.Combine(App.GameDir, "logs", "latest.log");
-                                            if (File.Exists(latestLogPath))
-                                            {
-                                                var lines = await File.ReadAllLinesAsync(latestLogPath);
-                                                var last30 = lines.Skip(Math.Max(0, lines.Length - 30)).ToArray();
-                                                
-                                                var errorLine = last30.LastOrDefault(l => l.Contains("[ERROR]") || l.Contains("[FATAL]") || l.Contains("Exception in thread")) ?? "Bilinmeyen çökme hatası.";
-                                                crashLog = "Oyun Günlüğü Hatası: " + errorLine;
-                                                crashStack = "En Son Log Çıktısı (Son 30 Satır):\n" + string.Join("\n", last30);
-                                                App.Log("[Oyun İzleme] logs/latest.log dosyasının son satırları okundu.");
-                                            }
-                                        }
-
-                                        // Firebase'e hatayı gönder!
-                                        await MistikAnalytics.TrackCrashAsync(Config.User ?? "Oyuncu", crashLog, crashStack);
-                                    }
-                                    catch (Exception exVal)
-                                    {
-                                        App.Log($"[Oyun İzleme] Çökme analizi başarısız: {exVal.Message}");
-                                    }
-                                });
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            App.Log($"[KernelOpt] Oyun izleme hatası: {ex.Message}");
-                            KernelOptimizer.RevertAll();
-                        }
-                        finally
-                        {
-                            if (Config.AutoClose)
-                            {
-                                Dispatcher.Invoke(() =>
-                                {
-                                    this.Show();
-                                    this.WindowState = WindowState.Normal;
-                                    this.Activate();
-                                });
-                            }
-                        }
-                    });
                 }
+                process.OutputDataReceived+=Capture; process.ErrorDataReceived+=Capture;
+                process.BeginOutputReadLine(); process.BeginErrorReadLine();
+                await Task.Delay(1500);
+                if(process.HasExited) {
+                    process.WaitForExit();
+                    int earlyExit=process.ExitCode; process.Dispose();
+                    string output; lock(outputGate) output=captured.ToString();
+                    CrashDiagnostics.Show(this,CrashDiagnostics.Report(earlyExit,started,output));
+                    return;
+                }
+                gameRunning=true;
+                if(Config.KernelPriority || Config.KernelTimer || Config.KernelAffinity || Config.KernelPower || Config.KernelNagle || Config.KernelGpu)
+                    KernelOptimizer.ApplyAll(process,Config);
+                if(Config.AutoClose) Hide();
+                _ = Task.Run(async ()=> {
+                    try {
+                        await process.WaitForExitAsync(); process.WaitForExit();
+                        int exit=process.ExitCode;
+                        string output; lock(outputGate) output=captured.ToString();
+                        string? report=exit==0?null:CrashDiagnostics.Report(exit,started,output);
+                        await Dispatcher.InvokeAsync(()=> {
+                            if(report!=null) CrashDiagnostics.Show(this,report);
+                            else if(Config.AutoClose) { Show(); WindowState=WindowState.Normal; Activate(); }
+                        });
+                    } catch(Exception monitorError) { App.Log("Game monitor: "+monitorError.Message); }
+                    finally {
+                        KernelOptimizer.RevertAll(); process.Dispose();
+                        if(!Dispatcher.HasShutdownStarted) await Dispatcher.InvokeAsync(()=> { gameRunning=false; BtnLaunch.IsEnabled=true; });
+                    }
+                });
                 SetProgress(100);
                 Relay?.UpdateStatus("Oyunda", version, "Minecraft");
 
@@ -901,24 +807,20 @@ namespace MistikLauncher
                 }
                 catch { }
 
-                if (Config.AutoClose)
-                {
-                    Dispatcher.Invoke(() => this.Hide());
-                }
+
             }
             catch (Exception ex)
             {
                 App.Log($"Launch error: {ex.Message}");
                 try { _ = MistikAnalytics.TrackCrashAsync(Config.User ?? "Oyuncu", $"Oyun Başlatma Hatası: {ex.Message}", ex.StackTrace ?? ""); } catch { }
-                MessageBox.Show($"Baslatma hatasi:\n{ex.Message}", "Hata",
-                                MessageBoxButton.OK, MessageBoxImage.Error);
+                CrashDiagnostics.Show(this,CrashDiagnostics.Report(null,started,ex.Message));
             }
             finally
             {
-                BtnLaunch.IsEnabled = true;
-                BtnLaunch.Content   = "OYUNA GIR";
+                BtnLaunch.IsEnabled = !gameRunning;
+                BtnLaunch.Content   = Localization.T("play");
                 SetProgress(0);
-                SetStatus($"Surum: {version}");
+                SetStatus($"{Localization.T("version")}: {version}");
             }
         }
 
@@ -2302,42 +2204,7 @@ namespace MistikLauncher
 
         public static bool RequiresJava25(string version)
         {
-            if (string.IsNullOrEmpty(version)) return false;
-            
-            var clean = version.Split(' ')[0];
-
-            // Snapshot check
-            var snapshotMatch = System.Text.RegularExpressions.Regex.Match(clean, @"^(\d{2})w(\d{2})[a-z]$");
-            if (snapshotMatch.Success)
-            {
-                if (int.TryParse(snapshotMatch.Groups[1].Value, out var year))
-                {
-                    if (year > 24) return true;
-                    if (year == 24)
-                    {
-                        if (int.TryParse(snapshotMatch.Groups[2].Value, out var week))
-                        {
-                            return week >= 36; // 24w36a+
-                        }
-                    }
-                }
-            }
-
-            var parts = GetVersionNumbers(clean);
-            if (parts.Count >= 2)
-            {
-                var major = parts[0];
-                var minor = parts[1];
-                var patch = parts.Count >= 3 ? parts[2] : 0;
-
-                if (major > 1) return true;
-                if (major == 1)
-                {
-                    if (minor > 21) return true;
-                    if (minor == 21 && patch >= 4) return true;
-                }
-            }
-            return false;
+            return !string.IsNullOrEmpty(version) && GameProfiles.RequiredJava(App.GameDir,version)>=25;
         }
 
         public async Task<string?> DownloadAndInstallJava25Async()
@@ -2446,7 +2313,7 @@ namespace MistikLauncher
             return null;
         }
 
-        void SetStatus(string s) => Dispatcher.Invoke(() => StatusLbl.Text = s);
+        void SetStatus(string s) => Dispatcher.Invoke(() => StatusLbl.Text = Localization.T(s));
 
         // ── Relay ─────────────────────────────────────────────────────────────
         async Task StartRelayAsync()

@@ -211,6 +211,25 @@ public class ModernSettingsPage : Page, ILanguagePage
             styleTiles.Add((style,tile,tick)); styleGrid.Children.Add(button);
         }
         UpdateWindowSelection(); windowContent.Children.Add(styleGrid); windowCard.Child=windowContent; stack.Children.Insert(3,windowCard);
+        windowContent.Children.Add(PageHelpers.Lbl(Localization.Language=="en"?"Close button lighting":"Çıkış düğmesi aydınlatması",14,"#EFF5FF",true));
+        var lightRow=new WrapPanel { Margin=new Thickness(0,8,0,0) };
+        var modes=new[]{"Theme","RGB","Rainbow","Off"};
+        var lighting=new ComboBox { ItemsSource=Localization.Language=="en"?new[]{"Theme","RGB","Rainbow","Off"}:new[]{"Tema","RGB","Gökkuşağı","Kapalı"},SelectedIndex=Array.IndexOf(modes,main.Config.CloseLighting),Width=140,MinHeight=36,Margin=new Thickness(0,0,10,0) };
+        var rgb=PageHelpers.DarkTextBox(main.Config.CloseRgb); rgb.Width=110; rgb.MaxLength=7; rgb.ToolTip="#RRGGBB";
+        var lightStatus=PageHelpers.Lbl("",12,"#F0CF84");
+        lighting.Name="CloseLightingBox"; rgb.Name="CloseRgbBox";
+        System.Windows.Automation.AutomationProperties.SetName(lighting,Localization.Language=="en"?"Close button lighting":"Çıkış düğmesi aydınlatması");
+        var applyLight=PageHelpers.MkBtn(Localization.Language=="en"?"Apply":"Uygula","#226DA0"); applyLight.Margin=new Thickness(10,0,0,0);
+        void ApplyLighting() {
+            bool valid=Regex.IsMatch(rgb.Text,"^#[0-9A-Fa-f]{6}$");
+            if(lighting.SelectedIndex==1 && !valid) { lightStatus.Text=Localization.Language=="en"?"Use #RRGGBB, for example #FFB000.":"#RRGGBB kullanın; örneğin #FFB000."; return; }
+            main.Config.CloseLighting=modes[Math.Max(0,lighting.SelectedIndex)]; if(valid) main.Config.CloseRgb=rgb.Text;
+            ConfigManager.Save(main.Config); main.ApplyWindowAppearance(); lightStatus.Text="";
+        }
+        lighting.SelectionChanged+=(_,_)=>ApplyLighting(); applyLight.Click+=(_,_)=>ApplyLighting();
+        rgb.TextChanged+=(_,_)=> { if(lighting.SelectedIndex==1) ApplyLighting(); };
+        lightRow.Children.Add(lighting); lightRow.Children.Add(rgb); lightRow.Children.Add(applyLight);
+        windowContent.Children.Add(lightRow); windowContent.Children.Add(lightStatus);
         Label("username"); user=PageHelpers.DarkTextBox(main.Config.User); user.MaxLength=16; stack.Children.Add(user);
         stack.Children.Add(PageHelpers.Lbl(Localization.T("usernameHelp"),13,"#BDCAD8",wrap:TextWrapping.Wrap));
         Label("memory"); ram=PageHelpers.DarkTextBox(main.Config.Ram.ToString()); stack.Children.Add(ram);

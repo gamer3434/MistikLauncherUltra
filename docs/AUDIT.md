@@ -1,5 +1,21 @@
 # Audit / Denetim
 
+## Preview.7 — PC findings / PC bulguları
+
+| Problem / Sorun | Correction / Düzeltme |
+|---|---|
+| 1.21.11 incorrectly demanded Java 25 / Yanlış Java 25 gereksinimi | Official inherited Java metadata / Resmî kalıtılmış Java bilgisi |
+| Ancient alpha IDs sorted above new releases / Eski alfa sürümleri üstte | Official release dates with inherited-profile dates / Resmî yayın tarihleri |
+| Home version stayed stale / Ana panel sürümü eski kaldı | Refresh home after selection / Seçim sonrası panel yenileme |
+| Borderless maximize overlapped taskbar / Tam ekranda görev çubuğu çakıştı | Native monitor work-area bounds / Monitör çalışma alanı sınırı |
+| Launch still forced server authentication off / Başlatma sunucu doğrulamasını kapatıyordu | Removed recursive property mutation / Zorunlu dosya değişikliği kaldırıldı |
+| Java early-exit diagnostics lost / Java açılış hataları kayboluyordu | Drain bounded stdout/stderr, show actionable bilingual report / Sınırlı çıktılar ve iki dilli rapor |
+| Another game could launch while hidden / Oyun çalışırken tekrar başlatılabiliyordu | Keep launch disabled until child exit / İşlem bitene kadar başlatmayı kapat |
+| RGB selector visually stuck on Rainbow / RGB seçici Rainbow'da kaldı | Preserve WPF bindings; skip generated ComboBox text during translation / WPF bağlantılarını koru |
+| Glow applied to all caption buttons / Tüm pencere düğmeleri parlıyordu | Glow exclusively on close, with RGB/Rainbow/Off / Yalnızca çıkışta aydınlatma |
+
+Evidence and remaining issues / Kanıt ve eksikler: [PC report](PC-TESTS-PREVIEW-7.md).
+
 Base: `7d90ade`. Version: `6.0.0-preview.1`.
 
 | Problem | Correction |
