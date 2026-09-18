@@ -23,6 +23,14 @@ public static class Localization
         }
     }
     public static string T(string key) => Catalogs[Language].GetValueOrDefault(key, key);
+    public static void RegisterText(DependencyObject node,string source)
+    {
+        var translated=T(source);
+        node.SetValue(SourceProperty,source); node.SetValue(RenderedProperty,translated);
+        if(node is HeaderedContentControl headered) headered.Header=translated;
+        else if(node is TextBlock text) text.Text=translated;
+        else if(node is ContentControl control) control.Content=translated;
+    }
     public static void SetLanguage(string code)
     {
         Language = code == "en" || code == "English" ? "en" : "tr";
@@ -38,6 +46,7 @@ public static class Localization
         string? current = node switch
         {
             TextBlock text => text.Text,
+            HeaderedContentControl headered when headered.Header is string title => title,
             ContentControl control when control is not ComboBoxItem && control.Content is string value => value,
             _ => null
         };
@@ -47,7 +56,8 @@ public static class Localization
             if (previous != current) node.SetValue(SourceProperty, current);
             var source = node.GetValue(SourceProperty) as string ?? current;
             var translated = T(source);
-            if (node is TextBlock text) text.SetCurrentValue(TextBlock.TextProperty, translated);
+            if(node is HeaderedContentControl headered) headered.SetCurrentValue(HeaderedContentControl.HeaderProperty,translated);
+            else if (node is TextBlock text) text.SetCurrentValue(TextBlock.TextProperty, translated);
             else if (node is ContentControl control) control.SetCurrentValue(ContentControl.ContentProperty, translated);
             node.SetValue(RenderedProperty, translated);
         }

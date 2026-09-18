@@ -30,11 +30,12 @@ namespace MistikLauncher.Pages
             bool bold = false, Thickness? pad = null, TextWrapping wrap = TextWrapping.Wrap)
         {
             var tb = new TextBlock {
-                Text = text, FontSize = size, Foreground = HexBrush(color),
+                Text = text, FontSize = Math.Max(12,size), Foreground = HexBrush(color),
                 FontFamily = new FontFamily("Segoe UI"), TextWrapping = wrap,
                 VerticalAlignment = VerticalAlignment.Center };
             if (bold) tb.FontWeight = FontWeights.Bold;
             if (pad.HasValue) tb.Padding = pad.Value;
+            Localization.RegisterText(tb,text);
             return tb;
         }
 
@@ -50,18 +51,20 @@ namespace MistikLauncher.Pages
         public static Button MkBtn(string text, string color = "#00A3FF", double width = 0)
         {
             var btn = new Button {
-                Content = text, MinHeight = 38, Background = HexBrush(color), Foreground = ColorThemes.IsThemed(color)?ColorThemes.ActionText:Brushes.White,
+                Content = text, MinHeight = 40, Background = HexBrush(color), Foreground = color.ToUpperInvariant() is "#00A3FF" or "#226DA0" or "#65C6E8"?ColorThemes.ActionText:Brushes.White,
                 BorderThickness = new Thickness(0), FontFamily = new FontFamily("Segoe UI"),
-                FontSize = 12, FontWeight = FontWeights.Bold,
+                FontSize = 13, FontWeight = FontWeights.SemiBold,
+                HorizontalContentAlignment=HorizontalAlignment.Center,VerticalContentAlignment=VerticalAlignment.Center,
                 Padding = new Thickness(14, 7, 14, 7), Cursor = System.Windows.Input.Cursors.Hand };
-            if (width > 0) btn.Width = width;
+            if (width > 0) btn.MinWidth = width;
             btn.Template = RoundedTemplate(color);
+            Localization.RegisterText(btn,text);
             return btn;
         }
 
         static ControlTemplate RoundedTemplate(string color)
         {
-            const string xaml = "<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border Name='border' Background='{TemplateBinding Background}' CornerRadius='8' Padding='{TemplateBinding Padding}' BorderThickness='2' BorderBrush='Transparent'><ContentPresenter HorizontalAlignment='Center' VerticalAlignment='Center'/></Border><ControlTemplate.Triggers><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='border' Property='BorderBrush' Value='White'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='border' Property='Opacity' Value='0.85'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter TargetName='border' Property='Opacity' Value='0.45'/></Trigger></ControlTemplate.Triggers></ControlTemplate>";
+            const string xaml = "<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border Name='border' Background='{TemplateBinding Background}' CornerRadius='8' Padding='{TemplateBinding Padding}' BorderThickness='2' BorderBrush='Transparent'><ContentPresenter HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}' VerticalAlignment='{TemplateBinding VerticalContentAlignment}'/></Border><ControlTemplate.Triggers><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='border' Property='BorderBrush' Value='White'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='border' Property='Opacity' Value='0.85'/></Trigger><Trigger Property='IsPressed' Value='True'><Setter TargetName='border' Property='Opacity' Value='0.65'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter TargetName='border' Property='Opacity' Value='0.45'/></Trigger></ControlTemplate.Triggers></ControlTemplate>";
             return (ControlTemplate)System.Windows.Markup.XamlReader.Parse(xaml);
         }
 
@@ -70,7 +73,7 @@ namespace MistikLauncher.Pages
                 Background = HexBrush("#222222"), Foreground = Brushes.White, CaretBrush = Brushes.White,
                 BorderBrush = HexBrush("#333333"), BorderThickness = new Thickness(1),
                 Padding = new Thickness(10, 8, 10, 8), FontFamily = new FontFamily("Segoe UI"),
-                FontSize = 13, Height = height, Text = placeholder,
+                FontSize = 13, MinHeight = height, Text = placeholder,
                 VerticalContentAlignment = VerticalAlignment.Center };
 
         public static TextBlock SectionTitle(string text) => Lbl(text, 14, "#BDCAD8", true);
@@ -482,6 +485,7 @@ namespace MistikLauncher.Pages
                 infoSp.Children.Add(PageHelpers.Lbl(item.Item1, 14, "#FFFFFF", true));
                 infoSp.Children.Add(PageHelpers.Lbl(item.Item2, 11, "#A0A0A0"));
                 var chk = new CheckBox { IsChecked = item.Item3, VerticalAlignment = VerticalAlignment.Center };
+                System.Windows.Automation.AutomationProperties.SetName(chk, Localization.T(item.Item1));
                 chk.Checked   += (_, _) => vals[idx] = true;
                 chk.Unchecked += (_, _) => vals[idx] = false;
                 Grid.SetColumn(chk, 1); row.Children.Add(infoSp); row.Children.Add(chk);
@@ -506,7 +510,7 @@ namespace MistikLauncher.Pages
 
             // ── Kernel Optimizasyonları Kartı ──
             sp.Children.Add(new Separator { Background = PageHelpers.HexBrush("#282828"), Margin = new Thickness(0, 20, 0, 20) });
-            sp.Children.Add(PageHelpers.Lbl("🔧 Kernel Düzeyinde Optimizasyonlar", 18, "#FF6B00", true));
+            sp.Children.Add(PageHelpers.Lbl("Kernel Düzeyinde Optimizasyonlar", 18, "#FFFFFF", true));
             sp.Children.Add(PageHelpers.Lbl("Oyun başlatılınca otomatik uygulanır, kapanınca geri alınır. GPU'ya dokunmaz.", 11, "#A0A0A0"));
 
             var kernCard = PageHelpers.Card("#181818", 12, margin: new Thickness(0, 12, 0, 0));

@@ -175,6 +175,9 @@ class Program
                 }
                 double background=Luminance(ColorThemes.Brush("#00A3FF").Color), foreground=Luminance(((SolidColorBrush)ColorThemes.ActionText).Color);
                 Check((Math.Max(background,foreground)+0.05)/(Math.Min(background,foreground)+0.05)>=4.5,"primary action text contrast meets 4.5:1: "+name);
+                var secondary=MistikLauncher.Pages.PageHelpers.MkBtn("Secondary","#203853");
+                double dark=Luminance(((SolidColorBrush)secondary.Background).Color), light=Luminance(((SolidColorBrush)secondary.Foreground).Color);
+                Check((Math.Max(dark,light)+0.05)/(Math.Min(dark,light)+0.05)>=4.5,"secondary button stays readable after theme change: "+name);
                 window.Navigate("Dash");
             }
             window.SetColorTheme("Amber");
@@ -205,6 +208,19 @@ class Program
                 Check(Texts(window.Content as DependencyObject).Contains(Localization.T("luTitle")+" · "+window.LauncherUpdates.CurrentVersion),"cached settings language " + code);
                 var settingsPage=(MistikLauncher.Pages.ModernSettingsPage)((Frame)window.FindName("MainFrame")).Content;
                 var settingsScroll=((DockPanel)settingsPage.Content).Children.OfType<ScrollViewer>().Single();
+                var player=Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="PlayerNameBox");
+                var memory=Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="MemoryBox");
+                player.Text="PendingName"; memory.Text="invalid";
+                window.SwitchLanguage(code=="tr"?"en":"tr"); Flush(window);
+                Check(Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="PlayerNameBox").Text=="PendingName" && Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="MemoryBox").Text=="invalid","language switching preserves unsaved form values: "+code);
+                window.SwitchLanguage(code); Flush(window);
+                settingsScroll=((DockPanel)settingsPage.Content).Children.OfType<ScrollViewer>().Single();
+                Nodes(settingsPage).OfType<Button>().Single(button=>button.Name=="SaveSettingsButton").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
+                var feedback=Nodes(settingsPage).OfType<TextBlock>().Single(text=>text.Name=="SettingsResult");
+                Check(feedback.Text==Localization.T("invalid") && !Nodes(settingsScroll).Contains(feedback),"validation feedback remains in fixed footer: "+code);
+                Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="PlayerNameBox").Text=window.Config.User;
+                Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="MemoryBox").Text=window.Config.Ram.ToString();
+                feedback.Text="";
                 var lighting=Nodes(settingsPage).OfType<ComboBox>().Single(box=>box.Name=="CloseLightingBox");
                 Check(!Texts(settingsPage).Contains(Localization.T("cloudTitle")) && !Nodes(settingsPage).OfType<PasswordBox>().Any(),"cloud account UI removed: "+code);
                 Check(lighting.Items.Count==3 && !lighting.Items.Cast<string>().Any(item=>item.Contains("Rainbow") || item.Contains("Gökkuşağı")),"single RGB mode replaces Rainbow: "+code);
@@ -214,20 +230,43 @@ class Program
                 var closeFrame=((StackPanel)window.FindName("CaptionButtons")).Children.OfType<Button>().Where(CaptionHasGlow).Select(button=>(Border)button.Content).Single();
                 var circle=((Grid)closeFrame.Child).Children.OfType<Border>().Single();
                 var cross=((Grid)closeFrame.Child).Children.OfType<System.Windows.Shapes.Path>().Single();
-                Check(circle.Width==38 && circle.Height==24 && circle.CornerRadius.TopLeft==5 && cross.HorizontalAlignment==HorizontalAlignment.Center && cross.VerticalAlignment==VerticalAlignment.Center && ((SolidColorBrush)circle.BorderBrush).HasAnimatedProperties && circle.Effect.HasAnimatedProperties && ConfigManager.Load().CloseLighting=="RGB","centered rounded rectangle RGB outline and glow animate and persist: "+code);
+                Check(circle.Width==38 && circle.Height==24 && circle.CornerRadius.TopLeft==5 && cross.HorizontalAlignment==HorizontalAlignment.Center && cross.VerticalAlignment==VerticalAlignment.Center && ((SolidColorBrush)circle.BorderBrush).HasAnimatedProperties==SystemParameters.ClientAreaAnimation && circle.Effect.HasAnimatedProperties==SystemParameters.ClientAreaAnimation && ConfigManager.Load().CloseLighting=="RGB","centered RGB outline respects animation preference and persists: "+code);
                 var before=((SolidColorBrush)circle.BorderBrush).Color;
                 var animationFrame=new DispatcherFrame();
                 var animationTimer=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(350) };
                 animationTimer.Tick+=(_,_)=> { animationTimer.Stop(); animationFrame.Continue=false; };
                 animationTimer.Start(); Dispatcher.PushFrame(animationFrame);
-                Check(((SolidColorBrush)circle.BorderBrush).Color!=before && ((System.Windows.Media.Effects.DropShadowEffect)circle.Effect).Color==((SolidColorBrush)circle.BorderBrush).Color,"RGB changes color over time and glow stays synchronized: "+code);
+                Check((((SolidColorBrush)circle.BorderBrush).Color!=before)==SystemParameters.ClientAreaAnimation && ((System.Windows.Media.Effects.DropShadowEffect)circle.Effect).Color==((SolidColorBrush)circle.BorderBrush).Color,"RGB motion follows Windows preference and glow stays synchronized: "+code);
                 lighting.SelectedIndex=2; Flush(window);
                 Check(((StackPanel)window.FindName("CaptionButtons")).Children.OfType<Button>().All(button=>!CaptionHasGlow(button)),"Off disables caption lighting: "+code);
                 lighting.SelectedIndex=1; Flush(window);
-                settingsScroll.ScrollToVerticalOffset(300); Capture(window,Path.Combine(output,"window-styles-"+code+".png"));
+                var styleHeading=Nodes(settingsPage).OfType<TextBlock>().Single(text=>text.Text==Localization.T("windowStyleTitle"));
+                settingsScroll.ScrollToVerticalOffset(styleHeading.TranslatePoint(new Point(0,0),(UIElement)settingsScroll.Content).Y-20); Capture(window,Path.Combine(output,"window-styles-"+code+".png"));
                 settingsScroll.ScrollToTop();
                 window.Navigate("Server"); Capture(window,Path.Combine(output,"server-"+code+".png"));
+                var status=(TextBlock)window.FindName("StatusLbl"); var previousStatus=status.Text; status.Text=new string('W',250);
+                window.Navigate("Dash"); Capture(window,Path.Combine(output,"home-compact-"+code+".png"),960,640);
+                var root=(FrameworkElement)window.Content;
+                var selector=(ComboBox)window.FindName("VerBox");
+                Check(status.TranslatePoint(new Point(status.ActualWidth,0),root).X<=selector.TranslatePoint(new Point(0,0),root).X,"long status cannot overlap launch controls at compact width: "+code);
+                var captionTitle=(TextBlock)window.FindName("CaptionTitle");
+                Check(Math.Abs(captionTitle.TranslatePoint(new Point(captionTitle.ActualWidth/2,0),root).X-root.ActualWidth/2)<1,"caption title remains centered regardless of button position: "+code);
+                status.Text=previousStatus; window.Navigate("Settings"); Capture(window,Path.Combine(output,"settings-compact-"+code+".png"),960,640);
+                window.Navigate("Vers"); Capture(window,Path.Combine(output,"versions-"+code+".png"));
+                window.Navigate("Mods"); Capture(window,Path.Combine(output,"mods-"+code+".png"),960,640);
+                var currentModPage=(DependencyObject)((Frame)window.FindName("MainFrame")).Content;
+                Check(Texts(currentModPage).Contains(Localization.T("modCenterTitle")),"mod center opens in selected language: "+code);
+                window.SwitchLanguage(code=="tr"?"en":"tr"); Flush(window);
+                Check(Texts(currentModPage).Contains(Localization.T("modCenterTitle")),"cached mod center headings follow language switch: "+code);
+                window.SwitchLanguage(code); Flush(window);
+                window.Navigate("Skin"); Capture(window,Path.Combine(output,"skin-"+code+".png"),960,640);
+                Check(Texts((DependencyObject)((Frame)window.FindName("MainFrame")).Content).Contains(Localization.T("skinStudioTitle")),"cached character studio opens in selected language: "+code);
+                window.Navigate("Opt"); Capture(window,Path.Combine(output,"performance-"+code+".png"),960,640);
             }
+            var horizontal=new System.Windows.Controls.Primitives.ScrollBar { Orientation=Orientation.Horizontal,Style=(Style)application.FindResource(typeof(System.Windows.Controls.Primitives.ScrollBar)) };
+            horizontal.ApplyTemplate();
+            var track=(System.Windows.Controls.Primitives.Track)horizontal.Template.FindName("PART_Track",horizontal);
+            Check(double.IsNaN(horizontal.Width) && horizontal.Height==12 && track.DecreaseRepeatButton.Command==System.Windows.Controls.Primitives.ScrollBar.PageLeftCommand && track.IncreaseRepeatButton.Command==System.Windows.Controls.Primitives.ScrollBar.PageRightCommand,"horizontal scrollbar preserves width and page commands");
             window.Close();
             Console.WriteLine($"{checks} checks passed. Test data: {testRoot}");
             return 0;
@@ -248,12 +287,12 @@ class Program
         for(int i=0;i<VisualTreeHelper.GetChildrenCount(node);i++)
             foreach(var child in Nodes(VisualTreeHelper.GetChild(node,i))) yield return child;
     }
-    static void Capture(Window window,string path)
+    static void Capture(Window window,string path,int width=1200,int height=820)
     {
         Flush(window);
         var root=(FrameworkElement)window.Content;
-        root.Measure(new Size(1200,820)); root.Arrange(new Rect(0,0,1200,820)); root.UpdateLayout();
-        var bitmap=new RenderTargetBitmap(1200,820,96,96,PixelFormats.Pbgra32); bitmap.Render(root);
+        root.Measure(new Size(width,height)); root.Arrange(new Rect(0,0,width,height)); root.UpdateLayout();
+        var bitmap=new RenderTargetBitmap(width,height,96,96,PixelFormats.Pbgra32); bitmap.Render(root);
         var encoder=new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var file=File.Create(path); encoder.Save(file);
     }

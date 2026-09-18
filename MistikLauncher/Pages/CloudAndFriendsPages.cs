@@ -18,18 +18,18 @@ namespace MistikLauncher.Pages
         {
             Background = Brushes.Transparent;
             var sp = new StackPanel { Margin = new Thickness(40,30,40,30) };
-            sp.Children.Add(PageHelpers.Lbl("🎨  Karakter (Skin) Odasi", 24, "#FFFFFF", true));
-            sp.Children.Add(PageHelpers.Lbl("Kullanici adi arayip canlı önizleyerek veya bilgisayarinizdan .png skin yukleyerek karakterinizi degistirin", 12, "#A0A0A0"));
+            sp.Children.Add(PageHelpers.Lbl("skinStudioTitle", 28, "#FFFFFF", true));
+            sp.Children.Add(PageHelpers.Lbl("skinStudioIntro", 14, "#A0A0A0"));
 
             // Premium Skin Changer Info Card
-            var skinInfoCard = PageHelpers.Card("#0f1b29", 10, "#FFB100", new Thickness(0, 12, 0, 12));
+            var skinInfoCard = PageHelpers.Card("#192C46", 12, "#365574", new Thickness(0, 12, 0, 12));
             var skinInfoSp = new StackPanel { Margin = new Thickness(16, 12, 16, 12) };
-            skinInfoSp.Children.Add(PageHelpers.Lbl("💡 Karakter Değişikliği Hakkında Önemli Bilgiler", 13, "#FFB100", bold: true));
             skinInfoSp.Children.Add(PageHelpers.Lbl("• Oyununuz Açıkken Değiştirme: Oyun açıkken skin değiştirdiyseniz, oyun içinde F3 + T tuşlarına basarak kaynak paketlerini yenileyin veya oyunu yeniden başlatın.", 10, "#CCCCCC", wrap: TextWrapping.Wrap));
             skinInfoSp.Children.Add(PageHelpers.Lbl("• Çok Oyunculu Sunucular: Özel skin eklentisi (SkinsRestorer vb.) olan sunucularda sunucu taraflı skin sistemi geçerlidir. Mistik Skin Sistemi, Tek Oyunculu dünyalarda ve normal yerel ağ sunucularında çalışır.", 10, "#CCCCCC", wrap: TextWrapping.Wrap));
             skinInfoSp.Children.Add(PageHelpers.Lbl("• Paket Kontrolü: Oyun içinde Ayarlar > Kaynak Paketleri menüsünden 'Mistik Launcher Ozel Skin' paketinin aktif ve listede en üstte olduğundan emin olun.", 10, "#CCCCCC", wrap: TextWrapping.Wrap));
             skinInfoSp.Children.Add(PageHelpers.Lbl("• Çok Oyunculu & Arkadaş Skin Çakışması: Çevrimdışı (offline) modda skin kurduğunuzda, oyun tüm varsayılan Steve/Alex modellerini sizin skininizle değiştirir (arkadaşınız da sizde kendi skininizle görünür). Bunu çözmek için 'Ayarlar' sayfasından Giriş Türü'nü Ely.by (Önerilen) olarak ayarlayabilir veya aşağıdaki 'CustomSkinLoader' modunu kurabilirsiniz.", 10, "#FFD200", wrap: TextWrapping.Wrap, bold: true));
-            skinInfoCard.Child = skinInfoSp;
+            var skinHelp=new Expander { Content=skinInfoSp,Foreground=Brushes.White,Padding=new Thickness(16,12,16,12),IsExpanded=false };
+            Localization.RegisterText(skinHelp,"skinHelpTitle"); skinInfoCard.Child=skinHelp;
             sp.Children.Add(skinInfoCard);
 
             // Dual card grid
@@ -41,17 +41,19 @@ namespace MistikLauncher.Pages
             // Col 0: Search & Live Preview Card
             var searchCard = PageHelpers.Card("#181818", 12);
             var searchSp = new StackPanel { Margin = new Thickness(20) };
-            searchSp.Children.Add(PageHelpers.Lbl("🔍 Karakter Arama & Canlı Önizleme", 14, "#00A3FF", true));
-            searchSp.Children.Add(PageHelpers.Lbl("Premium oyuncu adı yazarak karakteri aratın ve önizleyin:", 10, "#888", wrap: TextWrapping.Wrap));
+            searchSp.Children.Add(PageHelpers.Lbl("skinLookupTitle", 18, "#FFFFFF", true));
+            searchSp.Children.Add(PageHelpers.Lbl("skinLookupHelp", 13, "#ADBED6", wrap: TextWrapping.Wrap));
             
             // Search Input Row
-            var searchRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) };
+            var searchRow = new Grid { Margin = new Thickness(0, 12, 0, 0) };
+            searchRow.ColumnDefinitions.Add(new ColumnDefinition()); searchRow.ColumnDefinitions.Add(new ColumnDefinition { Width=GridLength.Auto });
             var tb = PageHelpers.DarkTextBox(main.Config.User, 38); 
-            tb.Width = 150;
+            tb.Name="SkinLookupName"; tb.MinWidth=120; System.Windows.Automation.AutomationProperties.SetName(tb,Localization.T("username"));
             searchRow.Children.Add(tb);
             
             var searchBtn = PageHelpers.MkBtn("Ara & Önizle", "#00A3FF", 100);
             searchBtn.Margin = new Thickness(8, 0, 0, 0);
+            Grid.SetColumn(searchBtn,1);
             searchRow.Children.Add(searchBtn);
             searchSp.Children.Add(searchRow);
 
@@ -197,20 +199,22 @@ namespace MistikLauncher.Pages
             // Col 2: Custom Local Skin Card
             var localCard = PageHelpers.Card("#181818", 12);
             var localSp = new StackPanel { Margin = new Thickness(20) };
-            localSp.Children.Add(PageHelpers.Lbl("📁 Bilgisayardan Ozel Skin (.png) Yukle", 14, "#2EB82E", true));
-            localSp.Children.Add(PageHelpers.Lbl("Kendi indirdiginiz .png skin dosyasini oyuna kaynak paketi olarak yukleyin:", 10, "#888", wrap: TextWrapping.Wrap));
+            localSp.Children.Add(PageHelpers.Lbl("skinLocalTitle", 18, "#FFFFFF", true));
+            localSp.Children.Add(PageHelpers.Lbl("skinLocalHelp", 13, "#ADBED6", wrap: TextWrapping.Wrap));
             
-            var selectedPathRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) };
-            var pathBox = PageHelpers.DarkTextBox(main.Config.SkinType == "local" ? main.Config.SkinUser : "Dosya secilmedi...", 38);
-            pathBox.Width = 150;
+            var selectedPathRow = new Grid { Margin = new Thickness(0, 12, 0, 0) };
+            selectedPathRow.ColumnDefinitions.Add(new ColumnDefinition()); selectedPathRow.ColumnDefinitions.Add(new ColumnDefinition { Width=GridLength.Auto }); selectedPathRow.ColumnDefinitions.Add(new ColumnDefinition { Width=GridLength.Auto });
+            var pathBox = PageHelpers.DarkTextBox(main.Config.SkinType == "local" ? main.Config.SkinUser : "", 38);
+            pathBox.Name="SkinPathBox"; pathBox.MinWidth=80; System.Windows.Automation.AutomationProperties.SetName(pathBox,Localization.T("skinLocalTitle"));
             pathBox.IsReadOnly = true;
             selectedPathRow.Children.Add(pathBox);
 
-            var chooseBtn = PageHelpers.MkBtn("Gozat", "#2EB82E", 60);
+            var chooseBtn = PageHelpers.MkBtn("Gozat", "#203853", 60);
             chooseBtn.Margin = new Thickness(8, 0, 0, 0);
 
             var applyLocalBtn = PageHelpers.MkBtn("Uygula", "#00A3FF", 80);
             applyLocalBtn.Margin = new Thickness(8, 0, 0, 0);
+            Grid.SetColumn(chooseBtn,1); Grid.SetColumn(applyLocalBtn,2);
 
             selectedPathRow.Children.Add(chooseBtn);
             selectedPathRow.Children.Add(applyLocalBtn);
@@ -278,12 +282,12 @@ namespace MistikLauncher.Pages
             sp.Children.Add(skinTypeGrid);
 
             // Ely.by Cilt Entegrasyon Kartı
-            var elyCard = PageHelpers.Card("#111a24", 12, "#00A3FF", new Thickness(0, 8, 0, 0));
+            var elyCard = PageHelpers.Card("#192C46", 12, "#365574", new Thickness(0, 8, 0, 0));
             var elySp = new StackPanel { Margin = new Thickness(20) };
             elySp.Children.Add(PageHelpers.Lbl("🌐 Ely.by Cilt Entegrasyonu", 15, "#00A3FF", true));
             elySp.Children.Add(PageHelpers.Lbl("Ely.by hesabınızdaki skininizi doğrudan yönetin. Yüklediğiniz skinler arkadaşlarınız ve diğer Ely.by kullanıcıları tarafından oyunda otomatik olarak görünür!", 11, "#CCCCCC", wrap: TextWrapping.Wrap));
             
-            var elyBtnRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) };
+            var elyBtnRow = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
             
             var openElyInLauncherBtn = PageHelpers.MkBtn("🌐 Başlatıcı İçinde Aç", "#00A3FF", 160);
             openElyInLauncherBtn.Height = 35;
