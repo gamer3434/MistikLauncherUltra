@@ -4,7 +4,9 @@
 
 **Önizleme; tamamlanmış kararlı sürüm değildir.** Gerçek Vanilla/Forge oyun ve ayrı sunucu testleri yapıldı. Eski sayfaların tam çevirisi ve daha geniş özellik testleri sürüyor. Kaynak `codex/modernization-preview` dalında.
 
-### Güncel sürüm / Current version — 6.0.0-preview.9
+### Güncel sürüm / Current version — 6.0.1
+
+Güncelleme etiket karşılaştırması, kurulumun hata sonrası geri alınması ve güncellenen dosyaların kaldırma kayıtları düzeltildi. / Fixed update version comparison, installation rollback and uninstall ownership after updates. [6.0.1 ayrıntıları / Details](docs/RELEASE-6.0.1.md).
 
 Çıkış düğmesi artık 38×24 ölçülerinde, köşeleri yuvarlatılmış dikdörtgendir. Simetrik vektör çarpı tam ortalanır. **Tema**, **RGB · renk geçişi**, **Kapalı** seçenekleri korunur; RGB yalnızca çıkış çerçevesi ve ışığında yumuşak geçiş yapar. Bulut hesabı arayüzü ve otomatik profil eşitlemesi kaldırılmıştır; eski bulut kayıtları silinmez.
 
@@ -12,19 +14,19 @@ The close control now uses a 38×24 rounded rectangle and a precisely centered s
 
 Minecraft startup failure/nonzero exit restores the launcher and displays diagnostics. / Minecraft açılış hatası veya sıfırdan farklı çıkış kodu launcher'ı geri açar ve hata analizini gösterir. Real Vanilla/Forge gameplay results and previous remaining issues: [PC report](docs/PC-TESTS-PREVIEW-7.md).
 
-**Download / İndir:** [6.0.0-preview.9 release](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.0.0-preview.9).
+**Download / İndir:** [6.0.1 release](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.0.1).
 
-- `MistikSetup-Online-6.0.0-preview.9.exe`: uygulama paketini GitHub'dan indirir ve SHA-256 doğrular / downloads and verifies this version's package from GitHub.
-- `MistikSetup-Offline-6.0.0-preview.9.exe`: uygulama dosyaları içinde bulunur; kurulum için internet gerekmez / embeds the full application; installation needs no internet.
-- `MistikLauncher-6.0.0-preview.9-win-x64.zip`: taşınabilir seçenek / portable option.
+- `MistikSetup-Online-6.0.1.exe`: uygulama paketini GitHub'dan indirir ve SHA-256 doğrular / downloads and verifies this version's package from GitHub.
+- `MistikSetup-Offline-6.0.1.exe`: uygulama dosyaları içinde bulunur; kurulum için internet gerekmez / embeds the full application; installation needs no internet.
+- `MistikLauncher-6.0.1-win-x64.zip`: taşınabilir seçenek / portable option.
 
 Kurulum dili sihirbazın sağ üstünden seçilir. Varsayılan konum `%LOCALAPPDATA%\Programs\MistikLauncherUltra`; yönetici izni gerekmez. Windows uygulama listesinden kaldırılabilir. Ayarlar, modlar ve dünyalar `%APPDATA%\.mistik_ultra` altında korunur. Dolu klasöre kurulum engellenir; mevcut kurulumu uygulamanın güncelleyicisiyle güncelleyin veya önce kaldırın. Launcher için yeni sürümleri otomatik alma ayarı ayrıca kullanılabilir.
 
 Choose installer language at the upper right. Default per-user folder: `%LOCALAPPDATA%\Programs\MistikLauncherUltra`; no administrator rights needed. Uninstall through Windows installed apps. Existing settings, mods and worlds under `%APPDATA%\.mistik_ultra` are preserved. Nonempty destinations are rejected; use the launcher's updater or uninstall first. The launcher separately offers automatic updates for future versions.
 
-**İmza / Signing:** Bu çalışma alanındaki güncel Preview.9 paketi imzasızdır; Authenticode veya genel Windows yayıncı güveni sağlamaz. İsteğe bağlı yerel test imzası yalnızca maintainer build adımında kullanılabilir. / The current Preview.9 package in this workspace is unsigned; it carries no Authenticode signature or public Windows publisher trust. Optional local test signing is maintainer-only.
+**İmza / Signing:** Güncel 6.0.1 paketi imzasızdır; Authenticode veya genel Windows yayıncı güveni sağlamaz. İsteğe bağlı yerel test imzası yalnızca maintainer build adımında kullanılabilir. / The current 6.0.1 package is unsigned; it carries no Authenticode signature or public Windows publisher trust. Optional local test signing is maintainer-only.
 
-**209 checks passed** on the protected package, including centered RGB controls in both languages and installer ownership/corruption/cancellation/lock tests. / Korumalı pakette **209 kontrol geçti**; iki dilde ortalı RGB düğmesi ve kurulum güvenliği doğrulandı. [Release details / Yayın ayrıntıları](docs/RELEASE-PREVIEW-9.md). [Current window controls / Güncel pencere kontrolleri](docs/WINDOW-AND-TOOLBAR.md).
+**218 checks passed** on the protected package, including centered RGB controls in both languages, update metadata, installer rollback/retry, ownership/corruption/cancellation/lock tests. / Korumalı pakette **218 kontrol geçti**; iki dilde ortalı RGB düğmesi, güncelleme kayıtları ve başarısız kurulumdan sonra tekrar deneme doğrulandı. [Release details / Yayın ayrıntıları](docs/RELEASE-6.0.1.md). [Current window controls / Güncel pencere kontrolleri](docs/WINDOW-AND-TOOLBAR.md).
 
 [Kurulum kılavuzu ve görseller / Setup guide and previews](docs/SETUP-PREVIEW-9.md).
 

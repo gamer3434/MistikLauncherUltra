@@ -14,6 +14,7 @@ static class LauncherUpdateTests
         void Check(bool ok,string name) { if(!ok) throw new Exception(name); Console.WriteLine("PASS "+name); checks++; }
         Check(LauncherUpdater.IsNewer("v7.0.0","6.0.0-preview.1") && LauncherUpdater.IsNewer("v6.0.0","6.0.0-preview.1"),"stable upgrade and preview promotion");
         Check(!LauncherUpdater.IsNewer("v5.5.2","6.0.0-preview.1") && !LauncherUpdater.IsNewer("v6.0.0","6.0.0"),"no downgrade or same-version loop");
+        Check(LauncherUpdater.IsNewer("v6.0.0-preview.9","6.0.0-preview.8") && !LauncherUpdater.IsNewer("v6.0.0-preview.9","6.0.0-preview.9") && !LauncherUpdater.IsNewer("v6.0.0-preview.9","6.0.0"),"published preview comparison avoids repeat updates and stable downgrades");
         string payload=Path.Combine(root,"launcher-payload"); Directory.CreateDirectory(payload);
         var names=new[] {"MistikLauncher.exe","MistikLauncher.dll","MistikUpdater.exe"};
         foreach(var name in names) File.WriteAllText(Path.Combine(payload,name),"new "+name);
@@ -44,6 +45,7 @@ static class LauncherUpdateTests
         UpdateEngine.Apply(payload,target);
         Check(names.All(name=>File.ReadAllText(Path.Combine(target,name))=="new "+name),"full package replacement");
         Check(File.ReadAllText(Path.Combine(target,"config.json"))=="user preferences" && File.ReadAllText(Path.Combine(target,"game","world.dat"))=="world","launcher update preserves settings and worlds");
+        Check(JsonSerializer.Deserialize<UpdateManifest>(File.ReadAllText(Path.Combine(target,"update-manifest.json")))!.Version=="7.0.0","update replaces the installed manifest");
         foreach(var name in names) File.WriteAllText(Path.Combine(target,name),"old "+name);
         bool failed=false;
         using(var locked=new FileStream(Path.Combine(target,names[2]),FileMode.Open,FileAccess.Read,FileShare.None))
