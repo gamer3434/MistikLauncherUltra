@@ -6,6 +6,7 @@ namespace MistikLauncher.Updates;
 public sealed record UpdateFile(string Path,string Hash);
 public sealed record UpdateManifest(string Product,string Version,UpdateFile[] Files);
 public sealed record UpdatePlan(string Target,string Payload,int ParentId,long ParentStarted,string Language);
+public sealed record UpdateInstallState(string Product,string Root,string Version,string[] Files);
 public static class UpdateEngine
 {
     public static string SafePath(string directory,string relative)
@@ -41,11 +42,11 @@ public static class UpdateEngine
     public static UpdateManifest Verify(string payload)
     {
         var manifest=JsonSerializer.Deserialize<UpdateManifest>(File.ReadAllText(SafePath(payload,"update-manifest.json"))) ?? throw new InvalidDataException("Missing manifest.");
-        if(manifest.Product!="MistikLauncher" || manifest.Files==null || manifest.Files.Length==0) throw new InvalidDataException("Wrong update product.");
+        if(manifest.Product!="MistikLauncher" || manifest.Files==null || manifest.Files.Length==0 || manifest.Files.Length>3000) throw new InvalidDataException("Wrong update product.");
         var names=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach(var item in manifest.Files)
         {
-            if(!names.Add(item.Path) || item.Path=="update-manifest.json") throw new InvalidDataException("Duplicate manifest entry.");
+            if(!names.Add(item.Path) || item.Path.Equals("update-manifest.json",StringComparison.OrdinalIgnoreCase) || item.Path.Equals("install-state.json",StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Duplicate or reserved manifest entry.");
             string path=SafePath(payload,item.Path);
             using var file=File.OpenRead(path);
             if(!Convert.ToHexString(SHA256.HashData(file)).Equals(item.Hash,StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Payload digest mismatch.");
@@ -65,9 +66,24 @@ public static class UpdateEngine
         var completed=new List<(string Destination,string? Backup)>();
         try
         {
-            foreach(var item in manifest.Files)
+            var replacements=manifest.Files.Select(item=>(item.Path,Source:SafePath(payload,item.Path))).ToList();
+            replacements.Add(("update-manifest.json",SafePath(payload,"update-manifest.json")));
+            string marker=SafePath(target,"install-state.json");
+            if(File.Exists(marker))
             {
-                string destination=SafePath(target,item.Path), source=SafePath(payload,item.Path);
+                using var state=JsonDocument.Parse(File.ReadAllText(marker));
+                var record=state.RootElement;
+                if(record.GetProperty("Product").GetString()!="MistikLauncher" || !System.IO.Path.GetFullPath(record.GetProperty("Root").GetString()!).Equals(System.IO.Path.GetFullPath(target),StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Invalid installation record.");
+                var owned=record.GetProperty("Files").EnumerateArray().Select(entry=>entry.GetString()!).ToArray();
+                if(owned.Length>3000) throw new InvalidDataException("Invalid ownership record.");
+                foreach(var path in owned) { SafePath(target,path); if(path.Equals("install-state.json",StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Invalid ownership record."); }
+                string updated=backup+".install-state.json";
+                File.WriteAllText(updated,JsonSerializer.Serialize(new UpdateInstallState("MistikLauncher",System.IO.Path.GetFullPath(target),manifest.Version,owned.Concat(manifest.Files.Select(item=>item.Path)).Append("update-manifest.json").Distinct(StringComparer.OrdinalIgnoreCase).ToArray())));
+                replacements.Add(("install-state.json",updated));
+            }
+            foreach(var item in replacements)
+            {
+                string destination=SafePath(target,item.Path), source=item.Source;
                 Directory.CreateDirectory(System.IO.Path.GetDirectoryName(destination)!);
                 string? saved=null;
                 if(File.Exists(destination)) { saved=SafePath(backup,item.Path); Directory.CreateDirectory(System.IO.Path.GetDirectoryName(saved)!); File.Copy(destination,saved); }
@@ -76,6 +92,8 @@ public static class UpdateEngine
                 finally { if(File.Exists(temporary)) File.Delete(temporary); }
                 completed.Add((destination,saved));
             }
+            using var key=Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\MistikLauncherUltra",true);
+            if(key?.GetValue("InstallLocation") is string location && System.IO.Path.GetFullPath(location).Equals(System.IO.Path.GetFullPath(target),StringComparison.OrdinalIgnoreCase)) key.SetValue("DisplayVersion",manifest.Version);
         }
         catch
         {
@@ -83,5 +101,6 @@ public static class UpdateEngine
                 if(item.Backup!=null) File.Copy(item.Backup,item.Destination,true); else File.Delete(item.Destination);
             throw;
         }
+        finally { if(File.Exists(backup+".install-state.json")) File.Delete(backup+".install-state.json"); }
     }
 }

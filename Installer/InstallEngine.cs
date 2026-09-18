@@ -17,7 +17,7 @@ public static class InstallEngine
         UpdateEngine.SafePath(root,"MistikLauncher.exe");
         return root;
     }
-    public static void Install(string payload,string root,bool shortcuts,CancellationToken cancellation=default,bool shell=true)
+    public static void Install(string payload,string root,bool shortcuts,CancellationToken cancellation=default,bool shell=true,Action? finalize=null)
     {
         root=ValidateRoot(root); var manifest=UpdateEngine.Verify(payload);
         if(Directory.Exists(root) && Directory.EnumerateFileSystemEntries(root).Any()) throw new IOException("Folder is not empty. Use launcher update or uninstall first / Klasör boş değil. Launcher güncellemesini kullanın veya önce kaldırın.");
@@ -31,12 +31,21 @@ public static class InstallEngine
             cancellation.ThrowIfCancellationRequested();
             if(Directory.Exists(root)) Directory.Delete(root,false);
             Directory.Move(stage,root);
-            if(shell) {
+            try { finalize?.Invoke(); if(shell) {
                 using var key=Registry.CurrentUser.CreateSubKey(RegistryKey);
                 key.SetValue("DisplayName","Mistik Launcher Ultra"); key.SetValue("DisplayVersion",manifest.Version); key.SetValue("Publisher","Mustafa Developer");
                 key.SetValue("InstallLocation",root); key.SetValue("UninstallString","\""+Path.Combine(root,"MistikUninstall.exe")+"\""); key.SetValue("NoModify",1); key.SetValue("NoRepair",1);
                 Shortcut(root,Environment.GetFolderPath(Environment.SpecialFolder.Programs),false);
                 if(shortcuts) Shortcut(root,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),false);
+            } } catch {
+                // Undo only this installation's shell entries and move our committed files
+                // back to the private staging directory before its normal cleanup.
+                if(shell) {
+                    try { Shortcut(root,Environment.GetFolderPath(Environment.SpecialFolder.Programs),true); Shortcut(root,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),true); } catch { }
+                    try { using var key=Registry.CurrentUser.OpenSubKey(RegistryKey); var location=key?.GetValue("InstallLocation") as string; key?.Dispose(); if(location!=null && Path.GetFullPath(location).Equals(root,StringComparison.OrdinalIgnoreCase)) Registry.CurrentUser.DeleteSubKeyTree(RegistryKey,false); } catch { }
+                }
+                Directory.Move(root,stage);
+                throw;
             }
         } finally { CleanupStage(stage,Path.GetDirectoryName(root)!); }
     }

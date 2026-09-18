@@ -34,11 +34,14 @@ public sealed class LauncherUpdater
     void Publish(string key,double progress=0) { StatusKey=key; Progress=progress; Changed?.Invoke(); }
     public static bool IsNewer(string offered,string installed)
     {
-        var a=Regex.Match(offered,@"^v?(\d+\.\d+\.\d+)$");
-        var b=Regex.Match(installed,@"^v?(\d+\.\d+\.\d+)(?:-.*)?$");
+        var a=Regex.Match(offered,@"^v?(\d+\.\d+\.\d+)(?:-preview\.(\d+))?$");
+        var b=Regex.Match(installed,@"^v?(\d+\.\d+\.\d+)(?:-preview\.(\d+))?$");
         if(!a.Success||!b.Success) return false;
         var latest=Version.Parse(a.Groups[1].Value); var current=Version.Parse(b.Groups[1].Value);
-        return latest>current || latest==current && installed.Contains('-');
+        if(latest!=current) return latest>current;
+        bool offeredPreview=a.Groups[2].Success, installedPreview=b.Groups[2].Success;
+        if(offeredPreview!=installedPreview) return !offeredPreview;
+        return offeredPreview && System.Numerics.BigInteger.Parse(a.Groups[2].Value)>System.Numerics.BigInteger.Parse(b.Groups[2].Value);
     }
     public static LauncherRelease? ParseRelease(string json,string installed)
     {

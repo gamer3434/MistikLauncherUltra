@@ -36,7 +36,7 @@ jobs:
           # Locally published signed releases take precedence; never replace existing assets.
           gh release view $env:RELEASE_TAG *> $null
           if ($LASTEXITCODE -eq 0) { exit 0 }
-          $arguments = @('release', 'create', $env:RELEASE_TAG, "artifacts/MistikLauncher-$version-win-x64.zip", "artifacts/installers/MistikSetup-Online-$version.exe", "artifacts/installers/MistikSetup-Offline-$version.exe", 'artifacts/installers/SHA256SUMS.txt', '--title', "Mistik Launcher $version", '--generate-notes')
+          $arguments = @('release', 'create', $env:RELEASE_TAG, "artifacts/MistikLauncher-$version-win-x64.zip", "artifacts/installers/MistikSetup-Online-$version.exe", "artifacts/installers/MistikSetup-Offline-$version.exe", 'artifacts/installers/SHA256SUMS.txt', '--title', "Mistik Launcher $version", '--notes-file', 'docs/RELEASE-6.0.1.md')
           if ($version.Contains('-')) { $arguments += '--prerelease' }
           gh @arguments
           if ($LASTEXITCODE) { throw 'Release publication failed' }
