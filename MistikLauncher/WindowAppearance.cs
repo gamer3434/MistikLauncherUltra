@@ -40,7 +40,7 @@ public partial class MainWindow
         WindowSurface.Margin=WindowState==WindowState.Maximized?new Thickness(6):new Thickness(0);
         WindowChrome.SetWindowChrome(this,new WindowChrome { CaptionHeight=42,ResizeBorderThickness=new Thickness(6),GlassFrameThickness=new Thickness(0),CornerRadius=new CornerRadius(0),UseAeroCaptionButtons=false });
         if(WindowStyle!=WindowStyle.None) WindowStyle=WindowStyle.None;
-        DockPanel.SetDock(CaptionButtons,style=="MacOS"?Dock.Left:Dock.Right);
+        CaptionButtons.HorizontalAlignment=style=="MacOS"?HorizontalAlignment.Left:HorizontalAlignment.Right;
         WindowChrome.SetIsHitTestVisibleInChrome(CaptionButtons,true);
         CaptionButtons.Children.Clear();
         var actions=style=="MacOS"?new[]{"close","minimize","maximize"}:new[]{"minimize","maximize","close"};
@@ -57,9 +57,9 @@ public partial class MainWindow
                 // A symmetric vector avoids the font's asymmetric multiplication-sign bearings.
                 var glyph=new System.Windows.Shapes.Path { Data=Geometry.Parse("M 0,0 L 8,8 M 8,0 L 0,8"),Stroke=Brushes.White,StrokeThickness=1.5,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Width=8,Height=8,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center };
                 var content=new Grid(); content.Children.Add(outline); content.Children.Add(glyph);
-                frame.Width=38; frame.Height=24; frame.BorderThickness=new Thickness(0); frame.BorderBrush=stroke;
+                frame.Width=38; frame.Height=24; frame.CornerRadius=new CornerRadius(5); frame.BorderThickness=new Thickness(0); frame.BorderBrush=stroke;
                 frame.Background=Brushes.Transparent; frame.Child=content;
-                if(Config.CloseLighting=="RGB") {
+                if(Config.CloseLighting=="RGB" && SystemParameters.ClientAreaAnimation) {
                     var cycle=new System.Windows.Media.Animation.ColorAnimationUsingKeyFrames { Duration=TimeSpan.FromSeconds(8),RepeatBehavior=System.Windows.Media.Animation.RepeatBehavior.Forever };
                     var colors=new[]{Colors.Red,Colors.Orange,Colors.Yellow,Colors.Lime,Colors.Cyan,Colors.Blue,Colors.Magenta,Colors.Red};
                     for(int i=0;i<colors.Length;i++) cycle.KeyFrames.Add(new System.Windows.Media.Animation.LinearColorKeyFrame(colors[i],System.Windows.Media.Animation.KeyTime.FromTimeSpan(TimeSpan.FromSeconds(i*8.0/(colors.Length-1)))));

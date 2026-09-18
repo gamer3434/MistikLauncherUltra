@@ -256,7 +256,7 @@ namespace MistikLauncher
             foreach(var item in quickButtons) {
                 bool selected=item.Key==key;
                 item.Value.Background=selected?ColorThemes.Brush("#274565"):Brushes.Transparent;
-                item.Value.Foreground=selected?ColorThemes.Brush("#00A3FF"):HexBrush("#ADBED6");
+                item.Value.Foreground=selected?Brushes.White:HexBrush("#ADBED6");
                 item.Value.BorderBrush=selected?ColorThemes.Brush("#00A3FF"):Brushes.Transparent;
                 item.Value.BorderThickness=new Thickness(selected?1:0);
             }
@@ -292,9 +292,11 @@ namespace MistikLauncher
             }
 
             page.Resources[typeof(ComboBox)]=FindResource(typeof(ComboBox));
+            page.Resources[typeof(ComboBoxItem)]=FindResource(typeof(ComboBoxItem));
             foreach(var resource in ColorThemes.Resources) page.Resources[resource.Key]=resource.Value;
             page.Resources["ThemeActionText"]=ColorThemes.ActionText;
             if(page is ILanguagePage localized) localized.RefreshLanguage();
+            Localization.TranslateTree(page);
             MainFrame.Navigate(page);
         }
 

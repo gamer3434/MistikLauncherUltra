@@ -681,7 +681,7 @@ namespace MistikLauncher.Pages
         StackPanel _resultsPanel = null!;
         StackPanel _installedPanel = null!;
         TextBlock installedHelp=null!;
-        public void RefreshLanguage() { installedHelp.Text=Localization.T("modToggleHelp"); RenderInstalledMods(); }
+        public void RefreshLanguage() { installedHelp.Text=Localization.T("modToggleHelp"); RenderInstalledMods(); Localization.TranslateTree(this); }
         static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30),MaxResponseContentBufferSize=128*1024*1024 };
 
         public ModManagerPage(MainWindow main)
@@ -689,15 +689,15 @@ namespace MistikLauncher.Pages
             _main = main;
             Background = Brushes.Transparent;
             var sp = new StackPanel { Margin = new Thickness(40, 30, 40, 30) };
-            sp.Children.Add(PageHelpers.Lbl("Mod Merkezi (Modrinth)", 24, "#FFFFFF", true));
-            sp.Children.Add(PageHelpers.Lbl("Modrinth'den binlerce mod - tek tiklama kurulum", 12, "#A0A0A0"));
+            sp.Children.Add(PageHelpers.Lbl("modCenterTitle", 28, "#FFFFFF", true));
+            sp.Children.Add(PageHelpers.Lbl("modCenterIntro", 14, "#A0A0A0"));
 
             // Mistik Özel Hazır Mod Paketleri Card
-            var packsCard = PageHelpers.Card("#111116", 12, "#00A3FF");
+            var packsCard = PageHelpers.Card("#192C46", 14, "#365574");
             packsCard.Margin = new Thickness(0, 10, 0, 10);
             var packsSp = new StackPanel { Margin = new Thickness(16) };
-            packsSp.Children.Add(PageHelpers.Lbl("🚀 Mistik Özel Tek Tıkla Hazır Mod Paketleri", 15, "#00A3FF", true));
-            packsSp.Children.Add(PageHelpers.Lbl("Oyun keyfinizi zirveye çıkaracak, birbiriyle tam uyumlu ve optimize edilmiş hazır mod paketleri:", 11, "#A0A0A0", wrap: TextWrapping.Wrap));
+            packsSp.Children.Add(PageHelpers.Lbl("modPacksTitle", 18, "#FFFFFF", true));
+            packsSp.Children.Add(PageHelpers.Lbl("modPacksIntro", 13, "#A0A0A0", wrap: TextWrapping.Wrap));
 
             // 3-Column Grid for Modpacks
             var packsGrid = new Grid { Margin = new Thickness(0, 14, 0, 0) };
@@ -708,12 +708,11 @@ namespace MistikLauncher.Pages
             packsGrid.ColumnDefinitions.Add(new ColumnDefinition());
 
             // Column 1: Ultra FPS Boost
-            var col1Card = PageHelpers.Card("#161a1e", 8, "#00FFCC", new Thickness(0));
+            var col1Card = PageHelpers.Card("#0D1727", 10, "#365574", new Thickness(0));
             var col1Sp = new StackPanel { Margin = new Thickness(12) };
-            col1Sp.Children.Add(PageHelpers.Lbl("🚀 ULTRA FPS BOOST", 13, "#00FFCC", true));
-            col1Sp.Children.Add(PageHelpers.Lbl("Sodium, Lithium, Iris ve Indium bir arada. Eski bilgisayarlarda bile +200 FPS artışı ve sıfır donma garantisi!", 10, "#CCCCCC", wrap: TextWrapping.Wrap, pad: new Thickness(0, 6, 0, 12)));
-            var col1Btn = PageHelpers.MkBtn("FPS Paketi Kur", "#00FFCC");
-            col1Btn.Foreground = Brushes.Black;
+            col1Sp.Children.Add(PageHelpers.Lbl("packPerformance", 14, "#FFFFFF", true));
+            col1Sp.Children.Add(PageHelpers.Lbl("packPerformanceHelp", 13, "#CCCCCC", wrap: TextWrapping.Wrap, pad: new Thickness(0, 6, 0, 12)));
+            var col1Btn = PageHelpers.MkBtn("packInstallPerformance", "#226DA0");
             col1Btn.Click += async (_, _) => await InstallModpack(
                 new[] { "sodium", "lithium", "iris", "indium" },
                 new[] { "Sodium", "Lithium", "Iris Shaders", "Indium" },
@@ -726,11 +725,11 @@ namespace MistikLauncher.Pages
             packsGrid.Children.Add(col1Card);
 
             // Column 2: Gizem & Korku
-            var col2Card = PageHelpers.Card("#1a1315", 8, "#FF3333", new Thickness(0));
+            var col2Card = PageHelpers.Card("#0D1727", 10, "#365574", new Thickness(0));
             var col2Sp = new StackPanel { Margin = new Thickness(12) };
-            col2Sp.Children.Add(PageHelpers.Lbl("👻 GİZEM & KORKU", 13, "#FF3333", true));
-            col2Sp.Children.Add(PageHelpers.Lbl("Minecraft'ın ürkütücü sislerinde Herobrine'ı hisset. 3D Gerçekçi ses fiziği modu ile dehşeti birebir yaşa!", 10, "#CCCCCC", wrap: TextWrapping.Wrap, pad: new Thickness(0, 6, 0, 12)));
-            var col2Btn = PageHelpers.MkBtn("Korku Paketi Kur", "#FF3333");
+            col2Sp.Children.Add(PageHelpers.Lbl("packMystery", 14, "#FFFFFF", true));
+            col2Sp.Children.Add(PageHelpers.Lbl("packMysteryHelp", 13, "#CCCCCC", wrap: TextWrapping.Wrap, pad: new Thickness(0, 6, 0, 12)));
+            var col2Btn = PageHelpers.MkBtn("packInstallMystery", "#226DA0");
             col2Btn.Click += async (_, _) => await InstallModpack(
                 new[] { "from-the-fog", "sound-physics-remastered" },
                 new[] { "From The Fog", "Sound Physics" },
@@ -743,12 +742,11 @@ namespace MistikLauncher.Pages
             packsGrid.Children.Add(col2Card);
 
             // Column 3: PVP & Akıcılık
-            var col3Card = PageHelpers.Card("#1b1710", 8, "#FFB100", new Thickness(0));
+            var col3Card = PageHelpers.Card("#0D1727", 10, "#365574", new Thickness(0));
             var col3Sp = new StackPanel { Margin = new Thickness(12) };
-            col3Sp.Children.Add(PageHelpers.Lbl("⚔️ PVP & AKICILIK", 13, "#FFB100", true));
-            col3Sp.Children.Add(PageHelpers.Lbl("Zoomify yakınlaştırma modu, gerçekçi 3 boyutlu karakter katmanları ve akıcılık için Sodium bir arada!", 10, "#CCCCCC", wrap: TextWrapping.Wrap, pad: new Thickness(0, 6, 0, 12)));
-            var col3Btn = PageHelpers.MkBtn("PVP Paketi Kur", "#FFB100");
-            col3Btn.Foreground = Brushes.Black;
+            col3Sp.Children.Add(PageHelpers.Lbl("packPvp", 14, "#FFFFFF", true));
+            col3Sp.Children.Add(PageHelpers.Lbl("packPvpHelp", 13, "#CCCCCC", wrap: TextWrapping.Wrap, pad: new Thickness(0, 6, 0, 12)));
+            var col3Btn = PageHelpers.MkBtn("packInstallPvp", "#226DA0");
             col3Btn.Click += async (_, _) => await InstallModpack(
                 new[] { "sodium", "zoomify", "3dskinlayers" },
                 new[] { "Sodium", "Zoomify", "3D Skin Layers" },
@@ -760,33 +758,42 @@ namespace MistikLauncher.Pages
             Grid.SetColumn(col3Card, 4);
             packsGrid.Children.Add(col3Card);
 
+            // Shared grid rows keep actions at the bottom without fixed text heights.
+            foreach(var card in new[]{col1Card,col2Card,col3Card})
+            {
+                var source=(StackPanel)card.Child;
+                var children=source.Children.Cast<UIElement>().ToArray(); source.Children.Clear();
+                var layout=new Grid { Margin=source.Margin };
+                foreach(var size in new[]{GridLength.Auto,new GridLength(1,GridUnitType.Star),GridLength.Auto}) layout.RowDefinitions.Add(new RowDefinition { Height=size });
+                for(int row=0;row<children.Length;row++) { Grid.SetRow(children[row],row); layout.Children.Add(children[row]); }
+                card.Child=layout;
+            }
+
             packsSp.Children.Add(packsGrid);
             packsCard.Child = packsSp;
             sp.Children.Add(packsCard);
 
             // OptiFine Card
-            var optiCard = PageHelpers.Card("#1e1a10", 12, "#FFB100");
+            var optiCard = PageHelpers.Card("#192C46", 14, "#365574");
             optiCard.Margin = new Thickness(0, 14, 0, 10);
             var optiSp = new StackPanel { Margin = new Thickness(16) };
-            optiSp.Children.Add(PageHelpers.Lbl("✨ OptiFine & FPS Optimizasyon Odası", 14, "#FFB100", true));
-            optiSp.Children.Add(PageHelpers.Lbl("OptiFine yuklemek son derece kolaydir! Asagidaki rehberi takip ederek saniyeler icinde kurabilirsiniz:", 11, "#CCC", wrap: TextWrapping.Wrap));
+            optiSp.Children.Add(PageHelpers.Lbl("modOptimizationTitle", 18, "#FFFFFF", true));
+            optiSp.Children.Add(PageHelpers.Lbl("modOptimizationHelp", 13, "#CCCCCC", wrap: TextWrapping.Wrap));
 
             var bulletPoints = new[] {
-                "• Forge Surumu icin: Indirdiginiz OptiFine .jar dosyasini dogrudan Mod Klasorune atmaniz yeterlidir.",
-                "• Fabric Surumu icin: Mod Klasorune hem OptiFine .jar dosyasini hem de OptiFabric modunu (asagidaki tusla kurabilirsiniz) atmaniz gerekir.",
-                "• Vanilla Surumu icin: Indirdiginiz OptiFine .jar dosyasina cift tiklayarak 'Install' demeniz yeterlidir, yeni profil otomatik olusur."
+                "modOptimizationForge", "modOptimizationFabric", "modOptimizationVanilla"
             };
             foreach(var p in bulletPoints)
             {
                 optiSp.Children.Add(PageHelpers.Lbl(p, 10, "#AAA", wrap: TextWrapping.Wrap));
             }
 
-            var optiBtns = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) };
+            var optiBtns = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
 
-            var dlOptiBtn = PageHelpers.MkBtn("OptiFine Indir (Resmi Site)", "#FFB100", 180);
+            var dlOptiBtn = PageHelpers.MkBtn("modOptifineDownload", "#226DA0", 180);
             dlOptiBtn.Click += (_, _) => Process.Start(new ProcessStartInfo("https://optifine.net/downloads") { UseShellExecute = true });
 
-            var optiFabricBtn = PageHelpers.MkBtn("OptiFabric Modunu Kur", "#A349A4", 170);
+            var optiFabricBtn = PageHelpers.MkBtn("modOptifabricInstall", "#203853", 170);
             optiFabricBtn.Margin = new Thickness(10, 0, 0, 0);
             optiFabricBtn.Click += async (_, _) => {
                 optiFabricBtn.IsEnabled = false; optiFabricBtn.Content = "Kuruluyor...";
@@ -806,16 +813,20 @@ namespace MistikLauncher.Pages
             optiCard.Child = optiSp;
             sp.Children.Add(optiCard);
 
-            var searchRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 16, 0, 12) };
-            _searchBox = PageHelpers.DarkTextBox("Mod ara... (Sodium, Iris, OptiFine...)");
-            _searchBox.Width = 420;
-            var searchBtn = PageHelpers.MkBtn("ARA", "#00A3FF", 80); searchBtn.Margin = new Thickness(8, 0, 0, 0);
+            var searchRow = new Grid { Margin = new Thickness(0, 16, 0, 12) };
+            searchRow.ColumnDefinitions.Add(new ColumnDefinition());
+            for(int column=0;column<3;column++) searchRow.ColumnDefinitions.Add(new ColumnDefinition { Width=GridLength.Auto });
+            sp.Children.Add(PageHelpers.Lbl("modSearch",14,"#FFFFFF",true));
+            _searchBox = PageHelpers.DarkTextBox();
+            System.Windows.Automation.AutomationProperties.SetName(_searchBox,Localization.T("modSearch"));
+            _searchBox.MinWidth = 180;
+            var searchBtn = PageHelpers.MkBtn("modSearchAction", "#00A3FF", 80); searchBtn.Margin = new Thickness(8, 0, 0, 0);
             searchBtn.Click += async (_, _) => await SearchMods();
             _searchBox.KeyDown += async (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) await SearchMods(); };
-            var folderBtn = PageHelpers.MkBtn("Mod Klasörü", "#333333"); folderBtn.Margin = new Thickness(8, 0, 0, 0);
+            var folderBtn = PageHelpers.MkBtn("modFolder", "#333333"); folderBtn.Margin = new Thickness(8, 0, 0, 0);
             folderBtn.Click += (_, _) => { Directory.CreateDirectory(App.ModsDir); Process.Start("explorer.exe", App.ModsDir); };
 
-            var importBtn = PageHelpers.MkBtn("TL/Orjinal Modları Aktar", "#A349A4"); importBtn.Margin = new Thickness(8, 0, 0, 0);
+            var importBtn = PageHelpers.MkBtn("modImport", "#203853"); importBtn.Margin = new Thickness(8, 0, 0, 0);
             importBtn.Click += async (_, _) => {
                 var mcMods = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "mods");
                 if (!Directory.Exists(mcMods)) {
@@ -839,10 +850,11 @@ namespace MistikLauncher.Pages
                     }
                 });
                 RenderInstalledMods();
-                importBtn.Content = "TL/Orjinal Modları Aktar"; importBtn.IsEnabled = true;
+                importBtn.Content = Localization.T("modImport"); importBtn.IsEnabled = true;
                 MessageBox.Show($"{count} adet mod başarıyla .minecraft klasöründen Mistik Launcher'a aktarıldı!", "Aktarım Tamamlandı", MessageBoxButton.OK, MessageBoxImage.Information);
             };
 
+            Grid.SetColumn(searchBtn,1); Grid.SetColumn(folderBtn,2); Grid.SetColumn(importBtn,3);
             searchRow.Children.Add(_searchBox); searchRow.Children.Add(searchBtn); searchRow.Children.Add(folderBtn); searchRow.Children.Add(importBtn);
             sp.Children.Add(searchRow);
 
@@ -850,20 +862,20 @@ namespace MistikLauncher.Pages
             sp.Children.Add(_resultsPanel);
 
             // ── Toplu Mod Sürüm Taşıyıcı (Migrator) Kartı ──
-            var migCard = PageHelpers.Card("#121814", 12, "#2EB82E");
+            var migCard = PageHelpers.Card("#192C46", 14, "#365574");
             migCard.Margin = new Thickness(0, 10, 0, 10);
 
             var migSp = new StackPanel { Margin = new Thickness(16) };
-            migSp.Children.Add(PageHelpers.Lbl("🔄 Toplu Mod Sürüm Taşıyıcı (Mod Migrator)", 15, "#2EB82E", true));
-            migSp.Children.Add(PageHelpers.Lbl("Aktif mod klasörünüzdeki modların seçtiğiniz hedef Minecraft sürümü ve Loader türüne uygun olan sürümlerini Modrinth'ten otomatik olarak indirip kurar. Mevcut modlarınız da güvenle yedeklenir (askıya alınır).", 10, "#A0A0A0", wrap: TextWrapping.Wrap));
+            migSp.Children.Add(PageHelpers.Lbl("modMigrationTitle", 18, "#FFFFFF", true));
+            migSp.Children.Add(PageHelpers.Lbl("modMigrationHelp", 13, "#A0A0A0", wrap: TextWrapping.Wrap));
 
-            var migControls = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 12, 0, 0) };
+            var migControls = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
 
-            migControls.Children.Add(PageHelpers.Lbl("Hedef Sürüm:", 11, "#FFFFFF"));
+            migControls.Children.Add(PageHelpers.Lbl("modTargetVersion", 13, "#FFFFFF"));
 
             var targetVerCombo = new ComboBox {
-                Width = 100, Height = 28, Margin = new Thickness(6, 0, 16, 0),
-                Background = Brushes.White, Foreground = Brushes.Black, FontWeight = FontWeights.Bold
+                Width = 120, MinHeight = 40, Margin = new Thickness(6, 0, 16, 8),
+                Background = PageHelpers.HexBrush("#203853"), Foreground = Brushes.White, FontWeight = FontWeights.SemiBold
             };
 
             var uniqueMcVersions = new HashSet<string>();
@@ -929,16 +941,15 @@ namespace MistikLauncher.Pages
             migControls.Children.Add(PageHelpers.Lbl("Mod Yükleyici:", 11, "#FFFFFF"));
 
             var targetLoaderCombo = new ComboBox {
-                Width = 100, Height = 28, Margin = new Thickness(6, 0, 16, 0),
-                Background = Brushes.White, Foreground = Brushes.Black, FontWeight = FontWeights.Bold
+                Width = 120, MinHeight = 40, Margin = new Thickness(6, 0, 16, 8),
+                Background = PageHelpers.HexBrush("#203853"), Foreground = Brushes.White, FontWeight = FontWeights.SemiBold
             };
             targetLoaderCombo.Items.Add("Fabric");
             targetLoaderCombo.Items.Add("Forge");
             targetLoaderCombo.SelectedIndex = 0;
             migControls.Children.Add(targetLoaderCombo);
 
-            var migBtn = PageHelpers.MkBtn("⚡ SEÇİLİ SÜRÜME TAŞI VE İNDİR", "#2EB82E", 240);
-            migBtn.Foreground = Brushes.White;
+            var migBtn = PageHelpers.MkBtn("modMigrate", "#226DA0", 240);
             migBtn.Click += async (_, _) => {
                 var targetVer = targetVerCombo.SelectedItem?.ToString();
                 var targetLoader = targetLoaderCombo.SelectedItem?.ToString();
@@ -958,11 +969,11 @@ namespace MistikLauncher.Pages
             instHeader.ColumnDefinitions.Add(new ColumnDefinition());
             instHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            var instTitle = PageHelpers.Lbl("📦 Kurulu Modlar", 18, "#A349A4", true);
+            var instTitle = PageHelpers.Lbl("modInstalledTitle", 20, "#FFFFFF", true);
             Grid.SetColumn(instTitle, 0);
             instHeader.Children.Add(instTitle);
 
-            var cleanBtn = PageHelpers.MkBtn("🗑 Klasörü Temizle", "#CC2222", 140);
+            var cleanBtn = PageHelpers.MkBtn("modClearFolder", "#CC2222", 140);
             cleanBtn.Click += (_, _) => {
                 var confirm = MessageBox.Show(
                     "Aktif mod klasöründeki tüm modları silmek istediğinizden emin misiniz?\n\nBu işlem eski/uyumsuz kalıntı modları temizlemek için önerilir.",
