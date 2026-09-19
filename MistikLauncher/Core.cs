@@ -147,6 +147,11 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.0.6","2026-09-19","#FFB000", new[]{
+                "Mod senkronizasyonu UI thread'inden arka plana taşındı; geçişlerde donma azaltıldı",
+                "Arka plan taraması sırasında yapılan son sürüm seçimi kaybolmaz",
+                "Senkronizasyon hatalarında WPF dispatcher kullanılarak çapraz thread hatası önlendi"
+            }),
             new("v6.0.5","2026-09-19","#FFB000", new[]{
                 "Güncelleme ekranında hedef sürüm açıkça gösterilir",
                 "Eski paketlerin yeni kurulumu geri alması downgrade korumasıyla engellenir",

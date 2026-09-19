@@ -228,7 +228,8 @@ public class ModernSettingsPage : Page, ILanguagePage
     void UpdateStatus()
     {
         if(updateStatus==null) return;
-        updateStatus.Text=Localization.T(main.LauncherUpdates.StatusKey)+(main.LauncherUpdates.Busy?$" ({main.LauncherUpdates.Progress:0}%)":"")+(main.LauncherUpdates.Error==null?"":"\n"+main.LauncherUpdates.Error);
+        var target=main.LauncherUpdates.LatestVersion=="—"?"":$"\n{Localization.T("luTarget")}: {main.LauncherUpdates.LatestVersion}";
+        updateStatus.Text=Localization.T(main.LauncherUpdates.StatusKey)+target+(main.LauncherUpdates.Busy?$" ({main.LauncherUpdates.Progress:0}%)":"")+(main.LauncherUpdates.Error==null?"":"\n"+main.LauncherUpdates.Error);
         updateButton.IsEnabled=!main.LauncherUpdates.Busy;
     }
     void Save()
