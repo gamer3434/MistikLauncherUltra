@@ -147,6 +147,11 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.0.7","2026-09-19","#FFB000", new[]{
+                "Güncelleme hız, indirilen boyut ve tahmini kalan süreyi gösterir",
+                "İndirme ilerleme olayları sınırlanarak güncelleme sırasında UI kasması azaltıldı",
+                "Sayfa geçişindeki gereksiz ilk çift render kaldırıldı"
+            }),
             new("v6.0.6","2026-09-19","#FFB000", new[]{
                 "Mod senkronizasyonu UI thread'inden arka plana taşındı; geçişlerde donma azaltıldı",
                 "Arka plan taraması sırasında yapılan son sürüm seçimi kaybolmaz",

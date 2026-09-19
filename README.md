@@ -1,14 +1,14 @@
-# Mistik Launcher Ultra 6.0.6 — Stable release / Kararlı sürüm
+# Mistik Launcher Ultra 6.0.7 — Stable release / Kararlı sürüm
 
 **Stable release.** Home, settings, navigation, diagnostics and launcher controls are bilingual. Vanilla/Forge profile management, automatic updates, installer rollback, crash reporting and the protected package were validated on Windows.
 
 **Kararlı sürüm.** Ana panel, ayarlar, gezinme, tanılama ve launcher kontrolleri iki dillidir. Vanilla/Forge profil yönetimi, otomatik güncelleme, kurulum geri alma, hata raporlama ve korumalı paket Windows üzerinde doğrulandı.
 
-### Güncel sürüm / Current version — 6.0.6
+### Güncel sürüm / Current version — 6.0.7
 
-Mod senkronizasyonu arka planda çalışır; sürüm geçişlerinde UI donması azaltılır ve son seçim korunur. Güncelleme hedefi görünür, eski paketlerle geri alma engellenir. Korumalı doğrulama: 260 kontrol. / Mod synchronization runs in the background, reducing UI freezes during version changes while preserving the latest selection. Update targets are visible and rollback to older packages is blocked. Protected validation: 260 checks.
+Mod senkronizasyonu ve güncelleme indirmesi UI’yi bloklamaz. Güncelleme kartı hız, indirilen boyut ve tahmini kalan süreyi gösterir. Korumalı doğrulama: 260 kontrol. / Mod synchronization and update downloads no longer block the UI. The update card shows speed, downloaded size and estimated time remaining. Protected validation: 260 checks.
 
-[6.0.6 ayrıntıları / Details](docs/RELEASE-6.0.6.md). [6.0.6 indir / Download](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.0.6). Online: `MistikSetup-Online-6.0.6.exe`; offline: `MistikSetup-Offline-6.0.6.exe`; portable: `MistikLauncher-6.0.6-win-x64.zip`. SignPath incelemesi sürüyor; sürüm şu anda imzasızdır / SignPath review is pending; this release is currently unsigned.
+[6.0.7 ayrıntıları / Details](docs/RELEASE-6.0.7.md). [6.0.7 indir / Download](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.0.7). Online: `MistikSetup-Online-6.0.7.exe`; offline: `MistikSetup-Offline-6.0.7.exe`; portable: `MistikLauncher-6.0.7-win-x64.zip`. SignPath incelemesi sürüyor; sürüm şu anda imzasızdır / SignPath review is pending; this release is currently unsigned.
 
 ### Önceki sürüm / Previous version — 6.0.1
 

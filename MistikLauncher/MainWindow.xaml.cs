@@ -268,8 +268,10 @@ namespace MistikLauncher
 
             // Server sayfası her zaman cache'den gelsin — sunucu kapanmasın!
             // Diğer sayfalar da cache'e alınır (hızlı geçiş için).
+            bool created=false;
             if (!_pageCache.TryGetValue(key, out Page? page) || page == null)
             {
+                created=true;
                 page = key switch {
                     "Dash"      => new Pages.ModernHomePage(this),
                     "Vers"      => new Pages.VersionManagerPage(this),
@@ -292,7 +294,9 @@ namespace MistikLauncher
             page.Resources[typeof(ComboBoxItem)]=FindResource(typeof(ComboBoxItem));
             foreach(var resource in ColorThemes.Resources) page.Resources[resource.Key]=resource.Value;
             page.Resources["ThemeActionText"]=ColorThemes.ActionText;
-            if(page is ILanguagePage localized) localized.RefreshLanguage();
+            // Constructors already render with the active language. Re-rendering the
+            // entire page immediately after creation caused visible navigation stutter.
+            if(!created && page is ILanguagePage localized) localized.RefreshLanguage();
             Localization.TranslateTree(page);
             MainFrame.Navigate(page);
         }

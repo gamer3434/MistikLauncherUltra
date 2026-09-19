@@ -229,8 +229,27 @@ public class ModernSettingsPage : Page, ILanguagePage
     {
         if(updateStatus==null) return;
         var target=main.LauncherUpdates.LatestVersion=="—"?"":$"\n{Localization.T("luTarget")}: {main.LauncherUpdates.LatestVersion}";
-        updateStatus.Text=Localization.T(main.LauncherUpdates.StatusKey)+target+(main.LauncherUpdates.Busy?$" ({main.LauncherUpdates.Progress:0}%)":"")+(main.LauncherUpdates.Error==null?"":"\n"+main.LauncherUpdates.Error);
+        var transfer="";
+        if(main.LauncherUpdates.StatusKey=="luDownloading" && main.LauncherUpdates.TotalBytes>0)
+        {
+            var speed=main.LauncherUpdates.DownloadSpeedBytesPerSecond>0?FormatBytes((long)main.LauncherUpdates.DownloadSpeedBytesPerSecond)+"/s":"—";
+            var eta=FormatEta(main.LauncherUpdates.RemainingTime);
+            transfer=$"\n{Localization.T("luDownloaded")}: {FormatBytes(main.LauncherUpdates.DownloadedBytes)} / {FormatBytes(main.LauncherUpdates.TotalBytes)} · {Localization.T("luSpeed")}: {speed} · {Localization.T("luRemaining")}: {eta}";
+        }
+        updateStatus.Text=Localization.T(main.LauncherUpdates.StatusKey)+target+transfer+(main.LauncherUpdates.Busy?$" ({main.LauncherUpdates.Progress:0}%)":"")+(main.LauncherUpdates.Error==null?"":"\n"+main.LauncherUpdates.Error);
         updateButton.IsEnabled=!main.LauncherUpdates.Busy;
+    }
+    static string FormatBytes(long bytes)
+    {
+        if(bytes<1024) return $"{bytes} B";
+        if(bytes<1024*1024) return $"{bytes/1024d:0.0} KB";
+        if(bytes<1024*1024*1024) return $"{bytes/1024d/1024d:0.0} MB";
+        return $"{bytes/1024d/1024d/1024d:0.00} GB";
+    }
+    static string FormatEta(TimeSpan? eta)
+    {
+        if(eta==null) return "—";
+        var value=eta.Value; return value.TotalHours>=1?$"{(int)value.TotalHours:00}:{value.Minutes:00}:{value.Seconds:00}":$"{value.Minutes:00}:{value.Seconds:00}";
     }
     void Save()
     {
