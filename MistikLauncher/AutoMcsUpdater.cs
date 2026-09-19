@@ -79,7 +79,8 @@ public sealed class AutoMcsUpdater
             if(cached==null || force || DateTime.UtcNow-checkedAt>TimeSpan.FromMinutes(10))
             {
                 using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(20));
-                cached=ParseRelease(await http.GetStringAsync(ReleaseEndpoint,timeout.Token)); checkedAt=DateTime.UtcNow;
+                var metadata=await GitHubReleaseCache.GetAsync(http,ReleaseEndpoint,Path.Combine(directory,"auto-mcs-release-cache.json"),timeout.Token);
+                cached=ParseRelease(metadata); checkedAt=DateTime.UtcNow;
             }
             LatestVersion=cached.Version;
             AutoMcsReceipt? receipt=null;

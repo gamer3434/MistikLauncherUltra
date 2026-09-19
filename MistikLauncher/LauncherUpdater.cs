@@ -69,9 +69,7 @@ public sealed class LauncherUpdater
             Busy=true; Error=null; Publish("luChecking");
             if(PreparedPayload!=null) { Publish("luReady",100); return true; }
             using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(20));
-            using var metadata=await http.GetAsync(Endpoint,timeout.Token);
-            if(metadata.StatusCode==HttpStatusCode.NotFound) { Publish("luCurrent"); return false; }
-            metadata.EnsureSuccessStatusCode(); string json=await metadata.Content.ReadAsStringAsync(timeout.Token);
+            string json=await GitHubReleaseCache.GetAsync(http,Endpoint,Path.Combine(App.AppData,"launcher-release-cache.json"),timeout.Token);
             using(var doc=JsonDocument.Parse(json)) LatestVersion=doc.RootElement.GetProperty("tag_name").GetString()??"—";
             var release=ParseRelease(json,CurrentVersion);
             if(release==null) { Publish("luCurrent"); return false; }

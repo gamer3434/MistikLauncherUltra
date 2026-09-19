@@ -1,14 +1,14 @@
-# Mistik Launcher Ultra 6.0.3 — Stable release / Kararlı sürüm
+# Mistik Launcher Ultra 6.0.4 — Stable release / Kararlı sürüm
 
 **Stable release.** Home, settings, navigation, diagnostics and launcher controls are bilingual. Vanilla/Forge profile management, automatic updates, installer rollback, crash reporting and the protected package were validated on Windows.
 
 **Kararlı sürüm.** Ana panel, ayarlar, gezinme, tanılama ve launcher kontrolleri iki dillidir. Vanilla/Forge profil yönetimi, otomatik güncelleme, kurulum geri alma, hata raporlama ve korumalı paket Windows üzerinde doğrulandı.
 
-### Güncel sürüm / Current version — 6.0.3
+### Güncel sürüm / Current version — 6.0.4
 
 Esnek ve modern yerleşim, ortalanmış başlık, okunabilir tema kontrolleri, görünür kaydetme alanı ve önbellekteki sayfalarda doğru dil geçişi. Korumalı pakette 253 kontrol geçti. / Flexible modern layout, centered title, readable themed controls, visible save actions and corrected cached-page language switching. 253 protected-package checks passed.
 
-[6.0.3 ayrıntıları ve görseller / Details and previews](docs/RELEASE-6.0.3.md). [6.0.3 indir / Download](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.0.3). Online: `MistikSetup-Online-6.0.3.exe`; offline: `MistikSetup-Offline-6.0.3.exe`; portable: `MistikLauncher-6.0.3-win-x64.zip`. Sürüm imzasızdır / This release is unsigned.
+[6.0.4 ayrıntıları / Details](docs/RELEASE-6.0.4.md). [6.0.4 indir / Download](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.0.4). Online: `MistikSetup-Online-6.0.4.exe`; offline: `MistikSetup-Offline-6.0.4.exe`; portable: `MistikLauncher-6.0.4-win-x64.zip`. SignPath incelemesi sürüyor; sürüm şu anda imzasızdır / SignPath review is pending; this release is currently unsigned.
 
 ### Önceki sürüm / Previous version — 6.0.1
 
