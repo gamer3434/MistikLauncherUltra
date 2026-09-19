@@ -34,6 +34,7 @@ namespace MistikLauncher
         string _accent = "#00A3FF";
         string _currentNav = "Dash";
         bool _isPopulatingVersionBox = false;
+        int _backgroundModSync;
 
         public MainWindow()
         {
@@ -68,7 +69,7 @@ namespace MistikLauncher
                     Config.Version = selected;
                     ConfigManager.Save(Config);
                     StatusLbl.Text = $"{Localization.T("version")}: {selected}";
-                    SyncModsForCurrentVersion();
+                    QueueBackgroundModSync();
                     if(MainFrame.Content is Pages.ModernHomePage home) home.RefreshLanguage();
                 }
             };
@@ -306,7 +307,6 @@ namespace MistikLauncher
             _isPopulatingVersionBox = true;
             try
             {
-                SyncModsForCurrentVersion();
                 VerBox.Items.Clear();
                 var uniqueVersions = new HashSet<string>();
 
@@ -386,6 +386,23 @@ namespace MistikLauncher
             {
                 _isPopulatingVersionBox = false;
             }
+            QueueBackgroundModSync();
+        }
+
+        void QueueBackgroundModSync()
+        {
+            if (string.IsNullOrWhiteSpace(Config.Version) || Interlocked.Exchange(ref _backgroundModSync,1)!=0) return;
+            var requestedVersion=Config.Version;
+            _ = Task.Run(() => {
+                try { SyncModsForCurrentVersion(requestedVersion); }
+                finally
+                {
+                    Interlocked.Exchange(ref _backgroundModSync,0);
+                    // A selection change while the scan was running must not be lost.
+                    if (!string.Equals(Config.Version,requestedVersion,StringComparison.Ordinal))
+                        QueueBackgroundModSync();
+                }
+            });
         }
 
         static List<int> GetVersionNumbers(string input)
@@ -1052,11 +1069,11 @@ namespace MistikLauncher
             }
         }
 
-        public bool SyncModsForCurrentVersion()
+        public bool SyncModsForCurrentVersion(string? requestedVersion=null)
         {
             try
             {
-                var currentVer = Config.Version ?? "";
+                var currentVer = requestedVersion ?? Config.Version ?? "";
                 if (string.IsNullOrEmpty(currentVer)) return false;
 
                 // 1. Determine loader type for current version
@@ -1090,6 +1107,7 @@ namespace MistikLauncher
                 ModFiles.SyncPools(App.ModsDir,Path.Combine(modsPoolDir,lastPoolKey),currentLoader=="vanilla"?null:Path.Combine(modsPoolDir,currentPoolKey));
 
                 // Update config
+                if (!string.Equals(Config.Version,currentVer,StringComparison.Ordinal)) return false;
                 Config.LastSyncedVersion = currentVer;
                 ConfigManager.Save(Config);
 
@@ -1116,7 +1134,9 @@ namespace MistikLauncher
             catch (Exception ex)
             {
                 App.Log($"SyncModsForCurrentVersion error: {ex.Message}");
-                StatusLbl.Text=Localization.T("modSyncFailed");
+                // This method can run on a worker thread. Marshal the small UI update
+                // back to WPF's dispatcher instead of freezing/crashing on cross-thread access.
+                Dispatcher.BeginInvoke(new Action(() => StatusLbl.Text=Localization.T("modSyncFailed")));
                 return false;
             }
         }
