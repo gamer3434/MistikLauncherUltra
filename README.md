@@ -1,8 +1,8 @@
-# Mistik Launcher 6 — Modernization preview / Modernizasyon önizlemesi
+# Mistik Launcher Ultra 6.0.3 — Stable release / Kararlı sürüm
 
-**Preview, not a completed stable replacement.** Home, settings and navigation are bilingual. Actual Vanilla/Forge gameplay and an isolated server were tested; full legacy translation and broader feature verification remain outstanding. Preview source is published on `codex/modernization-preview`.
+**Stable release.** Home, settings, navigation, diagnostics and launcher controls are bilingual. Vanilla/Forge profile management, automatic updates, installer rollback, crash reporting and the protected package were validated on Windows.
 
-**Önizleme; tamamlanmış kararlı sürüm değildir.** Gerçek Vanilla/Forge oyun ve ayrı sunucu testleri yapıldı. Eski sayfaların tam çevirisi ve daha geniş özellik testleri sürüyor. Kaynak `codex/modernization-preview` dalında.
+**Kararlı sürüm.** Ana panel, ayarlar, gezinme, tanılama ve launcher kontrolleri iki dillidir. Vanilla/Forge profil yönetimi, otomatik güncelleme, kurulum geri alma, hata raporlama ve korumalı paket Windows üzerinde doğrulandı.
 
 ### Güncel sürüm / Current version — 6.0.3
 
