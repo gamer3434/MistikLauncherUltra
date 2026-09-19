@@ -4,11 +4,11 @@
 
 **Önizleme; tamamlanmış kararlı sürüm değildir.** Gerçek Vanilla/Forge oyun ve ayrı sunucu testleri yapıldı. Eski sayfaların tam çevirisi ve daha geniş özellik testleri sürüyor. Kaynak `codex/modernization-preview` dalında.
 
-### Güncel sürüm / Current version — 6.0.2
+### Güncel sürüm / Current version — 6.0.3
 
 Esnek ve modern yerleşim, ortalanmış başlık, okunabilir tema kontrolleri, görünür kaydetme alanı ve önbellekteki sayfalarda doğru dil geçişi. Korumalı pakette 253 kontrol geçti. / Flexible modern layout, centered title, readable themed controls, visible save actions and corrected cached-page language switching. 253 protected-package checks passed.
 
-[6.0.2 ayrıntıları ve görseller / Details and previews](docs/RELEASE-6.0.2.md). [6.0.2 indir / Download](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.0.2). Online: `MistikSetup-Online-6.0.2.exe`; offline: `MistikSetup-Offline-6.0.2.exe`; portable: `MistikLauncher-6.0.2-win-x64.zip`. Sürüm imzasızdır / This release is unsigned.
+[6.0.3 ayrıntıları ve görseller / Details and previews](docs/RELEASE-6.0.3.md). [6.0.3 indir / Download](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.0.3). Online: `MistikSetup-Online-6.0.3.exe`; offline: `MistikSetup-Offline-6.0.3.exe`; portable: `MistikLauncher-6.0.3-win-x64.zip`. Sürüm imzasızdır / This release is unsigned.
 
 ### Önceki sürüm / Previous version — 6.0.1
 

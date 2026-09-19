@@ -15,6 +15,7 @@
   "memory": "Oyun belleği",
   "quick": "Oyun alanın",
   "files": "Oyun klasörünü aç",
+  "reportButton": "Hata raporu oluştur",
   "logs": "Günlüğü aç",
   "help": "Başlamak için",
   "helpText": "Sürümler sayfasından bir sürüm indir. Modları oyun sürümünle eşleştir. Başlatmadan önce oyuncu adını ve belleği kontrol et.",
@@ -320,5 +321,13 @@
   "skinLookupTitle": "Oyuncu skini bul",
   "skinLookupHelp": "Skinini arayıp önizlemek istediğin oyuncunun adını gir.",
   "skinLocalTitle": "Yerel PNG skin kullan",
-  "skinLocalHelp": "64×64 veya 64×32 boyutlarında bir Minecraft skin dosyası seç."
+  "skinLocalHelp": "64×64 veya 64×32 boyutlarında bir Minecraft skin dosyası seç.",
+  "skinPreviewLoading": "Skin önizlemesi yükleniyor…",
+  "skinPreviewReady": "Skin önizlemesi hazır.",
+  "skinPreviewFailed": "Skin önizlemesi yüklenemedi.",
+  "skinCustom": "Özel skin",
+  "skinChooseFirst": "Önce bir skin dosyası seç.",
+  "skinApplySuccess": "Özel skin, Mistik skin kaynak paketi olarak kuruldu ve etkinleştirildi.",
+  "skinApplyFailed": "Skin paketi hazırlanamadı. Minecraft'ı kapatıp tekrar deneyin.",
+  "skinApplyError": "Skin kurulumu başarısız:"
 }

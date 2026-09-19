@@ -15,6 +15,7 @@
   "memory": "Game memory",
   "quick": "Your workspace",
   "files": "Open game folder",
+  "reportButton": "Create error report",
   "logs": "Open log",
   "help": "Getting started",
   "helpText": "Download a version from Versions. Match mods to your game version. Check your player name and memory before launching.",
@@ -320,5 +321,13 @@
   "skinLookupTitle": "Find a player skin",
   "skinLookupHelp": "Enter a player name to look up and preview their skin.",
   "skinLocalTitle": "Use a local PNG skin",
-  "skinLocalHelp": "Choose a 64×64 or 64×32 Minecraft skin file."
+  "skinLocalHelp": "Choose a 64×64 or 64×32 Minecraft skin file.",
+  "skinPreviewLoading": "Loading skin preview…",
+  "skinPreviewReady": "Skin preview is ready.",
+  "skinPreviewFailed": "Skin preview could not be loaded.",
+  "skinCustom": "Custom skin",
+  "skinChooseFirst": "Choose a skin file first.",
+  "skinApplySuccess": "Custom skin installed and activated as the Mistik skin resource pack.",
+  "skinApplyFailed": "The skin pack could not be prepared. Close Minecraft and try again.",
+  "skinApplyError": "Skin installation failed:"
 }

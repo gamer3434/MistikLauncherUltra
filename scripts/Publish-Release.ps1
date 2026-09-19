@@ -23,7 +23,9 @@ try {
         $expected=$Matches[1]; $name=$Matches[2]; $file=$assets | Where-Object { (Split-Path $_ -Leaf) -eq $name }
         if(!$file -or (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLower() -ne $expected){ throw "Checksum mismatch: $name" }
     }
-    $body=Get-Content -LiteralPath docs/RELEASE-PREVIEW-9.md -Raw
+    $releaseNotes=Join-Path $repo "docs/RELEASE-$version.md"
+    if(!(Test-Path -LiteralPath $releaseNotes -PathType Leaf)){ throw "Missing release notes: $releaseNotes" }
+    $body=Get-Content -LiteralPath $releaseNotes -Raw
     # GitHub's by-tag endpoint cannot resolve an unpublished tag in a draft release.
     $allReleases=Invoke-RestMethod -Uri "$api/releases?per_page=100" -Headers $headers
     $matchingReleases=@($allReleases | Where-Object tag_name -eq $tag)
@@ -52,7 +54,7 @@ try {
         $curl=Join-Path $env:SystemRoot 'System32/curl.exe'
         if(!(Test-Path -LiteralPath $curl)){ throw 'Windows curl is required for release uploads' }
         $configuration=@(('header = "Authorization: Bearer '+$credentials.password+'"'),'header = "Accept: application/vnd.github+json"','header = "X-GitHub-Api-Version: 2022-11-28"','header = "User-Agent: MistikRelease"','header = "Content-Type: application/octet-stream"') -join "`n"
-        $responseText=$configuration | & $curl --config - --silent --show-error --fail-with-body --http1.1 --connect-timeout 30 --max-time 900 --request POST --data-binary ('@'+(Resolve-Path $asset).Path) $uri
+        $responseText=$configuration | & $curl --config - --silent --show-error --fail-with-body --http1.1 --connect-timeout 30 --max-time 900 --retry 6 --retry-delay 10 --retry-all-errors --request POST --data-binary ('@'+(Resolve-Path $asset).Path) $uri
         $configuration=$null
         if($LASTEXITCODE){
             $uploadCode=$LASTEXITCODE; $apiError=''; try { $apiError=(($responseText -join "`n") | ConvertFrom-Json).message } catch { }

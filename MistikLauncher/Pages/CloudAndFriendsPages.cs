@@ -175,23 +175,19 @@ namespace MistikLauncher.Pages
             searchSp.Children.Add(resetBtn);
 
             // Search action
-            Action doSearch = () => {
+            Func<Task> doSearch = async () => {
                 var n = tb.Text.Trim();
                 if (string.IsNullOrEmpty(n)) return;
                 previewNameLbl.Text = n;
-                previewStatusLbl.Text = "Önizleme indiriliyor...";
+                previewStatusLbl.Text = Localization.T("skinPreviewLoading");
                 previewStatusLbl.Foreground = PageHelpers.HexBrush("#FFB100");
-                _ = LoadImgAsync(previewImg, n, 80).ContinueWith(t => {
-                    previewImg.Dispatcher.Invoke(() => {
-                        var statusLbl = (TextBlock)previewDetails.Children[1];
-                        statusLbl.Text = "Karakter önizlemesi yüklendi. Oyuna kurmaya hazır!";
-                        statusLbl.Foreground = PageHelpers.HexBrush("#2EB82E");
-                    });
-                });
+                bool loaded = await LoadImgAsync(previewImg, n, 80);
+                previewStatusLbl.Text = Localization.T(loaded ? "skinPreviewReady" : "skinPreviewFailed");
+                previewStatusLbl.Foreground = PageHelpers.HexBrush(loaded ? "#2EB82E" : "#FF4B4B");
             };
 
-            searchBtn.Click += (_, _) => doSearch();
-            tb.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) doSearch(); };
+            searchBtn.Click += async (_, _) => await doSearch();
+            tb.KeyDown += async (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) await doSearch(); };
 
             searchCard.Child = searchSp;
             Grid.SetColumn(searchCard, 0); skinTypeGrid.Children.Add(searchCard);
@@ -247,7 +243,7 @@ namespace MistikLauncher.Pages
                 }
             };
 
-            applyLocalBtn.Click += (_, _) => {
+            applyLocalBtn.Click += async (_, _) => {
                 string targetPath = currentLocalPath;
                 if (string.IsNullOrEmpty(targetPath)) {
                     if (main.Config.SkinType == "local" && File.Exists(main.Config.SkinUser))
@@ -262,17 +258,18 @@ namespace MistikLauncher.Pages
                          return;
                     }
 
-                    ApplyLocalSkin(main, targetPath);
-                    try {
+                    applyLocalBtn.IsEnabled = false;
+                    bool applied = await ApplyLocalSkin(main, targetPath);
+                    applyLocalBtn.IsEnabled = true;
+                    if (applied) try {
                         previewImg.Source = face;
                         System.Windows.Media.RenderOptions.SetBitmapScalingMode(previewImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
-                        previewNameLbl.Text = "Ozel Skin";
-                        previewStatusLbl.Text = "Karakter hazır.";
+                        previewNameLbl.Text = Localization.T("skinCustom");
+                        previewStatusLbl.Text = Localization.T("skinPreviewReady");
                         previewStatusLbl.Foreground = PageHelpers.HexBrush("#2EB82E");
                     } catch { }
-                    MessageBox.Show("Ozel skin basariyla oyuna kuruldu!", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
                 } else {
-                    MessageBox.Show("Lutfen once bir skin dosyasi secin.", "Uyari", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(Localization.T("skinChooseFirst"), Localization.T("warning"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             };
 
@@ -380,20 +377,24 @@ namespace MistikLauncher.Pages
             Content = new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         }
 
-        internal static async Task LoadImgAsync(Image img, string user, int size)
+        public static async Task<bool> LoadImgAsync(Image img, string user, int size)
         {
             try {
+                user ??= "";
+                if (!System.Text.RegularExpressions.Regex.IsMatch(user, @"^[A-Za-z0-9_]{3,16}$")) return false;
+                size=Math.Clamp(size,16,128);
                 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
                 http.DefaultRequestHeaders.Add("User-Agent", "MistikLauncher/5.0");
                 byte[]? skinBytes = null;
 
                 // Önce Ely.by'den JSON texture verisi çekmeyi dene
                 try {
-                    var jsonStr = await http.GetStringAsync($"http://skinsystem.ely.by/textures/{user}");
+                    var jsonStr = await http.GetStringAsync($"https://skinsystem.ely.by/textures/{Uri.EscapeDataString(user)}");
                     var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
-                    var texUrl = jObj["SKIN"]?["url"]?.ToString();
+                    var texUrl = MainWindow.SkinTextureUrl(jObj["SKIN"]?["url"]?.ToString());
                     if (!string.IsNullOrEmpty(texUrl)) {
                         skinBytes = await http.GetByteArrayAsync(texUrl);
+                        CloudProfiles.ValidateSkin(skinBytes);
                     }
                 } catch { }
 
@@ -425,7 +426,7 @@ namespace MistikLauncher.Pages
                             }
                         } catch { }
                     });
-                    return;
+                    return true;
                 }
 
                 var avatarBytes = await http.GetByteArrayAsync($"https://mc-heads.net/avatar/{user}/{size}");
@@ -434,10 +435,11 @@ namespace MistikLauncher.Pages
                 avatarBmp.BeginInit(); avatarBmp.CacheOption = BitmapCacheOption.OnLoad;
                 avatarBmp.StreamSource = ams; avatarBmp.EndInit(); avatarBmp.Freeze();
                 img.Dispatcher.Invoke(() => img.Source = avatarBmp);
-            } catch {}
+                return true;
+            } catch { return false; }
         }
 
-        async void ApplyLocalSkin(MainWindow main, string filePath)
+        async Task<bool> ApplyLocalSkin(MainWindow main, string filePath)
         {
             try {
                 // Kalici olarak AppData icine kopyala
@@ -454,14 +456,17 @@ namespace MistikLauncher.Pages
 
                 if (success)
                 {
-                    MessageBox.Show("Ozel skininiz basariyla 'Mistik Ozel Skin' kaynak paketi olarak yuklendi ve aktif edildi!\n\nOyuna girdiginizde karakteriniz otomatik olarak hazir olacaktir!", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(Localization.T("skinApplySuccess"), Localization.T("success"), MessageBoxButton.OK, MessageBoxImage.Information);
+                    return true;
                 }
                 else
                 {
-                    MessageBox.Show("Özel skin kaynak paketi hazırlanamadı. Oyununuz (Minecraft) şu an açık ve skin dosyasını kilitliyor olabilir. Lütfen oyunu kapatıp tekrar deneyin.", "Hata", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(Localization.T("skinApplyFailed"), Localization.T("error"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return false;
                 }
             } catch (Exception ex) {
-                MessageBox.Show($"Skin yuklenirken hata olustu: {ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(Localization.T("skinApplyError")+"\n"+ex.Message, Localization.T("error"), MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
             }
         }
     }

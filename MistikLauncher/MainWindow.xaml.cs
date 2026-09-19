@@ -83,10 +83,7 @@ namespace MistikLauncher
             LanguageBox.SelectionChanged += (_,_) => SwitchLanguage(LanguageBox.SelectedIndex == 1 ? "English" : "Turkce");
             Localization.Changed += RefreshLanguage;
             MainFrame.LoadCompleted += (_,_) => Localization.TranslateTree(MainFrame);
-            var languageTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-            languageTimer.Tick += (_,_) => Localization.TranslateTree(MainFrame);
-            languageTimer.Start();
-            Closed += (_,_) => { languageTimer.Stop(); Localization.Changed -= RefreshLanguage; _http.Dispose(); _skinHttp.Dispose(); };
+            Closed += (_,_) => { Localization.Changed -= RefreshLanguage; _http.Dispose(); _skinHttp.Dispose(); };
             RefreshLanguage();
             var updateTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
             updateTimer.Tick += async (_,_) => await CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate);
@@ -96,9 +93,8 @@ namespace MistikLauncher
             };
             Closed += (_,_) => updateTimer.Stop();
             Navigate("Dash");
-            // Relay is started only by an explicit user action.
-            _ = RelayLoopAsync();
-            // Arka planda otomatik güncelleme kontrolü aktif edildi.
+            // Relay is opt-in. Do not start a polling task before the user connects.
+            // This prevents a permanent background loop on every launcher start.
 
 
             // Firebase Analytics: Oturum başlangıcı
@@ -110,6 +106,7 @@ namespace MistikLauncher
             Closing += async (s, e) =>
             {
                 try { await MistikAnalytics.TrackSessionEndAsync(Config.User ?? "Oyuncu"); } catch { }
+                try { if (Relay != null) await Relay.DisposeAsync(); } catch (Exception ex) { App.Log("Relay cleanup: " + ex.Message); }
             };
         }
 
@@ -281,7 +278,6 @@ namespace MistikLauncher
                     "Friends"   => new Pages.FriendsPage(this),
                     "Server"    => new Pages.ServerManagerPage(this),
                     "Changelog" => new Pages.ChangelogPage(this),
-                    "Admin"     => new Pages.AdminPanelPage(this),
                     "Opt"       => new Pages.OptimizationPage(this),
                     "Guide"     => new Pages.GuidePage(this),
                     "Settings"  => new Pages.ModernSettingsPage(this),
@@ -1440,11 +1436,12 @@ namespace MistikLauncher
 
                     byte[]? skinBytes = null;
                     try {
-                        var jsonStr = await _http.GetStringAsync($"http://skinsystem.ely.by/textures/{Uri.EscapeDataString(user)}");
+                        var jsonStr = await _http.GetStringAsync($"https://skinsystem.ely.by/textures/{Uri.EscapeDataString(user)}");
                         var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
-                        var texUrl = jObj["SKIN"]?["url"]?.ToString();
+                        var texUrl = SkinTextureUrl(jObj["SKIN"]?["url"]?.ToString());
                         if (!string.IsNullOrEmpty(texUrl)) {
                             skinBytes = await _http.GetByteArrayAsync(texUrl);
+                            CloudProfiles.ValidateSkin(skinBytes);
                         }
                     } catch { }
 
