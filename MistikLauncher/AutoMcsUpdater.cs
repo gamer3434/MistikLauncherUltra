@@ -27,6 +27,11 @@ public sealed class AutoMcsUpdater
     public string StatusKey { get; private set; } = "mcsIdle";
     public string? Error { get; private set; }
     public double Progress { get; private set; }
+    public long DownloadedBytes { get; private set; }
+    public long TotalBytes { get; private set; }
+    public double DownloadSpeedBytesPerSecond { get; private set; }
+    public TimeSpan? RemainingTime { get; private set; }
+    DateTime _lastTransferPublish=DateTime.MinValue;
     public bool Busy { get; private set; }
     public bool IsRunning => isRunning();
     public event Action? Changed;
@@ -75,7 +80,7 @@ public sealed class AutoMcsUpdater
         string? staging=null;
         try
         {
-            Busy=true; Error=null; Publish("mcsChecking");
+            Busy=true; Error=null; ResetTransfer(); Publish("mcsChecking");
             if(cached==null || force || DateTime.UtcNow-checkedAt>TimeSpan.FromMinutes(10))
             {
                 using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(20));
@@ -93,17 +98,21 @@ public sealed class AutoMcsUpdater
             Directory.CreateDirectory(directory);
             staging=Path.Combine(directory,".auto-mcs-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(staging);
             string zip=Path.Combine(staging,"package.zip");
-            Publish("mcsDownloading");
+            TotalBytes=cached.Size; PublishTransfer("mcsDownloading",0,true);
             using(var response=await http.GetAsync(cached.Url,HttpCompletionOption.ResponseHeadersRead))
             {
                 response.EnsureSuccessStatusCode();
                 using var input=await response.Content.ReadAsStreamAsync();
                 using var output=new FileStream(zip,FileMode.CreateNew,FileAccess.Write,FileShare.None,81920,true);
-                var buffer=new byte[81920]; long total=0; int read;
+                var buffer=new byte[81920]; long total=0; int read; var clock=Stopwatch.StartNew();
                 while((read=await input.ReadAsync(buffer))>0)
                 {
                     total+=read; if(total>cached.Size) throw new InvalidDataException("Package exceeds declared size.");
-                    await output.WriteAsync(buffer.AsMemory(0,read)); Publish("mcsDownloading",total*85d/cached.Size);
+                    await output.WriteAsync(buffer.AsMemory(0,read));
+                    DownloadedBytes=total;
+                    DownloadSpeedBytesPerSecond=clock.Elapsed.TotalSeconds>0?total/clock.Elapsed.TotalSeconds:0;
+                    RemainingTime=DownloadSpeedBytesPerSecond>1?TimeSpan.FromSeconds((cached.Size-total)/DownloadSpeedBytesPerSecond):null;
+                    PublishTransfer("mcsDownloading",total*85d/cached.Size);
                 }
                 if(total!=cached.Size) throw new InvalidDataException("Incomplete download.");
             }
@@ -136,5 +145,15 @@ public sealed class AutoMcsUpdater
             if(staging!=null) { try { foreach(var file in Directory.EnumerateFiles(staging)) File.Delete(file); Directory.Delete(staging); } catch { } }
             Busy=false; Changed?.Invoke(); gate.Release();
         }
+    }
+    void ResetTransfer()
+    {
+        DownloadedBytes=0; TotalBytes=0; DownloadSpeedBytesPerSecond=0; RemainingTime=null; _lastTransferPublish=DateTime.MinValue;
+    }
+    void PublishTransfer(string key,double progress,bool force=false)
+    {
+        var now=DateTime.UtcNow;
+        if(!force && DownloadedBytes<TotalBytes && now-_lastTransferPublish<TimeSpan.FromMilliseconds(120)) return;
+        _lastTransferPublish=now; Publish(key,progress);
     }
 }
