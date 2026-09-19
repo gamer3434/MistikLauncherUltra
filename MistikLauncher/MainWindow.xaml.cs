@@ -297,7 +297,9 @@ namespace MistikLauncher
             // Constructors already render with the active language. Re-rendering the
             // entire page immediately after creation caused visible navigation stutter.
             if(!created && page is ILanguagePage localized) localized.RefreshLanguage();
-            Localization.TranslateTree(page);
+            // ILanguagePage implementations refresh their own cached content. Walk the
+            // visual tree only for a new page or for pages without that contract.
+            if(created || page is not ILanguagePage) Localization.TranslateTree(page);
             MainFrame.Navigate(page);
         }
 
