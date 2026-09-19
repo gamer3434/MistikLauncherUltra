@@ -37,7 +37,7 @@ namespace MistikLauncher
         [JsonProperty("auto_close")] public bool   AutoClose  { get; set; } = true;
         [JsonProperty("friends")]    public List<string> Friends     { get; set; } = new();
         [JsonProperty("friend_codes")] public List<string> FriendCodes { get; set; } = new();
-        [JsonProperty("version_code")] public string VersionCode { get; set; } = "v5.5.2";
+        [JsonProperty("version_code")] public string VersionCode { get; set; } = App.LocalVersion;
         [JsonProperty("open_count")]   public int OpenCount   { get; set; } = 0;
         [JsonProperty("github_user")]  public string GithubUser { get; set; } = "Musta";
         [JsonProperty("tunnel_gateway")] public int TunnelGateway { get; set; } = 0; // 0=bore.pub 1=Özel SSH
@@ -68,8 +68,11 @@ namespace MistikLauncher
               cfg.User = Regex.IsMatch(cfg.User ?? "", @"^[A-Za-z0-9_]{3,16}$") ? cfg.User! : "Player";
               cfg.Version ??= "";
               cfg.Version = GameProfiles.SafeId(cfg.Version) && cfg.Version.Length<=120 ? cfg.Version : "1.21";
-            cfg.Friends ??= new(); cfg.FriendCodes ??= new();
-            cfg.QuickLinks=(cfg.QuickLinks ?? new()).Where(x=>new[]{"Dash","Vers","Mods","Skin","Server","Settings"}.Contains(x)).Distinct().Take(6).ToList();
+              cfg.Friends ??= new(); cfg.FriendCodes ??= new();
+              // Migrate stale configs from pre-6.x builds; this value is informational and
+              // must always describe the binary that is currently running.
+              cfg.VersionCode = App.LocalVersion;
+              cfg.QuickLinks=(cfg.QuickLinks ?? new()).Where(x=>new[]{"Dash","Vers","Mods","Skin","Server","Settings"}.Contains(x)).Distinct().Take(6).ToList();
               cfg.Role = "User";
               cfg.Accent = ColorThemes.Names.Contains(cfg.Accent) ? cfg.Accent : "Amber";
               cfg.WindowButtons = MainWindow.WindowButtonStyles.Contains(cfg.WindowButtons) ? cfg.WindowButtons : "MacOS";
@@ -144,6 +147,35 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.0.8","2026-09-19","#FFB000", new[]{
+                "Önbelleğe alınmış sayfalarda gereksiz ikinci dil ağacı taraması kaldırıldı",
+                "Sayfa geçişlerinde yeniden çizim ve görsel takılma daha da azaltıldı"
+            }),
+            new("v6.0.7","2026-09-19","#FFB000", new[]{
+                "Güncelleme hız, indirilen boyut ve tahmini kalan süreyi gösterir",
+                "İndirme ilerleme olayları sınırlanarak güncelleme sırasında UI kasması azaltıldı",
+                "Sayfa geçişindeki gereksiz ilk çift render kaldırıldı"
+            }),
+            new("v6.0.6","2026-09-19","#FFB000", new[]{
+                "Mod senkronizasyonu UI thread'inden arka plana taşındı; geçişlerde donma azaltıldı",
+                "Arka plan taraması sırasında yapılan son sürüm seçimi kaybolmaz",
+                "Senkronizasyon hatalarında WPF dispatcher kullanılarak çapraz thread hatası önlendi"
+            }),
+            new("v6.0.5","2026-09-19","#FFB000", new[]{
+                "Güncelleme ekranında hedef sürüm açıkça gösterilir",
+                "Eski paketlerin yeni kurulumu geri alması downgrade korumasıyla engellenir",
+                "Güncelleme yardımcısı seçilen release sürümünü doğrular"
+            }),
+            new("v6.0.4","2026-09-19","#FFB000", new[]{
+                "GitHub API rate limitlerinde son doğrulanmış sürüm metadata önbelleği kullanılır",
+                "Launcher ve Auto-MCS güncellemeleri ETag ile gereksiz istekleri azaltır",
+                "Güncelleme hataları mevcut sürümü korur ve yeniden denemeyi güvenli yapar"
+            }),
+            new("v6.0.3","2026-09-19","#FFB000", new[]{
+                "Modern ana panel, renk temaları ve pencere düğmesi stilleri yenilendi",
+                "Türkçe/İngilizce dil geçişi ve sürüm güncelleme akışı sağlamlaştırıldı",
+                "Forge sürüm seçimi, skin önizleme ve yerel skin uygulama hataları düzeltildi"
+            }),
             new("v5.5.2","2026-06-07","#FF3300", new[]{ 
                 "Karakter cilt (skin) kilitleme hataları düzeltildi",
                 "Minecraft açıkken skin değiştirmede uyarı penceresi eklendi",

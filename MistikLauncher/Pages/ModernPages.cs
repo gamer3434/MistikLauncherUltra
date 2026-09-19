@@ -61,6 +61,10 @@ public class ModernHomePage : Page, ILanguagePage
                 } catch (Exception ex) { MessageBox.Show(ex.Message,Localization.T("error")); }
             }; tools.Children.Add(button);
         }
+        var reportButton = PageHelpers.MkBtn(Localization.T("reportButton"),"#28445E");
+        reportButton.Margin = new Thickness(0,0,12,12);
+        reportButton.Click += (_,_) => CrashDiagnostics.Show(main, CrashDiagnostics.ManualReport());
+        tools.Children.Add(reportButton);
         stack.Children.Add(tools);
         stack.Children.Add(PageHelpers.Lbl(Localization.T("help"),20,"#FFFFFF",true,pad:new Thickness(0,20,0,10)));
         stack.Children.Add(PageHelpers.Lbl(Localization.T("helpText"),15,"#BDCAD8",wrap:TextWrapping.Wrap));
@@ -224,8 +228,28 @@ public class ModernSettingsPage : Page, ILanguagePage
     void UpdateStatus()
     {
         if(updateStatus==null) return;
-        updateStatus.Text=Localization.T(main.LauncherUpdates.StatusKey)+(main.LauncherUpdates.Busy?$" ({main.LauncherUpdates.Progress:0}%)":"")+(main.LauncherUpdates.Error==null?"":"\n"+main.LauncherUpdates.Error);
+        var target=main.LauncherUpdates.LatestVersion=="—"?"":$"\n{Localization.T("luTarget")}: {main.LauncherUpdates.LatestVersion}";
+        var transfer="";
+        if(main.LauncherUpdates.StatusKey=="luDownloading" && main.LauncherUpdates.TotalBytes>0)
+        {
+            var speed=main.LauncherUpdates.DownloadSpeedBytesPerSecond>0?FormatBytes((long)main.LauncherUpdates.DownloadSpeedBytesPerSecond)+"/s":"—";
+            var eta=FormatEta(main.LauncherUpdates.RemainingTime);
+            transfer=$"\n{Localization.T("luDownloaded")}: {FormatBytes(main.LauncherUpdates.DownloadedBytes)} / {FormatBytes(main.LauncherUpdates.TotalBytes)} · {Localization.T("luSpeed")}: {speed} · {Localization.T("luRemaining")}: {eta}";
+        }
+        updateStatus.Text=Localization.T(main.LauncherUpdates.StatusKey)+target+transfer+(main.LauncherUpdates.Busy?$" ({main.LauncherUpdates.Progress:0}%)":"")+(main.LauncherUpdates.Error==null?"":"\n"+main.LauncherUpdates.Error);
         updateButton.IsEnabled=!main.LauncherUpdates.Busy;
+    }
+    static string FormatBytes(long bytes)
+    {
+        if(bytes<1024) return $"{bytes} B";
+        if(bytes<1024*1024) return $"{bytes/1024d:0.0} KB";
+        if(bytes<1024*1024*1024) return $"{bytes/1024d/1024d:0.0} MB";
+        return $"{bytes/1024d/1024d/1024d:0.00} GB";
+    }
+    static string FormatEta(TimeSpan? eta)
+    {
+        if(eta==null) return "—";
+        var value=eta.Value; return value.TotalHours>=1?$"{(int)value.TotalHours:00}:{value.Minutes:00}:{value.Seconds:00}":$"{value.Minutes:00}:{value.Seconds:00}";
     }
     void Save()
     {

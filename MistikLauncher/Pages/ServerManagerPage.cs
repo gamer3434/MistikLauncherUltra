@@ -65,11 +65,30 @@ public sealed class ServerManagerPage : Page, ILanguagePage
     {
         installed.Text=updater.InstalledVersion=="?"?Localization.T("mcsUnknown"):updater.InstalledVersion;
         latest.Text=updater.LatestVersion;
-        status.Text=Localization.T(updater.StatusKey)+(updater.Error==null?"":"\n"+updater.Error);
+        var transfer="";
+        if(updater.StatusKey=="mcsDownloading" && updater.TotalBytes>0)
+        {
+            var speed=updater.DownloadSpeedBytesPerSecond>0?FormatBytes((long)updater.DownloadSpeedBytesPerSecond)+"/s":"—";
+            var eta=FormatEta(updater.RemainingTime);
+            transfer=$"\n{Localization.T("mcsDownloaded")}: {FormatBytes(updater.DownloadedBytes)} / {FormatBytes(updater.TotalBytes)} · {Localization.T("mcsSpeed")}: {speed} · {Localization.T("mcsRemaining")}: {eta}";
+        }
+        status.Text=Localization.T(updater.StatusKey)+transfer+(updater.Error==null?"":"\n"+updater.Error);
         status.Foreground=PageHelpers.HexBrush(updater.Error==null?"#CCE1EF":"#F3BDA3");
         progress.Value=updater.Progress; progress.Visibility=updater.Busy?Visibility.Visible:Visibility.Collapsed;
         launch.IsEnabled=!updater.Busy; update.IsEnabled=!updater.Busy;
         launch.Content=Localization.T(File.Exists(updater.ExecutablePath)?"mcsLaunch":"mcsInstallLaunch");
+    }
+    static string FormatBytes(long bytes)
+    {
+        if(bytes<1024) return $"{bytes} B";
+        if(bytes<1024*1024) return $"{bytes/1024d:0.0} KB";
+        if(bytes<1024*1024*1024) return $"{bytes/1024d/1024d:0.0} MB";
+        return $"{bytes/1024d/1024d/1024d:0.00} GB";
+    }
+    static string FormatEta(TimeSpan? eta)
+    {
+        if(eta==null) return "—";
+        var value=eta.Value; return value.TotalHours>=1?$"{(int)value.TotalHours:00}:{value.Minutes:00}:{value.Seconds:00}":$"{value.Minutes:00}:{value.Seconds:00}";
     }
     async Task Launch()
     {

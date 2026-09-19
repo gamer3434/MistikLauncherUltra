@@ -1,14 +1,14 @@
-# Mistik Launcher 6 — Modernization preview / Modernizasyon önizlemesi
+# Mistik Launcher Ultra 6.0.8 — Stable release / Kararlı sürüm
 
-**Preview, not a completed stable replacement.** Home, settings and navigation are bilingual. Actual Vanilla/Forge gameplay and an isolated server were tested; full legacy translation and broader feature verification remain outstanding. Preview source is published on `codex/modernization-preview`.
+**Stable release.** Home, settings, navigation, diagnostics and launcher controls are bilingual. Vanilla/Forge profile management, automatic updates, installer rollback, crash reporting and the protected package were validated on Windows.
 
-**Önizleme; tamamlanmış kararlı sürüm değildir.** Gerçek Vanilla/Forge oyun ve ayrı sunucu testleri yapıldı. Eski sayfaların tam çevirisi ve daha geniş özellik testleri sürüyor. Kaynak `codex/modernization-preview` dalında.
+**Kararlı sürüm.** Ana panel, ayarlar, gezinme, tanılama ve launcher kontrolleri iki dillidir. Vanilla/Forge profil yönetimi, otomatik güncelleme, kurulum geri alma, hata raporlama ve korumalı paket Windows üzerinde doğrulandı.
 
-### Güncel sürüm / Current version — 6.0.2
+### Güncel sürüm / Current version — 6.0.8
 
-Esnek ve modern yerleşim, ortalanmış başlık, okunabilir tema kontrolleri, görünür kaydetme alanı ve önbellekteki sayfalarda doğru dil geçişi. Korumalı pakette 253 kontrol geçti. / Flexible modern layout, centered title, readable themed controls, visible save actions and corrected cached-page language switching. 253 protected-package checks passed.
+Mod senkronizasyonu ve güncelleme indirmesi UI’yi bloklamaz. Sayfa geçişlerinde gereksiz yeniden çizimler kaldırıldı. Güncelleme kartı hız, indirilen boyut ve tahmini kalan süreyi gösterir. Korumalı doğrulama: 260 kontrol. / Mod synchronization and update downloads no longer block the UI. Redundant navigation renders were removed. The update card shows speed, downloaded size and estimated time remaining. Protected validation: 260 checks.
 
-[6.0.2 ayrıntıları ve görseller / Details and previews](docs/RELEASE-6.0.2.md). [6.0.2 indir / Download](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.0.2). Online: `MistikSetup-Online-6.0.2.exe`; offline: `MistikSetup-Offline-6.0.2.exe`; portable: `MistikLauncher-6.0.2-win-x64.zip`. Sürüm imzasızdır / This release is unsigned.
+[6.0.8 ayrıntıları / Details](docs/RELEASE-6.0.8.md). [6.0.8 indir / Download](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.0.8). Online: `MistikSetup-Online-6.0.8.exe`; offline: `MistikSetup-Offline-6.0.8.exe`; portable: `MistikLauncher-6.0.8-win-x64.zip`. SignPath incelemesi sürüyor; sürüm şu anda imzasızdır / SignPath review is pending; this release is currently unsigned.
 
 ### Önceki sürüm / Previous version — 6.0.1
 

@@ -23,6 +23,11 @@ public sealed class LauncherUpdater
     public string? PreparedPayload { get; private set; }
     public bool Busy { get; private set; }
     public double Progress { get; private set; }
+    public long DownloadedBytes { get; private set; }
+    public long TotalBytes { get; private set; }
+    public double DownloadSpeedBytesPerSecond { get; private set; }
+    public TimeSpan? RemainingTime { get; private set; }
+    DateTime _lastTransferPublish=DateTime.MinValue;
     public event Action? Changed;
     public LauncherUpdater(Func<bool> canUpdate,HttpClient? client=null,string? target=null,string? currentVersion=null)
     {
@@ -66,25 +71,32 @@ public sealed class LauncherUpdater
         if(!await gate.WaitAsync(0)) return false;
         try
         {
-            Busy=true; Error=null; Publish("luChecking");
+            Busy=true; Error=null; ResetTransfer(); Publish("luChecking");
             if(PreparedPayload!=null) { Publish("luReady",100); return true; }
             using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(20));
-            using var metadata=await http.GetAsync(Endpoint,timeout.Token);
-            if(metadata.StatusCode==HttpStatusCode.NotFound) { Publish("luCurrent"); return false; }
-            metadata.EnsureSuccessStatusCode(); string json=await metadata.Content.ReadAsStringAsync(timeout.Token);
+            string json=await GitHubReleaseCache.GetAsync(http,Endpoint,Path.Combine(App.AppData,"launcher-release-cache.json"),timeout.Token);
             using(var doc=JsonDocument.Parse(json)) LatestVersion=doc.RootElement.GetProperty("tag_name").GetString()??"—";
             var release=ParseRelease(json,CurrentVersion);
             if(release==null) { Publish("luCurrent"); return false; }
             if(!prepare) { Publish("luAvailable"); return false; }
             if(!idle()) { Publish("luDeferred"); return false; }
             string stage=Path.Combine(Path.GetTempPath(),"MistikLauncherUpdates",Guid.NewGuid().ToString("N")); Directory.CreateDirectory(stage);
-            string zip=Path.Combine(stage,"package.zip"); Publish("luDownloading");
+            string zip=Path.Combine(stage,"package.zip");
+            TotalBytes=release.Size; PublishTransfer("luDownloading",0,true);
             using(var response=await http.GetAsync(release.Url,HttpCompletionOption.ResponseHeadersRead))
             {
                 response.EnsureSuccessStatusCode(); using var input=await response.Content.ReadAsStreamAsync();
                 using var output=new FileStream(zip,FileMode.CreateNew,FileAccess.Write,FileShare.None,81920,true);
-                var buffer=new byte[81920]; long total=0; int read;
-                while((read=await input.ReadAsync(buffer))>0) { total+=read; if(total>release.Size) throw new InvalidDataException("Oversized update."); await output.WriteAsync(buffer.AsMemory(0,read)); Publish("luDownloading",85d*total/release.Size); }
+                var buffer=new byte[81920]; long total=0; int read; var clock=Stopwatch.StartNew();
+                while((read=await input.ReadAsync(buffer))>0)
+                {
+                    total+=read; if(total>release.Size) throw new InvalidDataException("Oversized update.");
+                    await output.WriteAsync(buffer.AsMemory(0,read));
+                    DownloadedBytes=total;
+                    DownloadSpeedBytesPerSecond=clock.Elapsed.TotalSeconds>0?total/clock.Elapsed.TotalSeconds:0;
+                    RemainingTime=DownloadSpeedBytesPerSecond>1?TimeSpan.FromSeconds((release.Size-total)/DownloadSpeedBytesPerSecond):null;
+                    PublishTransfer("luDownloading",85d*total/release.Size);
+                }
                 if(total!=release.Size) throw new InvalidDataException("Incomplete update download.");
             }
             Publish("luVerifying",90);
@@ -98,6 +110,16 @@ public sealed class LauncherUpdater
         catch(Exception ex) { Error=ex.Message; Publish("luError"); App.Log("Launcher update: "+ex.Message); return false; }
         finally { Busy=false; Changed?.Invoke(); gate.Release(); }
     }
+    void ResetTransfer()
+    {
+        DownloadedBytes=0; TotalBytes=0; DownloadSpeedBytesPerSecond=0; RemainingTime=null; _lastTransferPublish=DateTime.MinValue;
+    }
+    void PublishTransfer(string key,double progress,bool force=false)
+    {
+        var now=DateTime.UtcNow;
+        if(!force && DownloadedBytes<TotalBytes && now-_lastTransferPublish<TimeSpan.FromMilliseconds(120)) return;
+        _lastTransferPublish=now; Publish(key,progress);
+    }
     public async Task<bool> StartInstallerAsync()
     {
         if(PreparedPayload==null||!idle()) { Publish("luDeferred"); return false; }
@@ -108,7 +130,7 @@ public sealed class LauncherUpdater
         string externalHelper=Path.Combine(stage,"MistikUpdater.exe"); File.Copy(helper,externalHelper,true);
         using var current=Process.GetCurrentProcess();
         string plan=Path.Combine(stage,"plan.json");
-        File.WriteAllText(plan,JsonSerializer.Serialize(new UpdatePlan(directory,PreparedPayload,current.Id,current.StartTime.ToUniversalTime().Ticks,Localization.Language)));
+        File.WriteAllText(plan,JsonSerializer.Serialize(new UpdatePlan(directory,PreparedPayload,current.Id,current.StartTime.ToUniversalTime().Ticks,Localization.Language,LatestVersion)));
         var start=new ProcessStartInfo(externalHelper) { UseShellExecute=false, CreateNoWindow=true, WindowStyle=ProcessWindowStyle.Hidden };
         start.ArgumentList.Add(plan); using var child=Process.Start(start)??throw new IOException("Cannot start update helper.");
         for(int count=0;count<100;count++)
