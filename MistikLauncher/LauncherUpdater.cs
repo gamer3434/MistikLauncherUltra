@@ -106,7 +106,7 @@ public sealed class LauncherUpdater
         string externalHelper=Path.Combine(stage,"MistikUpdater.exe"); File.Copy(helper,externalHelper,true);
         using var current=Process.GetCurrentProcess();
         string plan=Path.Combine(stage,"plan.json");
-        File.WriteAllText(plan,JsonSerializer.Serialize(new UpdatePlan(directory,PreparedPayload,current.Id,current.StartTime.ToUniversalTime().Ticks,Localization.Language)));
+        File.WriteAllText(plan,JsonSerializer.Serialize(new UpdatePlan(directory,PreparedPayload,current.Id,current.StartTime.ToUniversalTime().Ticks,Localization.Language,LatestVersion)));
         var start=new ProcessStartInfo(externalHelper) { UseShellExecute=false, CreateNoWindow=true, WindowStyle=ProcessWindowStyle.Hidden };
         start.ArgumentList.Add(plan); using var child=Process.Start(start)??throw new IOException("Cannot start update helper.");
         for(int count=0;count<100;count++)

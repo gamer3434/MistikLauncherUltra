@@ -17,7 +17,7 @@ class Program
                 throw new InvalidDataException("Update parent identity mismatch.");
             File.WriteAllText(args[0]+".ready","ready");
             if(!parent.WaitForExit(60000)) throw new IOException("Launcher is still running.");
-            UpdateEngine.Apply(plan.Payload,plan.Target);
+            UpdateEngine.Apply(plan.Payload,plan.Target,plan.ExpectedVersion);
             Process.Start(new ProcessStartInfo(UpdateEngine.SafePath(plan.Target,"MistikLauncher.exe")) { UseShellExecute=true, WorkingDirectory=plan.Target });
             return 0;
         }
