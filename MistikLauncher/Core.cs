@@ -147,6 +147,11 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.0.5","2026-09-19","#FFB000", new[]{
+                "Güncelleme ekranında hedef sürüm açıkça gösterilir",
+                "Eski paketlerin yeni kurulumu geri alması downgrade korumasıyla engellenir",
+                "Güncelleme yardımcısı seçilen release sürümünü doğrular"
+            }),
             new("v6.0.4","2026-09-19","#FFB000", new[]{
                 "GitHub API rate limitlerinde son doğrulanmış sürüm metadata önbelleği kullanılır",
                 "Launcher ve Auto-MCS güncellemeleri ETag ile gereksiz istekleri azaltır",

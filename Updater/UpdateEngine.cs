@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace MistikLauncher.Updates;
 public sealed record UpdateFile(string Path,string Hash);
 public sealed record UpdateManifest(string Product,string Version,UpdateFile[] Files);
-public sealed record UpdatePlan(string Target,string Payload,int ParentId,long ParentStarted,string Language);
+public sealed record UpdatePlan(string Target,string Payload,int ParentId,long ParentStarted,string Language,string? ExpectedVersion=null);
 public sealed record UpdateInstallState(string Product,string Root,string Version,string[] Files);
 public static class UpdateEngine
 {
@@ -56,10 +56,24 @@ public static class UpdateEngine
         if(!actual.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(names)) throw new InvalidDataException("Unlisted payload file.");
         return manifest;
     }
-    public static void Apply(string payload,string target)
+    public static void Apply(string payload,string target,string? expectedVersion=null)
     {
         var manifest=Verify(payload);
+        if(!string.IsNullOrWhiteSpace(expectedVersion) && !string.Equals(manifest.Version,expectedVersion.TrimStart('v'),StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Update package version does not match the selected release.");
         if(!File.Exists(SafePath(target,"MistikLauncher.exe"))) throw new InvalidDataException("Launcher installation not found.");
+        string installedManifest=SafePath(target,"update-manifest.json");
+        if(File.Exists(installedManifest))
+        {
+            try
+            {
+                using var current=JsonDocument.Parse(File.ReadAllText(installedManifest));
+                string? currentVersion=current.RootElement.GetProperty("Version").GetString();
+                if(ReleaseNumber(manifest.Version) < ReleaseNumber(currentVersion))
+                    throw new InvalidDataException("Downgrade blocked; the installed launcher is newer.");
+            }
+            catch(JsonException) { throw new InvalidDataException("Installed update manifest is invalid."); }
+        }
         // Validate every destination before modifying any installed file.
         foreach(var item in manifest.Files) SafePath(target,item.Path);
         string backup=System.IO.Path.Combine(System.IO.Path.GetDirectoryName(payload)!,"backup-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(backup);
@@ -102,5 +116,12 @@ public static class UpdateEngine
             throw;
         }
         finally { if(File.Exists(backup+".install-state.json")) File.Delete(backup+".install-state.json"); }
+    }
+
+    static Version ReleaseNumber(string? value)
+    {
+        var number=(value??"").Trim().TrimStart('v');
+        var dash=number.IndexOf('-'); if(dash>=0) number=number[..dash];
+        return Version.TryParse(number,out var parsed)?parsed:new Version(0,0,0);
     }
 }

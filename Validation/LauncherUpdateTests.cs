@@ -42,6 +42,11 @@ static class LauncherUpdateTests
         Check(!await service.CheckAsync(false) && service.StatusKey=="luAvailable" && service.PreparedPayload==null,"launcher check-only avoids download");
         Check(await service.CheckAsync(true) && service.PreparedPayload!=null && UpdateEngine.Verify(service.PreparedPayload).Version=="7.0.0","verified portable update prepared");
         Check(File.ReadAllText(Path.Combine(target,names[0]))=="old "+names[0],"preparation leaves installed files untouched");
+        File.WriteAllText(Path.Combine(target,"update-manifest.json"),"{\"Product\":\"MistikLauncher\",\"Version\":\"8.0.0\",\"Files\":[]}");
+        bool downgradeBlocked=false;
+        try { UpdateEngine.Apply(payload,target); } catch(InvalidDataException ex) { downgradeBlocked=ex.Message.Contains("Downgrade blocked",StringComparison.Ordinal); }
+        Check(downgradeBlocked,"older update package is blocked before file replacement");
+        File.Delete(Path.Combine(target,"update-manifest.json"));
         UpdateEngine.Apply(payload,target);
         Check(names.All(name=>File.ReadAllText(Path.Combine(target,name))=="new "+name),"full package replacement");
         Check(File.ReadAllText(Path.Combine(target,"config.json"))=="user preferences" && File.ReadAllText(Path.Combine(target,"game","world.dat"))=="world","launcher update preserves settings and worlds");
