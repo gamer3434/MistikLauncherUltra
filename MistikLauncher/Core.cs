@@ -147,6 +147,10 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.0.8","2026-09-19","#FFB000", new[]{
+                "Önbelleğe alınmış sayfalarda gereksiz ikinci dil ağacı taraması kaldırıldı",
+                "Sayfa geçişlerinde yeniden çizim ve görsel takılma daha da azaltıldı"
+            }),
             new("v6.0.7","2026-09-19","#FFB000", new[]{
                 "Güncelleme hız, indirilen boyut ve tahmini kalan süreyi gösterir",
                 "İndirme ilerleme olayları sınırlanarak güncelleme sırasında UI kasması azaltıldı",
