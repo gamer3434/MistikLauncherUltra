@@ -59,8 +59,10 @@ public partial class MainWindow
                 var content=new Grid(); content.Children.Add(outline); content.Children.Add(glyph);
                 frame.Width=38; frame.Height=24; frame.CornerRadius=new CornerRadius(5); frame.BorderThickness=new Thickness(0); frame.BorderBrush=stroke;
                 frame.Background=Brushes.Transparent; frame.Child=content;
-                if(Config.CloseLighting=="RGB" && SystemParameters.ClientAreaAnimation) {
-                    var cycle=new System.Windows.Media.Animation.ColorAnimationUsingKeyFrames { Duration=TimeSpan.FromSeconds(8),RepeatBehavior=System.Windows.Media.Animation.RepeatBehavior.Forever };
+                if(Config.CloseLighting=="RGB") {
+                    // RGB is an explicit launcher choice; keep it animated even when Windows
+                    // global client-area animations are disabled.
+                    var cycle=new System.Windows.Media.Animation.ColorAnimationUsingKeyFrames { Duration=TimeSpan.FromSeconds(6),RepeatBehavior=System.Windows.Media.Animation.RepeatBehavior.Forever };
                     var colors=new[]{Colors.Red,Colors.Orange,Colors.Yellow,Colors.Lime,Colors.Cyan,Colors.Blue,Colors.Magenta,Colors.Red};
                     for(int i=0;i<colors.Length;i++) cycle.KeyFrames.Add(new System.Windows.Media.Animation.LinearColorKeyFrame(colors[i],System.Windows.Media.Animation.KeyTime.FromTimeSpan(TimeSpan.FromSeconds(i*8.0/(colors.Length-1)))));
                     stroke.BeginAnimation(SolidColorBrush.ColorProperty,cycle);

@@ -828,6 +828,8 @@ namespace MistikLauncher.Pages
         }
     }
 
+    // Removed product surface retained only as source history; excluded from shipped binaries.
+#if false
     // Admin Panel
     public class AdminPanelPage : Page
     {
@@ -2383,4 +2385,5 @@ namespace MistikLauncher.Pages
             }
         }
     }
+#endif
 }

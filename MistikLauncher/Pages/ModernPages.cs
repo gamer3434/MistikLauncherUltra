@@ -61,6 +61,10 @@ public class ModernHomePage : Page, ILanguagePage
                 } catch (Exception ex) { MessageBox.Show(ex.Message,Localization.T("error")); }
             }; tools.Children.Add(button);
         }
+        var reportButton = PageHelpers.MkBtn(Localization.T("reportButton"),"#28445E");
+        reportButton.Margin = new Thickness(0,0,12,12);
+        reportButton.Click += (_,_) => CrashDiagnostics.Show(main, CrashDiagnostics.ManualReport());
+        tools.Children.Add(reportButton);
         stack.Children.Add(tools);
         stack.Children.Add(PageHelpers.Lbl(Localization.T("help"),20,"#FFFFFF",true,pad:new Thickness(0,20,0,10)));
         stack.Children.Add(PageHelpers.Lbl(Localization.T("helpText"),15,"#BDCAD8",wrap:TextWrapping.Wrap));

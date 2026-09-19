@@ -37,6 +37,9 @@ class Program
             Check(CrashDiagnostics.Category("Incompatible mods found")=="MLU-MOD-DEPENDENCY","mod compatibility failure classification");
             Check(CrashDiagnostics.Category("exit code 1")=="MLU-EXIT","exit code alone does not blame a mod");
             Check(CrashDiagnostics.Category("ClassNotFoundException")=="MLU-CLASSPATH","missing class has actionable profile/library guidance");
+            var manualReport=CrashDiagnostics.ManualReport();
+            var savedReport=CrashDiagnostics.SaveReport(manualReport);
+            Check(File.Exists(savedReport) && new FileInfo(savedReport).Length>0,"manual error report can be saved locally");
             Directory.CreateDirectory(App.ModsDir);
             File.WriteAllText(Path.Combine(App.ModsDir,"suspect.jar"),"fixture");
             File.WriteAllText(Path.Combine(App.ModsDir,"innocent.jar"),"fixture");
@@ -70,7 +73,7 @@ class Program
             var config = new LauncherConfig { User="../bad", Ram=200, Lang="English", TunnelPort=-1, Role="Yonetici" };
             ConfigManager.Save(config);
             var loaded = ConfigManager.Load();
-            Check(loaded.User=="Player" && loaded.Ram==32 && loaded.TunnelPort==1 && loaded.Role=="User", "config validation");
+            Check(loaded.User=="Player" && loaded.Ram==32 && loaded.TunnelPort==1 && loaded.Role=="User" && loaded.VersionCode==App.LocalVersion, "config validation and version migration");
             config.User="TestPlayer"; config.Ram=4; ConfigManager.Save(config);
             Check(File.Exists(Path.Combine(testRoot,"config.json.bak")), "atomic settings backup");
             File.WriteAllText(Path.Combine(testRoot,"config.json"), "{broken");
@@ -100,6 +103,7 @@ class Program
             var window=new MainWindow { Width=1200, Height=820 };
             Check(MainWindow.SkinTextureUrl("http://textures.minecraft.net/texture/test")=="https://textures.minecraft.net/texture/test" && MainWindow.SkinTextureUrl("https://ely.by.attacker.invalid/test")==null && MainWindow.SkinTextureUrl("file:///C:/Windows/test.png")==null,"skin texture URLs enforce trusted HTTPS hosts");
             Check(window.FetchAvatarAsync("../../outside").GetAwaiter().GetResult()==null,"avatar username traversal is rejected before network or cache access");
+            Check(!MistikLauncher.Pages.SkinPage.LoadImgAsync(new Image(),"../../outside",80).GetAwaiter().GetResult(),"skin preview rejects invalid usernames before network access");
             Directory.CreateDirectory(App.ModsDir);
             string disabledMod=Path.Combine(App.ModsDir,"kept.jar.disabled"); File.WriteAllText(disabledMod,"kept bytes");
             window.Config.LastSyncedVersion="1.20.1-forge-47.4.10"; window.Config.Version="1.19.2-forge-43.5.0"; window.SyncModsForCurrentVersion();
@@ -151,6 +155,7 @@ class Program
             ((Button)caption.Children[2]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(window.WindowState==WindowState.Normal,"custom window button restores");
             Check(App.LocalVersion=="v"+window.LauncherUpdates.CurrentVersion,"all local version labels match actual compiled version");
+            Check(new LauncherConfig().VersionCode==App.LocalVersion && App.Changelog[0].Ver==App.LocalVersion,"config and changelog use the compiled release version");
             Check(((DockPanel)window.FindName("WindowSurface")).Margin.Left==0,"restored window removes maximized frame inset");
             ((Button)window.FindName("ProfileButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
             Check(((Frame)window.FindName("MainFrame")).Content is MistikLauncher.Pages.ModernSettingsPage,"top-right player profile opens settings");
@@ -230,13 +235,13 @@ class Program
                 var closeFrame=((StackPanel)window.FindName("CaptionButtons")).Children.OfType<Button>().Where(CaptionHasGlow).Select(button=>(Border)button.Content).Single();
                 var circle=((Grid)closeFrame.Child).Children.OfType<Border>().Single();
                 var cross=((Grid)closeFrame.Child).Children.OfType<System.Windows.Shapes.Path>().Single();
-                Check(circle.Width==38 && circle.Height==24 && circle.CornerRadius.TopLeft==5 && cross.HorizontalAlignment==HorizontalAlignment.Center && cross.VerticalAlignment==VerticalAlignment.Center && ((SolidColorBrush)circle.BorderBrush).HasAnimatedProperties==SystemParameters.ClientAreaAnimation && circle.Effect.HasAnimatedProperties==SystemParameters.ClientAreaAnimation && ConfigManager.Load().CloseLighting=="RGB","centered RGB outline respects animation preference and persists: "+code);
+                Check(circle.Width==38 && circle.Height==24 && circle.CornerRadius.TopLeft==5 && cross.HorizontalAlignment==HorizontalAlignment.Center && cross.VerticalAlignment==VerticalAlignment.Center && ((SolidColorBrush)circle.BorderBrush).HasAnimatedProperties && circle.Effect.HasAnimatedProperties && ConfigManager.Load().CloseLighting=="RGB","centered RGB outline animates independently of Windows animation preference and persists: "+code);
                 var before=((SolidColorBrush)circle.BorderBrush).Color;
                 var animationFrame=new DispatcherFrame();
                 var animationTimer=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(350) };
                 animationTimer.Tick+=(_,_)=> { animationTimer.Stop(); animationFrame.Continue=false; };
                 animationTimer.Start(); Dispatcher.PushFrame(animationFrame);
-                Check((((SolidColorBrush)circle.BorderBrush).Color!=before)==SystemParameters.ClientAreaAnimation && ((System.Windows.Media.Effects.DropShadowEffect)circle.Effect).Color==((SolidColorBrush)circle.BorderBrush).Color,"RGB motion follows Windows preference and glow stays synchronized: "+code);
+                Check(((SolidColorBrush)circle.BorderBrush).Color!=before && ((System.Windows.Media.Effects.DropShadowEffect)circle.Effect).Color==((SolidColorBrush)circle.BorderBrush).Color,"RGB motion stays active and glow stays synchronized: "+code);
                 lighting.SelectedIndex=2; Flush(window);
                 Check(((StackPanel)window.FindName("CaptionButtons")).Children.OfType<Button>().All(button=>!CaptionHasGlow(button)),"Off disables caption lighting: "+code);
                 lighting.SelectedIndex=1; Flush(window);
