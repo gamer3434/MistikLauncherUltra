@@ -37,7 +37,7 @@ namespace MistikLauncher
         [JsonProperty("auto_close")] public bool   AutoClose  { get; set; } = true;
         [JsonProperty("friends")]    public List<string> Friends     { get; set; } = new();
         [JsonProperty("friend_codes")] public List<string> FriendCodes { get; set; } = new();
-        [JsonProperty("version_code")] public string VersionCode { get; set; } = "v6.0.3";
+        [JsonProperty("version_code")] public string VersionCode { get; set; } = App.LocalVersion;
         [JsonProperty("open_count")]   public int OpenCount   { get; set; } = 0;
         [JsonProperty("github_user")]  public string GithubUser { get; set; } = "Musta";
         [JsonProperty("tunnel_gateway")] public int TunnelGateway { get; set; } = 0; // 0=bore.pub 1=Özel SSH
@@ -147,6 +147,11 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.0.4","2026-09-19","#FFB000", new[]{
+                "GitHub API rate limitlerinde son doğrulanmış sürüm metadata önbelleği kullanılır",
+                "Launcher ve Auto-MCS güncellemeleri ETag ile gereksiz istekleri azaltır",
+                "Güncelleme hataları mevcut sürümü korur ve yeniden denemeyi güvenli yapar"
+            }),
             new("v6.0.3","2026-09-19","#FFB000", new[]{
                 "Modern ana panel, renk temaları ve pencere düğmesi stilleri yenilendi",
                 "Türkçe/İngilizce dil geçişi ve sürüm güncelleme akışı sağlamlaştırıldı",
