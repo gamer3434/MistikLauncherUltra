@@ -87,7 +87,15 @@ public static class UpdateEngine
             {
                 using var state=JsonDocument.Parse(File.ReadAllText(marker));
                 var record=state.RootElement;
-                if(record.GetProperty("Product").GetString()!="MistikLauncher" || !System.IO.Path.GetFullPath(record.GetProperty("Root").GetString()!).Equals(System.IO.Path.GetFullPath(target),StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Invalid installation record.");
+                var product=record.GetProperty("Product").GetString();
+                var recordedRoot=record.TryGetProperty("Root",out var rootValue)?rootValue.GetString():null;
+                if(product!="MistikLauncher" || string.IsNullOrWhiteSpace(recordedRoot)) throw new InvalidDataException("Invalid installation record.");
+                // Older installers could preserve a differently normalized root (for
+                // example a trailing separator or a junction path). The helper is
+                // launched by the executable inside `target`; when the uninstall
+                // registry entry confirms that same target, repair the marker while
+                // carrying forward only its validated relative file list.
+                if(!SamePath(recordedRoot,target) && !RegistryTargetMatches(target)) throw new InvalidDataException("Invalid installation record.");
                 var owned=record.GetProperty("Files").EnumerateArray().Select(entry=>entry.GetString()!).ToArray();
                 if(owned.Length>3000) throw new InvalidDataException("Invalid ownership record.");
                 foreach(var path in owned) { SafePath(target,path); if(path.Equals("install-state.json",StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Invalid ownership record."); }
@@ -123,5 +131,20 @@ public static class UpdateEngine
         var number=(value??"").Trim().TrimStart('v');
         var dash=number.IndexOf('-'); if(dash>=0) number=number[..dash];
         return Version.TryParse(number,out var parsed)?parsed:new Version(0,0,0);
+    }
+    static bool SamePath(string left,string right)
+    {
+        static string Normalize(string value)=>System.IO.Path.GetFullPath(value).TrimEnd(System.IO.Path.DirectorySeparatorChar,System.IO.Path.AltDirectorySeparatorChar);
+        return Normalize(left).Equals(Normalize(right),StringComparison.OrdinalIgnoreCase);
+    }
+    static bool RegistryTargetMatches(string target)
+    {
+        try
+        {
+            using var key=Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\MistikLauncherUltra");
+            var location=key?.GetValue("InstallLocation") as string;
+            return !string.IsNullOrWhiteSpace(location) && SamePath(location,target);
+        }
+        catch { return false; }
     }
 }

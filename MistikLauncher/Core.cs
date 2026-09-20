@@ -147,6 +147,10 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.0.9","2026-09-20","#FFB000", new[]{
+                "Eski kurulum kayıtlarındaki yol biçimi güncelleme yardımcısıyla uyumlu hale getirildi",
+                "Kayıt onarımı yalnızca Windows kurulum kaydı ve güvenli göreli dosya listesi doğrulanınca yapılır"
+            }),
             new("v6.0.8","2026-09-19","#FFB000", new[]{
                 "Önbelleğe alınmış sayfalarda gereksiz ikinci dil ağacı taraması kaldırıldı",
                 "Sayfa geçişlerinde yeniden çizim ve görsel takılma daha da azaltıldı"
