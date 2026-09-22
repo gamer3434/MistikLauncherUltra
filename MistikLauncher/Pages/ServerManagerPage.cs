@@ -14,8 +14,8 @@ public sealed class ServerManagerPage : Page, ILanguagePage
     public ServerManagerPage(MainWindow window)
     {
         main=window; updater=window.AutoMcs;
-        Loaded += (_,_) => { Localization.Changed+=Render; updater.Changed+=RefreshAsync; Refresh(); };
-        Unloaded += (_,_) => { Localization.Changed-=Render; updater.Changed-=RefreshAsync; };
+        Loaded += (_,_) => { updater.Changed+=RefreshAsync; Refresh(); };
+        Unloaded += (_,_) => updater.Changed-=RefreshAsync;
         Render();
     }
     public void RefreshLanguage() => Render();

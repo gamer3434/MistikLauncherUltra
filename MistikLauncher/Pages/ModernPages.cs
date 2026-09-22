@@ -10,8 +10,6 @@ public class ModernHomePage : Page, ILanguagePage
     public ModernHomePage(MainWindow window)
     {
         main = window;
-        Loaded += (_, _) => { Localization.Changed += Render; Render(); };
-        Unloaded += (_, _) => Localization.Changed -= Render;
         Render();
     }
     public void RefreshLanguage() => Render();
@@ -80,11 +78,12 @@ public class ModernSettingsPage : Page, ILanguagePage
     CheckBox close = null!;
     TextBlock result = null!, updateStatus = null!;
     Button updateButton = null!;
+    ProgressBar updateProgress = null!;
     public ModernSettingsPage(MainWindow window)
     {
         main=window;
-        Loaded += (_,_) => { Localization.Changed += Render; main.LauncherUpdates.Changed += UpdateStatusAsync; Render(); };
-        Unloaded += (_,_) => { Localization.Changed -= Render; main.LauncherUpdates.Changed -= UpdateStatusAsync; };
+        Loaded += (_,_) => main.LauncherUpdates.Changed += UpdateStatusAsync;
+        Unloaded += (_,_) => main.LauncherUpdates.Changed -= UpdateStatusAsync;
         Render();
     }
     public void RefreshLanguage() => Render();
@@ -106,6 +105,8 @@ public class ModernSettingsPage : Page, ILanguagePage
         updateButton=PageHelpers.MkBtn(Localization.T("luCheck"),"#226DA0"); updateButton.HorizontalAlignment=HorizontalAlignment.Left;
         updateButton.Click += async (_,_)=> await main.CheckLauncherUpdatesAsync(true); updateContent.Children.Add(updateButton);
         updateStatus=PageHelpers.Lbl("",13,"#ADBED6",pad:new Thickness(0,10,0,0),wrap:TextWrapping.Wrap); updateContent.Children.Add(updateStatus);
+        updateProgress=new ProgressBar { Height=8, Maximum=100, Margin=new Thickness(0,12,0,2), Background=ColorThemes.Brush("#263D56"), Foreground=ColorThemes.Brush("#00A3FF"), BorderThickness=new Thickness(0), Visibility=Visibility.Collapsed };
+        updateContent.Children.Add(updateProgress);
         updateCard.Child=updateContent; stack.Children.Add(updateCard); UpdateStatus();
         void Label(string key) => stack.Children.Add(PageHelpers.Lbl(Localization.T(key),15,"#FFFFFF",true,pad:new Thickness(0,16,0,6)));
         var themeCard=new Border { Background=PageHelpers.HexBrush("#192C46"), Padding=new Thickness(20), CornerRadius=new CornerRadius(14) };
@@ -238,6 +239,9 @@ public class ModernSettingsPage : Page, ILanguagePage
         }
         updateStatus.Text=Localization.T(main.LauncherUpdates.StatusKey)+target+transfer+(main.LauncherUpdates.Busy?$" ({main.LauncherUpdates.Progress:0}%)":"")+(main.LauncherUpdates.Error==null?"":"\n"+main.LauncherUpdates.Error);
         updateButton.IsEnabled=!main.LauncherUpdates.Busy;
+        updateProgress.Visibility=main.LauncherUpdates.Busy?Visibility.Visible:Visibility.Collapsed;
+        updateProgress.IsIndeterminate=main.LauncherUpdates.Busy && main.LauncherUpdates.TotalBytes<=0;
+        updateProgress.Value=Math.Clamp(main.LauncherUpdates.Progress,0,100);
     }
     static string FormatBytes(long bytes)
     {
