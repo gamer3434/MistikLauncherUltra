@@ -58,6 +58,7 @@ namespace MistikLauncher
     public static class ConfigManager
     {
         static readonly string Path = System.IO.Path.Combine(App.AppData, "config.json");
+        static readonly byte[] Header = Encoding.ASCII.GetBytes("MLUC1\n");
 
         private static readonly object Gate = new();
         public static LauncherConfig Normalize(LauncherConfig cfg)
@@ -90,7 +91,7 @@ namespace MistikLauncher
             {
                 try
                 {
-                    if (File.Exists(Path)) return Normalize(JsonConvert.DeserializeObject<LauncherConfig>(File.ReadAllText(Path)) ?? new());
+                    if (File.Exists(Path)) return Read(Path);
                 }
                 catch (Exception ex)
                 {
@@ -98,7 +99,7 @@ namespace MistikLauncher
                     try
                     {
                         if (File.Exists(Path + ".bak"))
-                            return Normalize(JsonConvert.DeserializeObject<LauncherConfig>(File.ReadAllText(Path + ".bak")) ?? new());
+                            return Read(Path + ".bak");
                     }
                     catch (Exception backupError) { App.Log("Configuration backup recovery: " + backupError.Message); }
                 }
@@ -106,6 +107,44 @@ namespace MistikLauncher
             }
         }
         public static event Action<LauncherConfig>? Saved;
+        static bool Encrypted(byte[] bytes) => bytes.AsSpan().StartsWith(Header);
+        static LauncherConfig Read(string path)
+        {
+            byte[] bytes = File.ReadAllBytes(path);
+            try
+            {
+                if (Encrypted(bytes))
+                {
+                    byte[] plain = WindowsSecret.Transform(bytes[Header.Length..], false);
+                    try { return Normalize(JsonConvert.DeserializeObject<LauncherConfig>(Encoding.UTF8.GetString(plain)) ?? new()); }
+                    finally { CryptographicOperations.ZeroMemory(plain); }
+                }
+                return Normalize(JsonConvert.DeserializeObject<LauncherConfig>(Encoding.UTF8.GetString(bytes)) ?? new());
+            }
+            finally { CryptographicOperations.ZeroMemory(bytes); }
+        }
+        static byte[] Protect(byte[] plain)
+        {
+            byte[] cipher = WindowsSecret.Transform(plain, true);
+            byte[] result = new byte[Header.Length + cipher.Length];
+            Header.CopyTo(result, 0);
+            cipher.CopyTo(result, Header.Length);
+            CryptographicOperations.ZeroMemory(cipher);
+            return result;
+        }
+        static void ProtectLegacyBackup()
+        {
+            if (!File.Exists(Path + ".bak")) return;
+            byte[] backup = File.ReadAllBytes(Path + ".bak");
+            try
+            {
+                if (Encrypted(backup)) return;
+                string temporary = Path + ".bak.tmp";
+                File.WriteAllBytes(temporary, Protect(backup));
+                File.Move(temporary, Path + ".bak", true);
+            }
+            finally { CryptographicOperations.ZeroMemory(backup); }
+        }
         public static void Save(LauncherConfig cfg)
         {
             lock (Gate)
@@ -113,9 +152,35 @@ namespace MistikLauncher
                 Normalize(cfg);
                 Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
                 string temporary = Path + ".tmp";
-                File.WriteAllText(temporary, JsonConvert.SerializeObject(cfg, Formatting.Indented), Encoding.UTF8);
-                if (File.Exists(Path)) File.Replace(temporary, Path, Path + ".bak");
-                else File.Move(temporary, Path);
+                byte[] plain = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(cfg));
+                try { File.WriteAllBytes(temporary, Protect(plain)); }
+                finally { CryptographicOperations.ZeroMemory(plain); }
+                if (!File.Exists(Path))
+                {
+                    File.Move(temporary, Path);
+                    ProtectLegacyBackup();
+                }
+                else
+                {
+                    byte[] previous = File.ReadAllBytes(Path);
+                    try
+                    {
+                        bool valid;
+                        try { Read(Path); valid = true; }
+                        catch { valid = false; }
+                        if (valid && Encrypted(previous)) File.Replace(temporary, Path, Path + ".bak");
+                        else
+                        {
+                            // Never replace a healthy backup with a broken primary.
+                            string backupTemporary = Path + ".bak.tmp";
+                            if (valid) File.WriteAllBytes(backupTemporary, Protect(previous));
+                            File.Replace(temporary, Path, null);
+                            if (valid) File.Move(backupTemporary, Path + ".bak", true);
+                            else ProtectLegacyBackup();
+                        }
+                    }
+                    finally { CryptographicOperations.ZeroMemory(previous); }
+                }
             }
             Saved?.Invoke(cfg);
         }
@@ -147,6 +212,11 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.0.10","2026-09-22","#FFB000", new[]{
+                "Ayarlar ve yedekleri Windows kullanıcı hesabına bağlı olarak şifrelendi; eski kayıtlar otomatik taşınır",
+                "Ana panel ve ayarlarda gereksiz ikinci çizim kaldırıldı; sayfa geçişleri hızlandı",
+                "Güncelleme kartına tema rengini izleyen ilerleme çubuğu eklendi"
+            }),
             new("v6.0.9","2026-09-20","#FFB000", new[]{
                 "Eski kurulum kayıtlarındaki yol biçimi güncelleme yardımcısıyla uyumlu hale getirildi",
                 "Kayıt onarımı yalnızca Windows kurulum kaydı ve güvenli göreli dosya listesi doğrulanınca yapılır"

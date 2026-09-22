@@ -75,11 +75,19 @@ class Program
             ConfigManager.Save(config);
             var loaded = ConfigManager.Load();
             Check(loaded.User=="Player" && loaded.Ram==32 && loaded.TunnelPort==1 && loaded.Role=="User" && loaded.VersionCode==App.LocalVersion, "config validation and version migration");
+            Check(!File.ReadAllText(Path.Combine(testRoot,"config.json")).Contains("Player"), "saved settings do not expose the player name");
             config.User="TestPlayer"; config.Ram=4; ConfigManager.Save(config);
             Check(File.Exists(Path.Combine(testRoot,"config.json.bak")), "atomic settings backup");
+            Check(!File.ReadAllText(Path.Combine(testRoot,"config.json.bak")).Contains("Player"), "settings backup is encrypted");
             File.WriteAllText(Path.Combine(testRoot,"config.json"), "{broken");
             Check(ConfigManager.Load().Ram==32 && ConfigManager.Load().User=="Player", "corrupt settings restores previous backup");
-            ConfigManager.Save(config);
+            ConfigManager.Save(ConfigManager.Load());
+            File.WriteAllText(Path.Combine(testRoot,"config.json"), "{broken again");
+            Check(ConfigManager.Load().User=="Player", "saving recovered settings keeps a healthy backup");
+            File.WriteAllText(Path.Combine(testRoot,"config.json"), "{\"user\":\"LegacyUser\",\"ram\":8}");
+            Check(ConfigManager.Load().User=="LegacyUser", "legacy plaintext settings remain readable");
+            ConfigManager.Save(ConfigManager.Load());
+            Check(ConfigManager.Load().User=="LegacyUser" && !File.ReadAllText(Path.Combine(testRoot,"config.json")).Contains("LegacyUser") && !File.ReadAllText(Path.Combine(testRoot,"config.json.bak")).Contains("LegacyUser"), "legacy settings and backup migrate to encrypted files");
             Check(!ReleaseSecurity.AutomaticUpdatesEnabled && !MistikLauncher.App.AdminAccessEnabled, "unsafe remote controls disabled");
             bool rejected=false;
             try { ReleaseSecurity.ValidateUninstallTarget(Path.GetTempPath()); } catch(InvalidOperationException) { rejected=true; }

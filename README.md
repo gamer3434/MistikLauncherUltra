@@ -1,14 +1,16 @@
-# Mistik Launcher Ultra 6.0.9 — Stable release / Kararlı sürüm
+# Mistik Launcher Ultra 6.0.10 — Stable release / Kararlı sürüm
 
 **Stable release.** Home, settings, navigation, diagnostics and launcher controls are bilingual. Vanilla/Forge profile management, automatic updates, installer rollback, crash reporting and the protected package were validated on Windows.
 
 **Kararlı sürüm.** Ana panel, ayarlar, gezinme, tanılama ve launcher kontrolleri iki dillidir. Vanilla/Forge profil yönetimi, otomatik güncelleme, kurulum geri alma, hata raporlama ve korumalı paket Windows üzerinde doğrulandı.
 
-### Güncel sürüm / Current version — 6.0.9
+### Güncel sürüm / Current version — 6.0.10
 
-Güncelleme yardımcısı eski kurulum kayıtlarının yol biçimini güvenle onarır. Mod senkronizasyonu ve güncelleme indirmesi UI’yi bloklamaz. Güncelleme kartı hız, indirilen boyut ve tahmini kalan süreyi gösterir. Korumalı doğrulama: 260 kontrol. / The updater safely repairs legacy installation-record path formats. Mod synchronization and update downloads no longer block the UI. The update card shows speed, downloaded size and estimated time remaining. Protected validation: 260 checks.
+Kaydedilen ayarlar ve yedekleri Windows DPAPI ile kullanıcı hesabına bağlı şifrelenir. Eski düz metin ayarlar ilk kayıtta taşınır. Ana panel ve ayarlardaki ikinci çizim kaldırıldı; güncelleme kartında tema renkli ilerleme çubuğu bulunur. / Saved settings and backups use Windows DPAPI encryption bound to the user account. Legacy plaintext settings migrate on the next save. Duplicate rendering was removed from Home and Settings; the update card has a theme-colored progress bar.
 
-[6.0.9 ayrıntıları / Details](docs/RELEASE-6.0.9.md). [6.0.9 indir / Download](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.0.9). Online: `MistikSetup-Online-6.0.9.exe`; offline: `MistikSetup-Offline-6.0.9.exe`; portable: `MistikLauncher-6.0.9-win-x64.zip`. SignPath incelemesi sürüyor; sürüm şu anda imzasızdır / SignPath review is pending; this release is currently unsigned.
+[6.0.10 ayrıntıları / Details](docs/RELEASE-6.0.10.md). [6.0.10 indir / Download](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.0.10). Online: `MistikSetup-Online-6.0.10.exe`; offline: `MistikSetup-Offline-6.0.10.exe`; portable: `MistikLauncher-6.0.10-win-x64.zip`. SignPath incelemesi sürüyor; sürüm şu anda imzasızdır / SignPath review is pending; this release is currently unsigned.
+
+**Ayarların taşınması / Moving settings:** `%APPDATA%\.mistik_ultra\config.json` ve `.bak` dosyaları artık aynı Windows kullanıcı hesabında açılır. Başka bilgisayara veya hesaba taşıyacaksanız, eski bilgisayarda ayarları yeniden girmeniz gerekir; oyun dünyaları ve modlar şifrelenmez. / The encrypted settings files can be opened only under the same Windows account. Re-enter preferences when moving to another account or PC; game worlds and mods are not encrypted.
 
 ### Önceki sürüm / Previous version — 6.0.1
 
