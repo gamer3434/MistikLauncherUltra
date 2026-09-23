@@ -212,6 +212,11 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.0.11","2026-09-23","#FFB000", new[]{
+                "Güvensiz eski bulut/MQTT güncellemesi ve eski EXE güncelleme beslemesi kaldırıldı",
+                "Kullanılmayan bulut hesabı kodu ve eski kaynak yedeği güncel depodan çıkarıldı",
+                "Menü geçişleri hızlandı; hızlı sekme değişimi ve optimizasyon ayarlarının korunması düzeltildi"
+            }),
             new("v6.0.10","2026-09-22","#FFB000", new[]{
                 "Ayarlar ve yedekleri Windows kullanıcı hesabına bağlı olarak şifrelendi; eski kayıtlar otomatik taşınır",
                 "Ana panel ve ayarlarda gereksiz ikinci çizim kaldırıldı; sayfa geçişleri hızlandı",
@@ -554,7 +559,6 @@ namespace MistikLauncher
         public event Action<string?>?        OnTunnelReady;
         public event Action<string, string>? OnFriendRequestReceived;
         public event Action<string, string>? OnFriendRequestAccepted;
-        public event Action<string, string, string>? OnUpdateNotification;
         public event Action<string>?        OnTunnelLog;
 
         readonly Dictionary<string, PeerInfo> _peers = new();
@@ -599,7 +603,6 @@ namespace MistikLauncher
                 await _client.SubscribeAsync($"{TopicBase}/#");
                 await _client.SubscribeAsync($"{ReqBase}/{RoomCode}");
                 await _client.SubscribeAsync($"{RespBase}/{RoomCode}");
-                await _client.SubscribeAsync("mistik_ultra_v2/updates");
                 Connected = true;
 
                 _ = HeartbeatLoopAsync();
@@ -675,19 +678,6 @@ namespace MistikLauncher
             await _client.PublishAsync(msg);
         }
 
-        public async Task PublishUpdateAsync(string ver, string url, string changelog)
-        {
-            if (_client == null || !Connected) return;
-            var payload = JsonConvert.SerializeObject(new { version = ver, url = url, changelog = changelog });
-            var msg = new MqttApplicationMessageBuilder()
-                .WithTopic("mistik_ultra_v2/updates")
-                .WithPayload(payload)
-                .WithRetainFlag(true)
-                .WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.AtLeastOnce)
-                .Build();
-            await _client.PublishAsync(msg);
-        }
-
         Task OnMessage(MqttApplicationMessageReceivedEventArgs e)
         {
             try
@@ -695,15 +685,7 @@ namespace MistikLauncher
                 var topic = e.ApplicationMessage.Topic;
                 var json = Encoding.UTF8.GetString(e.ApplicationMessage.PayloadSegment);
 
-                if (topic == "mistik_ultra_v2/updates")
-                {
-                    var upd = JsonConvert.DeserializeObject<UpdateMessage>(json);
-                    if (upd != null)
-                    {
-                        OnUpdateNotification?.Invoke(upd.Version, upd.Url, upd.Changelog);
-                    }
-                }
-                else if (topic.StartsWith(ReqBase))
+                if (topic.StartsWith(ReqBase))
                 {
                     var req = JsonConvert.DeserializeObject<dynamic>(json);
                     string fromUser = req?.from_user ?? "";
@@ -1774,13 +1756,6 @@ namespace MistikLauncher
             catch { return false; }
         }
     }
-    public class UpdateMessage
-    {
-        [JsonProperty("version")]   public string Version   { get; set; } = "";
-        [JsonProperty("url")]       public string Url       { get; set; } = "";
-        [JsonProperty("changelog")] public string Changelog { get; set; } = "";
-    }
-
     // ── Firebase Realtime Database Analytics ─────────────────────────────────────
     // Google Firebase REST API ile kullanıcı veritabanı.
     // Firebase Console: https://console.firebase.google.com

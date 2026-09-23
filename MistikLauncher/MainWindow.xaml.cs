@@ -25,10 +25,10 @@ namespace MistikLauncher
         public AutoMcsUpdater AutoMcs { get; } = new();
         public LauncherUpdater LauncherUpdates { get; }
         public MistikRelay?   Relay;
-        public string? LatestOnlineVersion;
-        public string? LatestOnlineUrl;
-        public string? LatestOnlineChangelog;
         readonly Dictionary<string, Page> _pageCache = new();
+        readonly Dictionary<string, string> _pageLanguages = new();
+        readonly HashSet<Page> _pendingTranslations = new();
+        Page? _pendingPage;
         readonly HttpClient _http = new();
         readonly HttpClient _skinHttp = new() { Timeout=TimeSpan.FromSeconds(6),MaxResponseContentBufferSize=65536 };
         string _accent = "#00A3FF";
@@ -70,7 +70,7 @@ namespace MistikLauncher
                     ConfigManager.Save(Config);
                     StatusLbl.Text = $"{Localization.T("version")}: {selected}";
                     QueueBackgroundModSync();
-                    if(MainFrame.Content is Pages.ModernHomePage home) home.RefreshLanguage();
+                    if(_pageCache.TryGetValue("Dash", out var homePage) && homePage is Pages.ModernHomePage home) home.RefreshLanguage();
                 }
             };
 
@@ -83,7 +83,11 @@ namespace MistikLauncher
             LanguageBox.SelectedIndex = Localization.Language == "en" ? 1 : 0;
             LanguageBox.SelectionChanged += (_,_) => SwitchLanguage(LanguageBox.SelectedIndex == 1 ? "English" : "Turkce");
             Localization.Changed += RefreshLanguage;
-            MainFrame.LoadCompleted += (_,_) => Localization.TranslateTree(MainFrame);
+            MainFrame.LoadCompleted += (_, e) => {
+                if (ReferenceEquals(_pendingPage, e.Content)) _pendingPage = null;
+                if (e.Content is Page loaded && _pendingTranslations.Remove(loaded))
+                    Localization.TranslateTree(loaded);
+            };
             Closed += (_,_) => { Localization.Changed -= RefreshLanguage; _http.Dispose(); _skinHttp.Dispose(); };
             RefreshLanguage();
             var updateTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
@@ -123,7 +127,9 @@ namespace MistikLauncher
 
         public void SwitchLanguage(string code)
         {
-            Config.Lang = code == "English" || code == "en" ? "English" : "Turkce";
+            var language = code == "English" || code == "en" ? "English" : "Turkce";
+            if (Config.Lang == language && Localization.Language == (language == "English" ? "en" : "tr")) return;
+            Config.Lang = language;
             ConfigManager.Save(Config);
             Localization.SetLanguage(Config.Lang);
         }
@@ -138,6 +144,11 @@ namespace MistikLauncher
             StatusLbl.Text = Localization.T("version") + ": " + Config.Version;
             if(MainFrame.Content is ILanguagePage currentPage) currentPage.RefreshLanguage();
             Localization.TranslateTree(MainFrame);
+            if (MainFrame.Content is Page active && _pageCache.TryGetValue(_currentNav, out var cached) && ReferenceEquals(active, cached))
+            {
+                _pageLanguages[_currentNav] = Localization.Language;
+                _pendingTranslations.Remove(active);
+            }
             var index = Localization.Language == "en" ? 1 : 0;
             if (LanguageBox.SelectedIndex != index) LanguageBox.SelectedIndex = index;
         }
@@ -245,7 +256,7 @@ namespace MistikLauncher
                 System.Windows.Automation.AutomationProperties.SetName(button,Localization.T(item.Item2));
                 button.Click+=(_,_)=>Navigate(item.Item1); quickButtons[item.Item1]=button; QuickBarPanel.Children.Add(button);
             }
-            QuickBarHost.Visibility=Config.QuickLinks.Count==0?Visibility.Collapsed:Visibility.Visible;
+            QuickBarHost.Visibility=quickButtons.Count==0?Visibility.Collapsed:Visibility.Visible;
             SelectNav(_currentNav);
         }
 
@@ -290,21 +301,27 @@ namespace MistikLauncher
                 _pageCache[key] = page;
             }
 
+            if (ReferenceEquals(_pendingPage, page) || (_pendingPage == null && ReferenceEquals(MainFrame.Content, page))) return;
+
             page.Resources[typeof(ComboBox)]=FindResource(typeof(ComboBox));
             page.Resources[typeof(ComboBoxItem)]=FindResource(typeof(ComboBoxItem));
             foreach(var resource in ColorThemes.Resources) page.Resources[resource.Key]=resource.Value;
             page.Resources["ThemeActionText"]=ColorThemes.ActionText;
-            // Constructors already render with the active language. Re-rendering the
-            // entire page immediately after creation caused visible navigation stutter.
-            if(!created && page is ILanguagePage localized) localized.RefreshLanguage();
-            // ILanguagePage implementations refresh their own cached content. Walk the
-            // visual tree only for a new page or for pages without that contract.
-            if(created || page is not ILanguagePage) Localization.TranslateTree(page);
+            // Cached pages only need rebuilding when the language has changed.
+            bool languageChanged = created || !_pageLanguages.TryGetValue(key, out var pageLanguage) || pageLanguage != Localization.Language;
+            if (!created && languageChanged && page is ILanguagePage localized) localized.RefreshLanguage();
+            _pageLanguages[key] = Localization.Language;
+            if (languageChanged) _pendingTranslations.Add(page);
+            _pendingPage = page;
             MainFrame.Navigate(page);
         }
 
         // Belirli bir sayfanın cache'ini temizler (yeniden oluşturmak için)
-        public void InvalidatePageCache(string key) => _pageCache.Remove(key);
+        public void InvalidatePageCache(string key)
+        {
+            if (_pageCache.Remove(key, out var page)) _pendingTranslations.Remove(page);
+            _pageLanguages.Remove(key);
+        }
 
 
         // ── Version box ───────────────────────────────────────────────────────
@@ -491,7 +508,7 @@ namespace MistikLauncher
                             var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
                             var texUrl = SkinTextureUrl(jObj["SKIN"]?["url"]?.ToString());
                             if (!string.IsNullOrEmpty(texUrl)) {
-                                var bytes = await _skinHttp.GetByteArrayAsync(texUrl); CloudProfiles.ValidateSkin(bytes);
+                                var bytes = await _skinHttp.GetByteArrayAsync(texUrl); SkinValidator.Validate(bytes);
                                 Directory.CreateDirectory(App.AppData);
                                 await File.WriteAllBytesAsync(cache, bytes);
                             }
@@ -540,7 +557,7 @@ namespace MistikLauncher
                         var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
                         var texUrl = SkinTextureUrl(jObj["SKIN"]?["url"]?.ToString());
                         if (!string.IsNullOrEmpty(texUrl)) {
-                            var elyBytes = await _skinHttp.GetByteArrayAsync(texUrl); CloudProfiles.ValidateSkin(elyBytes);
+                            var elyBytes = await _skinHttp.GetByteArrayAsync(texUrl); SkinValidator.Validate(elyBytes);
                             Directory.CreateDirectory(App.AppData);
                             await File.WriteAllBytesAsync(elybyCache, elyBytes);
                         }
@@ -948,87 +965,8 @@ namespace MistikLauncher
         {
             try
             {
-                string optionsPath = Path.Combine(App.GameDir, "options.txt");
-                if (!File.Exists(optionsPath)) return;
-
-                var lines = File.ReadAllLines(optionsPath).ToList();
-                bool modified = false;
-
-                bool hasSyncWrites = false;
-                bool hasMaxFps = false;
-
-                for (int i = 0; i < lines.Count; i++)
-                {
-                    var trimmed = lines[i].Trim();
-                    if (trimmed.StartsWith("renderDistance:", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var parts = trimmed.Split(':', 2);
-                        if (parts.Length == 2 && int.TryParse(parts[1].Trim(), out int dist))
-                        {
-                            if (dist > 12)
-                            {
-                                lines[i] = "renderDistance:12";
-                                modified = true;
-                                App.Log($"[ChunkOpt] Render distance capped from {dist} to 12 for smoother startup.");
-                            }
-                        }
-                    }
-                    else if (trimmed.StartsWith("simulationDistance:", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var parts = trimmed.Split(':', 2);
-                        if (parts.Length == 2 && int.TryParse(parts[1].Trim(), out int dist))
-                        {
-                            if (dist > 8)
-                            {
-                                lines[i] = "simulationDistance:8";
-                                modified = true;
-                                App.Log($"[ChunkOpt] Simulation distance capped from {dist} to 8 for smoother startup.");
-                            }
-                        }
-                    }
-                    else if (trimmed.StartsWith("syncChunkWrites:", StringComparison.OrdinalIgnoreCase))
-                    {
-                        hasSyncWrites = true;
-                        if (!trimmed.EndsWith("false"))
-                        {
-                            lines[i] = "syncChunkWrites:false";
-                            modified = true;
-                            App.Log("[ChunkOpt] syncChunkWrites disabled to prevent disk write stutters.");
-                        }
-                    }
-                    else if (trimmed.StartsWith("maxFps:", StringComparison.OrdinalIgnoreCase))
-                    {
-                        hasMaxFps = true;
-                        var parts = trimmed.Split(':', 2);
-                        if (parts.Length == 2 && int.TryParse(parts[1].Trim(), out int fps))
-                        {
-                            if (fps > 144)
-                            {
-                                lines[i] = "maxFps:144";
-                                modified = true;
-                                App.Log($"[ChunkOpt] FPS capped to 144 (was {fps}) to prevent GPU overheating.");
-                            }
-                        }
-                    }
-                }
-
-                if (!hasSyncWrites)
-                {
-                    lines.Add("syncChunkWrites:false");
-                    modified = true;
-                    App.Log("[ChunkOpt] syncChunkWrites:false added to options.txt.");
-                }
-                if (!hasMaxFps)
-                {
-                    lines.Add("maxFps:144");
-                    modified = true;
-                    App.Log("[ChunkOpt] maxFps:144 added to options.txt.");
-                }
-
-                if (modified)
-                {
-                    File.WriteAllLines(optionsPath, lines);
-                }
+                if (GameGraphicsOptions.EnsureStartupSettings(App.GameDir, Config.OptFps))
+                    App.Log("[ChunkOpt] Startup graphics settings updated; Minecraft FPS limit preserved.");
             }
             catch (Exception ex)
             {
@@ -1467,7 +1405,7 @@ namespace MistikLauncher
                         var texUrl = SkinTextureUrl(jObj["SKIN"]?["url"]?.ToString());
                         if (!string.IsNullOrEmpty(texUrl)) {
                             skinBytes = await _http.GetByteArrayAsync(texUrl);
-                            CloudProfiles.ValidateSkin(skinBytes);
+                            SkinValidator.Validate(skinBytes);
                         }
                     } catch { }
 
@@ -2332,7 +2270,6 @@ namespace MistikLauncher
         {
             try {
                 Relay = new MistikRelay(Config.User);
-                Relay.OnUpdateNotification += OnUpdateReceived;
                 var (ok, msg) = await Relay.StartAsync(new PeerInfo {
                     User   = Config.User,
                     Status = "Launcher'da",
@@ -2363,243 +2300,7 @@ namespace MistikLauncher
             }
         }
 
-        public async Task CheckCloudUpdateAsync(bool manual = false)
-        {
-            await Task.Yield(); // async uyumluluğu için
-            try
-            {
-                if (string.IsNullOrEmpty(LatestOnlineVersion))
-                {
-                    // Wait up to 3 seconds for MQTT connection and message receipt
-                    for (int i = 0; i < 30; i++)
-                    {
-                        if (!string.IsNullOrEmpty(LatestOnlineVersion)) break;
-                        await Task.Delay(100);
-                    }
-                }
-
-                // Highly resilient direct HTTPS fallback in case broker.emqx.io is down or slow
-                if (string.IsNullOrEmpty(LatestOnlineVersion))
-                {
-                    var ghUser = string.IsNullOrEmpty(Config.GithubUser) ? "gamer3434" : Config.GithubUser;
-                    var fallbackUrls = new[] {
-                        $"https://raw.githubusercontent.com/{ghUser}/MistikLauncherUltra/main/update.json",
-                        $"https://raw.githubusercontent.com/{ghUser}/MistikLauncherCS/main/update.json",
-                        $"https://raw.githubusercontent.com/{ghUser}/MistikLauncher/main/update.json",
-                        "https://raw.githubusercontent.com/gamer3434/MistikLauncherUltra/main/update.json",
-                        "https://raw.githubusercontent.com/gamer3434/MistikLauncherCS/main/update.json",
-                        "https://raw.githubusercontent.com/gamer3434/MistikLauncher/main/update.json"
-                    };
-
-                    foreach (var u in fallbackUrls)
-                    {
-                        try
-                        {
-                            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(3));
-                            var response = await _http.GetStringAsync(u, cts.Token);
-                            if (!string.IsNullOrEmpty(response))
-                            {
-                                var data = Newtonsoft.Json.Linq.JObject.Parse(response);
-                                var ver = data["version"]?.ToString();
-                                var dlUrl = data["url"]?.ToString();
-                                var log = data["changelog"]?.ToString() ?? "";
-                                if (!string.IsNullOrEmpty(ver) && !string.IsNullOrEmpty(dlUrl))
-                                {
-                                    LatestOnlineVersion = ver;
-                                    LatestOnlineUrl = dlUrl;
-                                    LatestOnlineChangelog = log;
-                                    App.Log($"Cloud update info successfully loaded from HTTPS fallback: {u} (Version: {ver})");
-                                    break;
-                                }
-                            }
-                        }
-                        catch { }
-                    }
-                }
-
-                string version = LatestOnlineVersion ?? "";
-                string url = LatestOnlineUrl ?? "";
-                string changelog = LatestOnlineChangelog ?? "";
-
-                if (string.IsNullOrEmpty(version) || string.IsNullOrEmpty(url))
-                {
-                    // Fallback to local history
-                    var historyPath = Path.Combine(App.AppData, "update_history.json");
-                    if (File.Exists(historyPath))
-                    {
-                        try
-                        {
-                            var json = Newtonsoft.Json.Linq.JArray.Parse(await File.ReadAllTextAsync(historyPath));
-                            if (json.Count > 0)
-                            {
-                                var latest = (Newtonsoft.Json.Linq.JObject)json[0];
-                                version = latest["version"]?.ToString() ?? "";
-                                url = latest["url"]?.ToString() ?? "";
-                                changelog = latest["changelog"]?.ToString() ?? "";
-                            }
-                        }
-                        catch { }
-                    }
-                }
-
-                if (string.IsNullOrEmpty(version) || string.IsNullOrEmpty(url))
-                {
-                    if (manual)
-                    {
-                        Dispatcher.Invoke(() =>
-                            MessageBox.Show(
-                                "Şu anda buluttan güncelleme bilgileri alınamadı. Lütfen daha sonra tekrar deneyin.",
-                                "Güncelleme Kontrolü",
-                                MessageBoxButton.OK,
-                                MessageBoxImage.Warning));
-                    }
-                    return;
-                }
-
-                if (version == App.LocalVersion)
-                {
-                    bool forceUpdate = false;
-                    if (manual)
-                    {
-                        Dispatcher.Invoke(() =>
-                        {
-                            var res = MessageBox.Show(
-                                $"Mistik Launcher zaten en son sürümde ({App.LocalVersion}).\n\nYine de buluttaki dosyayı indirip üzerine yazmak (yeniden kurmak) istiyor musunuz?",
-                                "Güncelleme Kontrolü",
-                                MessageBoxButton.YesNo,
-                                MessageBoxImage.Question
-                            );
-                            forceUpdate = (res == MessageBoxResult.Yes);
-                        });
-                    }
-                    if (!forceUpdate) return;
-                }
-
-                // Ask for user confirmation before starting auto update
-                bool proceed = false;
-                Dispatcher.Invoke(() =>
-                {
-                    var res = MessageBox.Show(
-                        $"Yeni bir güncelleme mevcut!\n\nSürüm: {version}\n\nYenilikler:\n{changelog}\n\nŞimdi indirip güncellemek istiyor musunuz?",
-                        "Yeni Güncelleme Bulundu",
-                        MessageBoxButton.YesNo,
-                        MessageBoxImage.Question
-                    );
-                    proceed = (res == MessageBoxResult.Yes);
-                });
-
-                if (!proceed) return;
-
-                // Start update process
-                await AutoUpdateAsync(url, version, !manual);
-            }
-            catch (Exception ex)
-            {
-                App.Log($"Update check failed: {ex.Message}");
-                if (manual) throw;
-            }
-        }
-
-
         public Task CheckRemoteSettingsAsync() => Task.CompletedTask;
-
-        private void OnUpdateReceived(string ver, string url, string changelog)
-        {
-            LatestOnlineVersion = ver;
-            LatestOnlineUrl = url;
-            LatestOnlineChangelog = changelog;
-        }
-
-        public async Task AutoUpdateAsync(string url, string newVersion, bool silent = false)
-        {
-            if (!ReleaseSecurity.AutomaticUpdatesEnabled)
-                throw new InvalidOperationException(Localization.T("updateDisabled"));
-            try
-            {
-                var currentExe = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName;
-                if (string.IsNullOrEmpty(currentExe))
-                {
-                    throw new Exception("Mevcut program yolu alınamadı, otomatik güncelleme iptal edildi.");
-                }
-
-                var tempDir = Path.GetTempPath();
-                var newExe = Path.Combine(tempDir, "mistik_launcher_new.exe");
-
-                SetProgress(5, "Yeni güncelleme indiriliyor...");
-
-                // Google Drive direct link resolver
-                url = await Pages.VersionManagerPage.ResolveDirectDownloadUrlAsync(url, _http);
-
-                // Download with progress
-                await Pages.VersionManagerPage.DownloadFileWithProgressAsync(url, newExe, (pct, status) => {
-                    SetProgress(5 + pct * 0.85, $"[Güncelleme {newVersion}] {status}");
-                }, 0, 100);
-
-                // Verify download size and MZ header to prevent self-destruction
-                if (!File.Exists(newExe) || new FileInfo(newExe).Length < 200 * 1024)
-                {
-                    throw new Exception("İndirilen güncelleme dosyası geçersiz veya çok küçük (en az 200 KB olmalıdır).");
-                }
-
-                using (var fs = new FileStream(newExe, FileMode.Open, FileAccess.Read))
-                {
-                    if (fs.Length < 2)
-                    {
-                        throw new Exception("İndirilen dosya boş veya okunamadı.");
-                    }
-                    int b1 = fs.ReadByte();
-                    int b2 = fs.ReadByte();
-                    if (b1 != 0x4D || b2 != 0x5A) // 'M' and 'Z'
-                    {
-                        throw new Exception("İndirilen dosya geçerli bir Windows uygulaması (EXE) değil.");
-                    }
-                }
-
-                SetProgress(95, "Güncelleme kuruluyor...");
-
-                // Write the batch script using .bak hot-swap strategy
-                var batPath = Path.Combine(tempDir, "mistik_updater.bat");
-                var currentDir = Path.GetDirectoryName(currentExe);
-                var exeName = Path.GetFileName(currentExe);
-                var batContent = $@"@echo off
-chcp 65001 > nul
-title Mistik Launcher Guncelleyici
-echo Mistik Launcher güncelleniyor, lütfen bekleyin...
-timeout /t 1 /nobreak > nul
-cd /d ""{currentDir}""
-if exist ""{exeName}.bak"" del ""{exeName}.bak""
-ren ""{exeName}"" ""{exeName}.bak""
-copy /y ""{newExe}"" ""{currentExe}"" > nul
-start """" ""{currentExe}""
-del ""{newExe}""
-del ""%~f0""
-";
-
-                await File.WriteAllTextAsync(batPath, batContent, Encoding.UTF8);
-
-                // Run batch script
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = $"/c \"{batPath}\"",
-                    CreateNoWindow = true,
-                    UseShellExecute = false
-                };
-                Process.Start(psi);
-
-                // Shutdown
-                Application.Current.Shutdown();
-            }
-            catch (Exception ex)
-            {
-                App.Log($"Auto update failed: {ex.Message}");
-                SetProgress(0, "Güncelleme başarısız.");
-                if (!silent)
-                {
-                    throw;
-                }
-            }
-        }
 
         // ── Progress ──────────────────────────────────────────────────────────
         public void SetProgress(double v, string? status = null)
@@ -2683,6 +2384,8 @@ del ""%~f0""
 
             try { LoadAvatar(); }
             catch (Exception ex) { App.Log($"ReloadConfig LoadAvatar error: {ex.Message}"); }
+
+            if (_pageCache.TryGetValue("Dash", out var homePage) && homePage is Pages.ModernHomePage home) home.RefreshLanguage();
 
             // Settings sayfasının cache'ini temizle ki yeni config ile yeniden oluşturulsun
             try { InvalidatePageCache("Settings"); }
