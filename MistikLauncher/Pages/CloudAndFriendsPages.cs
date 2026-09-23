@@ -394,7 +394,7 @@ namespace MistikLauncher.Pages
                     var texUrl = MainWindow.SkinTextureUrl(jObj["SKIN"]?["url"]?.ToString());
                     if (!string.IsNullOrEmpty(texUrl)) {
                         skinBytes = await http.GetByteArrayAsync(texUrl);
-                        CloudProfiles.ValidateSkin(skinBytes);
+                    SkinValidator.Validate(skinBytes);
                     }
                 } catch { }
 

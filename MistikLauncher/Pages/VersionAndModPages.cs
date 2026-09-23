@@ -681,6 +681,7 @@ namespace MistikLauncher.Pages
         StackPanel _resultsPanel = null!;
         StackPanel _installedPanel = null!;
         TextBlock installedHelp=null!;
+        DateTime _installedModsWriteTimeUtc;
         public void RefreshLanguage() { installedHelp.Text=Localization.T("modToggleHelp"); RenderInstalledMods(); Localization.TranslateTree(this); }
         static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30),MaxResponseContentBufferSize=128*1024*1024 };
 
@@ -1011,7 +1012,13 @@ namespace MistikLauncher.Pages
             // Load popular mods on open
             _ = LoadPopular();
             RenderInstalledMods();
+            Loaded += (_, _) => {
+                if (InstalledModsWriteTimeUtc() != _installedModsWriteTimeUtc) RenderInstalledMods();
+            };
         }
+
+        static DateTime InstalledModsWriteTimeUtc() => Directory.Exists(App.ModsDir)
+            ? Directory.GetLastWriteTimeUtc(App.ModsDir) : DateTime.MinValue;
 
         async Task LoadPopular()
         {
@@ -1416,6 +1423,7 @@ namespace MistikLauncher.Pages
         }
         void RenderInstalledMods()
         {
+            _installedModsWriteTimeUtc = InstalledModsWriteTimeUtc();
             _installedPanel.Children.Clear();
 
             if (!Directory.Exists(App.ModsDir))

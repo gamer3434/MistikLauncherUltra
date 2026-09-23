@@ -1,7 +1,9 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -344,7 +346,7 @@ namespace MistikLauncher.Pages
             javaCard.Child = javaSp; 
             sp.Children.Add(javaCard);
 
-            // Bulut Güncelleme Sistemi Card
+            // Release updater card
             var updateCard = PageHelpers.Card("#0a1f1a", 12, "#00A3FF"); updateCard.Margin = new Thickness(0, 12, 0, 0);
             var updateSp = new StackPanel { Margin = new Thickness(24, 16, 24, 16) };
             updateSp.Children.Add(PageHelpers.Lbl("🔄 Launcher Güncelleme", 14, "#00A3FF", true));
@@ -363,9 +365,10 @@ namespace MistikLauncher.Pages
                 updateStatusLbl.Foreground = PageHelpers.HexBrush("#FFB100");
                 try
                 {
-                    await _main.CheckCloudUpdateAsync(true);
-                    updateStatusLbl.Text = "Kontrol tamamlandı.";
-                    updateStatusLbl.Foreground = PageHelpers.HexBrush("#2EB82E");
+                    await _main.CheckLauncherUpdatesAsync(true);
+                    updateStatusLbl.Text = Localization.T(_main.LauncherUpdates.StatusKey) +
+                        (_main.LauncherUpdates.Error is null ? "" : "\n" + _main.LauncherUpdates.Error);
+                    updateStatusLbl.Foreground = PageHelpers.HexBrush(_main.LauncherUpdates.Error is null ? "#2EB82E" : "#FF4B4B");
                 }
                 catch (Exception ex)
                 {
@@ -466,11 +469,11 @@ namespace MistikLauncher.Pages
         {
             Background = Brushes.Transparent;
             var sp = new StackPanel { Margin = new Thickness(40, 30, 40, 30) };
-            sp.Children.Add(PageHelpers.Lbl("Optimizasyon Merkezi", 24, "#FFFFFF", true));
+            sp.Children.Add(PageHelpers.Lbl("optTitle", 24, "#FFFFFF", true));
 
             var items = new[] {
-                ("Turbo Modu (Maksimum Performans)", "G1GC + agresif JVM optimizasyonu", main.Config.OptTurbo),
-                ("FPS Artirici (Gorsel Akicilik)", "Render optimizasyonu ve frame sinirlaması kaldirma", main.Config.OptFps),
+                ("optTurbo", "optTurboHelp", main.Config.OptTurbo),
+                ("optFps", "optFpsHelp", main.Config.OptFps),
             };
             bool[] vals = { main.Config.OptTurbo, main.Config.OptFps };
 
@@ -492,83 +495,97 @@ namespace MistikLauncher.Pages
                 card.Child = row; sp.Children.Add(card);
             }
 
-            var saveBtn = PageHelpers.MkBtn("KAYDET", "#00A3FF", 200);
+            var saveBtn = PageHelpers.MkBtn("optSave", "#00A3FF", 200);
             saveBtn.Margin = new Thickness(0, 16, 0, 0); saveBtn.HorizontalAlignment = HorizontalAlignment.Left;
             saveBtn.Click += (_, _) => {
                 try
                 {
                     main.Config.OptTurbo = vals[0]; main.Config.OptFps = vals[1];
                     ConfigManager.Save(main.Config);
-                    MessageBox.Show("Optimizasyon ayarlari kaydedildi.", "Basarili", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(Localization.T("optSaved"), Localization.T("optSuccessTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Optimizasyon kaydedilemedi:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show($"{Localization.T("optSaveFailed")}\n{ex.Message}", Localization.T("optErrorTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             };
             sp.Children.Add(saveBtn);
 
             // ── Kernel Optimizasyonları Kartı ──
             sp.Children.Add(new Separator { Background = PageHelpers.HexBrush("#282828"), Margin = new Thickness(0, 20, 0, 20) });
-            sp.Children.Add(PageHelpers.Lbl("Kernel Düzeyinde Optimizasyonlar", 18, "#FFFFFF", true));
-            sp.Children.Add(PageHelpers.Lbl("Oyun başlatılınca otomatik uygulanır, kapanınca geri alınır. GPU'ya dokunmaz.", 11, "#A0A0A0"));
+            sp.Children.Add(PageHelpers.Lbl("optKernelTitle", 18, "#FFFFFF", true));
+            sp.Children.Add(PageHelpers.Lbl("optKernelHelp", 11, "#A0A0A0"));
 
             var kernCard = PageHelpers.Card("#181818", 12, margin: new Thickness(0, 12, 0, 0));
             var kernSp = new StackPanel { Margin = new Thickness(24, 20, 24, 20) };
 
-            var chkKernPriority = new CheckBox { Content = "İşlem Önceliği → HIGH (CPU'da Minecraft'a öncelik verir)",
+            var chkKernPriority = new CheckBox { Content = Localization.T("optKernelPriority"),
                 IsChecked = main.Config.KernelPriority, Foreground = Brushes.White,
                 FontFamily = new FontFamily("Segoe UI"), Margin = new Thickness(0, 10, 0, 0) };
             kernSp.Children.Add(chkKernPriority);
+            Localization.RegisterText(chkKernPriority, "optKernelPriority");
 
-            var chkKernTimer = new CheckBox { Content = "Timer Çözünürlüğü → 1ms (Daha akıcı FPS, düşük input lag)",
+            var chkKernTimer = new CheckBox { Content = Localization.T("optKernelTimer"),
                 IsChecked = main.Config.KernelTimer, Foreground = Brushes.White,
                 FontFamily = new FontFamily("Segoe UI"), Margin = new Thickness(0, 6, 0, 0) };
             kernSp.Children.Add(chkKernTimer);
+            Localization.RegisterText(chkKernTimer, "optKernelTimer");
 
-            var chkKernAffinity = new CheckBox { Content = "CPU Affinity (Çekirdek 0'ı OS'a bırak, kalanını oyuna ver)",
-                IsChecked = main.Config.KernelAffinity, Foreground = Brushes.White,
+            var chkKernAffinity = new CheckBox { Content = Localization.T("optKernelAffinity"),
+                IsChecked = false, IsEnabled = false, Foreground = Brushes.White,
                 FontFamily = new FontFamily("Segoe UI"), Margin = new Thickness(0, 6, 0, 0) };
             kernSp.Children.Add(chkKernAffinity);
+            Localization.RegisterText(chkKernAffinity, "optKernelAffinity");
 
-            var chkKernPower = new CheckBox { Content = "Güç Planı → Yüksek Performans (Oyun süresince otomatik geçiş)",
+            var chkKernPower = new CheckBox { Content = Localization.T("optKernelPower"),
                 IsChecked = main.Config.KernelPower, Foreground = Brushes.White,
                 FontFamily = new FontFamily("Segoe UI"), Margin = new Thickness(0, 6, 0, 0) };
             kernSp.Children.Add(chkKernPower);
+            Localization.RegisterText(chkKernPower, "optKernelPower");
 
-            var chkKernNagle = new CheckBox { Content = "Nagle Kapatma (TCP gecikmesiz, düşük ping - Multiplayer)",
+            var chkKernNagle = new CheckBox { Content = Localization.T("optKernelNagle"),
                 IsChecked = main.Config.KernelNagle, Foreground = Brushes.White,
                 FontFamily = new FontFamily("Segoe UI"), Margin = new Thickness(0, 6, 0, 0) };
             kernSp.Children.Add(chkKernNagle);
+            Localization.RegisterText(chkKernNagle, "optKernelNagle");
 
-            var chkKernGpu = new CheckBox { Content = "🎮 GPU & Sistem Optimizasyonu (Ekran kartı tercihi, Game Bar kapatma, I/O Boost, Working Set)",
+            var chkKernGpu = new CheckBox { Content = Localization.T("optKernelGpu"),
                 IsChecked = main.Config.KernelGpu, Foreground = Brushes.White,
                 FontFamily = new FontFamily("Segoe UI"), Margin = new Thickness(0, 6, 0, 0) };
             kernSp.Children.Add(chkKernGpu);
+            Localization.RegisterText(chkKernGpu, "optKernelGpu");
 
-            var kernStatusBtn = PageHelpers.MkBtn("Optimizasyon Durumunu Göster", "#FF6B00", 260);
+            var kernStatusBtn = PageHelpers.MkBtn("optStatus", "#FF6B00", 260);
             kernStatusBtn.Margin = new Thickness(0, 12, 0, 0);
             kernStatusBtn.HorizontalAlignment = HorizontalAlignment.Left;
             kernStatusBtn.Click += (_, _) => {
-                MessageBox.Show(KernelOptimizer.GetStatus(main.Config), "Kernel Optimizasyon Durumu", MessageBoxButton.OK, MessageBoxImage.Information);
+                var selected = new[] {
+                    (main.Config.KernelPriority, "optKernelPriority"), (main.Config.KernelTimer, "optKernelTimer"),
+                    (main.Config.KernelPower, "optKernelPower"),
+                    (main.Config.KernelNagle, "optKernelNagle"), (main.Config.KernelGpu, "optKernelGpu")
+                }.Where(item => item.Item1).Select(item => "• " + Localization.T(item.Item2));
+                var summary = string.Join("\n", selected);
+                MessageBox.Show(Localization.T("optStatusHelp") + "\n\n" +
+                    (summary.Length > 0 ? summary : Localization.T("optStatusNone")),
+                    Localization.T("optStatusTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
             };
             kernSp.Children.Add(kernStatusBtn);
 
-            var kernSaveBtn = PageHelpers.MkBtn("KERNEL AYARLARINI KAYDET", "#FF6B00", 260);
+            var kernSaveBtn = PageHelpers.MkBtn("optKernelSave", "#FF6B00", 260);
             kernSaveBtn.Margin = new Thickness(0, 12, 0, 0);
             kernSaveBtn.HorizontalAlignment = HorizontalAlignment.Left;
             kernSaveBtn.Click += (_, _) => {
                 try {
                     main.Config.KernelPriority = chkKernPriority.IsChecked == true;
                     main.Config.KernelTimer    = chkKernTimer.IsChecked == true;
-                    main.Config.KernelAffinity = chkKernAffinity.IsChecked == true;
+                    main.Config.KernelAffinity = false;
                     main.Config.KernelPower    = chkKernPower.IsChecked == true;
                     main.Config.KernelNagle    = chkKernNagle.IsChecked == true;
                     main.Config.KernelGpu      = chkKernGpu.IsChecked == true;
                     ConfigManager.Save(main.Config);
-                    MessageBox.Show("Kernel optimizasyon ayarları kaydedildi.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show(Localization.T("optKernelSaved"), Localization.T("optSuccessTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
                 } catch (Exception ex) {
-                    MessageBox.Show($"Kernel ayarları kaydedilemedi:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show($"{Localization.T("optKernelFailed")}\n{ex.Message}", Localization.T("optErrorTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             };
             kernSp.Children.Add(kernSaveBtn);
@@ -577,8 +594,8 @@ namespace MistikLauncher.Pages
 
             // Separator
             sp.Children.Add(new Separator { Background = PageHelpers.HexBrush("#282828"), Margin = new Thickness(0, 20, 0, 20) });
-            sp.Children.Add(PageHelpers.Lbl("⚡ Gelişmiş Mistik Performans Motoru", 18, "#FFB100", true));
-            sp.Children.Add(PageHelpers.Lbl("Sisteminizdeki gereksiz yükleri kaldırın ve oyun ayarlarını en yüksek performansa uyarlayın.", 11, "#A0A0A0"));
+            sp.Children.Add(PageHelpers.Lbl("optAdvancedTitle", 18, "#FFB100", true));
+            sp.Children.Add(PageHelpers.Lbl("optAdvancedHelp", 11, "#A0A0A0"));
 
             // Mistik Cleaner Card
             var cleanCard = PageHelpers.Card("#181818", 12, margin: new Thickness(0, 12, 0, 0));
@@ -587,11 +604,11 @@ namespace MistikLauncher.Pages
             cleanRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             
             var cleanInfo = new StackPanel();
-            cleanInfo.Children.Add(PageHelpers.Lbl("🧹 Mistik Sistem & Disk Temizleyici", 14, "#FFFFFF", true));
-            cleanInfo.Children.Add(PageHelpers.Lbl("Eski hata raporlarını, Minecraft log dosyalarını temizler ve Windows DNS önbelleğini temizleyerek pingi düşürür.", 11, "#A0A0A0", wrap: TextWrapping.Wrap));
+            cleanInfo.Children.Add(PageHelpers.Lbl("optCleanTitle", 14, "#FFFFFF", true));
+            cleanInfo.Children.Add(PageHelpers.Lbl("optCleanHelp", 11, "#A0A0A0", wrap: TextWrapping.Wrap));
             
-            var cleanBtn = PageHelpers.MkBtn("Temizle & Hızlandır", "#2EB82E", 160);
-            cleanBtn.Click += (_, _) => RunMistikCleaner(cleanBtn);
+            var cleanBtn = PageHelpers.MkBtn("optCleanAction", "#2EB82E", 160);
+            cleanBtn.Click += async (_, _) => await RunMistikCleaner(cleanBtn);
             
             Grid.SetColumn(cleanBtn, 1);
             cleanRow.Children.Add(cleanInfo);
@@ -606,10 +623,10 @@ namespace MistikLauncher.Pages
             gfxRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             
             var gfxInfo = new StackPanel();
-            gfxInfo.Children.Add(PageHelpers.Lbl("⚙️ Tek Tıkla Grafik FPS Ayarlayıcı", 14, "#FFFFFF", true));
-            gfxInfo.Children.Add(PageHelpers.Lbl("Minecraft'ın kendi grafik ayarlarını (options.txt) ultra-düşük ayarlara çekerek ekran kartı yükünü tamamen sıfıra indirir.", 11, "#A0A0A0", wrap: TextWrapping.Wrap));
+            gfxInfo.Children.Add(PageHelpers.Lbl("optGraphicsTitle", 14, "#FFFFFF", true));
+            gfxInfo.Children.Add(PageHelpers.Lbl("optGraphicsHelp", 11, "#A0A0A0", wrap: TextWrapping.Wrap));
             
-            var gfxBtn = PageHelpers.MkBtn("Grafikleri Optimize Et", "#FFB100", 160);
+            var gfxBtn = PageHelpers.MkBtn("optGraphicsAction", "#FFB100", 160);
             gfxBtn.Foreground = Brushes.Black;
             gfxBtn.Click += (_, _) => OptimizeGameGraphics(gfxBtn);
             
@@ -622,88 +639,26 @@ namespace MistikLauncher.Pages
             Content = new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         }
 
-        static void RunMistikCleaner(Button btn)
+        static async Task RunMistikCleaner(Button btn)
         {
             btn.IsEnabled = false;
-            btn.Content = "Temizleniyor...";
+            Localization.RegisterText(btn, "optCleanBusy");
             try
             {
-                long freedBytes = 0;
-
-                // 1. Clean logs directory
-                var logsDir = Path.Combine(App.GameDir, "logs");
-                if (Directory.Exists(logsDir))
-                {
-                    foreach (var file in Directory.GetFiles(logsDir))
-                    {
-                        try
-                        {
-                            var size = new FileInfo(file).Length;
-                            File.Delete(file);
-                            freedBytes += size;
-                        }
-                        catch { }
-                    }
-                }
-
-                // 2. Clean crash-reports directory
-                var crashDir = Path.Combine(App.GameDir, "crash-reports");
-                if (Directory.Exists(crashDir))
-                {
-                    foreach (var file in Directory.GetFiles(crashDir))
-                    {
-                        try
-                        {
-                            var size = new FileInfo(file).Length;
-                            File.Delete(file);
-                            freedBytes += size;
-                        }
-                        catch { }
-                    }
-                }
-
-                // 3. Clean Temp folder JVM logs/files
-                try
-                {
-                    var tempDir = Path.GetTempPath();
-                    foreach (var file in Directory.GetFiles(tempDir, "hs_err_pid*.log"))
-                    {
-                        try
-                        {
-                            var size = new FileInfo(file).Length;
-                            File.Delete(file);
-                            freedBytes += size;
-                        }
-                        catch { }
-                    }
-                }
-                catch { }
-
-                // 4. Flush DNS
-                try
-                {
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = "ipconfig",
-                        Arguments = "/flushdns",
-                        CreateNoWindow = true,
-                        UseShellExecute = false
-                    };
-                    var p = Process.Start(psi);
-                    p?.WaitForExit(2000);
-                }
-                catch { }
-
+                var cutoff = DateTime.UtcNow.AddDays(-7);
+                long freedBytes = await Task.Run(() => GameLogCleaner.CleanOldLogs(App.GameDir, cutoff));
                 double freedMb = Math.Round((double)freedBytes / (1024 * 1024), 2);
-                MessageBox.Show($"Mistik Temizlik Başarılı!\n\n• Toplam {freedMb} MB gereksiz log/hata dosyası silindi.\n• DNS önbelleği temizlenerek pinginiz optimize edildi.", "Mistik Performans Motoru", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"{Localization.T("optCleanDone")} {freedMb} MB",
+                    Localization.T("optCleanTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Temizlik yapılırken hata oluştu: {ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"{Localization.T("optCleanFailed")} {ex.Message}",
+                    Localization.T("optErrorTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
-                btn.Content = "Temizle & Hızlandır";
+                Localization.RegisterText(btn, "optCleanAction");
                 btn.IsEnabled = true;
             }
         }
@@ -713,57 +668,13 @@ namespace MistikLauncher.Pages
             btn.IsEnabled = false;
             try
             {
-                var optionsPath = Path.Combine(App.GameDir, "options.txt");
-                Directory.CreateDirectory(App.GameDir);
-
-                var settings = new System.Collections.Generic.Dictionary<string, string>
-                {
-                    { "enableVsync", "false" },
-                    { "graphicsMode", "0" }, // 0: Fast
-                    { "renderDistance", "6" },
-                    { "simulationDistance", "6" },
-                    { "particles", "2" }, // 2: Minimal
-                    { "ao", "0" }, // Smooth Lighting Off
-                    { "clouds", "false" },
-                    { "bobView", "false" },
-                    { "mipmapLevels", "0" }, // Turn off mipmaps for HUGE fps boost on Intel/AMD GPUs
-                    { "maxFps", "260" }
-                };
-
-                var existingSettings = new System.Collections.Generic.Dictionary<string, string>();
-                if (File.Exists(optionsPath))
-                {
-                    var lines = File.ReadAllLines(optionsPath);
-                    foreach (var line in lines)
-                    {
-                        var parts = line.Split(':', 2);
-                        if (parts.Length == 2)
-                        {
-                            existingSettings[parts[0].Trim()] = parts[1].Trim();
-                        }
-                    }
-                }
-
-                // Override settings
-                foreach (var kvp in settings)
-                {
-                    existingSettings[kvp.Key] = kvp.Value;
-                }
-
-                // Write back
-                var outputLines = new System.Collections.Generic.List<string>();
-                foreach (var kvp in existingSettings)
-                {
-                    outputLines.Add($"{kvp.Key}:{kvp.Value}");
-                }
-
-                File.WriteAllLines(optionsPath, outputLines);
-
-                MessageBox.Show("Minecraft ayarlarınız başarıyla optimize edildi!\n\n• Grafikler: Hızlı (Fast)\n• Görüş Mesafesi: 6 Chunk\n• Dikey Eşitleme (Vsync): KAPALI\n• Parçacıklar: En Az\n• Yumuşak Aydınlatma: KAPALI\n• Bulutlar: KAPALI\n• Mipmap Seviyesi: KAPALI (AMD/Intel için devasa FPS artışı)\n\nOyunu başlattığınızda ayarlar otomatik olarak uygulanmış olacaktır.", "Mistik Ultra FPS", MessageBoxButton.OK, MessageBoxImage.Information);
+                var changed = GameGraphicsOptions.ApplyFastPreset(App.GameDir);
+                MessageBox.Show(Localization.T(changed ? "optGraphicsSaved" : "optGraphicsUnchanged"),
+                    Localization.T("optGraphicsTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Ayarlar uygulanırken hata oluştu: {ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"{Localization.T("optGraphicsFailed")} {ex.Message}", Localization.T("optErrorTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
@@ -908,17 +819,7 @@ namespace MistikLauncher.Pages
             usersTab.Content = BuildUsersTab();
             _tabControl.Items.Add(usersTab);
 
-            // Tab 2: Cloud Update
-            var updateTab = new TabItem { Header = "🔄  Bulut Güncelleme Dağıtımı" };
-            updateTab.Content = BuildUpdateTab();
-            _tabControl.Items.Add(updateTab);
-
-            // Tab 3: Update Rollback
-            var rollbackTab = new TabItem { Header = "⏪  Bulut Güncelleme Geri Al" };
-            rollbackTab.Content = BuildRollbackTab();
-            _tabControl.Items.Add(rollbackTab);
-
-            // Tab 4: Live Dashboard
+            // Live Dashboard
             var dashTab = new TabItem { Header = "📊  Canlı İstatistikler" };
             dashTab.Content = BuildDashboardTab();
             _tabControl.Items.Add(dashTab);
@@ -2170,220 +2071,6 @@ namespace MistikLauncher.Pages
             detailsWindow.ShowDialog();
         }
 
-        private UIElement BuildUpdateTab()
-        {
-            var roleSp = new StackPanel { Margin = new Thickness(0, 16, 0, 0) };
-            roleSp.Children.Add(PageHelpers.Lbl("☁️ BULUTTAN GÜNCELLEME DAĞITIMI", 14, "#00A3FF", true));
-            roleSp.Children.Add(PageHelpers.Lbl("Aktif olan tüm oyuncuların Launcher'larına anında güncelleme uyarısı gönderin ve dosyayı otomatik indirtin.", 11, "#A0A0A0", wrap: TextWrapping.Wrap, pad: new Thickness(0, 4, 0, 12)));
-
-            roleSp.Children.Add(PageHelpers.Lbl("Yeni Sürüm Kodu (Örn: v5.3.0)", 11, "#A0A0A0"));
-            var tbUpdateVer = PageHelpers.DarkTextBox("v5.3.0");
-            roleSp.Children.Add(tbUpdateVer);
-
-            roleSp.Children.Add(PageHelpers.Lbl("Güncelleme İndirme URL'si (Doğrudan .exe Bağlantısı)", 11, "#A0A0A0", pad: new Thickness(0, 8, 0, 0)));
-            var tbUpdateUrl = PageHelpers.DarkTextBox("https://github.com/gamer3434/MistikLauncherUltra/releases/download/v5.3.0/MistikLauncher.exe");
-            roleSp.Children.Add(tbUpdateUrl);
-
-            roleSp.Children.Add(PageHelpers.Lbl("Yenilikler / Güncelleme Notları", 11, "#A0A0A0", pad: new Thickness(0, 8, 0, 0)));
-            var tbChangelog = PageHelpers.DarkTextBox("• Hata düzeltmeleri yapıldı.\n• Harita indirme sistemi optimize edildi.\n• FPS performansı artırıldı.", 80);
-            tbChangelog.AcceptsReturn = true;
-            tbChangelog.TextWrapping = TextWrapping.Wrap;
-            tbChangelog.VerticalContentAlignment = VerticalAlignment.Top;
-            roleSp.Children.Add(tbChangelog);
-
-            var publishBtn = PageHelpers.MkBtn("GÜNCELLEMEYİ BULUTA YAYINLA", "#00A3FF");
-            publishBtn.Margin = new Thickness(0, 14, 0, 0);
-            publishBtn.HorizontalAlignment = HorizontalAlignment.Left;
-            
-            publishBtn.Click += async (_, _) => {
-                string ver = tbUpdateVer.Text.Trim();
-                string url = tbUpdateUrl.Text.Trim();
-                string changelog = tbChangelog.Text.Trim();
-
-                if (string.IsNullOrEmpty(ver) || string.IsNullOrEmpty(url) || string.IsNullOrEmpty(changelog))
-                {
-                    MessageBox.Show("Lütfen tüm alanları doldurun!", "Uyarı", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
-                if (_main.Relay == null || !_main.Relay.Connected)
-                {
-                    MessageBox.Show("Bulut sunucusu (MQTT) bağlantısı aktif değil!", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-
-                publishBtn.IsEnabled = false;
-                publishBtn.Content = "YAYINLANIYOR...";
-                try
-                {
-                    await _main.Relay.PublishUpdateAsync(ver, url, changelog);
-                    MessageBox.Show($"'{ver}' sürüm güncellemesi tüm istemcilere başarıyla dağıtıldı!", "Güncelleme Yayınlandı", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Güncelleme gönderilirken hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-                finally
-                {
-                    publishBtn.Content = "GÜNCELLEMEYİ BULUTA YAYINLA";
-                    publishBtn.IsEnabled = true;
-                }
-
-                try
-                {
-                    string historyPath = System.IO.Path.Combine(App.AppData, "update_history.json");
-                    var historyList = new System.Collections.Generic.List<Newtonsoft.Json.Linq.JObject>();
-                    if (System.IO.File.Exists(historyPath))
-                    {
-                        try
-                        {
-                            var arr = Newtonsoft.Json.Linq.JArray.Parse(System.IO.File.ReadAllText(historyPath));
-                            foreach (var item in arr)
-                                if (item is Newtonsoft.Json.Linq.JObject jo) historyList.Add(jo);
-                        }
-                        catch { }
-                    }
-                    historyList.Insert(0, new Newtonsoft.Json.Linq.JObject
-                    {
-                        ["version"]   = tbUpdateVer.Text.Trim(),
-                        ["url"]       = tbUpdateUrl.Text.Trim(),
-                        ["changelog"] = tbChangelog.Text.Trim(),
-                        ["date"]      = DateTime.Now.ToString("yyyy-MM-dd HH:mm")
-                    });
-                    if (historyList.Count > 20) historyList = historyList.GetRange(0, 20);
-                    System.IO.File.WriteAllText(historyPath, new Newtonsoft.Json.Linq.JArray(historyList).ToString());
-                }
-                catch { }
-            };
-
-            return roleSp;
-        }
-
-        private UIElement BuildRollbackTab()
-        {
-            var roleSp = new StackPanel { Margin = new Thickness(0, 16, 0, 0) };
-            roleSp.Children.Add(PageHelpers.Lbl("⏪ HATALI GÜNCELLEMEYİ GERİ AL (ROLLBACK)", 14, "#FF4B4B", true));
-            roleSp.Children.Add(PageHelpers.Lbl(
-                "Yanlışlıkla yayınladığınız bir güncellemeyi geri almak için aşağıdaki geçmişten seçin ve " +
-                "\"GERİ AL\" butonuna basın. Seçilen eski sürüm tüm istemcilere anında yeniden dağıtılacaktır.",
-                11, "#A0A0A0", wrap: TextWrapping.Wrap, pad: new Thickness(0, 4, 0, 12)));
-
-            var rollbackPanel = new StackPanel();
-            BuildRollbackList(rollbackPanel, _main);
-
-            var rollbackScroll = new ScrollViewer
-            {
-                Content = rollbackPanel,
-                MaxHeight = 280,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
-            };
-
-            var refreshBtn = PageHelpers.MkBtn("🔄 LİSTEYİ YENİLE", "#283040", 160);
-            refreshBtn.Height = 30;
-            refreshBtn.HorizontalAlignment = HorizontalAlignment.Left;
-            refreshBtn.Margin = new Thickness(0, 0, 0, 10);
-            refreshBtn.Click += (_, _) => { BuildRollbackList(rollbackPanel, _main); };
-
-            roleSp.Children.Add(refreshBtn);
-            roleSp.Children.Add(rollbackScroll);
-
-            return roleSp;
-        }
-
-        private static void BuildRollbackList(StackPanel panel, MainWindow main)
-        {
-            panel.Children.Clear();
-            string historyPath = System.IO.Path.Combine(App.AppData, "update_history.json");
-            if (!System.IO.File.Exists(historyPath))
-            {
-                panel.Children.Add(PageHelpers.Lbl("Henüz yayınlanmış güncelleme geçmişi bulunamadı.", 11, "#555555"));
-                return;
-            }
-
-            Newtonsoft.Json.Linq.JArray history;
-            try
-            {
-                history = Newtonsoft.Json.Linq.JArray.Parse(System.IO.File.ReadAllText(historyPath));
-            }
-            catch
-            {
-                panel.Children.Add(PageHelpers.Lbl("Geçmiş okunamadı.", 11, "#FF4B4B"));
-                return;
-            }
-
-            foreach (var token in history)
-            {
-                if (token is not Newtonsoft.Json.Linq.JObject entry) continue;
-
-                var ver      = entry["version"]?.ToString()   ?? "?";
-                var url      = entry["url"]?.ToString()        ?? "";
-                var chlog    = entry["changelog"]?.ToString()  ?? "";
-                var date     = entry["date"]?.ToString()       ?? "";
-
-                var card = PageHelpers.Card("#1a1020", 10, "#4a1a4a", new Thickness(0, 0, 0, 8));
-                var cardSp = new StackPanel { Margin = new Thickness(16, 12, 16, 12) };
-
-                var headerRow = new Grid();
-                headerRow.ColumnDefinitions.Add(new ColumnDefinition());
-                headerRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-                var verLbl = PageHelpers.Lbl($"🏷️  {ver}", 13, "#E080FF", true);
-                Grid.SetColumn(verLbl, 0);
-                headerRow.Children.Add(verLbl);
-
-                var dateLbl = PageHelpers.Lbl(date, 10, "#666666");
-                Grid.SetColumn(dateLbl, 1);
-                headerRow.Children.Add(dateLbl);
-
-                cardSp.Children.Add(headerRow);
-
-                var urlPreview = url.Length > 60 ? url[..57] + "..." : url;
-                cardSp.Children.Add(PageHelpers.Lbl($"🔗 {urlPreview}", 10, "#A0A0A0", wrap: TextWrapping.Wrap, pad: new Thickness(0, 4, 0, 4)));
-
-                var firstLine = chlog.Split('\n')[0].Trim();
-                if (firstLine.Length > 80) firstLine = firstLine[..77] + "...";
-                cardSp.Children.Add(PageHelpers.Lbl(firstLine, 10, "#888888"));
-
-                var capturedVer = ver; var capturedUrl = url; var capturedChlog = chlog;
-                var rollbackBtn = PageHelpers.MkBtn($"⏪ {ver} SÜRÜMÜNE GERİ AL", "#FF4B4B", 220);
-                rollbackBtn.Height = 30;
-                rollbackBtn.HorizontalAlignment = HorizontalAlignment.Left;
-                rollbackBtn.Margin = new Thickness(0, 10, 0, 0);
-                rollbackBtn.Click += async (_, _) =>
-                {
-                    var confirm = MessageBox.Show(
-                        $"'{capturedVer}' sürümü tüm istemcilere yeniden dağıtılacak. Emin misiniz?",
-                        "Geri Al Onayı", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                    if (confirm != MessageBoxResult.Yes) return;
-
-                    if (main.Relay == null || !main.Relay.Connected)
-                    {
-                        MessageBox.Show("Bulut sunucusu bağlantısı aktif değil!", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
-                        return;
-                    }
-
-                    rollbackBtn.IsEnabled = false;
-                    rollbackBtn.Content = "GERİ ALINIYOR...";
-                    try
-                    {
-                        await main.Relay.PublishUpdateAsync(capturedVer, capturedUrl, capturedChlog);
-                        rollbackBtn.Content = $"✅ {capturedVer} Geri Alındı!";
-                        rollbackBtn.Background = PageHelpers.HexBrush("#2EB82E");
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Geri alma başarısız:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
-                        rollbackBtn.IsEnabled = true;
-                        rollbackBtn.Content = $"⏪ {capturedVer} SÜRÜMÜNE GERİ AL";
-                    }
-                };
-                cardSp.Children.Add(rollbackBtn);
-
-                card.Child = cardSp;
-                panel.Children.Add(card);
-            }
-        }
     }
 #endif
 }

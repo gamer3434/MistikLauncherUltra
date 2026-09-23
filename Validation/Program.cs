@@ -107,8 +107,8 @@ class Program
             Check(turkish.Keys.Order().SequenceEqual(english.Keys.Order()), "locale keys match");
             Check(turkish.Values.All(v=>!string.IsNullOrWhiteSpace(v)) && english.Values.All(v=>!string.IsNullOrWhiteSpace(v)), "no empty translations");
             var application=new MistikLauncher.Application(); application.InitializeComponent();
-            checks+=CloudTests.Run(Path.Combine(testRoot,"cloud-unit"));
-            if(args.Contains("--live-cloud")) checks+=CloudTests.Live(Path.Combine(testRoot,"cloud-live")).GetAwaiter().GetResult();
+            checks+=SecurityTests.Run();
+            checks+=OptimizationTests.Run(Path.Combine(testRoot,"graphics-tests"));
             var window=new MainWindow { Width=1200, Height=820 };
             Check(MainWindow.SkinTextureUrl("http://textures.minecraft.net/texture/test")=="https://textures.minecraft.net/texture/test" && MainWindow.SkinTextureUrl("https://ely.by.attacker.invalid/test")==null && MainWindow.SkinTextureUrl("file:///C:/Windows/test.png")==null,"skin texture URLs enforce trusted HTTPS hosts");
             Check(window.FetchAvatarAsync("../../outside").GetAwaiter().GetResult()==null,"avatar username traversal is rejected before network or cache access");
@@ -176,7 +176,9 @@ class Program
             Flush(window);
             Check(((Frame)window.FindName("MainFrame")).Content is MistikLauncher.Pages.ModernSettingsPage,"top shortcut navigates to requested page");
             window.Config.QuickLinks.Clear(); window.BuildQuickBar();
-            Check(((Border)window.FindName("QuickBarHost")).Visibility==Visibility.Collapsed,"empty top bar hides without reserving space");
+            Check(((Border)window.FindName("QuickBarHost")).Visibility==Visibility.Visible && bar.Children.Count==1,"optimization remains reachable with no optional shortcuts");
+            ((Button)bar.Children[0]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
+            Check(((Frame)window.FindName("MainFrame")).Content is MistikLauncher.Pages.OptimizationPage,"optimization shortcut opens its page");
             window.Config.QuickLinks=new(){"Dash","Vers","Mods","Skin","Server","Settings"}; ConfigManager.Save(window.Config); window.BuildQuickBar();
             foreach(var name in ColorThemes.Names)
             {
@@ -221,11 +223,15 @@ class Program
                 window.Navigate("Settings"); Capture(window,Path.Combine(output,"settings-"+code+".png"));
                 Check(Texts(window.Content as DependencyObject).Contains(Localization.T("luTitle")+" · "+window.LauncherUpdates.CurrentVersion),"cached settings language " + code);
                 var settingsPage=(MistikLauncher.Pages.ModernSettingsPage)((Frame)window.FindName("MainFrame")).Content;
+                var cachedSettingsContent=settingsPage.Content;
+                window.Navigate("Dash"); window.Navigate("Settings"); Flush(window);
+                Check(ReferenceEquals(settingsPage.Content,cachedSettingsContent),"cached settings navigation reuses visual tree: "+code);
                 var settingsScroll=((DockPanel)settingsPage.Content).Children.OfType<ScrollViewer>().Single();
                 var player=Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="PlayerNameBox");
                 var memory=Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="MemoryBox");
                 player.Text="PendingName"; memory.Text="invalid";
                 window.SwitchLanguage(code=="tr"?"en":"tr"); Flush(window);
+                Check(!ReferenceEquals(settingsPage.Content,cachedSettingsContent),"language change rebuilds cached settings: "+code);
                 Check(Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="PlayerNameBox").Text=="PendingName" && Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="MemoryBox").Text=="invalid","language switching preserves unsaved form values: "+code);
                 window.SwitchLanguage(code); Flush(window);
                 settingsScroll=((DockPanel)settingsPage.Content).Children.OfType<ScrollViewer>().Single();
@@ -276,6 +282,7 @@ class Program
                 window.Navigate("Skin"); Capture(window,Path.Combine(output,"skin-"+code+".png"),960,640);
                 Check(Texts((DependencyObject)((Frame)window.FindName("MainFrame")).Content).Contains(Localization.T("skinStudioTitle")),"cached character studio opens in selected language: "+code);
                 window.Navigate("Opt"); Capture(window,Path.Combine(output,"performance-"+code+".png"),960,640);
+                Check(Texts((DependencyObject)((Frame)window.FindName("MainFrame")).Content).Contains(Localization.T("optTitle")),"optimization page opens in selected language: "+code);
             }
             var horizontal=new System.Windows.Controls.Primitives.ScrollBar { Orientation=Orientation.Horizontal,Style=(Style)application.FindResource(typeof(System.Windows.Controls.Primitives.ScrollBar)) };
             horizontal.ApplyTemplate();
