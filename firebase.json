@@ -1,0 +1,11 @@
+{
+  "hosting": {
+    "public": "site",
+    "site": "mistiklauncher-9eb4b",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}

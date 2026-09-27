@@ -59,3 +59,4 @@ MistikCodeSign.cer
 # Reproducible release output and private obfuscation maps
 artifacts/
 !scripts/*.ps1
+.firebase/
