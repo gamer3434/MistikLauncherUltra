@@ -5,7 +5,7 @@
   "auth": {
     "providers": {
       "emailPassword": true,
-      "anonymous": false
+      "anonymous": true
     }
   }
 }

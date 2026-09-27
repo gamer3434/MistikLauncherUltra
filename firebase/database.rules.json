@@ -2,6 +2,21 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "activeSessions": {
+      ".read": true,
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        "$sessionId": {
+          ".validate": "newData.hasChildren(['lastSeen'])",
+          "lastSeen": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
     "launcherProfiles": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
