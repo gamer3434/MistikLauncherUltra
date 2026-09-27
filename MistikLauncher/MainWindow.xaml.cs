@@ -104,6 +104,7 @@ namespace MistikLauncher
 
             // Firebase Analytics: Oturum başlangıcı
             _ = MistikAnalytics.TrackSessionStartAsync(Config.User ?? "Oyuncu", App.LocalVersion, Config.Version ?? "1.21");
+            MistikPresence.Start();
             _ = CheckRemoteSettingsAsync();
 
 
@@ -111,6 +112,7 @@ namespace MistikLauncher
             Closing += async (s, e) =>
             {
                 try { await MistikAnalytics.TrackSessionEndAsync(Config.User ?? "Oyuncu"); } catch { }
+                try { await MistikPresence.StopAsync(); } catch { }
                 try { if (Relay != null) await Relay.DisposeAsync(); } catch (Exception ex) { App.Log("Relay cleanup: " + ex.Message); }
             };
         }

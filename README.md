@@ -50,7 +50,7 @@ Maintainer-only signing / Yalnızca maintainer imzalama: `./scripts/Build-Protec
 
 Yeni ana panel oyuncu profili, sürüm, bellek ve hızlı işlemleri gösterir. Ayarlarda oyuncu adı, 1–32 GB bellek, skin sağlayıcısı, renk ve otomatik kapanma seçilir. Üst menüdeki dil listesi anında Türkçe / English geçişi sağlar. Global launcher araması kaldırıldı; gezinme üstte, oyuncu adı ve skin yüzü sağ üsttedir. RedX referansındaki kömür siyahı yüzeyler, 20 renk seçeneği, Segoe UI ve görünür klavye odağı kullanılır.
 
-Ayarlar atomik kaydedilir; önceki değerler `.bak` dosyasından kurtarılır. Donanım/IP telemetrisi ve kimlik doğrulamasız Firebase uzaktan yönetimi kaldırıldı. Sabit yönetici şifreleri ve eski kontrolsüz EXE değiştirme devre dışı bırakıldı; resmî doğrulanmış paket güncellemeleri yeni sistemle uygulanır. Açılışta sessiz kurulum, diğer başlatıcı işlemlerini sonlandırma ve otomatik sistem müdahaleleri kaldırıldı. MQTT için TLS yapılandırıldı; başlangıçta otomatik bağlantı kaldırıldı. Topluluk aktarımının güvenlik/kullanılabilirlik incelemesi sürüyor.
+Ayarlar atomik kaydedilir; önceki değerler `.bak` dosyasından kurtarılır. Donanım, IP, oyuncu adı ve oyun etkinliği telemetrisi ile kimlik doğrulamasız Firebase uzaktan yönetimi kaldırıldı. Canlı sayaç için yalnızca anonim Firebase UID'si ve sunucu zaman damgası gönderilir; sayaç 2 dakikadan eski oturumları göstermez, refresh token Windows DPAPI ile korunur. Sabit yönetici şifreleri ve eski kontrolsüz EXE değiştirme devre dışı bırakıldı; resmî doğrulanmış paket güncellemeleri yeni sistemle uygulanır. Açılışta sessiz kurulum, diğer başlatıcı işlemlerini sonlandırma ve otomatik sistem müdahaleleri kaldırıldı. MQTT için TLS yapılandırıldı; başlangıçta otomatik bağlantı kaldırıldı. Topluluk aktarımının güvenlik/kullanılabilirlik incelemesi sürüyor.
 
 ### Çalıştırma
 
@@ -79,7 +79,7 @@ Koruma betiği sabit sürümlü aracı yükler, taşınabilir sürümü derler, 
 
 The redesigned home shows player, version, memory and quick actions. Settings validate player names and 1–32 GB RAM, and offer skin provider, accent and automatic closing. The top-right Turkish / English selector updates at runtime. Navigation is centered at the top, with player name and skin face at the right. Global launcher search has been removed; page-local mod and skin search remains. Charcoal surfaces, 20 accent palettes, Segoe UI typography and visible keyboard focus follow the supplied RedX references.
 
-Configuration writes are atomic with recovery from the previous backup. Hardware/IP telemetry and unauthenticated Firebase administration were removed. Hardcoded administrator access and legacy arbitrary executable replacement are disabled; verified official package updates now use the new updater. Startup no longer silently installs, terminates other launcher processes or changes system preferences. MQTT uses TLS; automatic startup connection was removed. Community relay security/usability review remains outstanding.
+Configuration writes are atomic with recovery from the previous backup. Hardware, IP, player-name and gameplay telemetry, plus unauthenticated Firebase administration, were removed. The live counter sends only an anonymous Firebase UID and server timestamp; it ignores sessions older than two minutes and protects the refresh token with Windows DPAPI. Hardcoded administrator access and legacy arbitrary executable replacement are disabled; verified official package updates now use the new updater. Startup no longer silently installs, terminates other launcher processes or changes system preferences. MQTT uses TLS; automatic startup connection was removed. Community relay security/usability review remains outstanding.
 
 ### Run
 
@@ -119,7 +119,7 @@ Real off-screen WPF renders, not a running Minecraft session. / Gerçek WPF gör
 
 | File | Purpose / Amaç |
 |---|---|
-| `MistikLauncher/Core.cs` | Config recovery, normalization, telemetry removal, TLS / Ayarlar ve güvenlik |
+| `MistikLauncher/Core.cs`, `MistikLauncher/MistikPresence.cs` | Config recovery, anonymous active-session presence, TLS / Ayarlar ve güvenlik |
 | `MistikLauncher/App.xaml.cs` | Portable startup / Taşınabilir açılış |
 | `MistikLauncher/MainWindow.xaml` | Top navigation, player profile, language, focus / Üst menü ve profil |
 | `MistikLauncher/MainWindow.xaml.cs` | Runtime switching and navigation / Dil değiştirme |
