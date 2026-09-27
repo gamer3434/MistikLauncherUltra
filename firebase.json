@@ -1,7 +1,7 @@
 {
   "hosting": {
     "public": "site",
-    "site": "mistiklauncher-9eb4b",
+    "site": "mistiklauncherultra",
     "ignore": [
       "firebase.json",
       "**/.*",

@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "mistiklauncher-9eb4b"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }
