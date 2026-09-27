@@ -8,6 +8,23 @@ using System.Windows.Media;
 namespace MistikLauncher;
 public static class CrashDiagnostics
 {
+    public static string[] SuspectedMods(string text,string? modsRoot=null)
+    {
+        try
+        {
+            modsRoot??=App.ModsDir;
+            if (!Directory.Exists(modsRoot)) return Array.Empty<string>();
+            var evidence = string.Join("\n", text.Split('\n').Where(line => Regex.IsMatch(line, @"(?i)error|exception|caused by|mod file:|failed|requires|mixin")));
+            return ModFiles.List(modsRoot)
+                .Where(ModFiles.Enabled)
+                .Where(file => evidence.Contains(Path.GetFileName(file), StringComparison.OrdinalIgnoreCase))
+                .Take(12)
+                .ToArray();
+        }
+        catch (IOException) { return Array.Empty<string>(); }
+        catch (UnauthorizedAccessException) { return Array.Empty<string>(); }
+    }
+
     public static string ManualReport()
     {
         var output = File.Exists(App.LogFile) ? Tail(App.LogFile) : "";
@@ -24,7 +41,8 @@ public static class CrashDiagnostics
     }
 
     public static string Redact(string text) => Regex.Replace(text, @"(?i)(access[_-]?token|refresh[_-]?token|id[_-]?token|authorization)([\s=:""']+)[^\s,""']+", "$1$2[REDACTED]");
-    public static string Category(string text) => text.Contains("OutOfMemoryError",StringComparison.OrdinalIgnoreCase) || text.Contains("Could not reserve",StringComparison.OrdinalIgnoreCase) ? "MLU-MEMORY" :
+    public static string Category(string text) => text.Contains("MLU-INTEGRITY",StringComparison.OrdinalIgnoreCase) || text.Contains("integrity check",StringComparison.OrdinalIgnoreCase) ? "MLU-INTEGRITY" :
+        text.Contains("OutOfMemoryError",StringComparison.OrdinalIgnoreCase) || text.Contains("Could not reserve",StringComparison.OrdinalIgnoreCase) ? "MLU-MEMORY" :
         text.Contains("UnsupportedClassVersionError",StringComparison.OrdinalIgnoreCase) ? "MLU-JAVA" :
         text.Contains("ClassNotFoundException",StringComparison.OrdinalIgnoreCase) || text.Contains("Could not find or load main class",StringComparison.OrdinalIgnoreCase) ? "MLU-CLASSPATH" :
         text.Contains("Mixin",StringComparison.OrdinalIgnoreCase) ? "MLU-MOD-MIXIN" :
@@ -42,16 +60,18 @@ public static class CrashDiagnostics
         var files=new List<string>(); var text=output;
         var crash=Path.Combine(App.GameDir,"crash-reports");
         var candidates=new List<string> { Path.Combine(App.GameDir,"logs","latest.log") };
-        if(Directory.Exists(crash)) candidates.AddRange(Directory.EnumerateFiles(crash,"crash-*.txt").OrderByDescending(File.GetLastWriteTimeUtc).Take(1));
-        if(Directory.Exists(App.GameDir)) candidates.AddRange(Directory.EnumerateFiles(App.GameDir,"hs_err_pid*.log").OrderByDescending(File.GetLastWriteTimeUtc).Take(1));
+        try { if(Directory.Exists(crash)) candidates.AddRange(Directory.EnumerateFiles(crash,"crash-*.txt").OrderByDescending(File.GetLastWriteTimeUtc).Take(1)); }
+        catch(IOException) { } catch(UnauthorizedAccessException) { }
+        try { if(Directory.Exists(App.GameDir)) candidates.AddRange(Directory.EnumerateFiles(App.GameDir,"hs_err_pid*.log").OrderByDescending(File.GetLastWriteTimeUtc).Take(1)); }
+        catch(IOException) { } catch(UnauthorizedAccessException) { }
         foreach(var file in candidates) try {
             if(File.Exists(file) && File.GetLastWriteTimeUtc(file)>=started) { text+="\n"+Tail(file); files.Add(file); }
         } catch(IOException) { } catch(UnauthorizedAccessException) { }
         // Only explicit error lines implicate a mod; the loaded-mod list is not evidence of blame.
-        var evidence=string.Join("\n",text.Split('\n').Where(line=>Regex.IsMatch(line,@"(?i)error|exception|caused by|mod file:|failed|requires|mixin")));
-        var suspects=Directory.Exists(App.ModsDir)?Directory.EnumerateFiles(App.ModsDir,"*.jar").Where(file=>evidence.Contains(Path.GetFileName(file),StringComparison.OrdinalIgnoreCase)).Take(12).ToArray():Array.Empty<string>();
+        var suspects=SuspectedMods(text);
         var code=Category(text); if(exitCode==null && code=="MLU-EXIT") code="MLU-LAUNCH";
         string advice=code switch {
+            "MLU-INTEGRITY"=>en?"A required game file failed integrity verification. Use Launch readiness to repair it before retrying.":"Gerekli bir oyun dosyası bütünlük doğrulamasını geçemedi. Yeniden denemeden önce Başlatma hazırlığı ile onarın.",
             "MLU-MEMORY"=>en?"Check free memory and reduce RAM allocation or heavy mods.":"Boş belleği kontrol edin; RAM tahsisini veya ağır modları azaltın.",
             "MLU-JAVA"=>en?"Select the Java version required by this Minecraft profile.":"Bu Minecraft profilinin gerektirdiği Java sürümünü kullanın.",
             "MLU-CLASSPATH"=>en?"A required class could not be loaded. Check the profile main class, game JAR and library/mod compatibility.":"Gerekli bir sınıf yüklenemedi. Profil ana sınıfını, oyun JAR dosyasını ve kütüphane/mod uyumunu kontrol edin.",
@@ -66,6 +86,7 @@ public static class CrashDiagnostics
     public static void Show(Window owner,string report)
     {
         bool en=Localization.Language=="en";
+        var suspects=SuspectedMods(report);
         owner.Show(); owner.WindowState=WindowState.Normal; owner.Activate();
         var window=new Window { Owner=owner,Title=en?"Minecraft diagnostics":"Minecraft hata analizi",Width=760,Height=560,MinWidth=500,MinHeight=350,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=new SolidColorBrush(Color.FromRgb(24,24,28)) };
         var layout=new DockPanel { Margin=new Thickness(22) };
@@ -79,6 +100,22 @@ public static class CrashDiagnostics
         save.Click+=(_,_)=> { try { status.Text=(en?"Saved: ":"Kaydedildi: ")+SaveReport(report); } catch(Exception ex) { status.Text=(en?"Save failed: ":"Kayıt başarısız: ")+ex.Message; } };
         var open=new Button { Content=en?"Open folder":"Klasörü aç",Padding=new Thickness(12,7,12,7),Margin=new Thickness(0,0,10,0),MinWidth=100 };
         open.Click+=(_,_)=> { try { var dir=Path.Combine(App.AppData,"reports"); Directory.CreateDirectory(dir); System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(dir) { UseShellExecute=true }); } catch { } };
+        if(suspects.Length>0)
+        {
+            var disable=new Button { Content=en?"Disable suspected mods":"Şüpheli modları kapat",Padding=new Thickness(12,7,12,7),Margin=new Thickness(0,0,10,0),MinWidth=150 };
+            disable.Click+=(_,_)=> {
+                var names=string.Join("\n",suspects.Select(Path.GetFileName));
+                var answer=MessageBox.Show(window,(en?"Disable these suspected mods without deleting them?\n\n":"Bu şüpheli modlar silinmeden devre dışı bırakılsın mı?\n\n")+names,en?"Safe recovery":"Güvenli kurtarma",MessageBoxButton.YesNo,MessageBoxImage.Question);
+                if(answer!=MessageBoxResult.Yes) return;
+                var failed=new List<string>(); int changed=0;
+                foreach(var file in suspects) try { if(File.Exists(file) && ModFiles.Enabled(file)) { ModFiles.Toggle(App.ModsDir,file); changed++; } } catch(Exception ex) { failed.Add(Path.GetFileName(file)+": "+ex.Message); }
+                disable.IsEnabled=false;
+                status.Text=failed.Count==0
+                    ? (en?$"Disabled {changed} mod(s). You can re-enable them in Mod center.":$"{changed} mod devre dışı. Mod merkezinden yeniden açabilirsiniz.")
+                    : (en?"Some mods could not be disabled: ":"Bazı modlar kapatılamadı: ")+string.Join("; ",failed);
+            };
+            buttons.Children.Add(disable);
+        }
         var close=new Button { Content=en?"Close":"Kapat",Padding=new Thickness(12,7,12,7) }; close.Click+=(_,_)=>window.Close();
         buttons.Children.Add(status); buttons.Children.Add(copy); buttons.Children.Add(save); buttons.Children.Add(open); buttons.Children.Add(close); DockPanel.SetDock(buttons,Dock.Bottom); layout.Children.Add(buttons);
         layout.Children.Add(new TextBox { Text=report,IsReadOnly=true,TextWrapping=TextWrapping.Wrap,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,Background=new SolidColorBrush(Color.FromRgb(15,15,18)),Foreground=Brushes.White,Padding=new Thickness(14),BorderBrush=Brushes.DimGray });

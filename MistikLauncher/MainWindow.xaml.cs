@@ -70,7 +70,7 @@ namespace MistikLauncher
                     ConfigManager.Save(Config);
                     StatusLbl.Text = $"{Localization.T("version")}: {selected}";
                     QueueBackgroundModSync();
-                    if(_pageCache.TryGetValue("Dash", out var homePage) && homePage is Pages.ModernHomePage home) home.RefreshLanguage();
+                    if(_pageCache.TryGetValue("Dash", out var homePage) && homePage is Pages.ModernHomePage home) { home.RefreshLanguage(); home.InvalidateReadiness(); }
                 }
             };
 
@@ -123,6 +123,17 @@ namespace MistikLauncher
                     System.Windows.Application.Current.Shutdown();
             }
             catch(Exception ex) { App.Log("Update handoff: " + ex.Message); MessageBox.Show(Localization.T("luError")+"\n"+ex.Message,"Mistik Launcher"); }
+        }
+
+        public async Task<GameRuntimeHealthResult> VerifyAndRepairGameAsync(string version, Action<string>? status = null)
+        {
+            var progress = new Progress<GameRuntimeHealthProgress>(update =>
+            {
+                var text = update.Status + (string.IsNullOrWhiteSpace(update.Artifact) ? "" : ": " + update.Artifact);
+                status?.Invoke(text);
+                SetStatus(text);
+            });
+            return await GameRuntimeHealth.VerifyAndRepairAsync(App.GameDir, version, progress: progress);
         }
 
         public void SwitchLanguage(string code)
@@ -685,20 +696,17 @@ namespace MistikLauncher
                 }
 
                 if(javaPath==null) return;
-                // 2. JAR kontrol
-                var versDir = Path.Combine(App.GameDir, "versions", version);
-                var jar     = Path.Combine(versDir, $"{version}.jar");
-                if (!GameProfiles.IsInstalled(App.GameDir,version))
+                SetProgress(40);
+                SetStatus("Oyun dosyalari dogrulaniyor...");
+                var health = await VerifyAndRepairGameAsync(version, message => SetStatus(message));
+                if (!health.CanLaunch)
                 {
-                    var res = MessageBox.Show(
-                        $"Surum dosyasi bulunamadi: {version}\n\nSurum Yoneticisi'nden indirmek ister misiniz?",
-                        "Dosya Yok", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                    if (res == MessageBoxResult.Yes) Navigate("Vers");
+                    var detail = $"MLU-INTEGRITY: {health.FailedArtifact ?? "runtime"}\n{health.FailedPath}\n{health.FailureReason}";
+                    CrashDiagnostics.Show(this, CrashDiagnostics.Report(null, started, detail));
                     return;
                 }
 
-                SetProgress(40);
-                SetStatus("Lutfen bekleyin...");
+                var versDir = Path.Combine(App.GameDir, "versions", version);
 
                 // 3. Natives klasoru olustur
                 var natives = Path.Combine(versDir, "natives");
@@ -713,8 +721,7 @@ namespace MistikLauncher
                 SetStatus("Görüş mesafesi optimize ediliyor...");
                 EnsureChunkDistanceOptimized();
 
-                SetStatus("Eksik kütüphaneler indiriliyor...");
-                await EnsureLibrariesInstalledAsync(version, (pct, status) => Dispatcher.Invoke(() => SetProgress((int)(40 + pct * 0.25), status)));
+                SetStatus("Oyun dosyalari hazir...");
 
                 string? injectorPath = null;
                 string? resolvedUuid = null;
@@ -809,7 +816,11 @@ namespace MistikLauncher
                     } catch(Exception monitorError) { App.Log("Game monitor: "+monitorError.Message); }
                     finally {
                         KernelOptimizer.RevertAll(); process.Dispose();
-                        if(!Dispatcher.HasShutdownStarted) await Dispatcher.InvokeAsync(()=> { gameRunning=false; BtnLaunch.IsEnabled=true; });
+                        if(!Dispatcher.HasShutdownStarted) await Dispatcher.InvokeAsync(()=> {
+                            gameRunning=false;
+                            BtnLaunch.IsEnabled=true;
+                            if(Config.AutoClose && !IsVisible) { Show(); WindowState=WindowState.Normal; Activate(); }
+                        });
                     }
                 });
                 SetProgress(100);
@@ -2000,7 +2011,7 @@ namespace MistikLauncher
             return bestPath;
         }
 
-        static int GetJavaMajorVersion(string path)
+        internal static int GetJavaMajorVersion(string path)
         {
             try
             {
@@ -2385,7 +2396,7 @@ namespace MistikLauncher
             try { LoadAvatar(); }
             catch (Exception ex) { App.Log($"ReloadConfig LoadAvatar error: {ex.Message}"); }
 
-            if (_pageCache.TryGetValue("Dash", out var homePage) && homePage is Pages.ModernHomePage home) home.RefreshLanguage();
+            if (_pageCache.TryGetValue("Dash", out var homePage) && homePage is Pages.ModernHomePage home) { home.RefreshLanguage(); home.InvalidateReadiness(); }
 
             // Settings sayfasının cache'ini temizle ki yeni config ile yeniden oluşturulsun
             try { InvalidatePageCache("Settings"); }

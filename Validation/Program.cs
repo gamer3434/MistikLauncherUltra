@@ -109,6 +109,8 @@ class Program
             var application=new MistikLauncher.Application(); application.InitializeComponent();
             checks+=SecurityTests.Run();
             checks+=OptimizationTests.Run(Path.Combine(testRoot,"graphics-tests"));
+            checks+=GameRuntimeHealthTests.Run(Path.Combine(testRoot,"runtime-health")).GetAwaiter().GetResult();
+            checks+=LaunchReadinessTests.Run(Path.Combine(testRoot,"readiness-tests"));
             var window=new MainWindow { Width=1200, Height=820 };
             Check(MainWindow.SkinTextureUrl("http://textures.minecraft.net/texture/test")=="https://textures.minecraft.net/texture/test" && MainWindow.SkinTextureUrl("https://ely.by.attacker.invalid/test")==null && MainWindow.SkinTextureUrl("file:///C:/Windows/test.png")==null,"skin texture URLs enforce trusted HTTPS hosts");
             Check(window.FetchAvatarAsync("../../outside").GetAwaiter().GetResult()==null,"avatar username traversal is rejected before network or cache access");
@@ -220,6 +222,9 @@ class Program
                 Check(ConfigManager.Load().Lang==(code=="tr"?"Turkce":"English"), "language persistence " + code);
                 window.Navigate("Dash"); Capture(window,Path.Combine(output,"home-"+code+".png"));
                 Check(Texts(window.Content as DependencyObject).Contains(Localization.T("welcome")),"cached home language " + code);
+                Check(Texts(window.Content as DependencyObject).Contains(Localization.T("readinessTitle")),"home launch readiness card language " + code);
+                var readinessNames=new[]{Localization.T("readinessRefresh"),Localization.T("readinessVerifyRepair"),Localization.T("readinessOpenVersions"),Localization.T("readinessOpenSettings")};
+                Check(Nodes((DependencyObject)window.Content).OfType<Button>().Any(button=>button.MinHeight>=44 && readinessNames.Contains(System.Windows.Automation.AutomationProperties.GetName(button))),"home readiness action remains keyboard-sized " + code);
                 window.Navigate("Settings"); Capture(window,Path.Combine(output,"settings-"+code+".png"));
                 Check(Texts(window.Content as DependencyObject).Contains(Localization.T("luTitle")+" · "+window.LauncherUpdates.CurrentVersion),"cached settings language " + code);
                 var settingsPage=(MistikLauncher.Pages.ModernSettingsPage)((Frame)window.FindName("MainFrame")).Content;
