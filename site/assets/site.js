@@ -14,7 +14,8 @@
     const updateThemeColor=()=>themeColor.content=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
     updateThemeColor();
     themeSelect.addEventListener('change',()=>{const theme=themeSelect.value;if(theme==='auto')document.documentElement.removeAttribute('data-theme');else document.documentElement.dataset.theme=theme;try{if(theme==='auto')localStorage.removeItem('mistik-theme');else localStorage.setItem('mistik-theme',theme)}catch{}updateThemeColor()});
-    matchMedia('(prefers-color-scheme:light)').addEventListener('change',()=>{if(themeSelect.value==='auto')updateThemeColor()});
+    const colorScheme=matchMedia('(prefers-color-scheme:light)'),updateSystemTheme=()=>{if(themeSelect.value==='auto')updateThemeColor()};
+    if(colorScheme.addEventListener)colorScheme.addEventListener('change',updateSystemTheme);else if(colorScheme.addListener)colorScheme.addListener(updateSystemTheme);
     document.querySelectorAll('[data-copy-hash]').forEach(button=>button.addEventListener('click',async()=>{const status=document.getElementById('hash-status');try{await navigator.clipboard.writeText(button.dataset.copyHash);status.textContent=words[lang]['release.copied']}catch{status.textContent=words[lang]['release.copyError']}}));
     const screens=document.querySelectorAll('[data-panel]');
     document.querySelectorAll('[data-screen]').forEach(button=>button.addEventListener('click',()=>{const selected=button.dataset.screen;document.querySelectorAll('[data-screen]').forEach(tab=>tab.setAttribute('aria-pressed',String(tab===button)));screens.forEach(panel=>{panel.hidden=panel.dataset.panel!==selected})}));
