@@ -7,12 +7,22 @@ namespace MistikLauncher.Pages;
 public class ModernHomePage : Page, ILanguagePage
 {
     readonly MainWindow main;
+    TextBlock readinessState = null!, readinessDetails = null!;
+    Button readinessAction = null!;
+    LaunchReadinessSnapshot? readiness;
+    int readinessGeneration;
     public ModernHomePage(MainWindow window)
     {
         main = window;
+        Loaded += async (_,_) => await RefreshReadinessAsync();
         Render();
     }
-    public void RefreshLanguage() => Render();
+    public void RefreshLanguage()
+    {
+        Render();
+        if(readiness!=null) ShowReadiness(readiness);
+        else if(IsLoaded) _=RefreshReadinessAsync();
+    }
     void Render()
     {
         var stack = new StackPanel { Margin = new Thickness(32),MaxWidth=1120 };
@@ -39,6 +49,7 @@ public class ModernHomePage : Page, ILanguagePage
             row.Children.Add(new Border { Child=section, Background=PageHelpers.HexBrush("#13253C"),BorderBrush=ColorThemes.Brush("#365574"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(12),Padding=new Thickness(18,0,0,0),Margin=new Thickness(0,18,12,24) });
         }
         stack.Children.Add(row);
+        stack.Children.Add(BuildReadinessCard());
         stack.Children.Add(PageHelpers.Lbl(Localization.T("quick"),20,"#FFFFFF",true));
         var actions = new WrapPanel { Margin = new Thickness(0,12,0,18) };
         foreach (var item in new[] { ("versions","Vers"),("mods","Mods"),("server","Server"),("settings","Settings") })
@@ -67,6 +78,92 @@ public class ModernHomePage : Page, ILanguagePage
         stack.Children.Add(PageHelpers.Lbl(Localization.T("help"),20,"#FFFFFF",true,pad:new Thickness(0,20,0,10)));
         stack.Children.Add(PageHelpers.Lbl(Localization.T("helpText"),15,"#BDCAD8",wrap:TextWrapping.Wrap));
         Content = new ScrollViewer { Content = stack, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+    }
+
+    Border BuildReadinessCard()
+    {
+        var card=new Border { Background=PageHelpers.HexBrush("#192C46"),BorderBrush=ColorThemes.Brush("#365574"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(14),Padding=new Thickness(20),Margin=new Thickness(0,0,0,24) };
+        var grid=new Grid(); grid.ColumnDefinitions.Add(new ColumnDefinition()); grid.ColumnDefinitions.Add(new ColumnDefinition { Width=GridLength.Auto });
+        var copy=new StackPanel { Margin=new Thickness(0,0,18,0) };
+        copy.Children.Add(PageHelpers.Lbl(Localization.T("readinessTitle"),18,"#EFF5FF",true));
+        readinessState=PageHelpers.Lbl(Localization.T("readinessChecking"),14,"#F0CF84",true,pad:new Thickness(0,8,0,4),wrap:TextWrapping.Wrap);
+        System.Windows.Automation.AutomationProperties.SetLiveSetting(readinessState,System.Windows.Automation.AutomationLiveSetting.Polite);
+        copy.Children.Add(readinessState);
+        readinessDetails=PageHelpers.Lbl(Localization.T("readinessCheckingHelp"),13,"#ADBED6",wrap:TextWrapping.Wrap);
+        copy.Children.Add(readinessDetails); grid.Children.Add(copy);
+        readinessAction=PageHelpers.MkBtn(Localization.T("readinessRefresh"),"#226DA0",190);
+        readinessAction.MinHeight=44; readinessAction.VerticalAlignment=VerticalAlignment.Center;
+        System.Windows.Automation.AutomationProperties.SetName(readinessAction,Localization.T("readinessRefresh"));
+        readinessAction.Click+=async (_,_)=> {
+            if(readiness?.RecommendedPage is { Length: >0 } page) { main.Navigate(page); return; }
+            await VerifyAndRepairAsync();
+        };
+        Grid.SetColumn(readinessAction,1); grid.Children.Add(readinessAction); card.Child=grid;
+        if(readiness!=null) ShowReadiness(readiness);
+        return card;
+    }
+
+    public void InvalidateReadiness()
+    {
+        readiness=null;
+        if(IsLoaded) _=RefreshReadinessAsync();
+    }
+
+    async Task RefreshReadinessAsync()
+    {
+        if(readinessState==null) return;
+        int generation=++readinessGeneration;
+        string version=main.Config.Version;
+        readinessAction.IsEnabled=false;
+        readinessState.Text=Localization.T("readinessChecking"); readinessState.Foreground=PageHelpers.HexBrush("#F0CF84");
+        readinessDetails.Text=Localization.T("readinessCheckingHelp");
+        try
+        {
+            string? java=await Task.Run(async ()=>await MainWindow.FindJavaAsync());
+            var snapshot=await Task.Run(()=>LaunchReadiness.Evaluate(App.GameDir,version,main.Config.Ram,java,java==null?0:MainWindow.GetJavaMajorVersion(java),KernelOptimizer.GetTotalPhysicalMemory(),LaunchReadiness.FreeDiskBytes(App.GameDir)));
+            if(generation!=readinessGeneration || version!=main.Config.Version) return;
+            readiness=snapshot; ShowReadiness(snapshot);
+        }
+        catch(Exception ex)
+        {
+            if(generation!=readinessGeneration) return;
+            readinessState.Text=Localization.T("readinessError"); readinessState.Foreground=PageHelpers.HexBrush("#FF8F8F"); readinessDetails.Text=ex.Message;
+            readinessAction.Content=Localization.T("readinessRefresh"); readinessAction.IsEnabled=true;
+        }
+    }
+
+    void ShowReadiness(LaunchReadinessSnapshot value)
+    {
+        if(readinessState==null) return;
+        readinessState.Text=Localization.T(value.Ready?"readinessReady":"readinessBlocked");
+        readinessState.Foreground=PageHelpers.HexBrush(value.Ready?"#78E6B1":"#F0CF84");
+        string Mark(bool ok)=>ok?"✓":"!";
+        var java=value.JavaPath==null?Localization.T("readinessJavaMissing"):$"Java {value.JavaMajor} / {value.RequiredJava}";
+        var disk=value.FreeDiskGb<0?"—":$"{value.FreeDiskGb} GB";
+        readinessDetails.Text=
+            $"{Mark(value.VersionInstalled)} {Localization.T("readinessVersion")}: {value.Version}\n"+
+            $"{Mark(value.JavaReady)} {Localization.T("readinessJava")}: {java}\n"+
+            $"{Mark(value.MemoryReady)} {Localization.T("readinessMemory")}: {value.AllocatedRamGb} / {(value.TotalRamGb>0?value.TotalRamGb.ToString():"—")} GB\n"+
+            $"{Mark(value.DiskReady)} {Localization.T("readinessDisk")}: {disk} · {Localization.T("readinessMods")}: {value.EnabledMods} / {value.DisabledMods}";
+        var key=value.RecommendedPage switch { "Vers"=>"readinessOpenVersions","Settings"=>"readinessOpenSettings",_=>"readinessVerifyRepair" };
+        readinessAction.Content=Localization.T(key); readinessAction.IsEnabled=true;
+        System.Windows.Automation.AutomationProperties.SetName(readinessAction,Localization.T(key));
+    }
+
+    async Task VerifyAndRepairAsync()
+    {
+        readinessAction.IsEnabled=false; readinessState.Text=Localization.T("readinessRepairing"); readinessDetails.Text=Localization.T("readinessRepairingHelp");
+        var result=await main.VerifyAndRepairGameAsync(main.Config.Version,status => readinessDetails.Text=status);
+        if(!result.CanLaunch)
+        {
+            readinessState.Text=Localization.T("readinessRepairFailed"); readinessState.Foreground=PageHelpers.HexBrush("#FF8F8F");
+            readinessDetails.Text=result.FailedPath==null?Localization.T("readinessError"):$"{result.FailedPath}: {result.FailureReason}";
+            readinessAction.Content=Localization.T("readinessRefresh"); readinessAction.IsEnabled=true;
+            return;
+        }
+        readinessState.Text=result.RepairedCount>0?string.Format(Localization.T("readinessRepaired"),result.RepairedCount):Localization.T("readinessFilesHealthy");
+        readinessState.Foreground=PageHelpers.HexBrush("#78E6B1");
+        await RefreshReadinessAsync();
     }
 }
 

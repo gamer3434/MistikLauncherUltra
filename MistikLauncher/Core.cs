@@ -212,6 +212,11 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.1.0","2026-09-27","#00D4AA", new[]{
+                "Başlatma hazırlığı kartı seçili sürüm, Java, RAM, disk ve mod durumunu açılıştan önce gösterir",
+                "Oyun JAR ve kütüphaneleri boyut/SHA-1 ile doğrulanır; eksikler geçici dosyada güvenle onarılır",
+                "Çökme raporundan açıkça adı geçen modlar silmeden güvenli kurtarma ile devre dışı bırakılabilir"
+            }),
             new("v6.0.11","2026-09-23","#FFB000", new[]{
                 "Güvensiz eski bulut/MQTT güncellemesi ve eski EXE güncelleme beslemesi kaldırıldı",
                 "Kullanılmayan bulut hesabı kodu ve eski kaynak yedeği güncel depodan çıkarıldı",
