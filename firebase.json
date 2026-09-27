@@ -1,0 +1,11 @@
+{
+  "hosting": {
+    "public": "site",
+    "site": "REMOVED_PRIVATE_CONFIGURATION",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}
