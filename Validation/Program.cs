@@ -179,7 +179,7 @@ class Program
             Check(((Frame)window.FindName("MainFrame")).Content is MistikLauncher.Pages.ModernSettingsPage,"top shortcut navigates to requested page");
             window.Config.QuickLinks.Clear(); window.BuildQuickBar();
             Check(((Border)window.FindName("QuickBarHost")).Visibility==Visibility.Visible && bar.Children.Count==2,"account and optimization remain reachable with no optional shortcuts");
-            ((Button)bar.Children[0]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
+            ((Button)bar.Children[1]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
             Check(((Frame)window.FindName("MainFrame")).Content is MistikLauncher.Pages.OptimizationPage,"optimization shortcut opens its page");
             window.Config.QuickLinks=new(){"Dash","Vers","Mods","Skin","Server","Settings"}; ConfigManager.Save(window.Config); window.BuildQuickBar();
             foreach(var name in ColorThemes.Names)
