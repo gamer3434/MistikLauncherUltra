@@ -127,7 +127,13 @@ class Program
             File.Delete(collision); window.Config.Version="1.20.1-forge-47.4.10";
             var modPage=new MistikLauncher.Pages.ModManagerPage(window);
             var installedMods=((StackPanel)((ScrollViewer)modPage.Content).Content).Children.OfType<StackPanel>().Last();
-            Button ModToggleButton() => (Button)((Grid)((Border)installedMods.Children[0]).Child).Children.OfType<StackPanel>().Last().Children[0];
+            Button ModToggleButton()
+            {
+                var row = installedMods.Children.OfType<Border>().Single(card =>
+                    card.Child is Grid grid && grid.Children.OfType<StackPanel>().Any(stack =>
+                        stack.Children.OfType<TextBlock>().Any(label => label.Text.EndsWith("kept.jar", StringComparison.Ordinal))));
+                return (Button)((Grid)row.Child!).Children.OfType<StackPanel>().Last().Children[0];
+            }
             ModToggleButton().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(File.Exists(disabledMod[..^9]) && !File.Exists(disabledMod),"installed mod Enable button applies immediately");
             ModToggleButton().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
