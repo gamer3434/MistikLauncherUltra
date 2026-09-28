@@ -1,14 +1,14 @@
-# Mistik Launcher Ultra 6.1.0 — Stable release / Kararlı sürüm
+# Mistik Launcher Ultra 6.1.1 — Stable release / Kararlı sürüm
 
 **Stable release.** Home, settings, navigation, diagnostics and launcher controls are bilingual. Vanilla/Forge profile management, automatic updates, installer rollback, crash reporting and the protected package were validated on Windows.
 
 **Kararlı sürüm.** Ana panel, ayarlar, gezinme, tanılama ve launcher kontrolleri iki dillidir. Vanilla/Forge profil yönetimi, otomatik güncelleme, kurulum geri alma, hata raporlama ve korumalı paket Windows üzerinde doğrulandı.
 
-### Güncel sürüm / Current version — 6.1.0
+### Güncel sürüm / Current version — 6.1.1
 
-Başlatma hazırlığı kartı; sürüm, Java, bellek, disk ve mod durumunu oyun açılmadan gösterir. Oyun JAR/kütüphaneleri boyut ve SHA-1 ile doğrulanır, eksikler geçici dosyada güvenle onarılır. Çökme raporu, açıkça adı geçen modlar için silmeden güvenli kurtarma sunar. / The Launch readiness card checks the profile, Java, memory, disk and mods before starting. Game JARs/libraries are verified by size and SHA-1 and repaired through a staged temporary file. Crash diagnostics can safely disable explicitly implicated mods without deleting them.
+Launcher, resmî son kararlı sürüm duyurusunu Ayarlar bölümünde seçili dilde gösterir. Bozuk sürüm etiketleri güncelleme karşılaştırmasında reddedilir. Site, GitHub Release yayımlandığında sürüm, duyuru, indirme bağlantıları ve SHA-256 değerlerini birlikte yeniler; Firebase Hosting ve Cloudflare Pages üzerinden sunulur. / The launcher shows official stable release notes in the selected language and rejects malformed version tags. The website refreshes version, announcements, downloads and SHA-256 hashes together from GitHub Releases on Firebase Hosting and Cloudflare Pages.
 
-[6.1.0 ayrıntıları / Details](docs/RELEASE-6.1.0.md). [6.1.0 indir / Download](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.1.0).
+[6.1.1 ayrıntıları / Details](docs/RELEASE-6.1.1.md). [6.1.1 indir / Download](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.1.1). [Web sitesi / Website](https://mistiklauncherultra.web.app/).
 
 Eski, doğrulanmamış EXE indiren MQTT güncellemesi ve v5.5.2 güncelleme beslemesi kaldırıldı. Kullanılmayan bulut hesabı kodu ile sabit parolalı kaynak yedeği güncel koddan çıkarıldı. Önbellekteki sayfalar gereksiz yere yeniden çizilmez; Optimizasyon kısayolu ve grafik ayarları düzeltildi. / The obsolete MQTT updater and v5.5.2 update feed were removed. Unused cloud-account code and the legacy hardcoded-password backup were removed from current source. Cached pages avoid unnecessary redraws; the Optimization shortcut and graphics settings were fixed.
 
@@ -16,7 +16,9 @@ Eski, doğrulanmamış EXE indiren MQTT güncellemesi ve v5.5.2 güncelleme besl
 
 **Ayarların taşınması / Moving settings:** `%APPDATA%\.mistik_ultra\config.json` ve `.bak` dosyaları artık aynı Windows kullanıcı hesabında açılır. Başka bilgisayara veya hesaba taşıyacaksanız, eski bilgisayarda ayarları yeniden girmeniz gerekir; oyun dünyaları ve modlar şifrelenmez. / The encrypted settings files can be opened only under the same Windows account. Re-enter preferences when moving to another account or PC; game worlds and mods are not encrypted.
 
-### Önceki sürüm / Previous version — 6.0.11
+### Önceki sürümler / Previous versions
+
+**6.1.0:** Başlatma hazırlığı, güvenli oyun dosyası onarımı ve çökme sonrası mod kurtarma eklendi. / Added launch readiness, safe game-file repair and mod recovery after a crash. [6.1.0 ayrıntıları / Details](docs/RELEASE-6.1.0.md).
 
 Şifreli ayarlar, yedek kurtarma, daha az sayfa çizimi ve tema renkli güncelleme çubuğu eklendi. / Added encrypted settings, backup recovery, fewer page redraws and a theme-colored update bar. [6.0.11 ayrıntıları / Details](docs/RELEASE-6.0.11.md).
 
@@ -26,19 +28,19 @@ The close control now uses a 38×24 rounded rectangle and a precisely centered s
 
 Minecraft startup failure/nonzero exit restores the launcher and displays diagnostics. / Minecraft açılış hatası veya sıfırdan farklı çıkış kodu launcher'ı geri açar ve hata analizini gösterir. Real Vanilla/Forge gameplay results and previous remaining issues: [PC report](docs/PC-TESTS-PREVIEW-7.md).
 
-**Download / İndir:** [6.1.0 release](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.1.0).
+**Download / İndir:** [6.1.1 release](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.1.1).
 
-- `MistikSetup-Online-6.1.0.exe`: uygulama paketini GitHub'dan indirir ve SHA-256 doğrular / downloads and verifies this version's package from GitHub.
-- `MistikSetup-Offline-6.1.0.exe`: uygulama dosyaları içinde bulunur; kurulum için internet gerekmez / embeds the full application; installation needs no internet.
-- `MistikLauncher-6.1.0-win-x64.zip`: taşınabilir seçenek / portable option.
+- `MistikSetup-Online-6.1.1.exe`: uygulama paketini GitHub'dan indirir ve SHA-256 doğrular / downloads and verifies this version's package from GitHub.
+- `MistikSetup-Offline-6.1.1.exe`: uygulama dosyaları içinde bulunur; kurulum için internet gerekmez / embeds the full application; installation needs no internet.
+- `MistikLauncher-6.1.1-win-x64.zip`: taşınabilir seçenek / portable option.
 
 Kurulum dili sihirbazın sağ üstünden seçilir. Varsayılan konum `%LOCALAPPDATA%\Programs\MistikLauncherUltra`; yönetici izni gerekmez. Windows uygulama listesinden kaldırılabilir. Ayarlar, modlar ve dünyalar `%APPDATA%\.mistik_ultra` altında korunur. Dolu klasöre kurulum engellenir; mevcut kurulumu uygulamanın güncelleyicisiyle güncelleyin veya önce kaldırın. Launcher için yeni sürümleri otomatik alma ayarı ayrıca kullanılabilir.
 
 Choose installer language at the upper right. Default per-user folder: `%LOCALAPPDATA%\Programs\MistikLauncherUltra`; no administrator rights needed. Uninstall through Windows installed apps. Existing settings, mods and worlds under `%APPDATA%\.mistik_ultra` are preserved. Nonempty destinations are rejected; use the launcher's updater or uninstall first. The launcher separately offers automatic updates for future versions.
 
-**İmza / Signing:** Güncel 6.1.0 paketi imzasızdır; Authenticode veya genel Windows yayıncı güveni sağlamaz. İsteğe bağlı yerel test imzası yalnızca maintainer build adımında kullanılabilir. / The current 6.1.0 package is unsigned; it carries no Authenticode signature or public Windows publisher trust. Optional local test signing is maintainer-only.
+**İmza / Signing:** Güncel 6.1.1 paketi imzasızdır; Authenticode veya genel Windows yayıncı güveni sağlamaz. İsteğe bağlı yerel test imzası yalnızca maintainer build adımında kullanılabilir. / The current 6.1.1 package is unsigned; it carries no Authenticode signature or public Windows publisher trust. Optional local test signing is maintainer-only.
 
-**297 checks passed** on the protected package (**295** ordinary run), including launch readiness, integrity repair, bilingual controls, update metadata, installer rollback/retry and safe crash recovery. / Korumalı pakette **297 kontrol** (**normal çalıştırmada 295**) geçti; başlatma hazırlığı, bütünlük onarımı, iki dil, güncelleme kayıtları, kurulum geri alma ve güvenli çökme kurtarma doğrulandı. [Release details / Yayın ayrıntıları](docs/RELEASE-6.1.0.md). [Current window controls / Güncel pencere kontrolleri](docs/WINDOW-AND-TOOLBAR.md).
+**300 checks passed** on the protected package (**298** ordinary run), including bilingual release notes, malformed-version rejection, integrity repair and installer rollback. / Korumalı pakette **300 kontrol** (**normal çalıştırmada 298**) geçti; iki dilli duyuru, bozuk sürüm etiketi reddi, dosya onarımı ve kurulum geri alma doğrulandı. [Release details / Yayın ayrıntıları](docs/RELEASE-6.1.1.md). [Current window controls / Güncel pencere kontrolleri](docs/WINDOW-AND-TOOLBAR.md).
 
 [Kurulum kılavuzu ve görseller / Setup guide and previews](docs/SETUP-PREVIEW-9.md).
 
@@ -83,7 +85,7 @@ Configuration writes are atomic with recovery from the previous backup. Hardware
 
 ### Run
 
-Extract `artifacts/MistikLauncher-6.1.0-win-x64.zip` to a dedicated Windows x64 folder and run `MistikLauncher.exe`, or choose an online/offline setup from the `v6.1.0` release. The .NET runtime is included. **Keep all package files together.** Legacy in-launcher installation/uninstallation and certificate trust changes remain disabled; the new standalone installer manages its own ownership record. Data remains under `%APPDATA%\.mistik_ultra`.
+Extract `artifacts/MistikLauncher-6.1.1-win-x64.zip` to a dedicated Windows x64 folder and run `MistikLauncher.exe`, or choose an online/offline setup from the `v6.1.1` release. The .NET runtime is included. **Keep all package files together.** Legacy in-launcher installation/uninstallation and certificate trust changes remain disabled; the new standalone installer manages its own ownership record. Data remains under `%APPDATA%\.mistik_ultra`.
 
 1. Select Türkçe or English at the top right.
 2. Enter player name and RAM in Settings, then Save changes.
@@ -104,9 +106,9 @@ Gömülü kaynakların anahtarları aynıdır. Yeni sayfalar dil değişikliğin
 
 ## Protection limits / Koruma sınırları
 
-Eligible private member names and string constants are obfuscated. WPF entry points and JSON names are preserved. String hiding is reversible; it is not strong encryption and cannot secure embedded secrets. Public source remains readable. This 6.1.0 package is not Authenticode signed; SmartScreen and antivirus behavior cannot be guaranteed.
+Eligible private member names and string constants are obfuscated. WPF entry points and JSON names are preserved. String hiding is reversible; it is not strong encryption and cannot secure embedded secrets. Public source remains readable. This 6.1.1 package is not Authenticode signed; SmartScreen and antivirus behavior cannot be guaranteed.
 
-Özel üyeler ve metin sabitleri gizlenir; WPF/JSON adları korunur. Gizleme geri çevrilebilir; güçlü şifreleme değildir. Açık kaynak okunabilir kalır. 6.1.0 paketi Authenticode imzası taşımaz; antivirüs veya SmartScreen garantisi yoktur.
+Özel üyeler ve metin sabitleri gizlenir; WPF/JSON adları korunur. Gizleme geri çevrilebilir; güçlü şifreleme değildir. Açık kaynak okunabilir kalır. 6.1.1 paketi Authenticode imzası taşımaz; antivirüs veya SmartScreen garantisi yoktur.
 
 ## Screenshots / Ekran görüntüleri
 
@@ -126,12 +128,16 @@ Real off-screen WPF renders, not a running Minecraft session. / Gerçek WPF gör
 | `MistikLauncher/Pages/ModernPages.cs` | Bilingual home, readiness and settings / İki dilli ana panel, hazırlık ve ayarlar |
 | `MistikLauncher/GameRuntimeHealth.cs` | Profile/JAR/library verification and safe repair / Profil-JAR-kütüphane doğrulama ve güvenli onarım |
 | `MistikLauncher/LaunchReadiness.cs` | Java, memory, disk and mod readiness / Java, bellek, disk ve mod hazırlığı |
+| `MistikLauncher/LauncherUpdater.cs` | Verified updates and bilingual release notes / Doğrulanmış güncelleme ve iki dilli duyuru |
 | `MistikLauncher/Localization.cs` | Embedded resource loader / Dil kaynakları |
 | `MistikLauncher/ReleaseSecurity.cs` | Update and uninstall safeguards / Güvenlik |
 | `scripts/Build-Protected.ps1` | Protected package / Korumalı paket |
 | `Validation/Program.cs` | Ordinary/protected checks and WPF renders / Normal-korumalı denetimler |
 | `Validation/GameRuntimeHealthTests.cs` | Integrity and repair fixtures / Bütünlük ve onarım denetimleri |
 | `Validation/LaunchReadinessTests.cs` | Readiness and safe crash recovery checks / Hazırlık ve güvenli çökme kurtarma denetimleri |
+| `Validation/LauncherUpdateTests.cs` | Release-note parsing and update safeguards / Duyuru ve güncelleme denetimleri |
+| `Validation/WebsiteReleaseTests.js` | Stable-release and download-link checks / Kararlı sürüm ve indirme bağlantısı denetimleri |
+| `site/assets/release.js` | Latest stable release, announcements and matching download digests / Güncel kararlı sürüm, duyuru ve dosya özetleri |
 | `.github/workflows/validate.yml` | Windows CI / Windows doğrulama |
 
 See [audit and outstanding work](docs/AUDIT.md). / [Denetim ve kalan işler](docs/AUDIT.md).

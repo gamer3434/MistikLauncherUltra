@@ -184,6 +184,7 @@
   "mcsStarted": "Auto-MCS started. Manage your servers inside the application.",
   "mcsAlreadyRunning": "Auto-MCS is already running. Continue in its open window.",
   "luTitle": "Launcher updates",
+  "luReleaseNotes": "Latest release notes",
   "luAutomatic": "Install new releases automatically",
   "luCheck": "Check and install update",
   "luIdle": "The latest stable release is checked at startup and every 30 minutes.",

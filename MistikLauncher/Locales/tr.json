@@ -184,6 +184,7 @@
   "mcsStarted": "Auto-MCS açıldı. Sunucularını uygulama içinden yönetebilirsin.",
   "mcsAlreadyRunning": "Auto-MCS zaten açık. Açık pencereden devam edebilirsin.",
   "luTitle": "Launcher güncellemeleri",
+  "luReleaseNotes": "Son sürüm duyurusu",
   "luAutomatic": "Yeni sürümler otomatik yüklensin",
   "luCheck": "Güncellemeyi denetle ve yükle",
   "luIdle": "Açılışta ve her 30 dakikada son kararlı sürüm denetlenir.",

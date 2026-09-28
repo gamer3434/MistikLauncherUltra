@@ -212,6 +212,10 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.1.1","2026-09-28","#00D4AA", new[]{
+                "Ayarlar güncelleme kartı resmî son sürüm duyurusunu seçili dilde gösterir",
+                "Bozuk sürüm etiketleri güncelleme karşılaştırmasında reddedilir"
+            }),
             new("v6.1.0","2026-09-27","#00D4AA", new[]{
                 "Başlatma hazırlığı kartı seçili sürüm, Java, RAM, disk ve mod durumunu açılıştan önce gösterir",
                 "Oyun JAR ve kütüphaneleri boyut/SHA-1 ile doğrulanır; eksikler geçici dosyada güvenle onarılır",
