@@ -1,16 +1,16 @@
-# Mistik Launcher Ultra 6.1.1 — Stable release / Kararlı sürüm
+# Mistik Launcher Ultra 6.1.2 — Stable release / Kararlı sürüm
 
-**Stable release.** Home, settings, navigation, diagnostics and launcher controls are bilingual. Vanilla/Forge profile management, automatic updates, installer rollback, crash reporting and the protected package were validated on Windows.
+**Stable release.** Home, settings, navigation, diagnostics and launcher controls are bilingual. The 6.1.1 launcher base, Vanilla/Forge profile management, automatic updates, installer rollback and crash reporting were validated on Windows; 6.1.2 adds Mistik Launcher website accounts and an optional settings backup.
 
-**Kararlı sürüm.** Ana panel, ayarlar, gezinme, tanılama ve launcher kontrolleri iki dillidir. Vanilla/Forge profil yönetimi, otomatik güncelleme, kurulum geri alma, hata raporlama ve korumalı paket Windows üzerinde doğrulandı.
+**Kararlı sürüm.** Ana panel, ayarlar, gezinme, tanılama ve launcher kontrolleri iki dillidir. 6.1.1 temel sürümü, Vanilla/Forge profil yönetimi, otomatik güncelleme, kurulum geri alma ve hata raporlama Windows üzerinde doğrulandı; 6.1.2 Mıstık Launcher web hesabı ve isteğe bağlı ayar yedeği ekler.
 
-### Güncel sürüm / Current version — 6.1.1
+### Güncel sürüm / Current version — 6.1.2
 
 Launcher, resmî son kararlı sürüm duyurusunu Ayarlar bölümünde seçili dilde gösterir. Bozuk sürüm etiketleri güncelleme karşılaştırmasında reddedilir. Site, GitHub Release yayımlandığında sürüm, duyuru, indirme bağlantıları ve SHA-256 değerlerini birlikte yeniler; Firebase Hosting ve Cloudflare Pages üzerinden sunulur. / The launcher shows official stable release notes in the selected language and rejects malformed version tags. The website refreshes version, announcements, downloads and SHA-256 hashes together from GitHub Releases on Firebase Hosting and Cloudflare Pages.
 
-[6.1.1 ayrıntıları / Details](docs/RELEASE-6.1.1.md). [6.1.1 indir / Download](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.1.1). [Web sitesi / Website](https://mistiklauncherultra.web.app/).
+[6.1.2 ayrıntıları / Details](docs/RELEASE-6.1.2.md). [6.1.2 indir / Download](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.1.2). [Web sitesi / Website](https://mistiklauncherultra.web.app/).
 
-Eski, doğrulanmamış EXE indiren MQTT güncellemesi ve v5.5.2 güncelleme beslemesi kaldırıldı. Kullanılmayan bulut hesabı kodu ile sabit parolalı kaynak yedeği güncel koddan çıkarıldı. Önbellekteki sayfalar gereksiz yere yeniden çizilmez; Optimizasyon kısayolu ve grafik ayarları düzeltildi. / The obsolete MQTT updater and v5.5.2 update feed were removed. Unused cloud-account code and the legacy hardcoded-password backup were removed from current source. Cached pages avoid unnecessary redraws; the Optimization shortcut and graphics settings were fixed.
+Bu sürüm web sitesinde e-posta/parola hesabı açmayı ve aynı hesapla launcher'da oturum açmayı sağlar. Ayar yedeği yalnızca launcher içinden isteğe bağlı başlatılır ve belirli tercih alanlarıyla sınırlıdır. / This release adds website email/password accounts and sign-in to the launcher with the same account. Preference backup is optional, started from the launcher, and limited to specific settings.
 
 [Önceki 6.0.11 ayrıntıları / Previous 6.0.11 details](docs/RELEASE-6.0.11.md). SignPath incelemesi sürüyor; yeni sürüm şu anda imzasızdır / SignPath review is pending; the new release is currently unsigned.
 
@@ -18,29 +18,31 @@ Eski, doğrulanmamış EXE indiren MQTT güncellemesi ve v5.5.2 güncelleme besl
 
 ### Önceki sürümler / Previous versions
 
+**6.1.1:** Launcher'a resmî sürüm duyuruları ve bozuk sürüm etiketlerine karşı koruma eklendi; web sitesi Release indirmelerini ve SHA-256 değerlerini yeniler. / Added official release announcements and malformed-version checks; the website refreshes Release downloads and SHA-256 values. [6.1.1 ayrıntıları / Details](docs/RELEASE-6.1.1.md).
+
 **6.1.0:** Başlatma hazırlığı, güvenli oyun dosyası onarımı ve çökme sonrası mod kurtarma eklendi. / Added launch readiness, safe game-file repair and mod recovery after a crash. [6.1.0 ayrıntıları / Details](docs/RELEASE-6.1.0.md).
 
 Şifreli ayarlar, yedek kurtarma, daha az sayfa çizimi ve tema renkli güncelleme çubuğu eklendi. / Added encrypted settings, backup recovery, fewer page redraws and a theme-colored update bar. [6.0.11 ayrıntıları / Details](docs/RELEASE-6.0.11.md).
 
-Çıkış düğmesi artık 38×24 ölçülerinde, köşeleri yuvarlatılmış dikdörtgendir. Simetrik vektör çarpı tam ortalanır. **Tema**, **RGB · renk geçişi**, **Kapalı** seçenekleri korunur; RGB yalnızca çıkış çerçevesi ve ışığında yumuşak geçiş yapar. Bulut hesabı arayüzü ve otomatik profil eşitlemesi kaldırılmıştır; eski bulut kayıtları silinmez.
+Çıkış düğmesi artık 38×24 ölçülerinde, köşeleri yuvarlatılmış dikdörtgendir. Simetrik vektör çarpı tam ortalanır. **Tema**, **RGB · renk geçişi**, **Kapalı** seçenekleri korunur; RGB yalnızca çıkış çerçevesi ve ışığında yumuşak geçiş yapar. Otomatik profil eşitlemesi kaldırılmıştır; 6.1.2'de isteğe bağlı ve sınırlı ayar yedeği sunulur. Eski bulut kayıtları silinmez.
 
-The close control now uses a 38×24 rounded rectangle and a precisely centered symmetric vector cross. **Theme**, **RGB · color cycle**, **Off** remain available; only close gets animated outline/glow. Cloud account UI and automatic profile synchronization remain removed; old cloud records are preserved.
+The close control now uses a 38×24 rounded rectangle and a precisely centered symmetric vector cross. **Theme**, **RGB · color cycle**, **Off** remain available; only close gets animated outline/glow. Automatic profile synchronization remains removed; 6.1.2 offers an optional, limited settings backup. Old cloud records are preserved.
 
 Minecraft startup failure/nonzero exit restores the launcher and displays diagnostics. / Minecraft açılış hatası veya sıfırdan farklı çıkış kodu launcher'ı geri açar ve hata analizini gösterir. Real Vanilla/Forge gameplay results and previous remaining issues: [PC report](docs/PC-TESTS-PREVIEW-7.md).
 
-**Download / İndir:** [6.1.1 release](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.1.1).
+**Download / İndir:** [6.1.2 release](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.1.2).
 
-- `MistikSetup-Online-6.1.1.exe`: uygulama paketini GitHub'dan indirir ve SHA-256 doğrular / downloads and verifies this version's package from GitHub.
-- `MistikSetup-Offline-6.1.1.exe`: uygulama dosyaları içinde bulunur; kurulum için internet gerekmez / embeds the full application; installation needs no internet.
-- `MistikLauncher-6.1.1-win-x64.zip`: taşınabilir seçenek / portable option.
+- `MistikSetup-Online-6.1.2.exe`: uygulama paketini GitHub'dan indirir ve SHA-256 doğrular / downloads and verifies this version's package from GitHub.
+- `MistikSetup-Offline-6.1.2.exe`: uygulama dosyaları içinde bulunur; kurulum için internet gerekmez / embeds the full application; installation needs no internet.
+- `MistikLauncher-6.1.2-win-x64.zip`: taşınabilir seçenek / portable option.
 
 Kurulum dili sihirbazın sağ üstünden seçilir. Varsayılan konum `%LOCALAPPDATA%\Programs\MistikLauncherUltra`; yönetici izni gerekmez. Windows uygulama listesinden kaldırılabilir. Ayarlar, modlar ve dünyalar `%APPDATA%\.mistik_ultra` altında korunur. Dolu klasöre kurulum engellenir; mevcut kurulumu uygulamanın güncelleyicisiyle güncelleyin veya önce kaldırın. Launcher için yeni sürümleri otomatik alma ayarı ayrıca kullanılabilir.
 
 Choose installer language at the upper right. Default per-user folder: `%LOCALAPPDATA%\Programs\MistikLauncherUltra`; no administrator rights needed. Uninstall through Windows installed apps. Existing settings, mods and worlds under `%APPDATA%\.mistik_ultra` are preserved. Nonempty destinations are rejected; use the launcher's updater or uninstall first. The launcher separately offers automatic updates for future versions.
 
-**İmza / Signing:** Güncel 6.1.1 paketi imzasızdır; Authenticode veya genel Windows yayıncı güveni sağlamaz. İsteğe bağlı yerel test imzası yalnızca maintainer build adımında kullanılabilir. / The current 6.1.1 package is unsigned; it carries no Authenticode signature or public Windows publisher trust. Optional local test signing is maintainer-only.
+**İmza / Signing:** Güncel 6.1.2 paketi imzasızdır; Authenticode veya genel Windows yayıncı güveni sağlamaz. İsteğe bağlı yerel test imzası yalnızca maintainer build adımında kullanılabilir. / The current 6.1.2 package is unsigned; it carries no Authenticode signature or public Windows publisher trust. Optional local test signing is maintainer-only.
 
-**300 checks passed** on the protected package (**298** ordinary run), including bilingual release notes, malformed-version rejection, integrity repair and installer rollback. / Korumalı pakette **300 kontrol** (**normal çalıştırmada 298**) geçti; iki dilli duyuru, bozuk sürüm etiketi reddi, dosya onarımı ve kurulum geri alma doğrulandı. [Release details / Yayın ayrıntıları](docs/RELEASE-6.1.1.md). [Current window controls / Güncel pencere kontrolleri](docs/WINDOW-AND-TOOLBAR.md).
+**6.1.1 validation:** The previous protected package passed **300 checks** (**298** in the ordinary run), including bilingual release notes, malformed-version rejection, integrity repair and installer rollback. / Önceki 6.1.1 korumalı paketinde **300 kontrol** (**normal çalıştırmada 298**) geçti; iki dilli duyuru, bozuk sürüm etiketi reddi, dosya onarımı ve kurulum geri alma doğrulandı. [Previous release details / Önceki sürüm ayrıntıları](docs/RELEASE-6.1.1.md). [Current window controls / Güncel pencere kontrolleri](docs/WINDOW-AND-TOOLBAR.md).
 
 [Kurulum kılavuzu ve görseller / Setup guide and previews](docs/SETUP-PREVIEW-9.md).
 
@@ -52,7 +54,7 @@ Maintainer-only signing / Yalnızca maintainer imzalama: `./scripts/Build-Protec
 
 Yeni ana panel oyuncu profili, sürüm, bellek ve hızlı işlemleri gösterir. Ayarlarda oyuncu adı, 1–32 GB bellek, skin sağlayıcısı, renk ve otomatik kapanma seçilir. Üst menüdeki dil listesi anında Türkçe / English geçişi sağlar. Global launcher araması kaldırıldı; gezinme üstte, oyuncu adı ve skin yüzü sağ üsttedir. RedX referansındaki kömür siyahı yüzeyler, 20 renk seçeneği, Segoe UI ve görünür klavye odağı kullanılır.
 
-Ayarlar atomik kaydedilir; önceki değerler `.bak` dosyasından kurtarılır. Donanım, IP, oyuncu adı ve oyun etkinliği telemetrisi ile kimlik doğrulamasız Firebase uzaktan yönetimi kaldırıldı. Canlı sayaç için yalnızca anonim Firebase UID'si ve sunucu zaman damgası gönderilir; sayaç 2 dakikadan eski oturumları göstermez, refresh token Windows DPAPI ile korunur. Sabit yönetici şifreleri ve eski kontrolsüz EXE değiştirme devre dışı bırakıldı; resmî doğrulanmış paket güncellemeleri yeni sistemle uygulanır. Açılışta sessiz kurulum, diğer başlatıcı işlemlerini sonlandırma ve otomatik sistem müdahaleleri kaldırıldı. MQTT için TLS yapılandırıldı; başlangıçta otomatik bağlantı kaldırıldı. Topluluk aktarımının güvenlik/kullanılabilirlik incelemesi sürüyor.
+Ayarlar atomik kaydedilir; önceki değerler `.bak` dosyasından kurtarılır. Donanım, IP, oyuncu adı ve oyun etkinliği telemetrisi, canlı sayaç ve kimlik doğrulamasız Firebase yönetimi kaldırıldı. Launcher hesabının refresh token'ı Windows kullanıcı DPAPI'siyle korunur; izin verilen ayarlar yalnızca kullanıcı launcher'da yedekleme düğmesine bastığında gönderilir. Sabit yönetici şifreleri ve eski kontrolsüz EXE değiştirme devre dışı bırakıldı; resmî doğrulanmış paket güncellemeleri yeni sistemle uygulanır. Açılışta sessiz kurulum, diğer başlatıcı işlemlerini sonlandırma ve otomatik sistem müdahaleleri kaldırıldı. MQTT için TLS yapılandırıldı; başlangıçta otomatik bağlantı kaldırıldı. Topluluk aktarımının güvenlik/kullanılabilirlik incelemesi sürüyor.
 
 ### Çalıştırma
 
@@ -79,20 +81,20 @@ Koruma betiği sabit sürümlü aracı yükler, taşınabilir sürümü derler, 
 
 ## English
 
-The redesigned home shows player, version, memory and quick actions. Settings validate player names and 1–32 GB RAM, and offer skin provider, accent and automatic closing. The top-right Turkish / English selector updates at runtime. Navigation is centered at the top, with player name and skin face at the right. Global launcher search has been removed; page-local mod and skin search remains. Charcoal surfaces, 20 accent palettes, Segoe UI typography and visible keyboard focus follow the supplied RedX references.
+The redesigned home shows player, version, memory and quick actions. Settings validate player names and 1–32 GB RAM, and offer skin provider, accent and automatic closing. The top-right Turkish / English selector updates at runtime. Navigation is centered at the top, with player name and skin face at the right. Global launcher search has been removed; page-local mod and skin search remains. Charcoal surfaces, 20 accent palettes, Segoe UI typography and visible keyboard focus follow the supplied RedX references. The website supports Mistik Launcher email/password accounts; sign in to the launcher with the same account. This account is separate from Minecraft or Ely.by game sign-in. Only an explicit launcher action backs up the allowlisted player name, game version, RAM, interface language and theme; credentials are not synced and automatic sync/restore is not included.
 
-Configuration writes are atomic with recovery from the previous backup. Hardware, IP, player-name and gameplay telemetry, plus unauthenticated Firebase administration, were removed. The live counter sends only an anonymous Firebase UID and server timestamp; it ignores sessions older than two minutes and protects the refresh token with Windows DPAPI. Hardcoded administrator access and legacy arbitrary executable replacement are disabled; verified official package updates now use the new updater. Startup no longer silently installs, terminates other launcher processes or changes system preferences. MQTT uses TLS; automatic startup connection was removed. Community relay security/usability review remains outstanding.
+Configuration writes are atomic with recovery from the previous backup. Hardware, IP, player-name and gameplay telemetry, the live counter, and unauthenticated Firebase administration were removed. The account refresh token uses Windows user-scoped DPAPI; allowlisted preferences are sent only after the user selects the launcher backup action. Hardcoded administrator access and legacy arbitrary executable replacement are disabled; verified official package updates now use the new updater. Startup no longer silently installs, terminates other launcher processes or changes system preferences. MQTT uses TLS; automatic startup connection was removed. Community relay security/usability review remains outstanding.
 
 ### Run
 
-Extract `artifacts/MistikLauncher-6.1.1-win-x64.zip` to a dedicated Windows x64 folder and run `MistikLauncher.exe`, or choose an online/offline setup from the `v6.1.1` release. The .NET runtime is included. **Keep all package files together.** Legacy in-launcher installation/uninstallation and certificate trust changes remain disabled; the new standalone installer manages its own ownership record. Data remains under `%APPDATA%\.mistik_ultra`.
+Extract `artifacts/MistikLauncher-6.1.2-win-x64.zip` to a dedicated Windows x64 folder and run `MistikLauncher.exe`, or choose an online/offline setup from the `v6.1.2` release. The .NET runtime is included. **Keep all package files together.** Legacy in-launcher installation/uninstallation and certificate trust changes remain disabled; the new standalone installer manages its own ownership record. Data remains under `%APPDATA%\.mistik_ultra`.
 
 1. Select Türkçe or English at the top right.
 2. Enter player name and RAM in Settings, then Save changes.
 3. Download a version under Versions and select it in the bottom bar.
 4. Choose compatible mods and select Launch game.
 
-Vanilla/Forge gameplay and an isolated local server were verified. Every mod combination, Microsoft/Ely.by login and public tunnels remain untested; the third-party Auto-MCS server wizard failed. Microsoft account authentication was not added. Respect Minecraft and mod licenses.
+Vanilla/Forge gameplay and an isolated local server were verified. Every mod combination, Microsoft/Ely.by game login and public tunnels remain untested; the third-party Auto-MCS server wizard failed. The Mistik Launcher website account is separate and does not add Microsoft or Ely.by authentication to Minecraft. Respect Minecraft and mod licenses.
 
 ### Build
 
@@ -106,9 +108,9 @@ Gömülü kaynakların anahtarları aynıdır. Yeni sayfalar dil değişikliğin
 
 ## Protection limits / Koruma sınırları
 
-Eligible private member names and string constants are obfuscated. WPF entry points and JSON names are preserved. String hiding is reversible; it is not strong encryption and cannot secure embedded secrets. Public source remains readable. This 6.1.1 package is not Authenticode signed; SmartScreen and antivirus behavior cannot be guaranteed.
+Eligible private member names and string constants are obfuscated. WPF entry points and JSON names are preserved. String hiding is reversible; it is not strong encryption and cannot secure embedded secrets. Public source remains readable. This 6.1.2 package is not Authenticode signed; SmartScreen and antivirus behavior cannot be guaranteed.
 
-Özel üyeler ve metin sabitleri gizlenir; WPF/JSON adları korunur. Gizleme geri çevrilebilir; güçlü şifreleme değildir. Açık kaynak okunabilir kalır. 6.1.1 paketi Authenticode imzası taşımaz; antivirüs veya SmartScreen garantisi yoktur.
+Özel üyeler ve metin sabitleri gizlenir; WPF/JSON adları korunur. Gizleme geri çevrilebilir; güçlü şifreleme değildir. Açık kaynak okunabilir kalır. 6.1.2 paketi Authenticode imzası taşımaz; antivirüs veya SmartScreen garantisi yoktur.
 
 ## Screenshots / Ekran görüntüleri
 
