@@ -121,7 +121,7 @@ Real off-screen WPF renders, not a running Minecraft session. / Gerçek WPF gör
 
 | File | Purpose / Amaç |
 |---|---|
-| `MistikLauncher/Core.cs`, `MistikLauncher/MistikPresence.cs` | Config recovery, anonymous active-session presence, TLS / Ayarlar ve güvenlik |
+| `MistikLauncher/Core.cs` | Config recovery, TLS / Ayarlar ve güvenlik |
 | `MistikLauncher/App.xaml.cs` | Portable startup / Taşınabilir açılış |
 | `MistikLauncher/MainWindow.xaml` | Top navigation, player profile, language, focus / Üst menü ve profil |
 | `MistikLauncher/MainWindow.xaml.cs` | Runtime switching and navigation / Dil değiştirme |

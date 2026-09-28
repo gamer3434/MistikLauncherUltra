@@ -1,5 +1,5 @@
 {
   "score": 5,
-  "summary": "Realtime Database root access is denied. activeSessions and launcherProfiles are readable and writable only by the authenticated owner at their UID path. Session entries require a numeric lastSeen field and reject additional fields; launcherProfiles keeps its existing field-level validation. Updated rules have not yet had live authorization checks.",
+  "summary": "Live unauthenticated GET requests to the Realtime Database root, activeSessions, and launcherProfiles each returned HTTP 401. Source rules also deny activeSessions reads and writes and keep launcherProfiles owner-only with field-level validation; authenticated owner access was not exercised. Existing activeSessions records were not deleted. Anonymous Authentication remains enabled for compatibility with shipped clients.",
   "findings": []
 }
