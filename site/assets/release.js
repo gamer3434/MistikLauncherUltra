@@ -3,17 +3,17 @@
 
   const repo = 'gamer3434/MistikLauncherUltra';
   const minimumVersion = [6, 1, 0];
-  const fallbackVersion = '6.1.0';
+  const fallbackVersion = '6.1.1';
   const fallbackNotes = {
     tr: [
-      'Başlatma hazırlığı Java, bellek, disk ve mod durumunu gösterir.',
-      'Bozuk oyun dosyaları güvenle doğrulanıp onarılabilir.',
-      'Çökme kaydında adı geçen modlar silinmeden kapatılabilir.'
+      'Ayarlar → Launcher güncellemeleri resmî son kararlı sürüm duyurusunu gösterir.',
+      'Bozuk veya aşırı büyük sürüm etiketleri güncellemeyi başlatamaz.',
+      'Site sürüm, duyuru, indirme ve SHA-256 verilerini GitHub Releases üzerinden yeniler.'
     ],
     en: [
-      'Launch readiness shows Java, memory, disk, and mod status.',
-      'Damaged game files can be verified and repaired safely.',
-      'Mods identified in crash logs can be disabled without deletion.'
+      'Settings → Launcher updates shows the official latest stable release announcement.',
+      'Malformed or oversized version tags cannot start an update.',
+      'The website refreshes release details and hashes from GitHub Releases.'
     ]
   };
 
@@ -122,6 +122,6 @@
   }).then(release => {
     current = parseRelease(release);
     if (current) render();
-  }).catch(() => { /* The verified 6.1.0 fallback remains usable offline. */ })
+  }).catch(() => { /* The verified 6.1.1 fallback remains usable offline. */ })
     .finally(() => clearTimeout(timeout));
 }());
