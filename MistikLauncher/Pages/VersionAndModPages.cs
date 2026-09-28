@@ -303,8 +303,7 @@ namespace MistikLauncher.Pages
                     else
                     {
                         selBtn.Click += (_, _) => {
-                            _main.Config.Version = installedFolder;
-                            ConfigManager.Save(_main.Config);
+                            _main.SetVersion(installedFolder);
                             _main.PopulateVersionBox();
                             RenderList();
                             MessageBox.Show(Localization.Language=="en"?$"{vid} selected.":$"{vid} seçildi.", Localization.T("Basarili"), MessageBoxButton.OK, MessageBoxImage.Information);
@@ -337,8 +336,7 @@ namespace MistikLauncher.Pages
                             var jsonFile = Path.Combine(path, $"{installedId}.json");
                             if (GameProfiles.IsInstalled(App.GameDir, installedId))
                             {
-                                _main.Config.Version = installedId;
-                                ConfigManager.Save(_main.Config);
+                                _main.SetVersion(installedId);
                                 MessageBox.Show($"{installedId} başarıyla kuruldu ve seçildi!", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
                             }
                         }
@@ -1719,9 +1717,8 @@ namespace MistikLauncher.Pages
                     _main.VerBox.SelectedItem = matchedVerName;
                     var profile=GameProfiles.Read(App.GameDir,matchedVerName);
                     if(profile==null || GameProfiles.Kind(profile)!=loader) throw new IOException(Localization.T("modSyncFailed"));
-                    _main.Config.Version = matchedVerName;
+                    _main.SetVersion(matchedVerName);
                     if(!_main.SyncModsForCurrentVersion()) throw new IOException(Localization.T("modSyncFailed"));
-                    ConfigManager.Save(_main.Config);
                     _main.StatusLbl.Text = $"Surum: {matchedVerName}";
                 });
 
