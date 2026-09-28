@@ -117,14 +117,16 @@ class Program
             Check(!MistikLauncher.Pages.SkinPage.LoadImgAsync(new Image(),"../../outside",80).GetAwaiter().GetResult(),"skin preview rejects invalid usernames before network access");
             Directory.CreateDirectory(App.ModsDir);
             string disabledMod=Path.Combine(App.ModsDir,"kept.jar.disabled"); File.WriteAllText(disabledMod,"kept bytes");
-            window.Config.LastSyncedVersion="1.20.1-forge-47.4.10"; window.Config.Version="1.19.2-forge-43.5.0"; window.SyncModsForCurrentVersion();
+            window.Config.LastSyncedVersion="1.20.1-forge-47.4.10"; window.SetVersion("1.19.2-forge-43.5.0");
+            Check(!window.SyncModsForCurrentVersion("1.20.1-forge-47.4.10") && File.Exists(disabledMod) && window.Config.LastSyncedVersion=="1.20.1-forge-47.4.10","stale mod sync request leaves the active set untouched");
+            window.SyncModsForCurrentVersion();
             Check(File.Exists(Path.Combine(testRoot,"mods_pool","1.20.1_forge","kept.jar.disabled")),"disabled mod state follows original version pool");
-            window.Config.Version="1.20.1-forge-47.4.10"; window.SyncModsForCurrentVersion();
+            window.SetVersion("1.20.1-forge-47.4.10"); window.SyncModsForCurrentVersion();
             Check(File.ReadAllText(disabledMod)=="kept bytes" && !File.Exists(disabledMod[..^9]),"returning to a version preserves disabled mod state");
             var collision=Path.Combine(testRoot,"mods_pool","1.20.1_forge","kept.jar.disabled"); File.WriteAllText(collision,"existing pool copy");
-            window.Config.Version="1.19.2-forge-43.5.0";
+            window.SetVersion("1.19.2-forge-43.5.0");
             Check(!window.SyncModsForCurrentVersion() && window.Config.LastSyncedVersion=="1.20.1-forge-47.4.10" && File.ReadAllText(disabledMod)=="kept bytes" && File.ReadAllText(collision)=="existing pool copy","failed launcher mod sync preserves files and retains previous version state");
-            File.Delete(collision); window.Config.Version="1.20.1-forge-47.4.10";
+            File.Delete(collision); window.SetVersion("1.20.1-forge-47.4.10");
             var modPage=new MistikLauncher.Pages.ModManagerPage(window);
             var installedMods=((StackPanel)((ScrollViewer)modPage.Content).Content).Children.OfType<StackPanel>().Last();
             Button ModToggleButton()

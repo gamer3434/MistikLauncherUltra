@@ -36,6 +36,8 @@ namespace MistikLauncher
         string _currentNav = "Dash";
         bool _isPopulatingVersionBox = false;
         int _backgroundModSync;
+        // ponytail: one per-window gate; share it if multi-window support is added.
+        readonly object _modSyncGate = new();
 
         public MainWindow()
         {
@@ -67,8 +69,7 @@ namespace MistikLauncher
                 var selected = VerBox.SelectedItem?.ToString();
                 if (!string.IsNullOrEmpty(selected))
                 {
-                    Config.Version = selected;
-                    ConfigManager.Save(Config);
+                    SetVersion(selected);
                     StatusLbl.Text = $"{Localization.T("version")}: {selected}";
                     QueueBackgroundModSync();
                     if(_pageCache.TryGetValue("Dash", out var homePage) && homePage is Pages.ModernHomePage home) { home.RefreshLanguage(); home.InvalidateReadiness(); }
@@ -449,6 +450,15 @@ namespace MistikLauncher
             });
         }
 
+        public void SetVersion(string version)
+        {
+            lock (_modSyncGate)
+            {
+                Config.Version = version;
+                ConfigManager.Save(Config);
+            }
+        }
+
         static List<int> GetVersionNumbers(string input)
         {
             var list = new List<int>();
@@ -616,7 +626,7 @@ namespace MistikLauncher
                                 "Surum Bulunamadi", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            Config.Version = ver; ConfigManager.Save(Config);
+            SetVersion(ver);
             
             // Son güvenlik önlemi olarak modları senkronize et
             if(!SyncModsForCurrentVersion()) { MessageBox.Show(Localization.T("modSyncFailed"),"Mistik Launcher",MessageBoxButton.OK,MessageBoxImage.Warning); return; }
@@ -1036,73 +1046,76 @@ namespace MistikLauncher
 
         public bool SyncModsForCurrentVersion(string? requestedVersion=null)
         {
-            try
+            lock (_modSyncGate)
             {
-                var currentVer = requestedVersion ?? Config.Version ?? "";
-                if (string.IsNullOrEmpty(currentVer)) return false;
-
-                // 1. Determine loader type for current version
-                string currentLoader = "vanilla";
-                if (currentVer.Contains("fabric", StringComparison.OrdinalIgnoreCase)) currentLoader = "fabric";
-                else if (currentVer.Contains("neoforge", StringComparison.OrdinalIgnoreCase)) currentLoader = "neoforge";
-                else if (currentVer.Contains("forge", StringComparison.OrdinalIgnoreCase)) currentLoader = "forge";
-
-                // Extract exact MC version (e.g. 1.21.1) from folder name
-                var mcVersion = "1.21.1";
-                var mcMatch = System.Text.RegularExpressions.Regex.Match(currentVer, @"1\.\d+(\.\d+)?");
-                if (mcMatch.Success) mcVersion = mcMatch.Value;
-
-                // Dynamic pool key: e.g. "1.21.1_fabric" or "1.20.1_forge"
-                string currentPoolKey = currentLoader == "vanilla" ? "vanilla" : $"{mcVersion}_{currentLoader}";
-
-                var lastSynced = Config.LastSyncedVersion ?? "";
-
-                // If nothing has changed, do not do anything
-                if (lastSynced == currentVer) return true;
-
-                var modsPoolDir = Path.Combine(App.AppData, "mods_pool");
-                Directory.CreateDirectory(modsPoolDir);
-
-                string lastLoader = lastSynced.Contains("neoforge",StringComparison.OrdinalIgnoreCase)?"neoforge":
-                    lastSynced.Contains("forge",StringComparison.OrdinalIgnoreCase)?"forge":
-                    lastSynced.Contains("fabric",StringComparison.OrdinalIgnoreCase)?"fabric":"vanilla";
-                var lastMcMatch=Regex.Match(lastSynced,@"1\.\d+(\.\d+)?");
-                string lastPoolKey=lastLoader=="vanilla"?"vanilla":$"{(lastMcMatch.Success?lastMcMatch.Value:"1.21.1")}_{lastLoader}";
-                // Never clear leftovers: a locked file or collision must preserve both pools and the active set.
-                ModFiles.SyncPools(App.ModsDir,Path.Combine(modsPoolDir,lastPoolKey),currentLoader=="vanilla"?null:Path.Combine(modsPoolDir,currentPoolKey));
-
-                // Update config
-                if (!string.Equals(Config.Version,currentVer,StringComparison.Ordinal)) return false;
-                Config.LastSyncedVersion = currentVer;
-                ConfigManager.Save(Config);
-
-                // Uyumsuz modları otomatik askıya al
-                SuspendIncompatibleMods(mcVersion, currentLoader);
-
-                // Modları Firebase veritabanına senkronize et
                 try
                 {
-                    if (Directory.Exists(App.ModsDir))
-                    {
-                        var jarFiles = Directory.GetFiles(App.ModsDir, "*.jar")
-                                                .Select(x => Path.GetFileNameWithoutExtension(x) ?? "")
-                                                .Where(x => !string.IsNullOrEmpty(x))
-                                                .ToList();
-                        _ = MistikAnalytics.SyncInstalledModsAsync(Config.User ?? "Oyuncu", jarFiles);
-                    }
-                }
-                catch { }
+                    var currentVer = requestedVersion ?? Config.Version ?? "";
+                    if (string.IsNullOrEmpty(currentVer) || !string.Equals(Config.Version,currentVer,StringComparison.Ordinal)) return false;
 
-                App.Log($"Mods synchronized successfully for version: {currentVer} ({currentLoader})");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                App.Log($"SyncModsForCurrentVersion error: {ex.Message}");
-                // This method can run on a worker thread. Marshal the small UI update
-                // back to WPF's dispatcher instead of freezing/crashing on cross-thread access.
-                Dispatcher.BeginInvoke(new Action(() => StatusLbl.Text=Localization.T("modSyncFailed")));
-                return false;
+                    // 1. Determine loader type for current version
+                    string currentLoader = "vanilla";
+                    if (currentVer.Contains("fabric", StringComparison.OrdinalIgnoreCase)) currentLoader = "fabric";
+                    else if (currentVer.Contains("neoforge", StringComparison.OrdinalIgnoreCase)) currentLoader = "neoforge";
+                    else if (currentVer.Contains("forge", StringComparison.OrdinalIgnoreCase)) currentLoader = "forge";
+
+                    // Extract exact MC version (e.g. 1.21.1) from folder name
+                    var mcVersion = "1.21.1";
+                    var mcMatch = System.Text.RegularExpressions.Regex.Match(currentVer, @"1\.\d+(\.\d+)?");
+                    if (mcMatch.Success) mcVersion = mcMatch.Value;
+
+                    // Dynamic pool key: e.g. "1.21.1_fabric" or "1.20.1_forge"
+                    string currentPoolKey = currentLoader == "vanilla" ? "vanilla" : $"{mcVersion}_{currentLoader}";
+
+                    var lastSynced = Config.LastSyncedVersion ?? "";
+
+                    // If nothing has changed, do not do anything
+                    if (lastSynced == currentVer) return true;
+
+                    var modsPoolDir = Path.Combine(App.AppData, "mods_pool");
+                    Directory.CreateDirectory(modsPoolDir);
+
+                    string lastLoader = lastSynced.Contains("neoforge",StringComparison.OrdinalIgnoreCase)?"neoforge":
+                        lastSynced.Contains("forge",StringComparison.OrdinalIgnoreCase)?"forge":
+                        lastSynced.Contains("fabric",StringComparison.OrdinalIgnoreCase)?"fabric":"vanilla";
+                    var lastMcMatch=Regex.Match(lastSynced,@"1\.\d+(\.\d+)?");
+                    string lastPoolKey=lastLoader=="vanilla"?"vanilla":$"{(lastMcMatch.Success?lastMcMatch.Value:"1.21.1")}_{lastLoader}";
+                    // Never clear leftovers: a locked file or collision must preserve both pools and the active set.
+                    ModFiles.SyncPools(App.ModsDir,Path.Combine(modsPoolDir,lastPoolKey),currentLoader=="vanilla"?null:Path.Combine(modsPoolDir,currentPoolKey));
+
+                    // Update config
+                    if (!string.Equals(Config.Version,currentVer,StringComparison.Ordinal)) return false;
+                    Config.LastSyncedVersion = currentVer;
+                    ConfigManager.Save(Config);
+
+                    // Uyumsuz modları otomatik askıya al
+                    SuspendIncompatibleMods(mcVersion, currentLoader);
+
+                    // Modları Firebase veritabanına senkronize et
+                    try
+                    {
+                        if (Directory.Exists(App.ModsDir))
+                        {
+                            var jarFiles = Directory.GetFiles(App.ModsDir, "*.jar")
+                                                    .Select(x => Path.GetFileNameWithoutExtension(x) ?? "")
+                                                    .Where(x => !string.IsNullOrEmpty(x))
+                                                    .ToList();
+                            _ = MistikAnalytics.SyncInstalledModsAsync(Config.User ?? "Oyuncu", jarFiles);
+                        }
+                    }
+                    catch { }
+
+                    App.Log($"Mods synchronized successfully for version: {currentVer} ({currentLoader})");
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    App.Log($"SyncModsForCurrentVersion error: {ex.Message}");
+                    // This method can run on a worker thread. Marshal the small UI update
+                    // back to WPF's dispatcher instead of freezing/crashing on cross-thread access.
+                    Dispatcher.BeginInvoke(new Action(() => StatusLbl.Text=Localization.T("modSyncFailed")));
+                    return false;
+                }
             }
         }
 
@@ -2369,11 +2382,14 @@ namespace MistikLauncher
         // ── Reload ────────────────────────────────────────────────────────────
         public void ReloadConfig()
         {
-            try { Config = ConfigManager.Load(); } catch { Config ??= new LauncherConfig(); }
+            lock (_modSyncGate)
+            {
+                try { Config = ConfigManager.Load(); } catch { Config ??= new LauncherConfig(); }
+                Config.Version ??= "1.21";
+            }
 
             // Null-safe Config fields
             Config.User       ??= "Oyuncu";
-            Config.Version    ??= "1.21";
             Config.Lang       ??= "Turkce";
             Config.Accent     ??= "Blue";
             Config.SkinType   ??= "default";
