@@ -444,7 +444,9 @@ namespace MistikLauncher
                 {
                     Interlocked.Exchange(ref _backgroundModSync,0);
                     // A selection change while the scan was running must not be lost.
-                    if (!string.Equals(Config.Version,requestedVersion,StringComparison.Ordinal))
+                    string currentVersion;
+                    lock (_modSyncGate) currentVersion = Config.Version ?? "";
+                    if (!string.Equals(currentVersion,requestedVersion,StringComparison.Ordinal))
                         QueueBackgroundModSync();
                 }
             });
