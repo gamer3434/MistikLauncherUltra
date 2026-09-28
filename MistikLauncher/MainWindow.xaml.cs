@@ -94,6 +94,7 @@ namespace MistikLauncher
             var updateTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
             updateTimer.Tick += async (_,_) => await CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate);
             Loaded += async (_,_) => {
+                QueueBackgroundModSync();
                 _ = RestoreAccountSessionAsync();
                 updateTimer.Start();
                 await Task.WhenAll(CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate), AutoMcs.CheckAsync(Config.AutoMcsAutoUpdate && File.Exists(AutoMcs.ExecutablePath)));
@@ -434,7 +435,7 @@ namespace MistikLauncher
 
         void QueueBackgroundModSync()
         {
-            if (string.IsNullOrWhiteSpace(Config.Version) || Interlocked.Exchange(ref _backgroundModSync,1)!=0) return;
+            if (!IsLoaded || string.IsNullOrWhiteSpace(Config.Version) || Interlocked.Exchange(ref _backgroundModSync,1)!=0) return;
             var requestedVersion=Config.Version;
             _ = Task.Run(() => {
                 try { SyncModsForCurrentVersion(requestedVersion); }
@@ -1039,6 +1040,7 @@ namespace MistikLauncher
             {
                 var currentVer = requestedVersion ?? Config.Version ?? "";
                 if (string.IsNullOrEmpty(currentVer)) return false;
+                if (!string.Equals(Config.Version,currentVer,StringComparison.Ordinal)) return false;
 
                 // 1. Determine loader type for current version
                 string currentLoader = "vanilla";
