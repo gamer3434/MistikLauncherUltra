@@ -1,5 +1,5 @@
 {
   "score": 5,
-  "summary": "Live unauthenticated GET requests to the Realtime Database root, activeSessions, and launcherProfiles each returned HTTP 401. Source rules also deny activeSessions reads and writes and keep launcherProfiles owner-only with field-level validation; authenticated owner access was not exercised. Existing activeSessions records were not deleted. Anonymous Authentication remains enabled for compatibility with shipped clients.",
+  "summary": "Live unauthenticated GET requests to the Realtime Database root, activeSessions, and launcherProfiles each returned HTTP 401. Source rules deny activeSessions reads and writes and require a non-anonymous, UID-matching Firebase account for launcherProfiles, with field-level validation; authenticated access was not exercised. Existing activeSessions records were not deleted. Anonymous Authentication remains enabled for compatibility with shipped clients.",
   "findings": []
 }

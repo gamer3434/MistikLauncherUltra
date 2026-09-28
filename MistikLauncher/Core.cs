@@ -212,6 +212,10 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.1.2","2026-09-28","#00D4AA", new[]{
+                "Web sitesinden oluşturulan e-posta hesabıyla launcher'da giriş yapılabilir",
+                "Launcher ayarları isteğe bağlı olarak hesaba yedeklenebilir; Minecraft/Ely.by oturum bilgileri paylaşılmaz"
+            }),
             new("v6.1.1","2026-09-28","#00D4AA", new[]{
                 "Ayarlar güncelleme kartı resmî son sürüm duyurusunu seçili dilde gösterir",
                 "Bozuk sürüm etiketleri güncelleme karşılaştırmasında reddedilir"

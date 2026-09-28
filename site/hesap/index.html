@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d1727">
+  <meta name="description" content="Mistik Launcher hesabına giriş yap veya yeni hesap oluştur.">
+  <link rel="icon" type="image/png" href="/mistik_icon.png">
+  <link rel="stylesheet" href="/assets/site.css">
+  <link rel="stylesheet" href="/assets/account.css">
+  <title>Mistik Launcher — Hesabın</title>
+</head>
+<body data-title-tr="Mistik Launcher — Hesabın" data-title-en="Mistik Launcher — Your account">
+  <a class="skip-link" href="#main-content" data-i18n="skip">İçeriğe geç</a>
+  <header class="shell top account-top">
+    <a class="brand" href="/" aria-label="Mistik Launcher Ultra ana sayfa">
+      <img class="brand-logo" src="/mistik_icon.png" alt="">
+      <span class="brand-name">MISTIK<small>LAUNCHER ULTRA</small></span>
+    </a>
+    <nav class="nav account-nav" aria-label="Ana gezinme">
+      <a href="/ozellikler/" data-i18n="navFeatures">Özellikler</a>
+      <a href="/onizleme/" data-i18n="navPreview">Önizleme</a>
+      <a href="/indir/" data-i18n="navDownload">İndir</a>
+      <a href="/hesap/" aria-current="page" data-i18n="navAccount">Hesap</a>
+      <a href="https://github.com/gamer3434/MistikLauncherUltra" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+    </nav>
+    <div class="header-controls account-header-actions">
+      <button class="language" id="language" type="button" aria-label="Switch language to English">EN</button>
+    </div>
+  </header>
+
+  <main class="shell account-layout" id="main-content" tabindex="-1">
+    <aside class="account-story" aria-labelledby="story-title">
+      <div class="account-mark" aria-hidden="true">
+        <span class="account-mark-sun"></span><span class="account-mark-horizon"></span>
+        <span class="account-mark-cube"><i></i><b></b><em></em></span>
+      </div>
+      <p class="account-kicker" data-i18n="eyebrow">MİSTIK LAUNCHER HESABI</p>
+      <h1 id="story-title" data-i18n="storyTitle">Oyun düzenin<br>seninle gelsin.</h1>
+      <p class="account-story-copy" data-i18n="storyCopy">Hesabını oluştur ya da giriş yap. E-posta adresin Firebase Auth tarafından yönetilir; şifren bu sayfada saklanmaz.</p>
+      <div class="account-story-note"><span aria-hidden="true">✦</span><span data-i18n="storyNote">Tek hesap, kendi oyun düzenin.</span></div>
+    </aside>
+
+    <section class="account-card" aria-labelledby="account-title">
+      <div class="account-card-heading">
+        <p class="account-kicker" data-i18n="formKicker">HESAP ERİŞİMİ</p>
+        <h2 id="account-title" data-i18n="loginTitle">Tekrar hoş geldin.</h2>
+        <p id="account-intro" data-i18n="loginIntro">Hesabına giriş yapmak için e-posta adresini ve şifreni kullan.</p>
+      </div>
+
+      <div id="auth-views">
+        <div class="account-modes" role="group" aria-label="Hesap işlemi">
+          <button class="account-mode is-active" type="button" data-mode="login" aria-pressed="true" data-i18n="loginTab">Giriş yap</button>
+          <button class="account-mode" type="button" data-mode="signup" aria-pressed="false" data-i18n="signupTab">Hesap oluştur</button>
+        </div>
+
+        <form id="auth-form" class="account-form" novalidate>
+          <label for="email" data-i18n="emailLabel">E-posta adresi</label>
+          <input id="email" name="email" type="email" inputmode="email" autocomplete="email" required maxlength="254" data-i18n-placeholder="emailPlaceholder" placeholder="ornek@mail.com">
+
+          <div class="account-password-heading">
+            <label for="password" data-i18n="passwordLabel">Şifre</label>
+            <button id="forgot-password" class="account-text-button" type="button" data-i18n="forgot">Şifremi unuttum</button>
+          </div>
+          <input id="password" name="password" type="password" autocomplete="current-password" required minlength="6" data-i18n-placeholder="passwordPlaceholder" placeholder="En az 6 karakter">
+
+          <div id="confirm-wrap" hidden>
+            <label for="password-confirm" data-i18n="confirmLabel">Şifreyi tekrar gir</label>
+            <input id="password-confirm" name="password-confirm" type="password" autocomplete="new-password" minlength="6" data-i18n-placeholder="confirmPlaceholder" placeholder="Şifreni tekrar yaz">
+          </div>
+
+          <button class="button account-submit" id="auth-submit" type="submit" data-i18n="loginSubmit">Giriş yap</button>
+        </form>
+
+        <form id="reset-form" class="account-form" hidden>
+          <label for="reset-email" data-i18n="resetEmailLabel">Hesabındaki e-posta adresi</label>
+          <input id="reset-email" name="email" type="email" inputmode="email" autocomplete="email" required maxlength="254" data-i18n-placeholder="emailPlaceholder" placeholder="ornek@mail.com">
+          <button class="button account-submit" type="submit" data-i18n="resetSubmit">Sıfırlama bağlantısı gönder</button>
+          <button class="account-back-button" id="reset-back" type="button" data-i18n="resetBack">Girişe dön</button>
+        </form>
+
+        <div id="signed-in" class="signed-in" hidden>
+          <div class="signed-in-mark" aria-hidden="true">✓</div>
+          <p class="signed-in-label" data-i18n="signedInLabel">OTURUM AÇIK</p>
+          <p class="signed-in-copy" data-i18n="signedInCopy">Hesabına giriş yaptın.</p>
+          <p class="signed-in-email" id="signed-in-email"></p>
+          <p class="verification-status" id="verification-status" role="status" aria-live="polite"></p>
+          <div class="verification-actions" id="verification-actions" hidden>
+            <button class="account-text-button" id="resend-verification" type="button" data-i18n="resendVerification">Doğrulama e-postasını yeniden gönder</button>
+            <button class="account-text-button" id="refresh-verification" type="button" data-i18n="refreshVerification">Doğruladım, durumu yenile</button>
+          </div>
+          <button class="account-signout" id="sign-out" type="button" data-i18n="signOut">Çıkış yap</button>
+        </div>
+      </div>
+
+      <p class="account-status" id="account-status" role="status" aria-live="polite"></p>
+      <p class="account-footnote"><span aria-hidden="true">🔒</span><span data-i18n="securityNote">Şifren kaydedilmez. Hesabın güvenli biçimde Firebase Auth ile yönetilir.</span></p>
+    </section>
+  </main>
+  <script type="module" src="/assets/account.js"></script>
+</body>
+</html>
