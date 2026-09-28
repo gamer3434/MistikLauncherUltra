@@ -3,19 +3,8 @@
     ".read": false,
     ".write": false,
     "activeSessions": {
-      "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid",
-        "$sessionId": {
-          ".validate": "newData.hasChildren(['lastSeen'])",
-          "lastSeen": {
-            ".validate": "newData.isNumber()"
-          },
-          "$other": {
-            ".validate": false
-          }
-        }
-      }
+      ".read": false,
+      ".write": false
     },
     "launcherProfiles": {
       "$uid": {
