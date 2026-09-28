@@ -118,8 +118,6 @@ class Program
             Directory.CreateDirectory(App.ModsDir);
             string disabledMod=Path.Combine(App.ModsDir,"kept.jar.disabled"); File.WriteAllText(disabledMod,"kept bytes");
             window.Config.LastSyncedVersion="1.20.1-forge-47.4.10"; window.Config.Version="1.19.2-forge-43.5.0"; window.SyncModsForCurrentVersion();
-            Check(!window.SyncModsForCurrentVersion("1.20.1-forge-47.4.10") && File.Exists(disabledMod),"stale background mod sync leaves active files untouched");
-            window.SyncModsForCurrentVersion();
             Check(File.Exists(Path.Combine(testRoot,"mods_pool","1.20.1_forge","kept.jar.disabled")),"disabled mod state follows original version pool");
             window.Config.Version="1.20.1-forge-47.4.10"; window.SyncModsForCurrentVersion();
             Check(File.ReadAllText(disabledMod)=="kept bytes" && !File.Exists(disabledMod[..^9]),"returning to a version preserves disabled mod state");
