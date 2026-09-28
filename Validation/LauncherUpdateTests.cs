@@ -14,6 +14,7 @@ static class LauncherUpdateTests
         void Check(bool ok,string name) { if(!ok) throw new Exception(name); Console.WriteLine("PASS "+name); checks++; }
         Check(LauncherUpdater.IsNewer("v7.0.0","6.0.0-preview.1") && LauncherUpdater.IsNewer("v6.0.0","6.0.0-preview.1"),"stable upgrade and preview promotion");
         Check(!LauncherUpdater.IsNewer("v5.5.2","6.0.0-preview.1") && !LauncherUpdater.IsNewer("v6.0.0","6.0.0"),"no downgrade or same-version loop");
+        Check(!LauncherUpdater.IsNewer("v7.0.0junk","6.0.0") && !LauncherUpdater.IsNewer("v7.0.0","6.0.0junk") && !LauncherUpdater.IsNewer("v999999999999.0.0","6.0.0"),"malformed release version rejected");
         Check(LauncherUpdater.IsNewer("v6.0.0-preview.9","6.0.0-preview.8") && !LauncherUpdater.IsNewer("v6.0.0-preview.9","6.0.0-preview.9") && !LauncherUpdater.IsNewer("v6.0.0-preview.9","6.0.0"),"published preview comparison avoids repeat updates and stable downgrades");
         string payload=Path.Combine(root,"launcher-payload"); Directory.CreateDirectory(payload);
         var names=new[] {"MistikLauncher.exe","MistikLauncher.dll","MistikUpdater.exe"};
@@ -28,7 +29,7 @@ static class LauncherUpdateTests
             zip=memory.ToArray();
         }
         string metadata=JsonSerializer.Serialize(new {
-            draft=false,prerelease=false,tag_name="v7.0.0",assets=new[] {new {
+            draft=false,prerelease=false,tag_name="v7.0.0",body="# Mistik 7\n## Türkçe\n- **Yeni** sürüm [indir](https://example.com)\n- Hatalar düzeltildi\n## English\n- **New** release [download](https://example.com)\n- Fixed issues",assets=new[] {new {
                 name="MistikLauncher-7.0.0-win-x64.zip",browser_download_url="https://github.com/gamer3434/MistikLauncherUltra/releases/download/v7.0.0/MistikLauncher-7.0.0-win-x64.zip",
                 digest="sha256:"+Convert.ToHexString(SHA256.HashData(zip)),size=zip.Length
             }}
@@ -40,6 +41,8 @@ static class LauncherUpdateTests
         using var client=new HttpClient(new Stub(metadata,zip));
         var service=new LauncherUpdater(()=>true,client,target,"6.0.0-preview.1");
         Check(!await service.CheckAsync(false) && service.StatusKey=="luAvailable" && service.PreparedPayload==null,"launcher check-only avoids download");
+        Check(service.ReleaseNotes("tr").Contains("Yeni sürüm indir") && !service.ReleaseNotes("tr").Contains("Fixed") && !service.ReleaseNotes("tr").Contains("https://"),"Turkish release notes are short plain text");
+        Check(service.ReleaseNotes("en").Contains("New release download") && !service.ReleaseNotes("en").Contains("Hatalar"),"English release notes follow selected language");
         Check(await service.CheckAsync(true) && service.PreparedPayload!=null && UpdateEngine.Verify(service.PreparedPayload).Version=="7.0.0","verified portable update prepared");
         Check(File.ReadAllText(Path.Combine(target,names[0]))=="old "+names[0],"preparation leaves installed files untouched");
         File.WriteAllText(Path.Combine(target,"update-manifest.json"),"{\"Product\":\"MistikLauncher\",\"Version\":\"8.0.0\",\"Files\":[]}");

@@ -18,6 +18,7 @@ public sealed class LauncherUpdater
     readonly string directory;
     public string CurrentVersion { get; }
     public string LatestVersion { get; private set; }="—";
+    string latestReleaseBody="";
     public string StatusKey { get; private set; }="luIdle";
     public string? Error { get; private set; }
     public string? PreparedPayload { get; private set; }
@@ -39,14 +40,31 @@ public sealed class LauncherUpdater
     void Publish(string key,double progress=0) { StatusKey=key; Progress=progress; Changed?.Invoke(); }
     public static bool IsNewer(string offered,string installed)
     {
-        var a=Regex.Match(offered,@"^v?(\d+\.\d+\.\d+)(?:-preview\.(\d+))?$");
-        var b=Regex.Match(installed,@"^v?(\d+\.\d+\.\d+)(?:-preview\.(\d+))?$");
+        var a=Regex.Match(offered,@"^v?(\d+\.\d+\.\d+)(?:-preview\.(\d+))?\z");
+        var b=Regex.Match(installed,@"^v?(\d+\.\d+\.\d+)(?:-preview\.(\d+))?\z");
         if(!a.Success||!b.Success) return false;
-        var latest=Version.Parse(a.Groups[1].Value); var current=Version.Parse(b.Groups[1].Value);
+        if(!Version.TryParse(a.Groups[1].Value,out var latest)||!Version.TryParse(b.Groups[1].Value,out var current)) return false;
         if(latest!=current) return latest>current;
         bool offeredPreview=a.Groups[2].Success, installedPreview=b.Groups[2].Success;
         if(offeredPreview!=installedPreview) return !offeredPreview;
         return offeredPreview && System.Numerics.BigInteger.Parse(a.Groups[2].Value)>System.Numerics.BigInteger.Parse(b.Groups[2].Value);
+    }
+    public string ReleaseNotes(string language)
+    {
+        if(latestReleaseBody.Length==0) return "";
+        var lines=latestReleaseBody.Replace("\r", "").Split('\n');
+        string heading=language=="tr"?"Türkçe":"English";
+        int start=Array.FindIndex(lines,line=>line.Trim().Equals("## "+heading,StringComparison.OrdinalIgnoreCase));
+        var section=start<0?lines.AsEnumerable():lines.Skip(start+1).TakeWhile(line=>!line.TrimStart().StartsWith("## ",StringComparison.Ordinal));
+        return string.Join("\n",section.Where(line=>!line.TrimStart().StartsWith('#')).Select(PlainNote).Where(line=>line.Length>0).Take(3));
+    }
+    static string PlainNote(string line)
+    {
+        line=Regex.Replace(line,@"!\[[^\]]*\]\([^)]*\)","");
+        line=Regex.Replace(line,@"\[([^\]]+)\]\([^)]*\)","$1");
+        line=Regex.Replace(line,@"<[^>]*>","");
+        line=Regex.Replace(line,@"^\s*(?:[-*]|\d+\.)\s*","").Replace("**","").Replace("`","").Trim();
+        return line.Length<=180?line:line[..179]+"…";
     }
     public static LauncherRelease? ParseRelease(string json,string installed)
     {
@@ -73,9 +91,19 @@ public sealed class LauncherUpdater
         {
             Busy=true; Error=null; ResetTransfer(); Publish("luChecking");
             if(PreparedPayload!=null) { Publish("luReady",100); return true; }
+            LatestVersion="—"; latestReleaseBody="";
             using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(20));
             string json=await GitHubReleaseCache.GetAsync(http,Endpoint,Path.Combine(App.AppData,"launcher-release-cache.json"),timeout.Token);
-            using(var doc=JsonDocument.Parse(json)) LatestVersion=doc.RootElement.GetProperty("tag_name").GetString()??"—";
+            using(var doc=JsonDocument.Parse(json))
+            {
+                var root=doc.RootElement;
+                LatestVersion=root.GetProperty("tag_name").GetString()??"—";
+                if(!root.GetProperty("draft").GetBoolean() && !root.GetProperty("prerelease").GetBoolean() && root.TryGetProperty("body",out var body) && body.ValueKind==JsonValueKind.String)
+                {
+                    string notes=body.GetString()??"";
+                    latestReleaseBody=notes.Length>8192?notes[..8192]:notes;
+                }
+            }
             var release=ParseRelease(json,CurrentVersion);
             if(release==null) { Publish("luCurrent"); return false; }
             if(!prepare) { Publish("luAvailable"); return false; }

@@ -173,7 +173,7 @@ public class ModernSettingsPage : Page, ILanguagePage
     TextBox user = null!, ram = null!;
     ComboBox language = null!, provider = null!;
     CheckBox close = null!;
-    TextBlock result = null!, updateStatus = null!;
+    TextBlock result = null!, updateStatus = null!, updateNotes = null!;
     Button updateButton = null!;
     ProgressBar updateProgress = null!;
     public ModernSettingsPage(MainWindow window)
@@ -202,6 +202,7 @@ public class ModernSettingsPage : Page, ILanguagePage
         updateButton=PageHelpers.MkBtn(Localization.T("luCheck"),"#226DA0"); updateButton.HorizontalAlignment=HorizontalAlignment.Left;
         updateButton.Click += async (_,_)=> await main.CheckLauncherUpdatesAsync(true); updateContent.Children.Add(updateButton);
         updateStatus=PageHelpers.Lbl("",13,"#ADBED6",pad:new Thickness(0,10,0,0),wrap:TextWrapping.Wrap); updateContent.Children.Add(updateStatus);
+        updateNotes=PageHelpers.Lbl("",13,"#D7E5F5",pad:new Thickness(0,10,0,0),wrap:TextWrapping.Wrap); updateContent.Children.Add(updateNotes);
         updateProgress=new ProgressBar { Height=8, Maximum=100, Margin=new Thickness(0,12,0,2), Background=ColorThemes.Brush("#263D56"), Foreground=ColorThemes.Brush("#00A3FF"), BorderThickness=new Thickness(0), Visibility=Visibility.Collapsed };
         updateContent.Children.Add(updateProgress);
         updateCard.Child=updateContent; stack.Children.Add(updateCard); UpdateStatus();
@@ -335,6 +336,9 @@ public class ModernSettingsPage : Page, ILanguagePage
             transfer=$"\n{Localization.T("luDownloaded")}: {FormatBytes(main.LauncherUpdates.DownloadedBytes)} / {FormatBytes(main.LauncherUpdates.TotalBytes)} · {Localization.T("luSpeed")}: {speed} · {Localization.T("luRemaining")}: {eta}";
         }
         updateStatus.Text=Localization.T(main.LauncherUpdates.StatusKey)+target+transfer+(main.LauncherUpdates.Busy?$" ({main.LauncherUpdates.Progress:0}%)":"")+(main.LauncherUpdates.Error==null?"":"\n"+main.LauncherUpdates.Error);
+        var notes=main.LauncherUpdates.ReleaseNotes(Localization.Language);
+        updateNotes.Text=notes.Length==0?"":Localization.T("luReleaseNotes")+"\n"+notes;
+        updateNotes.Visibility=notes.Length==0?Visibility.Collapsed:Visibility.Visible;
         updateButton.IsEnabled=!main.LauncherUpdates.Busy;
         updateProgress.Visibility=main.LauncherUpdates.Busy?Visibility.Visible:Visibility.Collapsed;
         updateProgress.IsIndeterminate=main.LauncherUpdates.Busy && main.LauncherUpdates.TotalBytes<=0;
