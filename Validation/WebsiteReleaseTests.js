@@ -54,22 +54,24 @@ test('rejects leading zeroes and numeric components outside JavaScript safe inte
   ]) assert.equal(parseRelease(release({ tag_name: tag })), null, tag);
 });
 
-test('keeps a working v6.1.1 fallback and matching published digests', () => {
+test('keeps a working v6.1.2 fallback and matching published digests', () => {
   const home = readFileSync(require.resolve('../site/index.html'), 'utf8');
   const download = readFileSync(require.resolve('../site/indir/index.html'), 'utf8');
-  assert.match(home, /data-release-version>v6\.1\.1/);
+  const releaseScript = readFileSync(require.resolve('../site/assets/release.js'), 'utf8');
+  assert.match(releaseScript, /fallbackVersion = '6\.1\.2'/);
+  assert.match(home, /data-release-version>v6\.1\.2/);
   for (const [kind, name] of Object.entries({
-    online: 'MistikSetup-Online-6.1.1.exe',
-    offline: 'MistikSetup-Offline-6.1.1.exe',
-    portable: 'MistikLauncher-6.1.1-win-x64.zip'
+    online: 'MistikSetup-Online-6.1.2.exe',
+    offline: 'MistikSetup-Offline-6.1.2.exe',
+    portable: 'MistikLauncher-6.1.2-win-x64.zip'
   })) {
-    assert.match(download, new RegExp(`data-release-asset="${kind}" href="https://github\\.com/${repo}/releases/download/v6\\.1\\.1/${name.replaceAll('.', '\\.')}"`));
+    assert.match(download, new RegExp(`data-release-asset="${kind}" href="https://github\\.com/${repo}/releases/download/v6\\.1\\.2/${name.replaceAll('.', '\\.')}"`));
     const row = new RegExp(`data-release-hash="${kind}">[\\s\\S]*?<code>([a-f0-9]{64})</code>[\\s\\S]*?data-copy-hash="([a-f0-9]{64})"`).exec(download);
     assert.ok(row, `${kind} fallback hash exists`);
     assert.equal(row[1], {
-      online: '03ba2d8f0ce08f4c4362a06101d7ec8a566559409ec3ea5f0f23d4a08ecd5a71',
-      offline: '9bc664e2053e899b4ab317897501e222b80ba5ef7160dc0fb922052b2c831292',
-      portable: '033fae9084eb4248682bcb25c2ae32f1fec029f3a36b97e9cbfbffd5e7f3f51b'
+      online: '88b621f97071035d06c932da9fadf7680de8cdc3d4f7ebc4a00bf22a489d1497',
+      offline: '95307e9228ad82232b15c36a603bd4a4ef3ec856ec13d6fdcb487f3486000f8a',
+      portable: 'e0c82bcc0fe7a956b1d53a8ea969cef9b5344b1f585f00368749dcd7c3c3ed96'
     }[kind]);
     assert.equal(row[1], row[2]);
   }

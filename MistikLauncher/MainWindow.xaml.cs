@@ -1040,7 +1040,6 @@ namespace MistikLauncher
             {
                 var currentVer = requestedVersion ?? Config.Version ?? "";
                 if (string.IsNullOrEmpty(currentVer)) return false;
-                if (!string.Equals(Config.Version,currentVer,StringComparison.Ordinal)) return false;
 
                 // 1. Determine loader type for current version
                 string currentLoader = "vanilla";
