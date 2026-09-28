@@ -3,8 +3,8 @@
     ".read": false,
     ".write": false,
     "activeSessions": {
-      ".read": true,
       "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid",
         "$sessionId": {
           ".validate": "newData.hasChildren(['lastSeen'])",

@@ -35,8 +35,11 @@
 
   function parseRelease(release) {
     if (!release || release.draft !== false || release.prerelease !== false) return null;
-    const match = /^v(\d+)\.(\d+)\.(\d+)$/.exec(release.tag_name || '');
-    if (!match || [1, 2, 3].reduce((order, i) => order || Math.sign(Number(match[i]) - minimumVersion[i - 1]), 0) < 0) return null;
+    const match = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(release.tag_name || '');
+    if (!match || match.slice(1).some(part => part.length > 16)) return null;
+    const components = match.slice(1).map(Number);
+    if (!components.every(Number.isSafeInteger)) return null;
+    if (components.some((part, i) => part < minimumVersion[i] && components.slice(0, i).every((prior, j) => prior === minimumVersion[j]))) return null;
     const version = match.slice(1).join('.');
     const tag = release.tag_name;
     const releaseUrl = `https://github.com/${repo}/releases/tag/${tag}`;

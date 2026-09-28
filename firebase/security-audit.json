@@ -1,5 +1,5 @@
 {
   "score": 5,
-  "summary": "Realtime Database root access is denied. launcherProfiles remains restricted to the authenticated owner UID. activeSessions is intentionally public-read for the live count and contains only anonymous UIDs, random session keys, and server timestamps; writes require auth.uid to match the UID path and each session is limited to a numeric lastSeen field. Previous live tests covered launcherProfiles before activeSessions was added; the new presence rules still require live validation.",
+  "summary": "Realtime Database root access is denied. activeSessions and launcherProfiles are readable and writable only by the authenticated owner at their UID path. Session entries require a numeric lastSeen field and reject additional fields; launcherProfiles keeps its existing field-level validation. Updated rules have not yet had live authorization checks.",
   "findings": []
 }

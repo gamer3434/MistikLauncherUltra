@@ -6,14 +6,15 @@ const test = require('node:test');
 const { parseRelease } = require('../site/assets/release.js');
 
 const repo = 'gamer3434/MistikLauncherUltra';
-const names = {
-  online: 'MistikSetup-Online-6.2.0.exe',
-  offline: 'MistikSetup-Offline-6.2.0.exe',
-  portable: 'MistikLauncher-6.2.0-win-x64.zip'
-};
 
 function release(overrides = {}) {
-  const tag = 'v6.2.0';
+  const tag = overrides.tag_name || 'v6.2.0';
+  const version = tag.slice(1);
+  const names = {
+    online: `MistikSetup-Online-${version}.exe`,
+    offline: `MistikSetup-Offline-${version}.exe`,
+    portable: `MistikLauncher-${version}-win-x64.zip`
+  };
   return {
     tag_name: tag,
     html_url: `https://github.com/${repo}/releases/tag/${tag}`,
@@ -32,6 +33,7 @@ function release(overrides = {}) {
 test('accepts stable official release with exactly the three required assets and hashes', () => {
   const parsed = parseRelease(release());
   assert.equal(parsed.version, '6.2.0');
+  assert.equal(parseRelease(release({ tag_name: 'v6.1.1' })).version, '6.1.1');
   assert.deepEqual(Object.keys(parsed.assets).sort(), ['offline', 'online', 'portable']);
   assert.equal(parsed.assets.online.hash, '1'.repeat(64));
   assert.equal(parsed.notes.tr[0], 'Güvenli <img src=x onerror=alert(1)> güncelleme');
@@ -42,6 +44,14 @@ test('rejects prereleases, unofficial links, and incomplete assets', () => {
   assert.equal(parseRelease(release({ prerelease: true })), null);
   assert.equal(parseRelease(release({ html_url: 'https://example.com/fake' })), null);
   assert.equal(parseRelease(release({ assets: release().assets.slice(1) })), null);
+});
+
+test('rejects leading zeroes and numeric components outside JavaScript safe integers', () => {
+  for (const tag of [
+    'v06.2.0', 'v6.02.0', 'v6.2.00',
+    'v9007199254740992.0.0', 'v6.9007199254740992.0', 'v6.2.9007199254740992',
+    'v99999999999999999.0.0'
+  ]) assert.equal(parseRelease(release({ tag_name: tag })), null, tag);
 });
 
 test('keeps a working v6.1.1 fallback and matching published digests', () => {
