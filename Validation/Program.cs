@@ -181,12 +181,14 @@ class Program
             var bar=(System.Windows.Controls.WrapPanel)window.FindName("QuickBarPanel");
             Check(bar.Children.Count==8,"top bar exposes eight bilingual shortcuts by default");
             window.Config.QuickLinks=new(){"Dash","Settings"}; ConfigManager.Save(window.Config); window.BuildQuickBar();
-            Check(bar.Children.Count==4 && ConfigManager.Load().QuickLinks.SequenceEqual(new[]{"Dash","Settings"}),"shortcut customization persists alongside fixed account and optimization shortcuts");
+            Check(bar.Children.Count==4 && ConfigManager.Load().QuickLinks.SequenceEqual(new[]{"Dash","Settings"}),"shortcut customization persists alongside fixed updates and optimization shortcuts");
             ((Button)bar.Children[2]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Flush(window);
             Check(((Frame)window.FindName("MainFrame")).Content is MistikLauncher.Pages.ModernSettingsPage,"top shortcut navigates to requested page");
             window.Config.QuickLinks.Clear(); window.BuildQuickBar();
-            Check(((Border)window.FindName("QuickBarHost")).Visibility==Visibility.Visible && bar.Children.Count==2,"account and optimization remain reachable with no optional shortcuts");
+            Check(((Border)window.FindName("QuickBarHost")).Visibility==Visibility.Visible && bar.Children.Count==2,"updates and optimization remain reachable with no optional shortcuts");
+            ((Button)bar.Children[0]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
+            Check(((Frame)window.FindName("MainFrame")).Content is MistikLauncher.Pages.ModernSettingsPage,"fixed updates shortcut opens its page");
             ((Button)bar.Children[1]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
             Check(((Frame)window.FindName("MainFrame")).Content is MistikLauncher.Pages.OptimizationPage,"optimization shortcut opens its page");
             window.Config.QuickLinks=new(){"Dash","Vers","Mods","Skin","Server","Settings"}; ConfigManager.Save(window.Config); window.BuildQuickBar();
