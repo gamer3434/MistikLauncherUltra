@@ -246,7 +246,7 @@ public sealed class AccountPage : Page, ILanguagePage
         "NETWORK" => "Could not reach Firebase. Check your connection and try again.",
         "AUTH_REQUIRED" => "Sign in to your account first.",
         "PERMISSION_DENIED" => "Firebase denied access to this account profile.",
-        "LOCAL_STORAGE" => "Could not securely remove the saved sign-in. Try again.",
+        "LOCAL_STORAGE" => "Signed out here, but the saved sign-in could not be removed. Close the app and remove account.refresh.dpapi from %APPDATA%\\.mistik_ultra before reopening.",
         _ => "Account request failed. Try again."
     } : code switch
     {
@@ -260,7 +260,7 @@ public sealed class AccountPage : Page, ILanguagePage
         "NETWORK" => "Firebase'e ulaşılamadı. Bağlantını denetleyip tekrar dene.",
         "AUTH_REQUIRED" => "Önce hesabına giriş yap.",
         "PERMISSION_DENIED" => "Firebase bu hesap profiline erişimi reddetti.",
-        "LOCAL_STORAGE" => "Kaydedilen oturum güvenli şekilde silinemedi. Tekrar dene.",
+        "LOCAL_STORAGE" => "Bu oturum kapatıldı ancak kayıtlı giriş silinemedi. Yeniden açmadan önce %APPDATA%\\.mistik_ultra içindeki account.refresh.dpapi dosyasını sil.",
         _ => "Hesap işlemi tamamlanamadı. Tekrar dene."
     };
 }

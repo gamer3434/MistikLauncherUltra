@@ -44,9 +44,13 @@ public sealed class FirebaseAccountAuth
                 Required(response, "idToken"),
                 Required(response, "refreshToken"),
                 Expiry(response.Value<string>("expiresIn")));
+            if (method == "signUp")
+            {
+                await SendEmailVerificationAsync(session.IdToken, session.Email);
+                throw new FirebaseAccountAuthException("EMAIL_NOT_VERIFIED");
+            }
             if (!await IsEmailVerifiedAsync(session.IdToken))
             {
-                if (method == "signUp") await SendEmailVerificationAsync(session.IdToken, session.Email);
                 throw new FirebaseAccountAuthException("EMAIL_NOT_VERIFIED");
             }
             SetSession(session);
@@ -264,10 +268,10 @@ public sealed class FirebaseAccountAuth
 
     void ClearLocalSession()
     {
-        try { if (File.Exists(RefreshTokenPath)) File.Delete(RefreshTokenPath); }
-        catch { throw new FirebaseAccountAuthException("LOCAL_STORAGE"); }
         _session = null;
         _refreshToken = null;
+        try { File.Delete(RefreshTokenPath); }
+        catch { throw new FirebaseAccountAuthException("LOCAL_STORAGE"); }
     }
 
     sealed record AuthSession(string Uid, string Email, string IdToken, string RefreshToken, DateTimeOffset ExpiresAt);
