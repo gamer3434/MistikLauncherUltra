@@ -212,6 +212,10 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.1.3","2026-09-29","#00D4AA", new[]{
+                "Launcher girişi ve ayar yedeği için e-posta doğrulaması gerekir",
+                "Kayıt sırasında doğrulama bağlantısı gönderilir; doğrulanmamış oturumlar yedeklemeye erişemez"
+            }),
             new("v6.1.2","2026-09-28","#00D4AA", new[]{
                 "Web sitesinden oluşturulan e-posta hesabıyla launcher'da giriş yapılabilir",
                 "Launcher ayarları isteğe bağlı olarak hesaba yedeklenebilir; Minecraft/Ely.by oturum bilgileri paylaşılmaz"
