@@ -5,6 +5,10 @@
   "hosting": {
     "public": "site",
     "site": "mistiklauncherultra",
+    "redirects": [
+      { "source": "/hesap", "destination": "/", "type": 301 },
+      { "source": "/hesap/**", "destination": "/", "type": 301 }
+    ],
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -16,8 +20,12 @@
         "source": "**",
         "headers": [
           {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          },
+          {
             "key": "Content-Security-Policy",
-            "value": "default-src 'self'; script-src 'self' https://www.gstatic.com; style-src 'self'; img-src 'self'; connect-src 'self' https://api.github.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.googleapis.com https://firebaseinstallations.googleapis.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+            "value": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
           },
           {
             "key": "X-Content-Type-Options",
@@ -34,11 +42,5 @@
         ]
       }
     ]
-  },
-  "auth": {
-    "providers": {
-      "emailPassword": true,
-      "anonymous": true
-    }
   }
 }

@@ -5,17 +5,17 @@
   const minimumVersion = [6, 1, 3];
   const fallbackVersion = '6.1.3';
   const fallbackNotes = {
-    tr: [
-      'Launcher girişinden önce e-posta doğrulama bağlantısını aç.',
-      'Doğrulanmamış hesaplar launcher ayar yedeğine erişemez.',
-      'Yedek yalnızca temel launcher ayarlarını içerir; oyun bilgileri ve parolalar gönderilmez.'
-    ],
-    en: [
-      'Open the email verification link before signing in to the launcher.',
-      'Unverified accounts cannot access launcher settings backup.',
-      'Backup includes only basic launcher settings; game credentials and passwords stay private.'
-    ]
-  };
+  "tr": [
+    "Web sitesi ve launcher hesap ekranları kaldırıldı.",
+    "Oyuncu profilleri ve launcher ayarları cihazında saklanır.",
+    "Güncellemeler menüsünden kurulu sürümünü ve sürüm duyurularını görüntüle."
+  ],
+  "en": [
+    "Website and launcher account screens were removed.",
+    "Player profiles and launcher settings stay on your device.",
+    "View your installed version and release announcements in Updates."
+  ]
+};
 
   function releaseNotes(body, language) {
     const heading = language === 'tr' ? 'Türkçe' : 'English';

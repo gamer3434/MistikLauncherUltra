@@ -170,15 +170,17 @@ public class ModernHomePage : Page, ILanguagePage
 public class ModernSettingsPage : Page, ILanguagePage
 {
     readonly MainWindow main;
+    readonly bool updatesOnly;
     TextBox user = null!, ram = null!;
     ComboBox language = null!, provider = null!;
     CheckBox close = null!;
     TextBlock result = null!, updateStatus = null!, updateNotes = null!;
     Button updateButton = null!;
     ProgressBar updateProgress = null!;
-    public ModernSettingsPage(MainWindow window)
+    public ModernSettingsPage(MainWindow window, bool updatesOnly=false)
     {
         main=window;
+        this.updatesOnly=updatesOnly;
         Loaded += (_,_) => main.LauncherUpdates.Changed += UpdateStatusAsync;
         Unloaded += (_,_) => main.LauncherUpdates.Changed -= UpdateStatusAsync;
         Render();
@@ -191,8 +193,8 @@ public class ModernSettingsPage : Page, ILanguagePage
         var draftProvider=provider?.SelectedIndex??(main.Config.AuthType=="elyby"?1:0);
         var draftClose=close?.IsChecked??main.Config.AutoClose;
         var stack = new StackPanel { Margin = new Thickness(32), MaxWidth=1040 };
-        stack.Children.Add(PageHelpers.Lbl(Localization.T("settings"),28,"#FFFFFF",true));
-        stack.Children.Add(PageHelpers.Lbl(Localization.T("settingsIntro"),15,"#BDCAD8",pad:new Thickness(0,8,0,18),wrap:TextWrapping.Wrap));
+        stack.Children.Add(PageHelpers.Lbl(updatesOnly?(Localization.Language=="en"?"Updates":"Güncellemeler"):Localization.T("settings"),28,"#FFFFFF",true));
+        if(!updatesOnly) stack.Children.Add(PageHelpers.Lbl(Localization.T("settingsIntro"),15,"#BDCAD8",pad:new Thickness(0,8,0,18),wrap:TextWrapping.Wrap));
         var updateCard=new Border { Background=PageHelpers.HexBrush("#192C46"), CornerRadius=new CornerRadius(14), Padding=new Thickness(20), Margin=new Thickness(0,0,0,12) };
         var updateContent=new StackPanel();
         updateContent.Children.Add(PageHelpers.Lbl(Localization.T("luTitle")+" · "+main.LauncherUpdates.CurrentVersion,18,"#EFF5FF",true));
@@ -206,6 +208,7 @@ public class ModernSettingsPage : Page, ILanguagePage
         updateProgress=new ProgressBar { Height=8, Maximum=100, Margin=new Thickness(0,12,0,2), Background=ColorThemes.Brush("#263D56"), Foreground=ColorThemes.Brush("#00A3FF"), BorderThickness=new Thickness(0), Visibility=Visibility.Collapsed };
         updateContent.Children.Add(updateProgress);
         updateCard.Child=updateContent; stack.Children.Add(updateCard); UpdateStatus();
+        if(updatesOnly) { Content=new ScrollViewer { Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto }; return; }
         void Label(string key) => stack.Children.Add(PageHelpers.Lbl(Localization.T(key),15,"#FFFFFF",true,pad:new Thickness(0,16,0,6)));
         var themeCard=new Border { Background=PageHelpers.HexBrush("#192C46"), Padding=new Thickness(20), CornerRadius=new CornerRadius(14) };
         var themeContent=new StackPanel();

@@ -22,7 +22,6 @@ namespace MistikLauncher
     public partial class MainWindow : Window
     {
         public LauncherConfig Config;
-        public FirebaseAccountAuth AccountAuth { get; } = new();
         public AutoMcsUpdater AutoMcs { get; } = new();
         public LauncherUpdater LauncherUpdates { get; }
         public MistikRelay?   Relay;
@@ -96,7 +95,6 @@ namespace MistikLauncher
             updateTimer.Tick += async (_,_) => await CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate);
             Loaded += async (_,_) => {
                 QueueBackgroundModSync();
-                _ = RestoreAccountSessionAsync();
                 updateTimer.Start();
                 await Task.WhenAll(CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate), AutoMcs.CheckAsync(Config.AutoMcsAutoUpdate && File.Exists(AutoMcs.ExecutablePath)));
             };
@@ -127,12 +125,6 @@ namespace MistikLauncher
                     System.Windows.Application.Current.Shutdown();
             }
             catch(Exception ex) { App.Log("Update handoff: " + ex.Message); MessageBox.Show(Localization.T("luError")+"\n"+ex.Message,"Mistik Launcher"); }
-        }
-
-        async Task RestoreAccountSessionAsync()
-        {
-            try { await AccountAuth.RestoreSessionAsync(); }
-            catch (Exception ex) { App.Log("Firebase account session restore failed: " + ex.GetType().Name); }
         }
 
         public async Task<GameRuntimeHealthResult> VerifyAndRepairGameAsync(string version, Action<string>? status = null)
@@ -267,14 +259,15 @@ namespace MistikLauncher
         public void BuildQuickBar()
         {
             QuickBarPanel.Children.Clear(); quickButtons.Clear();
-            foreach(var item in new[]{("Dash","home","\uE80F"),("Vers","versions","\uE7FC"),("Mods","mods","\uE74C"),("Skin","skin","\uE77B"),("Server","server","\uE968"),("Account","account","\uE77B"),("Settings","settings","\uE713"),("Opt","optimization","\uE9D9")})
+            foreach(var item in new[]{("Dash","home","\uE80F"),("Vers","versions","\uE7FC"),("Mods","mods","\uE74C"),("Skin","skin","\uE77B"),("Server","server","\uE968"),("Updates","updates","\uE777"),("Settings","settings","\uE713"),("Opt","optimization","\uE9D9")})
             {
-                if(item.Item1!="Opt" && item.Item1!="Account" && !Config.QuickLinks.Contains(item.Item1)) continue;
+                if(item.Item1!="Opt" && item.Item1!="Updates" && !Config.QuickLinks.Contains(item.Item1)) continue;
+                var label=item.Item1 switch { "Updates" => Localization.Language=="en"?"Updates":"Güncellemeler", _ => Localization.T(item.Item2) };
                 var content=new StackPanel { Orientation=Orientation.Horizontal };
                 content.Children.Add(new TextBlock { Text=item.Item3,FontFamily=new FontFamily("Segoe MDL2 Assets"),FontSize=16,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,8,0) });
-                content.Children.Add(new TextBlock { Text=item.Item1=="Account"?(Localization.Language=="en"?"Account":"Hesap"):Localization.T(item.Item2),VerticalAlignment=VerticalAlignment.Center });
+                content.Children.Add(new TextBlock { Text=label,VerticalAlignment=VerticalAlignment.Center });
                 var button=new Button { Content=content,Style=(Style)FindResource("NavBtn"),Height=44,Padding=new Thickness(12,0,12,0),MinWidth=100 };
-                System.Windows.Automation.AutomationProperties.SetName(button,item.Item1=="Account"?(Localization.Language=="en"?"Account":"Hesap"):Localization.T(item.Item2));
+                System.Windows.Automation.AutomationProperties.SetName(button,label);
                 button.Click+=(_,_)=>Navigate(item.Item1); quickButtons[item.Item1]=button; QuickBarPanel.Children.Add(button);
             }
             QuickBarHost.Visibility=quickButtons.Count==0?Visibility.Collapsed:Visibility.Visible;
@@ -315,7 +308,7 @@ namespace MistikLauncher
                     "Changelog" => new Pages.ChangelogPage(this),
                     "Opt"       => new Pages.OptimizationPage(this),
                     "Guide"     => new Pages.GuidePage(this),
-                    "Account"   => new Pages.AccountPage(this),
+                    "Updates"   => new Pages.ModernSettingsPage(this, updatesOnly:true),
                     "Settings"  => new Pages.ModernSettingsPage(this),
                     "Licenses"  => new Pages.LicensesPage(this),
                     _           => new Pages.ModernHomePage(this)

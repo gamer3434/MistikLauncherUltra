@@ -212,6 +212,10 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.1.5","2026-09-29","#00D4AA", new[]{
+                "Mistik Launcher hesabı ve bulut ayar yedeği kaldırıldı; tercihler cihazda yönetilir",
+                "Üst menüye Güncellemeler sayfası eklendi; sürüm denetimi ve otomatik güncelleme ayarı burada da kullanılabilir"
+            }),
             new("v6.1.4","2026-09-29","#00D4AA", new[]{
                 "Kayıtta doğrulama e-postası hesap sorgusundan bağımsız gönderilir",
                 "Oturumu kapatınca yerel kayıt silinemese bile etkin oturum hemen kapanır"
