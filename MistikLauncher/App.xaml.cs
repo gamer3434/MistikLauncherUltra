@@ -5,6 +5,12 @@ public partial class Application : System.Windows.Application
 {
     protected override void OnStartup(StartupEventArgs e)
     {
+        foreach (var name in new[] { "account.refresh.dpapi", "account.refresh.dpapi.tmp" })
+        {
+            try { File.Delete(Path.Combine(App.AppData, name)); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            { App.Log("Obsolete launcher credential cleanup failed: " + ex.GetType().Name); }
+        }
         Localization.SetLanguage(ConfigManager.Load().Lang);
         DispatcherUnhandledException += (_, args) =>
         {
