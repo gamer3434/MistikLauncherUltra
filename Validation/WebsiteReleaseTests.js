@@ -33,7 +33,7 @@ function release(overrides = {}) {
 test('accepts stable official release with exactly the three required assets and hashes', () => {
   const parsed = parseRelease(release());
   assert.equal(parsed.version, '6.2.0');
-  assert.equal(parseRelease(release({ tag_name: 'v6.1.1' })).version, '6.1.1');
+  assert.equal(parseRelease(release({ tag_name: 'v6.1.3' })).version, '6.1.3');
   assert.deepEqual(Object.keys(parsed.assets).sort(), ['offline', 'online', 'portable']);
   assert.equal(parsed.assets.online.hash, '1'.repeat(64));
   assert.equal(parsed.notes.tr[0], 'Güvenli <img src=x onerror=alert(1)> güncelleme');
@@ -44,6 +44,7 @@ test('rejects prereleases, unofficial links, and incomplete assets', () => {
   assert.equal(parseRelease(release({ prerelease: true })), null);
   assert.equal(parseRelease(release({ html_url: 'https://example.com/fake' })), null);
   assert.equal(parseRelease(release({ assets: release().assets.slice(1) })), null);
+  assert.equal(parseRelease(release({ tag_name: 'v6.1.2' })), null);
 });
 
 test('rejects leading zeroes and numeric components outside JavaScript safe integers', () => {
@@ -54,24 +55,24 @@ test('rejects leading zeroes and numeric components outside JavaScript safe inte
   ]) assert.equal(parseRelease(release({ tag_name: tag })), null, tag);
 });
 
-test('keeps a working v6.1.2 fallback and matching published digests', () => {
+test('keeps a working v6.1.3 fallback and matching published digests', () => {
   const home = readFileSync(require.resolve('../site/index.html'), 'utf8');
   const download = readFileSync(require.resolve('../site/indir/index.html'), 'utf8');
   const releaseScript = readFileSync(require.resolve('../site/assets/release.js'), 'utf8');
-  assert.match(releaseScript, /fallbackVersion = '6\.1\.2'/);
-  assert.match(home, /data-release-version>v6\.1\.2/);
+  assert.match(releaseScript, /fallbackVersion = '6\.1\.3'/);
+  assert.match(home, /data-release-version>v6\.1\.3/);
   for (const [kind, name] of Object.entries({
-    online: 'MistikSetup-Online-6.1.2.exe',
-    offline: 'MistikSetup-Offline-6.1.2.exe',
-    portable: 'MistikLauncher-6.1.2-win-x64.zip'
+    online: 'MistikSetup-Online-6.1.3.exe',
+    offline: 'MistikSetup-Offline-6.1.3.exe',
+    portable: 'MistikLauncher-6.1.3-win-x64.zip'
   })) {
-    assert.match(download, new RegExp(`data-release-asset="${kind}" href="https://github\\.com/${repo}/releases/download/v6\\.1\\.2/${name.replaceAll('.', '\\.')}"`));
+    assert.match(download, new RegExp(`data-release-asset="${kind}" href="https://github\\.com/${repo}/releases/download/v6\\.1\\.3/${name.replaceAll('.', '\\.')}"`));
     const row = new RegExp(`data-release-hash="${kind}">[\\s\\S]*?<code>([a-f0-9]{64})</code>[\\s\\S]*?data-copy-hash="([a-f0-9]{64})"`).exec(download);
     assert.ok(row, `${kind} fallback hash exists`);
     assert.equal(row[1], {
-      online: '88b621f97071035d06c932da9fadf7680de8cdc3d4f7ebc4a00bf22a489d1497',
-      offline: '95307e9228ad82232b15c36a603bd4a4ef3ec856ec13d6fdcb487f3486000f8a',
-      portable: 'e0c82bcc0fe7a956b1d53a8ea969cef9b5344b1f585f00368749dcd7c3c3ed96'
+      online: '16cd85ff1a54caf67d8d600970a0f8636d6d3c85fb8831babac2b345c69b6e7b',
+      offline: '09f848ecade8757b83e51e8c45ae6267b5404f3e6766c07f456a3c7de1386aef',
+      portable: '70cfe05b989da3ae25fdb32a74af3620225f86ff4b3152c96da7ca2db6f218b2'
     }[kind]);
     assert.equal(row[1], row[2]);
   }

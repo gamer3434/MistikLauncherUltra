@@ -2,7 +2,7 @@
   'use strict';
 
   const repo = 'gamer3434/MistikLauncherUltra';
-  const minimumVersion = [6, 1, 0];
+  const minimumVersion = [6, 1, 3];
   const fallbackVersion = '6.1.3';
   const fallbackNotes = {
     tr: [

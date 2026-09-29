@@ -66,7 +66,9 @@ const words = {
   }
 };
 
-let language = document.documentElement.lang === 'en' ? 'en' : 'tr';
+let language;
+try { language = localStorage.getItem('mistik-language') === 'en' ? 'en' : 'tr'; }
+catch { language = 'tr'; }
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 auth.languageCode = language;
@@ -167,10 +169,11 @@ function firebaseMessage(error) {
 document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode)));
 languageButton.addEventListener('click', () => {
   language = language === 'tr' ? 'en' : 'tr';
+  try { localStorage.setItem('mistik-language', language); } catch { }
   auth.languageCode = language;
   translatePage();
 });
-document.getElementById('forgot-password').addEventListener('click', showReset);
+document.getElementById('forgot-password').addEventListener('click', () => showReset());
 document.getElementById('reset-back').addEventListener('click', () => {
   showingReset = false;
   resetForm.hidden = true;
