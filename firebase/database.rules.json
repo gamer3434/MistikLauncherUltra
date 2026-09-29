@@ -8,8 +8,8 @@
     },
     "launcherProfiles": {
       "$uid": {
-        ".read": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous'",
-        ".write": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous'",
+        ".read": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous' && auth.token.email_verified === true",
+        ".write": "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous' && auth.token.email_verified === true",
         ".validate": "newData.hasChildren(['schema','user','ram','lang'])",
         "schema": {
           ".validate": "newData.val() === 1"

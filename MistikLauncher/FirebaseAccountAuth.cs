@@ -38,12 +38,18 @@ public sealed class FirebaseAccountAuth
         {
             var body = new JObject { ["email"] = email.Trim(), ["password"] = password, ["returnSecureToken"] = true };
             JObject response = await PostJsonAsync(AuthUrl + "accounts:" + method + "?key=" + ApiKey, body);
-            SetSession(new AuthSession(
+            var session = new AuthSession(
                 Required(response, "localId"),
                 response.Value<string>("email") ?? email.Trim(),
                 Required(response, "idToken"),
                 Required(response, "refreshToken"),
-                Expiry(response.Value<string>("expiresIn"))));
+                Expiry(response.Value<string>("expiresIn")));
+            if (!await IsEmailVerifiedAsync(session.IdToken))
+            {
+                if (method == "signUp") await SendEmailVerificationAsync(session.IdToken, session.Email);
+                throw new FirebaseAccountAuthException("EMAIL_NOT_VERIFIED");
+            }
+            SetSession(session);
         }
         finally { _gate.Release(); }
     }
@@ -58,7 +64,13 @@ public sealed class FirebaseAccountAuth
             if (string.IsNullOrWhiteSpace(token)) return false;
             try
             {
-                _session = await RefreshAsync(token, "");
+                var restored = await RefreshAsync(token, "");
+                if (!await IsEmailVerifiedAsync(restored.IdToken))
+                {
+                    ClearLocalSession();
+                    throw new FirebaseAccountAuthException("EMAIL_NOT_VERIFIED");
+                }
+                _session = restored;
                 _refreshToken = _session.RefreshToken;
                 PersistRefreshToken(_refreshToken);
                 return true;
@@ -152,6 +164,18 @@ public sealed class FirebaseAccountAuth
             return (response["users"] as JArray)?.FirstOrDefault()?.Value<string>("email");
         }
         catch (FirebaseAccountAuthException) { return null; }
+    }
+
+    static async Task<bool> IsEmailVerifiedAsync(string idToken)
+    {
+        JObject response = await PostJsonAsync(AuthUrl + "accounts:lookup?key=" + ApiKey, new JObject { ["idToken"] = idToken });
+        return (response["users"] as JArray)?.FirstOrDefault()?.Value<bool?>("emailVerified") == true;
+    }
+
+    static async Task SendEmailVerificationAsync(string idToken, string email)
+    {
+        await PostJsonAsync(AuthUrl + "accounts:sendOobCode?key=" + ApiKey,
+            new JObject { ["requestType"] = "VERIFY_EMAIL", ["idToken"] = idToken, ["email"] = email });
     }
 
     static async Task<JObject> PostJsonAsync(string url, JObject body)
