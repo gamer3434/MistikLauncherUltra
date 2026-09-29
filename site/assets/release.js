@@ -2,8 +2,8 @@
   'use strict';
 
   const repo = 'gamer3434/MistikLauncherUltra';
-  const minimumVersion = [6, 1, 3];
-  const fallbackVersion = '6.1.3';
+  const minimumVersion = [6, 1, 5];
+  const fallbackVersion = '6.1.5';
   const fallbackNotes = {
   "tr": [
     "Web sitesi ve launcher hesap ekranları kaldırıldı.",
@@ -125,6 +125,6 @@
   }).then(release => {
     current = parseRelease(release);
     if (current) render();
-  }).catch(() => { /* The verified 6.1.3 fallback remains usable offline. */ })
+  }).catch(() => { /* The verified 6.1.5 fallback remains usable offline. */ })
     .finally(() => clearTimeout(timeout));
 }());
