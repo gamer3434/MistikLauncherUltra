@@ -3,17 +3,17 @@
 
   const repo = 'gamer3434/MistikLauncherUltra';
   const minimumVersion = [6, 1, 0];
-  const fallbackVersion = '6.1.2';
+  const fallbackVersion = '6.1.3';
   const fallbackNotes = {
     tr: [
-      'Web sitesinde Mıstık Launcher hesabı oluştur, giriş yap ve e-posta adresini doğrula.',
-      'Aynı hesapla masaüstü launcher’ın Hesap bölümünden de giriş yap.',
-      'İsteğe bağlı yedek yalnızca temel launcher ayarlarını içerir; oyun bilgileri ve parolalar gönderilmez.'
+      'Launcher girişinden önce e-posta doğrulama bağlantısını aç.',
+      'Doğrulanmamış hesaplar launcher ayar yedeğine erişemez.',
+      'Yedek yalnızca temel launcher ayarlarını içerir; oyun bilgileri ve parolalar gönderilmez.'
     ],
     en: [
-      'Create a Mistik Launcher account on the website, sign in, and verify your email.',
-      'Use the same account on the desktop launcher’s Account page.',
-      'Optional backup includes only basic launcher settings; game credentials and passwords stay private.'
+      'Open the email verification link before signing in to the launcher.',
+      'Unverified accounts cannot access launcher settings backup.',
+      'Backup includes only basic launcher settings; game credentials and passwords stay private.'
     ]
   };
 
@@ -125,6 +125,6 @@
   }).then(release => {
     current = parseRelease(release);
     if (current) render();
-  }).catch(() => { /* The verified 6.1.2 fallback remains usable offline. */ })
+  }).catch(() => { /* The verified 6.1.3 fallback remains usable offline. */ })
     .finally(() => clearTimeout(timeout));
 }());
