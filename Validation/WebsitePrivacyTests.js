@@ -7,15 +7,16 @@ const test = require('node:test');
 
 const read = path => readFileSync(require.resolve(path), 'utf8');
 
-test('active sessions are closed and launcher profiles reject anonymous owners', () => {
+test('active sessions are closed and launcher profiles require verified account owners', () => {
   const { rules } = JSON.parse(read('../firebase/database.rules.json'));
   assert.equal(rules['.read'], false);
   assert.equal(rules['.write'], false);
   assert.equal(rules.activeSessions['.read'], false);
   assert.equal(rules.activeSessions['.write'], false);
   assert.equal(rules.activeSessions.$uid, undefined);
-  assert.equal(rules.launcherProfiles.$uid['.read'], "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous'");
-  assert.equal(rules.launcherProfiles.$uid['.write'], "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous'");
+  const verifiedOwner = "auth != null && auth.uid === $uid && auth.token.firebase.sign_in_provider !== 'anonymous' && auth.token.email_verified === true";
+  assert.equal(rules.launcherProfiles.$uid['.read'], verifiedOwner);
+  assert.equal(rules.launcherProfiles.$uid['.write'], verifiedOwner);
   const firebase = JSON.parse(read('../firebase.json'));
   assert.equal(firebase.database.rules, 'firebase/database.rules.json');
   assert.equal(firebase.auth.providers.emailPassword, true);
