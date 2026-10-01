@@ -19,6 +19,7 @@ namespace MistikLauncher.Pages
         StackPanel _listPanel = null!;
         string _filter = "Hepsi";
         int _visibleVersions = 40;
+        string? _renderedVersion;
 
         static JArray? _mojangVersions = null;
         static bool _isLoadingVersions = false;
@@ -53,7 +54,16 @@ namespace MistikLauncher.Pages
                 var fv = f;
                 var b = PageHelpers.MkBtn(f, fv == _filter ? "#00A3FF" : "#333333");
                 b.Margin = new Thickness(0, 0, 8, 0);
-                b.Click += (_, _) => { _filter = fv; _visibleVersions=40; RenderList(); };
+                b.Click += (_, _) => {
+                    _filter = fv; _visibleVersions=40;
+                    foreach(var filter in fRow.Children.OfType<Button>())
+                    {
+                        bool selected=ReferenceEquals(filter,b);
+                        filter.Background=PageHelpers.HexBrush(selected?"#00A3FF":"#333333");
+                        filter.Foreground=selected?ColorThemes.ActionText:Brushes.White;
+                    }
+                    RenderList();
+                };
                 fRow.Children.Add(b);
             }
             sp.Children.Add(fRow);
@@ -62,6 +72,7 @@ namespace MistikLauncher.Pages
             sp.Children.Add(_listPanel);
             Content = new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             RenderList();
+            Loaded+=(_,_)=>RefreshSelection();
 
             // Background load the full list of Mojang releases and snapshots asynchronously
             _ = LoadMojangVersionsAsync();
@@ -306,7 +317,7 @@ namespace MistikLauncher.Pages
                         selBtn.Click += (_, _) => {
                             _main.SetVersion(installedFolder);
                             _main.PopulateVersionBox();
-                            RenderList();
+                            RefreshSelection();
                             MessageBox.Show(Localization.Language=="en"?$"{vid} selected.":$"{vid} seçildi.", Localization.T("Basarili"), MessageBoxButton.OK, MessageBoxImage.Information);
                         };
                     }
@@ -357,6 +368,12 @@ namespace MistikLauncher.Pages
                 more.Click+=(_,_)=> { _visibleVersions+=40; RenderList(); Localization.TranslateTree(this); };
                 _listPanel.Children.Add(more);
             }
+            _renderedVersion=_main.Config.Version;
+        }
+
+        public void RefreshSelection()
+        {
+            if(!string.Equals(_renderedVersion,_main.Config.Version,StringComparison.Ordinal)) RenderList();
         }
 
         // Pure C# HTTP download - no Python

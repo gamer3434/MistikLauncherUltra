@@ -212,6 +212,12 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.1.7","2026-10-01","#00D4AA", new[]{
+                "Sürümler sayfasında seçili filtre vurgusu filtre değişince doğru düğmeyi gösterir",
+                "Oyun profili başka menüden değişince sürüm kartları son seçimi gösterir",
+                "Arkadaşlar sayfası tünel durumunu yeniden açıldığında korur; eski bildirimler mevcut düğmeleri değiştirmez",
+                "Güncelleme paket doğrulaması arka planda çalışır; kurulum öncesi boşta olma durumu yeniden denetlenir"
+            }),
             new("v6.1.6","2026-10-01","#00D4AA", new[]{
                 "Sürüm listesi 40 kartlık gruplarla açılır; daha fazla sürüm isteğe bağlı yüklenir",
                 "Menü düğmeleri ortak şablonu kullanır; tekrar XAML çözümlemesi kaldırıldı",
