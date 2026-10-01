@@ -14,7 +14,7 @@
     <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>6.1.5</Version>
+    <Version>6.1.6</Version>
     <AssemblyVersion>6.0.0.0</AssemblyVersion>
     <FileVersion>$(Version)</FileVersion>
     <Authors>Mustafa</Authors>

@@ -397,5 +397,6 @@
   "optGraphicsAction": "Grafik profilini uygula",
   "optGraphicsSaved": "Hızlı grafik profili kaydedildi. Sonraki oyun açılışında uygulanır. Özgün ayarlar options.txt.mistik-backup dosyasında.",
   "optGraphicsUnchanged": "Hızlı grafik profili zaten etkin.",
-  "optGraphicsFailed": "Grafik ayarları uygulanamadı:"
+  "optGraphicsFailed": "Grafik ayarları uygulanamadı:",
+  "versionLoadMore": "Daha fazla sürüm göster"
 }

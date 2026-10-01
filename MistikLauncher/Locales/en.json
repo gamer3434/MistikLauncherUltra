@@ -397,5 +397,6 @@
   "optGraphicsAction": "Apply graphics preset",
   "optGraphicsSaved": "Fast graphics preset saved. It takes effect at the next game launch. Original settings are in options.txt.mistik-backup.",
   "optGraphicsUnchanged": "Fast graphics preset is already active.",
-  "optGraphicsFailed": "Could not apply graphics settings:"
+  "optGraphicsFailed": "Could not apply graphics settings:",
+  "versionLoadMore": "Show more versions"
 }

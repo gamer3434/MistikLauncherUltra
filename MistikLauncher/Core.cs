@@ -212,6 +212,13 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.1.6","2026-10-01","#00D4AA", new[]{
+                "Sürüm listesi 40 kartlık gruplarla açılır; daha fazla sürüm isteğe bağlı yüklenir",
+                "Menü düğmeleri ortak şablonu kullanır; tekrar XAML çözümlemesi kaldırıldı",
+                "Arkadaşlar sayfasında değişmeyen kartlar tekrar yüklenmez; yenileme yalnızca sayfa açıkken çalışır",
+                "Takılan güncelleme indirmeleri zaman aşımıyla sonlanır; hazır paket launcher meşgulse bekletilir",
+                "Windows dosya sürümü launcher sürümüyle eşleşir"
+            }),
             new("v6.1.5","2026-09-29","#00D4AA", new[]{
                 "Mistik Launcher hesabı ve bulut ayar yedeği kaldırıldı; tercihler cihazda yönetilir",
                 "Üst menüye Güncellemeler sayfası eklendi; sürüm denetimi ve otomatik güncelleme ayarı burada da kullanılabilir"
