@@ -452,6 +452,8 @@ namespace MistikLauncher
                 Config.Version = version;
                 ConfigManager.Save(Config);
             }
+            if(_pageCache.TryGetValue("Vers",out var page) && page is Pages.VersionManagerPage versions && versions.IsLoaded)
+                versions.RefreshSelection();
         }
 
         static List<int> GetVersionNumbers(string input)

@@ -16,6 +16,7 @@ static class VersionListTests
         Check(ReferenceEquals(blue.Template,red.Template) && ((System.Windows.Media.SolidColorBrush)blue.Background).Color!=((System.Windows.Media.SolidColorBrush)red.Background).Color,"buttons reuse rounded template while retaining individual backgrounds");
         var catalog=typeof(VersionManagerPage).GetFields(BindingFlags.Static|BindingFlags.NonPublic).Single(field=>field.FieldType==typeof(JArray));
         var previous=catalog.GetValue(null);
+        var previousVersion=window.Config.Version;
         try
         {
             catalog.SetValue(null,new JArray(Enumerable.Range(1,95).Select(index=>new JObject { ["id"]="batch-snapshot-"+index,["type"]="snapshot" })));
@@ -27,6 +28,9 @@ static class VersionListTests
             Check(More()!=null && cards.Children.OfType<Border>().Count()==40,"large version catalog initially creates forty cards across all loaders");
             Filter("Snapshot");
             Check(Versions().Length==40,"snapshot filter resets version batch to forty");
+            var snapshotFilter=Nodes(page).OfType<Button>().Single(button=>Equals(button.Content,"Snapshot"));
+            var allFilter=Nodes(page).OfType<Button>().Single(button=>Equals(button.Content,Localization.T("Hepsi")));
+            Check(((System.Windows.Media.SolidColorBrush)snapshotFilter.Background).Color==PageHelpers.HexBrush("#00A3FF").Color && ((System.Windows.Media.SolidColorBrush)allFilter.Background).Color==PageHelpers.HexBrush("#333333").Color && ReferenceEquals(allFilter.Foreground,System.Windows.Media.Brushes.White),"version filter highlight follows selected results with readable inactive text");
             More()!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Check(Versions().Length==80,"show more adds one forty-version batch");
             More()!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -35,8 +39,23 @@ static class VersionListTests
             Check(Versions().Length==40 && More()!=null,"changing filters resets expanded version list");
             Localization.TranslateTree(page);
             Check(Equals(More()!.Content,Localization.T("versionLoadMore")),"version batch action uses selected locale");
+            foreach(var id in new[]{"batch-selection-first","batch-selection-second"})
+            {
+                var directory=System.IO.Path.Combine(App.GameDir,"versions",id); System.IO.Directory.CreateDirectory(directory);
+                System.IO.File.WriteAllText(System.IO.Path.Combine(directory,id+".json"),new JObject { ["id"]=id }.ToString());
+                System.IO.File.WriteAllText(System.IO.Path.Combine(directory,id+".jar"),"fixture");
+            }
+            window.Config.Version="batch-selection-first"; Filter("Vanilla");
+            Button Selection(string id)=>Nodes(cards.Children.OfType<Border>().Single(card=>Nodes(card).OfType<TextBlock>().Any(text=>text.Text==id))).OfType<Button>().Single(button=>Equals(button.Content,Localization.T("SEC")) || Equals(button.Content,Localization.T("SECILDI")));
+            Check(!Selection("batch-selection-first").IsEnabled && Selection("batch-selection-second").IsEnabled,"version cards identify current installed profile");
+            window.Config.Version="batch-selection-second"; page.RefreshSelection();
+            Check(Selection("batch-selection-first").IsEnabled && !Selection("batch-selection-second").IsEnabled,"visible version selection refreshes after global profile change");
+            window.Config.Version="batch-selection-first"; page.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            Check(!Selection("batch-selection-first").IsEnabled && Selection("batch-selection-second").IsEnabled,"cached version page refreshes stale selection on load");
+            var unchanged=cards.Children[0]; page.RefreshSelection();
+            Check(ReferenceEquals(unchanged,cards.Children[0]),"unchanged version selection retains cached cards");
         }
-        finally { catalog.SetValue(null,previous); }
+        finally { catalog.SetValue(null,previous); window.Config.Version=previousVersion; }
         return checks;
     }
     static IEnumerable<DependencyObject> Nodes(DependencyObject root)

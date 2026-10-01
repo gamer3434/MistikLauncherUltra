@@ -151,23 +151,35 @@ public sealed class LauncherUpdater
     }
     public async Task<bool> StartInstallerAsync()
     {
-        if(PreparedPayload==null||!idle()) { Publish("luDeferred"); return false; }
-        UpdateEngine.Verify(PreparedPayload);
-        string helper=UpdateEngine.SafePath(directory,"MistikUpdater.exe");
-        if(!File.Exists(helper)) { Publish("luManual"); return false; }
-        string stage=Path.GetDirectoryName(PreparedPayload)!;
-        string externalHelper=Path.Combine(stage,"MistikUpdater.exe"); File.Copy(helper,externalHelper,true);
-        using var current=Process.GetCurrentProcess();
-        string plan=Path.Combine(stage,"plan.json");
-        File.WriteAllText(plan,JsonSerializer.Serialize(new UpdatePlan(directory,PreparedPayload,current.Id,current.StartTime.ToUniversalTime().Ticks,Localization.Language,LatestVersion)));
-        var start=new ProcessStartInfo(externalHelper) { UseShellExecute=false, CreateNoWindow=true, WindowStyle=ProcessWindowStyle.Hidden };
-        start.ArgumentList.Add(plan); using var child=Process.Start(start)??throw new IOException("Cannot start update helper.");
-        for(int count=0;count<100;count++)
+        if(!await gate.WaitAsync(0)) return false;
+        try
         {
-            if(File.Exists(plan+".ready")) { Publish("luRestarting",100); return true; }
-            if(child.HasExited) break;
-            await Task.Delay(100);
+            if(PreparedPayload is not string payload||!idle()) { Publish("luDeferred"); return false; }
+            Busy=true; Publish("luVerifying",90);
+            string helper=UpdateEngine.SafePath(directory,"MistikUpdater.exe");
+            string stage=Path.GetDirectoryName(payload)!;
+            string externalHelper=Path.Combine(stage,"MistikUpdater.exe");
+            bool hasHelper=await Task.Run(()=> {
+                UpdateEngine.Verify(payload);
+                if(!File.Exists(helper)) return false;
+                File.Copy(helper,externalHelper,true);
+                return true;
+            });
+            if(!idle()) { Publish("luDeferred",100); return false; }
+            if(!hasHelper) { Publish("luManual"); return false; }
+            using var current=Process.GetCurrentProcess();
+            string plan=Path.Combine(stage,"plan.json");
+            File.WriteAllText(plan,JsonSerializer.Serialize(new UpdatePlan(directory,payload,current.Id,current.StartTime.ToUniversalTime().Ticks,Localization.Language,LatestVersion)));
+            var start=new ProcessStartInfo(externalHelper) { UseShellExecute=false, CreateNoWindow=true, WindowStyle=ProcessWindowStyle.Hidden };
+            start.ArgumentList.Add(plan); using var child=Process.Start(start)??throw new IOException("Cannot start update helper.");
+            for(int count=0;count<100;count++)
+            {
+                if(File.Exists(plan+".ready")) { Publish("luRestarting",100); return true; }
+                if(child.HasExited) break;
+                await Task.Delay(100);
+            }
+            Publish("luError"); return false;
         }
-        Publish("luError"); return false;
+        finally { Busy=false; Changed?.Invoke(); gate.Release(); }
     }
 }

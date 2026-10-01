@@ -49,6 +49,13 @@ static class LauncherUpdateTests
         Check(!await service.CheckAsync(true) && service.StatusKey=="luDeferred","prepared update stays deferred while launcher is busy");
         canUpdate=true;
         Check(await service.CheckAsync(true) && service.StatusKey=="luReady","prepared update resumes when launcher becomes idle");
+        bool verifyingWasBusy=false;
+        void DeferDuringVerify() { if(service.StatusKey=="luVerifying") { verifyingWasBusy=service.Busy; canUpdate=false; } }
+        service.Changed+=DeferDuringVerify;
+        var stagePlan=Path.Combine(Path.GetDirectoryName(service.PreparedPayload!)!,"plan.json");
+        Check(!await service.StartInstallerAsync() && verifyingWasBusy && !service.Busy && service.StatusKey=="luDeferred" && !File.Exists(stagePlan),"launcher becoming busy during payload verification prevents helper handoff");
+        service.Changed-=DeferDuringVerify;
+        canUpdate=true;
         Check(File.ReadAllText(Path.Combine(target,names[0]))=="old "+names[0],"preparation leaves installed files untouched");
         File.WriteAllText(Path.Combine(target,"update-manifest.json"),"{\"Product\":\"MistikLauncher\",\"Version\":\"8.0.0\",\"Files\":[]}");
         bool downgradeBlocked=false;

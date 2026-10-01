@@ -543,6 +543,10 @@ namespace MistikLauncher.Pages
         Button     _tunnelBtn = null!;
         System.Windows.Threading.DispatcherTimer _timer = null!;
         MistikRelay? _subscribedRelay;
+        Action<string?>? _tunnelReadySubscription;
+        MistikRelay? _tunnelAttemptRelay;
+        int _tunnelAttempt;
+        bool _tunnelPending;
         List<(string User, string RoomCode, string Ver, string Status, string? Tunnel, bool IsFriend)>? _renderedOnline;
         StackPanel _visualMapContainer = null!;
         Border     _statusBanner = null!;
@@ -925,21 +929,7 @@ namespace MistikLauncher.Pages
 
             tunCard.Child = tunSp; sp.Children.Add(tunCard);
 
-            // Initialize connection flow map state based on active tunnel
-            if (_main.Relay?.TunnelAddress != null)
-            {
-                _tunnelBtn.Content    = "🛑  TÜNELI DURDUR";
-                _tunnelBtn.Background = new System.Windows.Media.LinearGradientBrush(
-                    System.Windows.Media.Color.FromRgb(200, 30, 30),
-                    System.Windows.Media.Color.FromRgb(140, 0, 0), 90);
-                _tunnelLbl.Text = _main.Relay.TunnelAddress;
-                _statusBanner.Visibility = Visibility.Visible;
-                UpdateVisualMap(2);
-            }
-            else
-            {
-                UpdateVisualMap(0);
-            }
+            ShowTunnelState();
 
 
             Content = new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -953,6 +943,7 @@ namespace MistikLauncher.Pages
             };
             Loaded += (_, _) => {
                 SetRelaySubscription(_main.Relay);
+                ShowTunnelState();
                 RenderSaved();
                 RenderOnline();
                 UpdateBadge();
@@ -972,15 +963,20 @@ namespace MistikLauncher.Pages
                 _subscribedRelay.OnFriendRequestReceived -= OnFriendRequestReceived;
                 _subscribedRelay.OnFriendRequestAccepted -= OnFriendRequestAccepted;
                 _subscribedRelay.OnTunnelLog -= OnTunnelLog;
+                if (_tunnelReadySubscription != null) _subscribedRelay.OnTunnelReady -= _tunnelReadySubscription;
             }
             _subscribedRelay = relay;
+            _tunnelReadySubscription = null;
             _myCodeBox.Text = relay?.RoomCode ?? "......";
             if (relay != null) {
                 relay.OnUpdate += OnRelayUpdate;
                 relay.OnFriendRequestReceived += OnFriendRequestReceived;
                 relay.OnFriendRequestAccepted += OnFriendRequestAccepted;
                 relay.OnTunnelLog += OnTunnelLog;
+                _tunnelReadySubscription = address => OnTunnelReady(relay, address);
+                relay.OnTunnelReady += _tunnelReadySubscription;
             }
+            if (_timer.IsEnabled) ShowTunnelState();
         }
 
         void OnRelayUpdate(List<PeerInfo> _) => Dispatcher.BeginInvoke(() => { if (_timer.IsEnabled) RenderOnline(); });
@@ -1224,16 +1220,13 @@ namespace MistikLauncher.Pages
 
             // ── Stop tunnel if running ────────────────────────────────────────────
             if (relay.TunnelAddress != null) {
+                ++_tunnelAttempt;
+                _tunnelPending = false;
+                _tunnelAttemptRelay = null;
                 relay.StopTunnel();
-                _tunnelBtn.Content    = "🚀 TÜNELI BAŞLAT";
-                _tunnelBtn.Background = new System.Windows.Media.LinearGradientBrush(
-                    System.Windows.Media.Color.FromRgb(0, 180, 100),
-                    System.Windows.Media.Color.FromRgb(0, 130, 60), 90);
-                _statusBanner.Visibility = Visibility.Collapsed;
-                _tunnelLbl.Text = "";
+                ShowTunnelState();
                 if (_consoleBox != null)
                     _consoleBox.Text = "🖥️ Mistik Tünel Log Konsolu sıfırlandı.\nTüneli başlattığınızda loglar burada görünecektir...\n";
-                UpdateVisualMap(0);
                 return;
             }
 
@@ -1262,60 +1255,65 @@ namespace MistikLauncher.Pages
             if (_consoleBox != null)
                 _consoleBox.Text = $"🖥️ Tünel başlatılıyor (Seçilen Sunucu: {displayGateway})...\n";
 
-            _tunnelBtn.IsEnabled  = false;
-            _tunnelBtn.Content    = "⌛  Bağlanıyor...";
-            _tunnelBtn.Background = PageHelpers.HexBrush("#996600");
-            _statusBanner.Visibility = Visibility.Collapsed;
-
-            UpdateVisualMap(1);
-
-            relay.OnTunnelReady -= OnTunnelReady;
-            relay.OnTunnelReady += OnTunnelReady;
+            _tunnelAttemptRelay = relay;
+            _tunnelPending = true;
+            int attempt = ++_tunnelAttempt;
+            ShowTunnelState();
 
             relay.StartTunnel(port, gateway, customSub, customHost);
 
             // bore indirme sürebilir — 60 saniye bekle
             int waitMs = gateway == "bore.pub" ? 60000 : 25000;
             _ = Task.Delay(waitMs).ContinueWith(_ => Dispatcher.BeginInvoke(() => {
-                if (relay.TunnelAddress == null) {
-                    _tunnelBtn.IsEnabled  = true;
-                    _tunnelBtn.Content    = "🚀  TÜNELI BAŞLAT";
-                    _tunnelBtn.Background = new System.Windows.Media.LinearGradientBrush(
-                        System.Windows.Media.Color.FromRgb(0, 180, 100),
-                        System.Windows.Media.Color.FromRgb(0, 130, 60), 90);
+                if (attempt != _tunnelAttempt || !ReferenceEquals(_tunnelAttemptRelay, relay) || !_tunnelPending || relay.TunnelAddress != null) return;
+                _tunnelPending = false;
+                _tunnelAttemptRelay = null;
+                if (_timer.IsEnabled && ReferenceEquals(_subscribedRelay, relay)) {
+                    ShowTunnelState();
                     if (_consoleBox != null)
                         _consoleBox.AppendText("[UYARI] Bağlantı zaman aşımına uğradı. Logları kontrol edin.\n");
-                    UpdateVisualMap(0);
                 }
             }));
         }
 
+        void ShowTunnelState(string? readyAddress = null)
+        {
+            var address = readyAddress ?? _main.Relay?.TunnelAddress;
+            _tunnelBtn.IsEnabled = true;
+            if (!string.IsNullOrEmpty(address)) {
+                _tunnelPending = false;
+                _tunnelAttemptRelay = null;
+                _tunnelBtn.Content = "🛑  TÜNELI DURDUR";
+                _tunnelBtn.Background = new System.Windows.Media.LinearGradientBrush(
+                    System.Windows.Media.Color.FromRgb(200, 30, 30),
+                    System.Windows.Media.Color.FromRgb(140, 0, 0), 90);
+                _tunnelLbl.Text = address;
+                _statusBanner.Visibility = Visibility.Visible;
+                UpdateVisualMap(2);
+            } else {
+                bool connecting = _tunnelPending && ReferenceEquals(_tunnelAttemptRelay, _main.Relay);
+                _tunnelBtn.IsEnabled = !connecting;
+                _tunnelBtn.Content = connecting ? "⌛  Bağlanıyor..." : "🚀  TÜNELI BAŞLAT";
+                _tunnelBtn.Background = connecting ? PageHelpers.HexBrush("#996600") : new System.Windows.Media.LinearGradientBrush(
+                    System.Windows.Media.Color.FromRgb(0, 180, 100),
+                    System.Windows.Media.Color.FromRgb(0, 130, 60), 90);
+                _tunnelLbl.Text = "";
+                _statusBanner.Visibility = Visibility.Collapsed;
+                UpdateVisualMap(connecting ? 1 : 0);
+            }
+        }
 
-        void OnTunnelReady(string? addr)
+        void OnTunnelReady(MistikRelay relay, string? addr)
         {
             Dispatcher.BeginInvoke(() => {
-                _tunnelBtn.IsEnabled = true;
-                if (string.IsNullOrEmpty(addr)) {
-                    // Failed to connect
-                    _tunnelBtn.Content    = "🚀  TÜNELI BAŞLAT";
-                    _tunnelBtn.Background = new System.Windows.Media.LinearGradientBrush(
-                        System.Windows.Media.Color.FromRgb(0, 180, 100),
-                        System.Windows.Media.Color.FromRgb(0, 130, 60), 90);
-                    _statusBanner.Visibility = Visibility.Collapsed;
-                    UpdateVisualMap(0);
-                } else {
-                    // Connected!
-                    _tunnelBtn.Content    = "🛑  TÜNELI DURDUR";
-                    _tunnelBtn.Background = new System.Windows.Media.LinearGradientBrush(
-                        System.Windows.Media.Color.FromRgb(200, 30, 30),
-                        System.Windows.Media.Color.FromRgb(140, 0, 0), 90);
-                    _tunnelLbl.Text = addr;
-                    _statusBanner.Visibility = Visibility.Visible;
-                    // Silent copy — no popup
+                if (!_timer.IsEnabled || !ReferenceEquals(_subscribedRelay, relay)) return;
+                _tunnelPending = false;
+                _tunnelAttemptRelay = null;
+                ShowTunnelState(addr);
+                if (!string.IsNullOrEmpty(addr)) {
                     try { Clipboard.SetText(addr); } catch { }
                     _pingStatusLbl.Text = "📌 Adres panoya kopyalandı! Minecraft → Çok Oyunculu → Doğrudan Bağlan'a yapıştır.";
                     _pingStatusLbl.Foreground = PageHelpers.HexBrush("#39FF14");
-                    UpdateVisualMap(2);
                 }
             });
         }

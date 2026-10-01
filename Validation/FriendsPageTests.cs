@@ -25,13 +25,17 @@ static class FriendsPageTests
             page = new FriendsPage(window);
             var fields = typeof(FriendsPage).GetFields(BindingFlags.Instance | BindingFlags.NonPublic);
             var timer = (DispatcherTimer)fields.Single(field => field.FieldType == typeof(DispatcherTimer)).GetValue(page)!;
-            var subscription = fields.Single(field => field.FieldType == typeof(MistikRelay));
+            var relayFields = fields.Where(field => field.FieldType == typeof(MistikRelay)).ToArray();
+            var tunnelSubscription = fields.Single(field => field.FieldType == typeof(Action<string>));
+            var tunnelButton = fields.Where(field => field.FieldType == typeof(Button))
+                .Select(field => (Button?)field.GetValue(page))
+                .Single(button => button?.Content?.ToString()?.Contains("TÜNEL", StringComparison.Ordinal) == true)!;
             var online = fields.Where(field => field.FieldType == typeof(StackPanel))
                 .Select(field => (StackPanel?)field.GetValue(page))
                 .Single(panel => panel != null && panel.Margin.Top == 6 && panel.Margin.Bottom == 16)!;
 
             page.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
-            Check(timer.IsEnabled && ReferenceEquals(subscription.GetValue(page), relay), "friends page subscribes and starts refresh on load");
+            Check(timer.IsEnabled && relayFields.Any(field => ReferenceEquals(field.GetValue(page), relay)) && tunnelSubscription.GetValue(page) != null, "friends page subscribes and starts refresh on load");
             Check(online.Children.Count == 1, "empty friends online view renders once");
             var empty = online.Children[0];
 
@@ -54,9 +58,11 @@ static class FriendsPageTests
             Check(ticked && ReferenceEquals(online.Children[0], empty), "unchanged online view survives refresh tick without reconstruction");
 
             page.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
-            Check(!timer.IsEnabled && subscription.GetValue(page) == null, "friends page stops refresh and detaches on unload");
+            Check(!timer.IsEnabled && relayFields.All(field => field.GetValue(page) == null) && tunnelSubscription.GetValue(page) == null, "friends page stops refresh and detaches on unload");
+            typeof(MistikRelay).GetProperty(nameof(MistikRelay.TunnelAddress))!.SetValue(relay, "test.example:25565");
             page.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
-            Check(timer.IsEnabled && ReferenceEquals(subscription.GetValue(page), relay) && ReferenceEquals(online.Children[0], empty), "cached friends page resumes without rebuilding unchanged online view");
+            Check(timer.IsEnabled && relayFields.Any(field => ReferenceEquals(field.GetValue(page), relay)) && tunnelSubscription.GetValue(page) != null && ReferenceEquals(online.Children[0], empty), "cached friends page resumes without rebuilding unchanged online view");
+            Check(tunnelButton.Content?.ToString()?.Contains("DURDUR", StringComparison.Ordinal) == true, "cached friends page restores active tunnel state on load");
             return checks;
         }
         finally
