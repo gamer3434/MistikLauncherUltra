@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const test = require('node:test');
+const { runInNewContext } = require('node:vm');
 const { parseRelease } = require('../site/assets/release.js');
 
 const repo = 'gamer3434/MistikLauncherUltra';
@@ -76,4 +77,16 @@ test('keeps a working v6.1.5 fallback and matching published digests', () => {
     }[kind]);
     assert.equal(row[1], row[2]);
   }
+});
+
+test('preview sample labels translate and decorative switches stay silent', () => {
+  const preview = readFileSync(require.resolve('../site/onizleme/index.html'), 'utf8');
+  const script = readFileSync(require.resolve('../site/assets/site.js'), 'utf8');
+  const context = { window: {} };
+  runInNewContext(script.slice(0, script.indexOf('let lang=')), context);
+  assert.equal(context.window.mistikWords.en['screen.versions.sampleProfile'], 'Modded world');
+  assert.equal(context.window.mistikWords.en['screen.settings.currentLanguage'], 'English ⌄');
+  assert.match(preview, /data-i18n="screen\.versions\.sampleProfile"/);
+  assert.match(preview, /data-i18n="screen\.settings\.currentLanguage"/);
+  assert.doesNotMatch(preview, /class="toggle-demo" aria-label=/);
 });

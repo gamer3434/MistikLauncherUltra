@@ -39,11 +39,16 @@ static class LauncherUpdateTests
         File.WriteAllText(Path.Combine(target,"config.json"),"user preferences");
         Directory.CreateDirectory(Path.Combine(target,"game")); File.WriteAllText(Path.Combine(target,"game","world.dat"),"world");
         using var client=new HttpClient(new Stub(metadata,zip));
-        var service=new LauncherUpdater(()=>true,client,target,"6.0.0-preview.1");
+        bool canUpdate=true;
+        var service=new LauncherUpdater(()=>canUpdate,client,target,"6.0.0-preview.1");
         Check(!await service.CheckAsync(false) && service.StatusKey=="luAvailable" && service.PreparedPayload==null,"launcher check-only avoids download");
         Check(service.ReleaseNotes("tr").Contains("Yeni sürüm indir") && !service.ReleaseNotes("tr").Contains("Fixed") && !service.ReleaseNotes("tr").Contains("https://"),"Turkish release notes are short plain text");
         Check(service.ReleaseNotes("en").Contains("New release download") && !service.ReleaseNotes("en").Contains("Hatalar"),"English release notes follow selected language");
         Check(await service.CheckAsync(true) && service.PreparedPayload!=null && UpdateEngine.Verify(service.PreparedPayload).Version=="7.0.0","verified portable update prepared");
+        canUpdate=false;
+        Check(!await service.CheckAsync(true) && service.StatusKey=="luDeferred","prepared update stays deferred while launcher is busy");
+        canUpdate=true;
+        Check(await service.CheckAsync(true) && service.StatusKey=="luReady","prepared update resumes when launcher becomes idle");
         Check(File.ReadAllText(Path.Combine(target,names[0]))=="old "+names[0],"preparation leaves installed files untouched");
         File.WriteAllText(Path.Combine(target,"update-manifest.json"),"{\"Product\":\"MistikLauncher\",\"Version\":\"8.0.0\",\"Files\":[]}");
         bool downgradeBlocked=false;
@@ -71,6 +76,10 @@ static class LauncherUpdateTests
         using var corruptClient=new HttpClient(new Stub(metadata,zip.Select(b=>(byte)(b^1)).ToArray()));
         var corrupt=new LauncherUpdater(()=>true,corruptClient,target,"6.0.0");
         Check(!await corrupt.CheckAsync(true) && corrupt.PreparedPayload==null && corrupt.StatusKey=="luError","corrupt launcher package rejected");
+        using var stalledClient=new HttpClient(new Stub(metadata,zip,stall:true)) { Timeout=TimeSpan.FromMilliseconds(500) };
+        var stalled=new LauncherUpdater(()=>true,stalledClient,target,"6.0.0");
+        var stalledCheck=stalled.CheckAsync(true);
+        Check(await Task.WhenAny(stalledCheck,Task.Delay(5000))==stalledCheck && !await stalledCheck && !stalled.Busy && stalled.PreparedPayload==null && stalled.StatusKey=="luError","stalled launcher download times out and releases busy state");
         rejected=false;
         try { LauncherUpdater.ParseRelease(metadata.Replace("github.com/gamer3434","example.com/gamer3434"),"6.0.0"); } catch(InvalidDataException) { rejected=true; }
         Check(rejected,"untrusted launcher release host rejected");
@@ -79,10 +88,15 @@ static class LauncherUpdateTests
         Check(rejected,"staged payload tampering rejected");
         return checks;
     }
-    sealed class Stub(string metadata,byte[] bytes) : HttpMessageHandler
+    sealed class StalledStream : MemoryStream
+    {
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer,CancellationToken cancellationToken=default)
+        { await Task.Delay(Timeout.Infinite,cancellationToken); return 0; }
+    }
+    sealed class Stub(string metadata,byte[] bytes,bool stall=false) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
-            Content=request.RequestUri!.Host=="api.github.com"?new StringContent(metadata):new ByteArrayContent(bytes)
+            Content=request.RequestUri!.Host=="api.github.com"?new StringContent(metadata):stall?new StreamContent(new StalledStream()):new ByteArrayContent(bytes)
         });
     }
 }

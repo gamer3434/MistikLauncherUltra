@@ -90,7 +90,7 @@ public sealed class LauncherUpdater
         try
         {
             Busy=true; Error=null; ResetTransfer(); Publish("luChecking");
-            if(PreparedPayload!=null) { Publish("luReady",100); return true; }
+            if(PreparedPayload!=null) { bool ready=idle(); Publish(ready?"luReady":"luDeferred",100); return ready; }
             LatestVersion="—"; latestReleaseBody="";
             using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(20));
             string json=await GitHubReleaseCache.GetAsync(http,Endpoint,Path.Combine(App.AppData,"launcher-release-cache.json"),timeout.Token);
@@ -111,15 +111,16 @@ public sealed class LauncherUpdater
             string stage=Path.Combine(Path.GetTempPath(),"MistikLauncherUpdates",Guid.NewGuid().ToString("N")); Directory.CreateDirectory(stage);
             string zip=Path.Combine(stage,"package.zip");
             TotalBytes=release.Size; PublishTransfer("luDownloading",0,true);
-            using(var response=await http.GetAsync(release.Url,HttpCompletionOption.ResponseHeadersRead))
+            using var downloadTimeout=new CancellationTokenSource(http.Timeout==Timeout.InfiniteTimeSpan?TimeSpan.FromMinutes(10):http.Timeout);
+            using(var response=await http.GetAsync(release.Url,HttpCompletionOption.ResponseHeadersRead,downloadTimeout.Token))
             {
-                response.EnsureSuccessStatusCode(); using var input=await response.Content.ReadAsStreamAsync();
+                response.EnsureSuccessStatusCode(); using var input=await response.Content.ReadAsStreamAsync(downloadTimeout.Token);
                 using var output=new FileStream(zip,FileMode.CreateNew,FileAccess.Write,FileShare.None,81920,true);
                 var buffer=new byte[81920]; long total=0; int read; var clock=Stopwatch.StartNew();
-                while((read=await input.ReadAsync(buffer))>0)
+                while((read=await input.ReadAsync(buffer.AsMemory(),downloadTimeout.Token))>0)
                 {
                     total+=read; if(total>release.Size) throw new InvalidDataException("Oversized update.");
-                    await output.WriteAsync(buffer.AsMemory(0,read));
+                    await output.WriteAsync(buffer.AsMemory(0,read),downloadTimeout.Token);
                     DownloadedBytes=total;
                     DownloadSpeedBytesPerSecond=clock.Elapsed.TotalSeconds>0?total/clock.Elapsed.TotalSeconds:0;
                     RemainingTime=DownloadSpeedBytesPerSecond>1?TimeSpan.FromSeconds((release.Size-total)/DownloadSpeedBytesPerSecond):null;
