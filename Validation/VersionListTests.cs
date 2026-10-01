@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using MistikLauncher;
 using MistikLauncher.Pages;
 using Newtonsoft.Json.Linq;
+using Localization = MistikLauncher.Localization;
 
 static class VersionListTests
 {
