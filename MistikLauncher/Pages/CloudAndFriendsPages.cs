@@ -542,6 +542,8 @@ namespace MistikLauncher.Pages
         TextBox    _myCodeBox = null!;
         Button     _tunnelBtn = null!;
         System.Windows.Threading.DispatcherTimer _timer = null!;
+        MistikRelay? _subscribedRelay;
+        List<(string User, string RoomCode, string Ver, string Status, string? Tunnel, bool IsFriend)>? _renderedOnline;
         StackPanel _visualMapContainer = null!;
         Border     _statusBanner = null!;
         Button     _pingCheckBtn = null!;
@@ -942,48 +944,46 @@ namespace MistikLauncher.Pages
 
             Content = new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
 
-            RenderSaved();
-            RenderOnline();
-
-            // Relay event - once
-            if (_main.Relay != null)
-            {
-                _myCodeBox.Text = _main.Relay.RoomCode;
-                _main.Relay.OnUpdate -= OnRelayUpdate;
-                _main.Relay.OnUpdate += OnRelayUpdate;
-                _main.Relay.OnFriendRequestReceived -= OnFriendRequestReceived;
-                _main.Relay.OnFriendRequestReceived += OnFriendRequestReceived;
-                _main.Relay.OnFriendRequestAccepted -= OnFriendRequestAccepted;
-                _main.Relay.OnFriendRequestAccepted += OnFriendRequestAccepted;
-                _main.Relay.OnTunnelLog -= OnTunnelLog;
-                _main.Relay.OnTunnelLog += OnTunnelLog;
-            }
-
             // Timer: her 4 saniye badge + refresh
             _timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
             _timer.Tick += (_, _) => {
+                SetRelaySubscription(_main.Relay);
                 UpdateBadge();
-                if (_myCodeBox.Text == "......" && _main.Relay?.RoomCode != null)
-                    _myCodeBox.Text = _main.Relay.RoomCode;
                 RenderOnline();
             };
-            _timer.Start();
-
+            Loaded += (_, _) => {
+                SetRelaySubscription(_main.Relay);
+                RenderSaved();
+                RenderOnline();
+                UpdateBadge();
+                _timer.Start();
+            };
             Unloaded += (_, _) => {
                 _timer.Stop();
-                if (_main.Relay != null)
-                {
-                    _main.Relay.OnUpdate -= OnRelayUpdate;
-                    _main.Relay.OnFriendRequestReceived -= OnFriendRequestReceived;
-                    _main.Relay.OnFriendRequestAccepted -= OnFriendRequestAccepted;
-                    _main.Relay.OnTunnelLog -= OnTunnelLog;
-                }
+                SetRelaySubscription(null);
             };
-
-            UpdateBadge();
         }
 
-        void OnRelayUpdate(List<PeerInfo> players) => Dispatcher.BeginInvoke(() => RenderOnline(players));
+        void SetRelaySubscription(MistikRelay? relay)
+        {
+            if (ReferenceEquals(_subscribedRelay, relay)) return;
+            if (_subscribedRelay != null) {
+                _subscribedRelay.OnUpdate -= OnRelayUpdate;
+                _subscribedRelay.OnFriendRequestReceived -= OnFriendRequestReceived;
+                _subscribedRelay.OnFriendRequestAccepted -= OnFriendRequestAccepted;
+                _subscribedRelay.OnTunnelLog -= OnTunnelLog;
+            }
+            _subscribedRelay = relay;
+            _myCodeBox.Text = relay?.RoomCode ?? "......";
+            if (relay != null) {
+                relay.OnUpdate += OnRelayUpdate;
+                relay.OnFriendRequestReceived += OnFriendRequestReceived;
+                relay.OnFriendRequestAccepted += OnFriendRequestAccepted;
+                relay.OnTunnelLog += OnTunnelLog;
+            }
+        }
+
+        void OnRelayUpdate(List<PeerInfo> _) => Dispatcher.BeginInvoke(() => { if (_timer.IsEnabled) RenderOnline(); });
 
         void UpdateBadge()
         {
@@ -1042,18 +1042,22 @@ namespace MistikLauncher.Pages
 
                 var cn = name; var cc = code;
                 var delBtn = PageHelpers.MkBtn("Sil", "#FF4B4B", 55);
-                delBtn.Click += (_, _) => { RemoveFriend(cc, cn); RenderSaved(); RenderOnline(); };
+                delBtn.Click += (_, _) => RemoveFriend(cc, cn);
                 Grid.SetColumn(delBtn, 2); g.Children.Add(delBtn);
                 card.Child = g; _savedList.Children.Add(card);
             }
         }
 
-        void RenderOnline(List<PeerInfo>? players = null)
+        void RenderOnline()
         {
-            players ??= _main.Relay?.GetOnlinePlayers() ?? new();
-            _onlineList.Children.Clear();
+            var players = _main.Relay?.GetOnlinePlayers() ?? new();
             var codes = _main.Config.FriendCodes;
             var names = _main.Config.Friends;
+            var rendered = players.Select(p => (p.User, p.RoomCode, p.Ver, p.Status, p.Tunnel,
+                IsFriend: codes.Contains(p.RoomCode) || names.Contains(p.User))).ToList();
+            if (_renderedOnline != null && _renderedOnline.SequenceEqual(rendered)) return;
+            _renderedOnline = rendered;
+            _onlineList.Children.Clear();
             var friends = players.Where(p => codes.Contains(p.RoomCode) || names.Contains(p.User)).ToList();
             var others  = players.Where(p => !friends.Contains(p)).ToList();
 

@@ -112,6 +112,8 @@ class Program
             checks+=GameRuntimeHealthTests.Run(Path.Combine(testRoot,"runtime-health")).GetAwaiter().GetResult();
             checks+=LaunchReadinessTests.Run(Path.Combine(testRoot,"readiness-tests"));
             var window=new MainWindow { Width=1200, Height=820 };
+            checks+=VersionListTests.Run(window);
+            checks+=FriendsPageTests.Run(window);
             Check(MainWindow.SkinTextureUrl("http://textures.minecraft.net/texture/test")=="https://textures.minecraft.net/texture/test" && MainWindow.SkinTextureUrl("https://ely.by.attacker.invalid/test")==null && MainWindow.SkinTextureUrl("file:///C:/Windows/test.png")==null,"skin texture URLs enforce trusted HTTPS hosts");
             Check(window.FetchAvatarAsync("../../outside").GetAwaiter().GetResult()==null,"avatar username traversal is rejected before network or cache access");
             Check(!MistikLauncher.Pages.SkinPage.LoadImgAsync(new Image(),"../../outside",80).GetAwaiter().GetResult(),"skin preview rejects invalid usernames before network access");

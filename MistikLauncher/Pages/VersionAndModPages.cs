@@ -18,6 +18,7 @@ namespace MistikLauncher.Pages
         readonly MainWindow _main;
         StackPanel _listPanel = null!;
         string _filter = "Hepsi";
+        int _visibleVersions = 40;
 
         static JArray? _mojangVersions = null;
         static bool _isLoadingVersions = false;
@@ -52,12 +53,12 @@ namespace MistikLauncher.Pages
                 var fv = f;
                 var b = PageHelpers.MkBtn(f, fv == _filter ? "#00A3FF" : "#333333");
                 b.Margin = new Thickness(0, 0, 8, 0);
-                b.Click += (_, _) => { _filter = fv; RenderList(); };
+                b.Click += (_, _) => { _filter = fv; _visibleVersions=40; RenderList(); };
                 fRow.Children.Add(b);
             }
             sp.Children.Add(fRow);
 
-            _listPanel = new StackPanel();
+            _listPanel = new StackPanel { Name="VersionListPanel" };
             sp.Children.Add(_listPanel);
             Content = new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             RenderList();
@@ -275,7 +276,7 @@ namespace MistikLauncher.Pages
 
             var filtered = _filter == "Hepsi" ? allVers : allVers.Where(v => v.type == _filter).ToList();
 
-            foreach (var (id, type, installedFolder) in filtered)
+            foreach (var (id, type, installedFolder) in filtered.Take(_visibleVersions))
             {
                 var vid = id;
                 bool installed = installedFolder != null;
@@ -349,6 +350,12 @@ namespace MistikLauncher.Pages
 
                 Grid.SetColumn(btnSp, 1); grid.Children.Add(btnSp);
                 card.Child = grid; _listPanel.Children.Add(card);
+            }
+            if(filtered.Count>_visibleVersions)
+            {
+                var more=PageHelpers.MkBtn("versionLoadMore","#226DA0"); more.Name="VersionLoadMore";
+                more.Click+=(_,_)=> { _visibleVersions+=40; RenderList(); Localization.TranslateTree(this); };
+                _listPanel.Children.Add(more);
             }
         }
 

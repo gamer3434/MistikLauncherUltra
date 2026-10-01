@@ -15,6 +15,7 @@ namespace MistikLauncher.Pages
     // Shared helpers
     public static class PageHelpers
     {
+        static ControlTemplate? roundedTemplate;
         public static Color HexColor(string hex) => (Color)ColorConverter.ConvertFromString(hex);
         public static SolidColorBrush HexBrush(string hex)
         {
@@ -59,15 +60,15 @@ namespace MistikLauncher.Pages
                 HorizontalContentAlignment=HorizontalAlignment.Center,VerticalContentAlignment=VerticalAlignment.Center,
                 Padding = new Thickness(14, 7, 14, 7), Cursor = System.Windows.Input.Cursors.Hand };
             if (width > 0) btn.MinWidth = width;
-            btn.Template = RoundedTemplate(color);
+            btn.Template = RoundedTemplate();
             Localization.RegisterText(btn,text);
             return btn;
         }
 
-        static ControlTemplate RoundedTemplate(string color)
+        static ControlTemplate RoundedTemplate()
         {
             const string xaml = "<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border Name='border' Background='{TemplateBinding Background}' CornerRadius='8' Padding='{TemplateBinding Padding}' BorderThickness='2' BorderBrush='Transparent'><ContentPresenter HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}' VerticalAlignment='{TemplateBinding VerticalContentAlignment}'/></Border><ControlTemplate.Triggers><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='border' Property='BorderBrush' Value='White'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='border' Property='Opacity' Value='0.85'/></Trigger><Trigger Property='IsPressed' Value='True'><Setter TargetName='border' Property='Opacity' Value='0.65'/></Trigger><Trigger Property='IsEnabled' Value='False'><Setter TargetName='border' Property='Opacity' Value='0.45'/></Trigger></ControlTemplate.Triggers></ControlTemplate>";
-            return (ControlTemplate)System.Windows.Markup.XamlReader.Parse(xaml);
+            return roundedTemplate ??= (ControlTemplate)System.Windows.Markup.XamlReader.Parse(xaml);
         }
 
         public static TextBox DarkTextBox(string placeholder = "", double height = 36)
