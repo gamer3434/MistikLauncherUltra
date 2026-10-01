@@ -16,7 +16,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Version>6.1.5</Version>
     <AssemblyVersion>6.0.0.0</AssemblyVersion>
-    <FileVersion>6.0.0.0</FileVersion>
+    <FileVersion>$(Version)</FileVersion>
     <Authors>Mustafa</Authors>
     <Company>Mustafa Developer</Company>
     <Product>Mistik Launcher</Product>

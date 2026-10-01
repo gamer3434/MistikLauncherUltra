@@ -99,16 +99,17 @@ public sealed class AutoMcsUpdater
             staging=Path.Combine(directory,".auto-mcs-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(staging);
             string zip=Path.Combine(staging,"package.zip");
             TotalBytes=cached.Size; PublishTransfer("mcsDownloading",0,true);
-            using(var response=await http.GetAsync(cached.Url,HttpCompletionOption.ResponseHeadersRead))
+            using var downloadTimeout=new CancellationTokenSource(http.Timeout==Timeout.InfiniteTimeSpan?TimeSpan.FromMinutes(10):http.Timeout);
+            using(var response=await http.GetAsync(cached.Url,HttpCompletionOption.ResponseHeadersRead,downloadTimeout.Token))
             {
                 response.EnsureSuccessStatusCode();
-                using var input=await response.Content.ReadAsStreamAsync();
+                using var input=await response.Content.ReadAsStreamAsync(downloadTimeout.Token);
                 using var output=new FileStream(zip,FileMode.CreateNew,FileAccess.Write,FileShare.None,81920,true);
                 var buffer=new byte[81920]; long total=0; int read; var clock=Stopwatch.StartNew();
-                while((read=await input.ReadAsync(buffer))>0)
+                while((read=await input.ReadAsync(buffer.AsMemory(),downloadTimeout.Token))>0)
                 {
                     total+=read; if(total>cached.Size) throw new InvalidDataException("Package exceeds declared size.");
-                    await output.WriteAsync(buffer.AsMemory(0,read));
+                    await output.WriteAsync(buffer.AsMemory(0,read),downloadTimeout.Token);
                     DownloadedBytes=total;
                     DownloadSpeedBytesPerSecond=clock.Elapsed.TotalSeconds>0?total/clock.Elapsed.TotalSeconds:0;
                     RemainingTime=DownloadSpeedBytesPerSecond>1?TimeSpan.FromSeconds((cached.Size-total)/DownloadSpeedBytesPerSecond):null;

@@ -49,6 +49,11 @@ static class AutoMcsTests
         using var offlineClient=new HttpClient(new Stub("",zip,true));
         var offline=new AutoMcsUpdater(offlineClient,failureFolder,()=>false);
         Check(!await offline.CheckAsync(true) && File.ReadAllText(installed)=="existing installation","offline update preserves installed executable");
+        using var stalledClient=new HttpClient(new Stub(Manifest(digest),zip,stall:true)) { Timeout=TimeSpan.FromMilliseconds(500) };
+        var stalled=new AutoMcsUpdater(stalledClient,failureFolder,()=>false);
+        var stalledCheck=stalled.CheckAsync(true);
+        Check(await Task.WhenAny(stalledCheck,Task.Delay(5000))==stalledCheck && !await stalledCheck && !stalled.Busy && stalled.StatusKey=="mcsError" && File.ReadAllText(installed)=="existing installation","stalled Auto-MCS download times out and preserves installed executable");
+        Check(!Directory.EnumerateDirectories(failureFolder,".auto-mcs-*").Any(),"timed-out Auto-MCS staging cleaned");
         bool rejected=false;
         try { AutoMcsUpdater.ParseRelease(Manifest(digest).Replace("github.com/macarooni-man","example.com/macarooni-man")); }
         catch(InvalidDataException) { rejected=true; }
@@ -59,7 +64,12 @@ static class AutoMcsTests
         Check(rejected,"missing official SHA-256 rejected");
         return checks;
     }
-    sealed class Stub(string manifest,byte[] package,bool fail=false) : HttpMessageHandler
+    sealed class StalledStream : MemoryStream
+    {
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer,CancellationToken cancellationToken=default)
+        { await Task.Delay(Timeout.Infinite,cancellationToken); return 0; }
+    }
+    sealed class Stub(string manifest,byte[] package,bool fail=false,bool stall=false) : HttpMessageHandler
     {
         public int AssetRequests;
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token)
@@ -68,7 +78,7 @@ static class AutoMcsTests
             bool metadata=request.RequestUri!.Host=="api.github.com";
             if(!metadata) AssetRequests++;
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
-                Content=metadata?new StringContent(manifest):new ByteArrayContent(package)
+                Content=metadata?new StringContent(manifest):stall?new StreamContent(new StalledStream()):new ByteArrayContent(package)
             });
         }
     }
