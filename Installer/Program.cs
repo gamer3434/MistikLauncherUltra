@@ -12,6 +12,11 @@ using MistikLauncher.Updates;
 
 internal static class Program
 {
+#if MISTIK_REPAIR
+    internal static bool RepairMode=>true;
+#else
+    internal static bool RepairMode=>false;
+#endif
     internal static readonly string Version=Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0];
     internal static bool Offline=>Assembly.GetExecutingAssembly().GetManifestResourceNames().Contains("MistikPayload.zip");
     [STAThread] static int Main(string[] args)
@@ -30,8 +35,17 @@ internal static class Program
         try {
             var zip=await Payload(work,null,CancellationToken.None); var stage=Path.Combine(work,"payload"); UpdateEngine.Extract(zip,stage); var manifest=UpdateEngine.Verify(stage); if(manifest.Version!=Version) throw new IOException("Version mismatch");
             var fixture=Path.Combine(work,"MistikLauncherUltra"); InstallEngine.Install(stage,fixture,false,shell:false); if(InstallEngine.ReadState(fixture).Version!=Version) throw new IOException("Install lifecycle failed");
+            if(RepairMode) {
+                File.Delete(Path.Combine(fixture,"MistikLauncher.exe"));
+                File.WriteAllText(Path.Combine(fixture,"MistikLauncher.dll"),"broken");
+                File.WriteAllText(Path.Combine(fixture,"update-manifest.json"),"{broken");
+                File.WriteAllText(Path.Combine(fixture,"user-test.txt"),"preserve");
+                InstallEngine.Repair(stage,fixture,false,shell:false);
+                UpdateEngine.VerifyInstalled(fixture,manifest);
+                if(File.ReadAllText(Path.Combine(fixture,"user-test.txt"))!="preserve") throw new IOException("Repair changed user data");
+            }
             File.WriteAllText(Path.Combine(fixture,"user-test.txt"),"preserve"); InstallEngine.Uninstall(fixture,false); if(File.ReadAllText(Path.Combine(fixture,"user-test.txt"))!="preserve") throw new IOException("User data not preserved");
-            File.WriteAllText(report,JsonSerializer.Serialize(new { manifest.Version,Files=manifest.Files.Length,Verified=true,Lifecycle=true,Mode=Offline?"offline":"online" }));
+            File.WriteAllText(report,JsonSerializer.Serialize(new { manifest.Version,Files=manifest.Files.Length,Verified=true,Lifecycle=true,Mode=RepairMode?"repair":Offline?"offline":"online" }));
         }
         finally { CleanupWork(work); }
     }
@@ -74,6 +88,7 @@ internal sealed class SetupWindow:Window
     public SetupWindow()
     {
         Title="Mistik Launcher Setup / Kurulum"; Width=680; Height=520; MinWidth=640; MinHeight=500; WindowStartupLocation=WindowStartupLocation.CenterScreen; FontFamily=new FontFamily("Segoe UI"); FontSize=14;
+        if(Program.RepairMode) Title="Mistik Launcher — Onarıcı / Repair";
         Background=new SolidColorBrush(Color.FromRgb(18,18,21)); Foreground=Brushes.White;
         var content=new StackPanel { Margin=new Thickness(32) }; var scroll=new ScrollViewer { Content=content,Background=Background,VerticalScrollBarVisibility=ScrollBarVisibility.Auto }; Content=scroll;
         shortcut.Foreground=Foreground;
@@ -101,6 +116,12 @@ internal sealed class SetupWindow:Window
         description.Text=Program.Offline?T("Yerel kurulum · İnternet bağlantısı gerekmez. Oyun verileri korunur.","Offline installation · No internet needed. Game data is preserved."):T("Online kurulum · Doğrulanmış uygulama dosyaları GitHub'dan indirilir.","Online installation · Verified application files are downloaded from GitHub.");
         locationLabel.Text=T("Kurulum klasörü","Installation folder"); shortcut.Content=T("Masaüstü kısayolu oluştur","Create desktop shortcut"); install.Content=Complete?T("Launcher'ı aç","Open launcher"):T("Kur","Install"); cancel.Content=Busy?T("İptal et","Cancel"):T("Kapat","Close");
         if(!Busy) status.Text=Complete?T("Kurulum tamamlandı.","Installation complete."):T("Sürüm: ","Version: ")+Program.Version;
+        if(Program.RepairMode) {
+            heading.Text=T("Mistik Launcher onarımı","Mistik Launcher repair");
+            description.Text=T("Eksik ve bozuk program dosyaları doğrulanmış kopyalarıyla yenilenir. Ayarlar, modlar ve dünyalar korunur. Başlamadan önce launcher'ı kapatın.","Missing and damaged program files are restored from verified copies. Settings, mods and worlds are kept. Close the launcher before starting.");
+            install.Content=Complete?T("Launcher'ı aç","Open launcher"):T("Onar","Repair");
+            if(!Busy && Complete) status.Text=T("Onarım tamamlandı.","Repair complete.");
+        }
     }
     internal void Capture(string folder)
     {
@@ -109,7 +130,7 @@ internal sealed class SetupWindow:Window
             language.SelectedIndex=code=="en"?1:0; Translate();
             visual.Measure(new Size(680,480)); visual.Arrange(new Rect(0,0,680,480)); visual.UpdateLayout();
             var image=new System.Windows.Media.Imaging.RenderTargetBitmap(680,480,96,96,PixelFormats.Pbgra32); image.Render(visual);
-            var encoder=new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image)); using var file=File.Create(Path.Combine(folder,"setup-"+(Program.Offline?"offline":"online")+"-"+code+".png")); encoder.Save(file);
+            var encoder=new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image)); using var file=File.Create(Path.Combine(folder,(Program.RepairMode?"repair":"setup-"+(Program.Offline?"offline":"online"))+"-"+code+".png")); encoder.Save(file);
         }
     }
     async Task Run()
@@ -119,11 +140,11 @@ internal sealed class SetupWindow:Window
             var root=InstallEngine.ValidateRoot(location.Text); location.Text=root;
             work=Program.CreateWork(); status.Text=T("Dosyalar hazırlanıyor…","Preparing files…");
             var downloadProgress=new Progress<double>(p=>progress.Value=p*0.75); var zip=await Program.Payload(work,downloadProgress,cancellation.Token);
-            status.Text=T("Dosyalar doğrulanıyor ve kuruluyor…","Verifying and installing files…"); var stage=Path.Combine(work,"payload"); bool desktop=shortcut.IsChecked==true;
-            await Task.Run(()=>{ cancellation.Token.ThrowIfCancellationRequested(); UpdateEngine.Extract(zip,stage); if(UpdateEngine.Verify(stage).Version!=Program.Version) throw new IOException("Version mismatch / Sürüm uyuşmazlığı."); InstallEngine.Install(stage,root,desktop,cancellation.Token); });
+            status.Text=Program.RepairMode?T("Dosyalar doğrulanıyor ve onarılıyor…","Verifying and repairing files…"):T("Dosyalar doğrulanıyor ve kuruluyor…","Verifying and installing files…"); var stage=Path.Combine(work,"payload"); bool desktop=shortcut.IsChecked==true;
+            await Task.Run(()=>{ cancellation.Token.ThrowIfCancellationRequested(); UpdateEngine.Extract(zip,stage); if(UpdateEngine.Verify(stage).Version!=Program.Version) throw new IOException("Version mismatch / Sürüm uyuşmazlığı."); if(Program.RepairMode) InstallEngine.Repair(stage,root,desktop,cancellation.Token); else InstallEngine.Install(stage,root,desktop,cancellation.Token); });
             progress.Value=100; Complete=true;
-        } catch(OperationCanceledException) { status.Text=T("Kurulum iptal edildi.","Installation cancelled."); }
-        catch(Exception error) { status.Text=T("Kurulum tamamlanamadı: ","Installation could not finish: ")+error.Message; }
-        finally { Busy=false; install.IsEnabled=true; location.IsEnabled=!Complete; shortcut.IsEnabled=!Complete; language.IsEnabled=true; cancel.Content=T("Kapat","Close"); install.Content=Complete?T("Launcher'ı aç","Open launcher"):T("Tekrar dene","Retry"); if(Complete) status.Text=T("Kurulum tamamlandı. Oyun verileri korundu.","Installation complete. Game data preserved."); if(work!=null) Program.CleanupWork(work); cancellation.Dispose(); }
+        } catch(OperationCanceledException) { status.Text=Program.RepairMode?T("Onarım iptal edildi.","Repair cancelled."):T("Kurulum iptal edildi.","Installation cancelled."); }
+        catch(Exception error) { status.Text=(Program.RepairMode?T("Onarım tamamlanamadı: ","Repair could not finish: "):T("Kurulum tamamlanamadı: ","Installation could not finish: "))+error.Message; }
+        finally { Busy=false; install.IsEnabled=true; location.IsEnabled=!Complete; shortcut.IsEnabled=!Complete; language.IsEnabled=true; cancel.Content=T("Kapat","Close"); install.Content=Complete?T("Launcher'ı aç","Open launcher"):T("Tekrar dene","Retry"); if(Complete) status.Text=Program.RepairMode?T("Onarım tamamlandı. Oyun verileri korundu.","Repair complete. Game data preserved."):T("Kurulum tamamlandı. Oyun verileri korundu.","Installation complete. Game data preserved."); if(work!=null) Program.CleanupWork(work); cancellation.Dispose(); }
     }
 }

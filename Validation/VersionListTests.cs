@@ -1,6 +1,9 @@
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
+using System.Net;
+using System.Net.Http;
 using MistikLauncher;
 using MistikLauncher.Pages;
 using Newtonsoft.Json.Linq;
@@ -17,6 +20,7 @@ static class VersionListTests
         var catalog=typeof(VersionManagerPage).GetFields(BindingFlags.Static|BindingFlags.NonPublic).Single(field=>field.FieldType==typeof(JArray));
         var previous=catalog.GetValue(null);
         var previousVersion=window.Config.Version;
+        var previousLanguage=Localization.Language;
         try
         {
             catalog.SetValue(null,new JArray(Enumerable.Range(1,95).Select(index=>new JObject { ["id"]="batch-snapshot-"+index,["type"]="snapshot" })));
@@ -54,9 +58,56 @@ static class VersionListTests
             Check(!Selection("batch-selection-first").IsEnabled && Selection("batch-selection-second").IsEnabled,"cached version page refreshes stale selection on load");
             var unchanged=cards.Children[0]; page.RefreshSelection();
             Check(ReferenceEquals(unchanged,cards.Children[0]),"unchanged version selection retains cached cards");
+            const string fabricId="fabric-loader-0.16.10-1.20.1";
+            foreach(var id in new[]{"1.20.1",fabricId})
+            {
+                var directory=System.IO.Path.Combine(App.GameDir,"versions",id); System.IO.Directory.CreateDirectory(directory);
+                var profile=new JObject { ["id"]=id };
+                if(id==fabricId) { profile["inheritsFrom"]="1.20.1"; profile["libraries"]=new JArray(new JObject { ["name"]="net.fabricmc:fabric-loader:0.16.10" }); }
+                System.IO.File.WriteAllText(System.IO.Path.Combine(directory,id+".json"),profile.ToString());
+                if(id!=fabricId) System.IO.File.WriteAllText(System.IO.Path.Combine(directory,id+".jar"),"fixture");
+            }
+            Filter("Fabric");
+            Check(Nodes(cards).OfType<TextBlock>().Count(label=>label.Text==fabricId)==1 && !Nodes(cards).OfType<TextBlock>().Any(label=>label.Text=="fabric-1.20.1"),"installed Fabric profile appears once without its duplicate catalog alias");
+            Localization.SetLanguage("en"); Filter("Snapshot");
+            Check(Nodes(cards).OfType<Button>().Where(button=>button.Name!="VersionLoadMore").All(button=>Equals(button.Content,Localization.T("INDIR"))),"rebuilt version cards retain English action labels");
+
+            var load=typeof(VersionManagerPage).GetMethods(BindingFlags.Instance|BindingFlags.NonPublic).Single(method=>method.ReturnType==typeof(Task) && method.GetParameters().Select(parameter=>parameter.ParameterType).SequenceEqual(new[]{typeof(bool),typeof(HttpClient)}));
+            Task Load(VersionManagerPage target,bool force,HttpClient client)=>(Task)load.Invoke(target,new object[]{force,client})!;
+            var handler=new CatalogHandler(); using var client=new HttpClient(handler);
+            var otherPage=new VersionManagerPage(window);
+            Nodes(otherPage).OfType<Button>().Single(button=>Equals(button.Content,"Snapshot")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var refresh=Load(page,true,client);
+            var waiting=Load(otherPage,false,client);
+            Check(!waiting.IsCompleted && handler.Requests==1,"a second version page waits for in-flight catalog refresh");
+            handler.Response.SetResult(new HttpResponseMessage(HttpStatusCode.OK) { Content=new StringContent("{\"versions\":[{\"id\":\"catalog-refreshed\",\"type\":\"snapshot\"}]}") });
+            Wait(Task.WhenAll(refresh,waiting));
+            Check(Nodes(page).OfType<TextBlock>().Any(label=>label.Text=="catalog-refreshed") && Nodes(otherPage).OfType<TextBlock>().Any(label=>label.Text=="catalog-refreshed") && handler.Requests==1,"all waiting version pages display the shared refreshed catalog");
+            var unavailable=new CatalogHandler(); using var offlineClient=new HttpClient(unavailable);
+            var failedRefresh=Load(page,true,offlineClient);
+            unavailable.Response.SetResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+            Wait(failedRefresh);
+            Check(Nodes(page).OfType<TextBlock>().Any(label=>label.Text=="catalog-refreshed"),"offline refresh preserves the working in-memory version catalog");
         }
-        finally { catalog.SetValue(null,previous); window.Config.Version=previousVersion; }
+        finally { catalog.SetValue(null,previous); window.Config.Version=previousVersion; Localization.SetLanguage(previousLanguage); }
         return checks;
+    }
+    static void Wait(Task task)
+    {
+        if(!task.IsCompleted)
+        {
+            var frame=new DispatcherFrame();
+            var dispatcher=Dispatcher.CurrentDispatcher;
+            _=task.ContinueWith(_=>dispatcher.BeginInvoke(new Action(()=>frame.Continue=false)),TaskScheduler.Default);
+            Dispatcher.PushFrame(frame);
+        }
+        task.GetAwaiter().GetResult();
+    }
+    sealed class CatalogHandler : HttpMessageHandler
+    {
+        public int Requests;
+        public readonly TaskCompletionSource<HttpResponseMessage> Response=new(TaskCreationOptions.RunContinuationsAsynchronously);
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken cancellationToken) { Requests++; return Response.Task; }
     }
     static IEnumerable<DependencyObject> Nodes(DependencyObject root)
     {

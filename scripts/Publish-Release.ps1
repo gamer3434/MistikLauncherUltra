@@ -16,7 +16,7 @@ try {
     $identity=Invoke-RestMethod -Uri 'https://api.github.com/user' -Headers $headers
     if($identity.login -ne 'gamer3434'){ throw 'Expected gamer3434 GitHub account' }
     $head=(git rev-parse HEAD).Trim()
-    $assets=@('artifacts/installers/SHA256SUMS.txt',"artifacts/MistikLauncher-$version-win-x64.zip","artifacts/installers/MistikSetup-Online-$version.exe","artifacts/installers/MistikSetup-Offline-$version.exe")
+    $assets=@('artifacts/installers/SHA256SUMS.txt',"artifacts/MistikLauncher-$version-win-x64.zip","artifacts/installers/MistikSetup-Online-$version.exe","artifacts/installers/MistikSetup-Offline-$version.exe","artifacts/installers/MistikRepair-$version.exe")
     foreach($asset in $assets){ if(!(Test-Path -LiteralPath $asset -PathType Leaf)){ throw "Missing release file: $asset" } }
     foreach($line in Get-Content artifacts/installers/SHA256SUMS.txt){
         if($line -notmatch '^([a-f0-9]{64})  (.+)$'){ throw 'Malformed checksums file' }

@@ -1,0 +1,11 @@
+# Depo ve gizlilik / Repository privacy
+
+Launcher oyuncu ayarlarını cihazda saklar. Eski Firebase hesap, telemetri ve yönetici paneli kullanılmaz; bu panelin kaynak kodu ve boş servis çağrıları kaldırıldı. `database.rules.json` eski bulut kayıtlarında okumayı ve yazmayı kapatır. Bu yerel düzenleme, canlı Firebase projesine dağıtım yapıldığı anlamına gelmez.
+
+Firebase proje eşlemesi `.firebaserc` dosyasında yalnızca yerel olarak tutulur. Gerekirse `.firebaserc.example` dosyasını kopyalayın, kendi proje kimliğinizi girin ve Firebase CLI ile doğru projeyi seçin. Kök `firebase.json` isteğe bağlı site dağıtımı ve kapalı veritabanı kuralları için tek yapılandırmadır. `firebase deploy --only hosting` yalnızca siteyi, `firebase deploy --only database` yalnızca kuralları dağıtır; doğru proje seçilmeden çalıştırmayın.
+
+`.env`, hizmet hesabı anahtarları, sertifika özel anahtarları, kişisel ayarlar, derleme çıktıları ve özel eşleme dosyaları Git dışında tutulur. Anahtarları istemciye gömmek veya gizlemek güvenli saklama sağlamaz. Firebase istemci API anahtarı ve proje kimliği herkese açık tanımlayıcılardır; erişim denetimini güvenlik kuralları sağlar. [Firebase anahtar belgeleri](https://firebase.google.com/docs/projects/api-keys).
+
+Geçmiş taramasında üç sabit parola değeri ve bir eski Firebase istemci anahtarı bulundu; değerleri bu belgede yayımlanmıyor. Ayrı yerel kopyada Git geçmişinin temizlenmesi hazırlanır. Bu işlem eski indirilmiş dosyaları, çatalları veya eski GitHub Release EXE'lerini geri alamaz. Daha önce yayımlanan gerçek parolalar kullanılıyorsa değiştirilmeli; hizmet hesabı veya erişim tokenı yayımlandıysa iptal edilmelidir. [GitHub hassas veri temizliği](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository).
+
+The launcher keeps player settings locally. Retired cloud administration and empty analytics calls were removed. Database reads and writes remain denied. Deployment mappings and credentials stay outside Git. Local source cleanup does not change a live Firebase project or revoke credentials; old releases and existing clones may still contain historical values.

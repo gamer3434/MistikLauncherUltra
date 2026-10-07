@@ -104,15 +104,9 @@ namespace MistikLauncher
             // This prevents a permanent background loop on every launcher start.
 
 
-            // Firebase Analytics: Oturum başlangıcı
-            _ = MistikAnalytics.TrackSessionStartAsync(Config.User ?? "Oyuncu", App.LocalVersion, Config.Version ?? "1.21");
-            _ = CheckRemoteSettingsAsync();
-
-
-            // Kapanışta oturum kaydı
+            // Dispose the opt-in relay when the window closes.
             Closing += async (s, e) =>
             {
-                try { await MistikAnalytics.TrackSessionEndAsync(Config.User ?? "Oyuncu"); } catch { }
                 try { if (Relay != null) await Relay.DisposeAsync(); } catch (Exception ex) { App.Log("Relay cleanup: " + ex.Message); }
             };
         }
@@ -180,9 +174,6 @@ namespace MistikLauncher
                         // GPU Algılama
                         string gpuName = KernelOptimizer.DetectGpuName();
                         App.Log($"[Startup] Algılanan Ekran Kartı: {gpuName}");
-
-                        // Firebase'e GPU bilgisi gönderme
-                        _ = MistikAnalytics.TrackGpuInfoAsync(Config.User ?? "Oyuncu", gpuName);
 
                         // NVIDIA Profil Kaydı ve GPU tercihi
                         try
@@ -843,29 +834,12 @@ namespace MistikLauncher
                 SetProgress(100);
                 Relay?.UpdateStatus("Oyunda", version, "Minecraft");
 
-                // Firebase Analytics: Oyun başlatma istatistiği
-                try { _ = MistikAnalytics.TrackGameLaunchAsync(Config.User ?? "Oyuncu", version, ram / 1024); } catch { }
-
-                // Oyun başarıyla açıldığı için mod listesini de Firebase'e senkronize et
-                try
-                {
-                    if (Directory.Exists(App.ModsDir))
-                    {
-                        var jarFiles = Directory.GetFiles(App.ModsDir, "*.jar")
-                                                .Select(x => Path.GetFileNameWithoutExtension(x) ?? "")
-                                                .Where(x => !string.IsNullOrEmpty(x))
-                                                .ToList();
-                        _ = MistikAnalytics.SyncInstalledModsAsync(Config.User ?? "Oyuncu", jarFiles);
-                    }
-                }
-                catch { }
 
 
             }
             catch (Exception ex)
             {
                 App.Log($"Launch error: {ex.Message}");
-                try { _ = MistikAnalytics.TrackCrashAsync(Config.User ?? "Oyuncu", $"Oyun Başlatma Hatası: {ex.Message}", ex.StackTrace ?? ""); } catch { }
                 CrashDiagnostics.Show(this,CrashDiagnostics.Report(null,started,ex.Message));
             }
             finally
@@ -1087,20 +1061,6 @@ namespace MistikLauncher
 
                     // Uyumsuz modları otomatik askıya al
                     SuspendIncompatibleMods(mcVersion, currentLoader);
-
-                    // Modları Firebase veritabanına senkronize et
-                    try
-                    {
-                        if (Directory.Exists(App.ModsDir))
-                        {
-                            var jarFiles = Directory.GetFiles(App.ModsDir, "*.jar")
-                                                    .Select(x => Path.GetFileNameWithoutExtension(x) ?? "")
-                                                    .Where(x => !string.IsNullOrEmpty(x))
-                                                    .ToList();
-                            _ = MistikAnalytics.SyncInstalledModsAsync(Config.User ?? "Oyuncu", jarFiles);
-                        }
-                    }
-                    catch { }
 
                     App.Log($"Mods synchronized successfully for version: {currentVer} ({currentLoader})");
                     return true;
@@ -1411,6 +1371,7 @@ namespace MistikLauncher
                 if (Config.SkinType == "username")
                 {
                     var user = !string.IsNullOrEmpty(Config.SkinUser) ? Config.SkinUser : Config.User;
+                    if (!Regex.IsMatch(user ?? "", @"^[A-Za-z0-9_]{3,16}$")) return false;
                     if (string.IsNullOrEmpty(user) || user == "Oyuncu")
                     {
                         EnsureMistikSkinPackEnabled(false);
@@ -1451,6 +1412,7 @@ namespace MistikLauncher
 
                     if (skinBytes != null)
                     {
+                        SkinValidator.Validate(skinBytes);
                         if (Directory.Exists(packDir))
                         {
                             try { Directory.Delete(packDir, true); } 
@@ -1491,6 +1453,7 @@ namespace MistikLauncher
                     var filePath = Config.SkinUser;
                     if (File.Exists(filePath))
                     {
+                        SkinValidator.Validate(await File.ReadAllBytesAsync(filePath));
                         if (Directory.Exists(packDir))
                         {
                             try { Directory.Delete(packDir, true); } 
@@ -2319,19 +2282,6 @@ namespace MistikLauncher
                 });
             } catch (Exception ex) { App.Log($"Relay ex: {ex.Message}"); }
         }
-
-        async Task RelayLoopAsync()
-        {
-            while (true) {
-                await Task.Delay(10000);
-                try { Relay?.UpdateStatus("Launcher'da", Config.Version, "Ana Ekran"); }
-                catch { }
-                try { await CheckRemoteSettingsAsync(); }
-                catch { }
-            }
-        }
-
-        public Task CheckRemoteSettingsAsync() => Task.CompletedTask;
 
         // ── Progress ──────────────────────────────────────────────────────────
         public void SetProgress(double v, string? status = null)

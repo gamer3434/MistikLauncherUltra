@@ -93,6 +93,9 @@ static class LauncherUpdateTests
         File.WriteAllText(Path.Combine(payload,names[0]),"tampered"); rejected=false;
         try { UpdateEngine.Verify(payload); } catch(InvalidDataException) { rejected=true; }
         Check(rejected,"staged payload tampering rejected");
+        File.WriteAllText(Path.Combine(service.PreparedPayload!,names[0]),"tampered staged helper payload");
+        Check(!await service.StartInstallerAsync() && !service.Busy && service.StatusKey=="luError" && !string.IsNullOrWhiteSpace(service.Error),"failed update handoff reports a usable error and releases busy state");
+        Check(!await service.StartInstallerAsync() && !service.Busy && service.StatusKey=="luError","update handoff failure releases the gate for retry");
         return checks;
     }
     sealed class StalledStream : MemoryStream

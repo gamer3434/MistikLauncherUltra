@@ -60,3 +60,15 @@ MistikCodeSign.cer
 artifacts/
 !scripts/*.ps1
 .firebase/
+
+# Deployment mappings and credentials stay on the maintainer device.
+.firebaserc
+**/.firebaserc
+service-account*.json
+*-service-account.json
+*firebase-adminsdk*.json
+credentials.json
+*.pdb
+*.bundle
+*.jks
+*.keystore

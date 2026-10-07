@@ -155,6 +155,7 @@ public sealed class LauncherUpdater
         try
         {
             if(PreparedPayload is not string payload||!idle()) { Publish("luDeferred"); return false; }
+            Error=null;
             Busy=true; Publish("luVerifying",90);
             string helper=UpdateEngine.SafePath(directory,"MistikUpdater.exe");
             string stage=Path.GetDirectoryName(payload)!;
@@ -178,8 +179,10 @@ public sealed class LauncherUpdater
                 if(child.HasExited) break;
                 await Task.Delay(100);
             }
+            Error="Update helper did not signal readiness.";
             Publish("luError"); return false;
         }
+        catch(Exception ex) { Error=ex.Message; Publish("luError"); App.Log("Launcher update handoff: "+ex.Message); return false; }
         finally { Busy=false; Changed?.Invoke(); gate.Release(); }
     }
 }

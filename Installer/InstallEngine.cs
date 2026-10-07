@@ -57,6 +57,38 @@ public static class InstallEngine
         foreach(var file in state.Files) { UpdateEngine.SafePath(root,file); if(file==Marker) throw new IOException("Invalid installation record"); }
         return state;
     }
+    public static void Repair(string payload,string root,bool shortcuts,CancellationToken cancellation=default,bool shell=true)
+    {
+        root=ValidateRoot(root);
+        if(!Directory.Exists(root)) throw new IOException("Installation folder not found / Kurulum klasörü bulunamadı.");
+        var manifest=UpdateEngine.Verify(payload);
+        static Version Number(string? value)=>Version.TryParse((value??"").TrimStart('v').Split('-')[0],out var version)?version:new Version(0,0,0);
+        string? installedVersion=null;
+        bool recognized=false;
+        try { var state=ReadState(root); installedVersion=state.Version; recognized=true; }
+        catch(Exception ex) when(ex is IOException or JsonException or InvalidOperationException) { }
+        if(shell) {
+            using var key=Registry.CurrentUser.OpenSubKey(RegistryKey);
+            if(key?.GetValue("InstallLocation") is string location && Path.GetFullPath(location).TrimEnd(Path.DirectorySeparatorChar).Equals(root,StringComparison.OrdinalIgnoreCase)) {
+                recognized=true;
+                var registeredVersion=key.GetValue("DisplayVersion") as string;
+                if(Number(registeredVersion)>Number(installedVersion)) installedVersion=registeredVersion;
+            }
+        }
+        if(!recognized) throw new IOException("Installation record not found. Reinstall in a new folder / Kurulum kaydı bulunamadı. Yeni bir klasöre kurun.");
+        if(Number(installedVersion)>Number(manifest.Version)) throw new IOException("Download the newer repair tool / Daha yeni onarıcıyı indirin.");
+        foreach(var relative in manifest.Files.Select(file=>file.Path).Concat(new[]{"update-manifest.json",Marker})) {
+            var path=UpdateEngine.SafePath(root,relative);
+            if(File.Exists(path)) using(File.Open(path,FileMode.Open,FileAccess.Read,FileShare.None)) { }
+        }
+        cancellation.ThrowIfCancellationRequested();
+        UpdateEngine.Apply(payload,root,manifest.Version,repair:true);
+        UpdateEngine.VerifyInstalled(root,manifest);
+        if(shell) {
+            Shortcut(root,Environment.GetFolderPath(Environment.SpecialFolder.Programs),false);
+            if(shortcuts) Shortcut(root,Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),false);
+        }
+    }
     public static void Uninstall(string root,bool shell=true)
     {
         root=ValidateRoot(root); var state=ReadState(root);

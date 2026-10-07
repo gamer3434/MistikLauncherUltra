@@ -1,213 +1,53 @@
-# Mistik Launcher Ultra 6.1.5 — Stable release / Kararlı sürüm
+# Mistik Launcher Ultra
 
-**Stable release.** Home, settings, navigation, diagnostics and launcher controls are bilingual. Version 6.1.5 adds a dedicated Updates page in the top menu for the existing updater controls and release notes.
+Windows x64 için Türkçe / English Minecraft launcher. Oyuncu ayarları cihazında saklanır; sürüm, mod, skin ve yerel sunucu yönetimi içerir.
 
-**Kararlı sürüm.** Ana panel, ayarlar, gezinme, tanılama ve launcher kontrolleri iki dillidir. 6.1.5 üst menüye mevcut güncelleme denetimlerini ve sürüm notlarını gösteren ayrı bir Güncellemeler sayfası ekler.
+[Yayımlanan sürümleri indir](https://github.com/gamer3434/MistikLauncherUltra/releases/latest) · [Web sitesi](https://mistiklauncherultra.web.app/) · [6.1.8 değişiklikleri](docs/RELEASE-6.1.8.md)
 
-### Güncel sürüm / Current version — 6.1.5
+## Kurulum ve onarım
 
-Launcher, resmî son kararlı sürüm duyurusunu Güncellemeler ve Ayarlar bölümlerinde seçili dilde gösterir. Bozuk sürüm etiketleri güncelleme karşılaştırmasında reddedilir. Site, GitHub Release yayımlandığında sürüm, duyuru, indirme bağlantıları ve SHA-256 değerlerini birlikte yeniler; Firebase Hosting ve Cloudflare Pages üzerinden sunulur. / The launcher shows official stable release notes in Updates and Settings in the selected language and rejects malformed version tags. The website refreshes version, announcements, downloads and SHA-256 hashes together from GitHub Releases on Firebase Hosting and Cloudflare Pages.
+Sürüm sayfasından online veya offline kurulum EXE'sini seçin. Taşınabilir kullanım için ZIP'in tüm dosyalarını aynı klasöre çıkartıp `MistikLauncher.exe` dosyasını açın. .NET çalışma zamanı pakete dahildir.
 
-[6.1.5 ayrıntıları / Details](docs/RELEASE-6.1.5.md). [6.1.5 indir / Download](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.1.5). [Web sitesi / Website](https://mistiklauncherultra.web.app/).
+Program bozulursa launcher'ı kapatın, aynı veya daha yeni sürümün `MistikRepair-6.1.8.exe` dosyasını açıp kurulum klasöründe **Onar** seçin. Onarıcı internet gerektirmez; program dosyalarını doğrular ve yeniler. Ayarlar, modlar ve dünyalar korunur. Onarıcı 6.1.8 paketine eklenmiştir; indirme için bu sürümün yayımlanmış olması gerekir.
 
-Mistik Launcher hesabı ve bulut ayar yedeği kaldırıldı. Oyuncu adı ve tercihler cihazında yönetilir. / Mistik Launcher accounts and cloud preference backup have been removed. Manage player names and preferences locally.
+Varsayılan kurulum: `%LOCALAPPDATA%\Programs\MistikLauncherUltra`. Oyuncu verileri: `%APPDATA%\.mistik_ultra`. Şifreli ayarlar aynı Windows kullanıcı hesabında açılır. Paket şu anda genel yayıncı sertifikasıyla imzalı değildir.
 
-[Önceki 6.0.11 ayrıntıları / Previous 6.0.11 details](docs/RELEASE-6.0.11.md). SignPath incelemesi sürüyor; yeni sürüm şu anda imzasızdır / SignPath review is pending; the new release is currently unsigned.
+## Kullanım
 
-**Ayarların taşınması / Moving settings:** `%APPDATA%\.mistik_ultra\config.json` ve `.bak` dosyaları artık aynı Windows kullanıcı hesabında açılır. Başka bilgisayara veya hesaba taşıyacaksanız, eski bilgisayarda ayarları yeniden girmeniz gerekir; oyun dünyaları ve modlar şifrelenmez. / The encrypted settings files can be opened only under the same Windows account. Re-enter preferences when moving to another account or PC; game worlds and mods are not encrypted.
+1. Sağ üstten Türkçe veya English seçin.
+2. Ayarlarda oyuncu adını ve belleği kaydedin.
+3. Sürümler sayfasından oyun sürümünü kurup alt çubuktan seçin.
+4. Uyumlu modları seçip **Oyunu başlat** düğmesini kullanın.
 
-### Önceki sürümler / Previous versions
+Minecraft ve mod lisanslarına uyun. Microsoft hesabı kimlik doğrulaması bu launcher'a eklenmemiştir.
 
-**6.1.4:** Kayıtta doğrulama e-postası gönderimi ve çıkışta etkin oturumun kapanması düzeltildi. / Fixed registration verification email delivery and immediate session clearing on sign-out. [6.1.4 ayrıntıları / Details](docs/RELEASE-6.1.4.md).
-
-**6.1.3:** Launcher girişi ve ayar yedeği için doğrulanmış e-posta zorunlu kılındı. / Required verified email for launcher sign-in and settings backup. [6.1.3 ayrıntıları / Details](docs/RELEASE-6.1.3.md).
-
-**6.1.1:** Launcher'a resmî sürüm duyuruları ve bozuk sürüm etiketlerine karşı koruma eklendi; web sitesi Release indirmelerini ve SHA-256 değerlerini yeniler. / Added official release announcements and malformed-version checks; the website refreshes Release downloads and SHA-256 values. [6.1.1 ayrıntıları / Details](docs/RELEASE-6.1.1.md).
-
-**6.1.0:** Başlatma hazırlığı, güvenli oyun dosyası onarımı ve çökme sonrası mod kurtarma eklendi. / Added launch readiness, safe game-file repair and mod recovery after a crash. [6.1.0 ayrıntıları / Details](docs/RELEASE-6.1.0.md).
-
-Şifreli ayarlar, yedek kurtarma, daha az sayfa çizimi ve tema renkli güncelleme çubuğu eklendi. / Added encrypted settings, backup recovery, fewer page redraws and a theme-colored update bar. [6.0.11 ayrıntıları / Details](docs/RELEASE-6.0.11.md).
-
-Çıkış düğmesi artık 38×24 ölçülerinde, köşeleri yuvarlatılmış dikdörtgendir. Simetrik vektör çarpı tam ortalanır. **Tema**, **RGB · renk geçişi**, **Kapalı** seçenekleri korunur; RGB yalnızca çıkış çerçevesi ve ışığında yumuşak geçiş yapar. Profil eşitlemesi ve bulut ayar yedeği kaldırılmıştır. Eski bulut kayıtlarına erişim kapalıdır.
-
-The close control now uses a 38×24 rounded rectangle and a precisely centered symmetric vector cross. **Theme**, **RGB · color cycle**, **Off** remain available; only close gets animated outline/glow. Profile synchronization and cloud preference backup have been removed. Access to old cloud records is closed.
-
-Minecraft startup failure/nonzero exit restores the launcher and displays diagnostics. / Minecraft açılış hatası veya sıfırdan farklı çıkış kodu launcher'ı geri açar ve hata analizini gösterir. Real Vanilla/Forge gameplay results and previous remaining issues: [PC report](docs/PC-TESTS-PREVIEW-7.md).
-
-**Download / İndir:** [6.1.5 release](https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v6.1.5).
-
-- `MistikSetup-Online-6.1.5.exe`: uygulama paketini GitHub'dan indirir ve SHA-256 doğrular / downloads and verifies this version's package from GitHub.
-- `MistikSetup-Offline-6.1.5.exe`: uygulama dosyaları içinde bulunur; kurulum için internet gerekmez / embeds the full application; installation needs no internet.
-- `MistikLauncher-6.1.5-win-x64.zip`: taşınabilir seçenek / portable option.
-
-Kurulum dili sihirbazın sağ üstünden seçilir. Varsayılan konum `%LOCALAPPDATA%\Programs\MistikLauncherUltra`; yönetici izni gerekmez. Windows uygulama listesinden kaldırılabilir. Ayarlar, modlar ve dünyalar `%APPDATA%\.mistik_ultra` altında korunur. Dolu klasöre kurulum engellenir; mevcut kurulumu uygulamanın güncelleyicisiyle güncelleyin veya önce kaldırın. Launcher için yeni sürümleri otomatik alma ayarı ayrıca kullanılabilir.
-
-Choose installer language at the upper right. Default per-user folder: `%LOCALAPPDATA%\Programs\MistikLauncherUltra`; no administrator rights needed. Uninstall through Windows installed apps. Existing settings, mods and worlds under `%APPDATA%\.mistik_ultra` are preserved. Nonempty destinations are rejected; use the launcher's updater or uninstall first. The launcher separately offers automatic updates for future versions.
-
-**İmza / Signing:** Güncel 6.1.5 paketi imzasızdır; Authenticode veya genel Windows yayıncı güveni sağlamaz. İsteğe bağlı yerel test imzası yalnızca maintainer build adımında kullanılabilir. / The current 6.1.5 package is unsigned; it carries no Authenticode signature or public Windows publisher trust. Optional local test signing is maintainer-only.
-
-**6.1.1 validation:** The previous protected package passed **300 checks** (**298** in the ordinary run), including bilingual release notes, malformed-version rejection, integrity repair and installer rollback. / Önceki 6.1.1 korumalı paketinde **300 kontrol** (**normal çalıştırmada 298**) geçti; iki dilli duyuru, bozuk sürüm etiketi reddi, dosya onarımı ve kurulum geri alma doğrulandı. [Previous release details / Önceki sürüm ayrıntıları](docs/RELEASE-6.1.1.md). [Current window controls / Güncel pencere kontrolleri](docs/WINDOW-AND-TOOLBAR.md).
-
-[Kurulum kılavuzu ve görseller / Setup guide and previews](docs/SETUP-PREVIEW-9.md).
-
-[İmza durumu ve ücretsiz genel imza başvuru seçeneği / Signing status and free trusted signing application option](docs/CODE-SIGNING.md).
-
-Maintainer-only signing / Yalnızca maintainer imzalama: `./scripts/Build-Protected.ps1 -SigningThumbprint YOUR_CERTIFICATE_THUMBPRINT` ardından `./scripts/Build-Installers.ps1 -SigningThumbprint YOUR_CERTIFICATE_THUMBPRINT`. `-AllowLocalTestSignature` yalnızca mevcut kullanıcı deposundaki açıkça güvenilir olmayan test sertifikası için kullanılabilir; özel anahtar pakete kopyalanmaz. İmzasız build eski signing metadata'sını taşımaz. / Use signing only in a maintainer-controlled build; public trust requires a separately verified publisher certificate.
-
-## Türkçe
-
-Yeni ana panel oyuncu profili, sürüm, bellek ve hızlı işlemleri gösterir. Ayarlarda oyuncu adı, 1–32 GB bellek, skin sağlayıcısı, renk ve otomatik kapanma seçilir. Üst menüdeki dil listesi anında Türkçe / English geçişi sağlar. Global launcher araması kaldırıldı; gezinme üstte, oyuncu adı ve skin yüzü sağ üsttedir. RedX referansındaki kömür siyahı yüzeyler, 20 renk seçeneği, Segoe UI ve görünür klavye odağı kullanılır.
-
-Ayarlar atomik kaydedilir; önceki değerler `.bak` dosyasından kurtarılır. Donanım, IP, oyuncu adı ve oyun etkinliği telemetrisi, canlı sayaç ve kimlik doğrulamasız Firebase yönetimi kaldırıldı. Mistik Launcher hesabı ve bulut yedek bağlantıları kaldırıldı. Sabit yönetici şifreleri ve eski kontrolsüz EXE değiştirme devre dışı bırakıldı; resmî doğrulanmış paket güncellemeleri yeni sistemle uygulanır. Açılışta sessiz kurulum, diğer başlatıcı işlemlerini sonlandırma ve otomatik sistem müdahaleleri kaldırıldı. MQTT için TLS yapılandırıldı; başlangıçta otomatik bağlantı kaldırıldı. Topluluk aktarımının güvenlik/kullanılabilirlik incelemesi sürüyor.
-
-### Çalıştırma
-
-Windows x64 için yayın sayfasından online veya yerel kurulumu seçin; taşınabilir kullanım için ZIP'i ayrı klasöre çıkartıp `MistikLauncher.exe` dosyasını açın. Paket kendi .NET çalışma zamanını içerir. **Paketin tüm dosyalarını bir arada tutun.** Yeni bağımsız kurulum kendi dosya kaydını yönetir; eski uygulama içi kurulum/kaldırma ve sertifika güven deposu değişiklikleri kapalıdır. Veriler `%APPDATA%\.mistik_ultra` içinde kalır.
-
-1. Sağ üstte Türkçe veya English seçin.
-2. Ayarlar sayfasında oyuncu adını ve belleği girip Değişiklikleri kaydet düğmesine basın.
-3. Sürümler sayfasından oyun sürümünü indirin, alt çubukta seçin.
-4. Uyumlu modları seçip Oyunu başlat düğmesini kullanın.
-
-Vanilla/Forge dünya testi ve ayrı yerel sunucu doğrulandı. Her mod kombinasyonu, Microsoft/Ely.by girişi ve genel tüneller test edilmedi; Auto-MCS sunucu oluşturma sihirbazı hata verdi. Microsoft hesabı kimlik doğrulaması eklenmedi. Minecraft ve mod lisanslarına uyun.
-
-### Derleme ve doğrulama
+## Kaynaktan derleme
 
 Windows ve .NET 8 SDK gerekir:
 
 ```powershell
 dotnet build MistikLauncher/MistikLauncher.csproj -c Release
 dotnet run --project Validation -c Release -- artifacts/screenshots-ordinary
+node --test Validation/WebsiteReleaseTests.js Validation/WebsitePrivacyTests.js
 ./scripts/Build-Protected.ps1
+./scripts/Build-Installers.ps1
 ```
 
-Koruma betiği sabit sürümlü aracı yükler, taşınabilir sürümü derler, korumalı DLL ile doğrulamayı çalıştırır ve ZIP üretir. Özel eşleme ve PDB dosyaları pakete eklenmez. `checksums.json` bozulma tespiti içindir; dijital imza değildir.
+Paketler `artifacts/` altında üretilir. Sürüm yayımlama iş akışı yalnızca proje sürümüyle eşleşen `v*` etiketlerinde çalışır. EXE, ZIP, PDB ve kişisel yapılandırmalar kaynak deposuna eklenmez.
+
+## Depo yapısı
+
+| Klasör | İçerik |
+| --- | --- |
+| `MistikLauncher/` | Launcher ve dil kaynakları |
+| `Installer/`, `Repair/`, `Uninstaller/`, `Updater/` | Kurulum, onarım ve güncelleme araçları |
+| `Validation/`, `UpdateFixture/` | Doğrulama ve güncelleme test uygulaması |
+| `site/` | Statik web sitesi |
+| `scripts/`, `.github/` | Derleme ve yayın iş akışları |
+| `docs/` | Sürüm notları ve teknik belgeler |
+
+Eski Firebase hesapları, telemetri ve yönetici paneli kaldırılmıştır. İsteğe bağlı site dağıtımı için kişisel Firebase proje eşlemesi yerel `.firebaserc` dosyasındadır; depoda yalnızca örnek ve erişimi kapatan kurallar tutulur. [Gizlilik ve geçmiş temizliği](docs/REPOSITORY-PRIVACY.md).
 
 ## English
 
-The redesigned home shows player, version, memory and quick actions. Settings validate player names and 1–32 GB RAM, and offer skin provider, accent and automatic closing. The top-right Turkish / English selector updates at runtime. Navigation is centered at the top, with player name and skin face at the right. Global launcher search has been removed; page-local mod and skin search remains. Charcoal surfaces, 20 accent palettes, Segoe UI typography and visible keyboard focus follow the supplied RedX references. Mistik Launcher accounts and cloud preference backup have been removed. Player names and preferences are managed locally.
-
-Configuration writes are atomic with recovery from the previous backup. Hardware, IP, player-name and gameplay telemetry, the live counter, and unauthenticated Firebase administration were removed. Mistik Launcher accounts and cloud backup connections have been removed. Hardcoded administrator access and legacy arbitrary executable replacement are disabled; verified official package updates now use the new updater. Startup no longer silently installs, terminates other launcher processes or changes system preferences. MQTT uses TLS; automatic startup connection was removed. Community relay security/usability review remains outstanding.
-
-### Run
-
-Extract `artifacts/MistikLauncher-6.1.5-win-x64.zip` to a dedicated Windows x64 folder and run `MistikLauncher.exe`, or choose an online/offline setup from the `v6.1.5` release. The .NET runtime is included. **Keep all package files together.** Legacy in-launcher installation/uninstallation and certificate trust changes remain disabled; the new standalone installer manages its own ownership record. Data remains under `%APPDATA%\.mistik_ultra`.
-
-1. Select Türkçe or English at the top right.
-2. Enter player name and RAM in Settings, then Save changes.
-3. Download a version under Versions and select it in the bottom bar.
-4. Choose compatible mods and select Launch game.
-
-Vanilla/Forge gameplay and an isolated local server were verified. Every mod combination, Microsoft/Ely.by game login and public tunnels remain untested; the third-party Auto-MCS server wizard failed. Respect Minecraft and mod licenses.
-
-### Build
-
-Use the three commands above with .NET 8 SDK on Windows. The protection script restores Obfuscar 2.2.49, publishes a self-contained portable build, validates the protected DLL and packages it. Private obfuscation maps and debug symbols are excluded.
-
-## Language resources / Dil kaynakları
-
-Embedded `MistikLauncher/Locales/tr.json` and `en.json` share identical keys. `Localization.T("play")` returns **Oyunu başlat** / **Launch game**. New pages respond immediately to language events. Catalogued legacy strings are updated without recreating running server controllers. Full legacy-page translation remains incomplete.
-
-Gömülü kaynakların anahtarları aynıdır. Yeni sayfalar dil değişikliğine anında yanıt verir; eski sayfaların tam çevirisi sürüyor. Eksik metinler [envanterde](docs/localization-remaining.txt) listelenir.
-
-## Protection limits / Koruma sınırları
-
-Eligible private member names and string constants are obfuscated. WPF entry points and JSON names are preserved. String hiding is reversible; it is not strong encryption and cannot secure embedded secrets. Public source remains readable. This 6.1.5 package is not Authenticode signed; SmartScreen and antivirus behavior cannot be guaranteed.
-
-Özel üyeler ve metin sabitleri gizlenir; WPF/JSON adları korunur. Gizleme geri çevrilebilir; güçlü şifreleme değildir. Açık kaynak okunabilir kalır. 6.1.5 paketi Authenticode imzası taşımaz; antivirüs veya SmartScreen garantisi yoktur.
-
-## Screenshots / Ekran görüntüleri
-
-Real off-screen WPF renders, not a running Minecraft session. / Gerçek WPF görüntüleri; açık Minecraft oturumu değildir.
-
-![English home](docs/screenshots/home-en.png)
-![Türkçe ayarlar](docs/screenshots/settings-tr.png)
-
-## Files / Dosyalar
-
-| File | Purpose / Amaç |
-|---|---|
-| `MistikLauncher/Core.cs` | Config recovery, TLS / Ayarlar ve güvenlik |
-| `MistikLauncher/App.xaml.cs` | Portable startup / Taşınabilir açılış |
-| `MistikLauncher/MainWindow.xaml` | Top navigation, player profile, language, focus / Üst menü ve profil |
-| `MistikLauncher/MainWindow.xaml.cs` | Runtime switching and navigation / Dil değiştirme |
-| `MistikLauncher/Pages/ModernPages.cs` | Bilingual home, readiness and settings / İki dilli ana panel, hazırlık ve ayarlar |
-| `MistikLauncher/GameRuntimeHealth.cs` | Profile/JAR/library verification and safe repair / Profil-JAR-kütüphane doğrulama ve güvenli onarım |
-| `MistikLauncher/LaunchReadiness.cs` | Java, memory, disk and mod readiness / Java, bellek, disk ve mod hazırlığı |
-| `MistikLauncher/LauncherUpdater.cs` | Verified updates and bilingual release notes / Doğrulanmış güncelleme ve iki dilli duyuru |
-| `MistikLauncher/Localization.cs` | Embedded resource loader / Dil kaynakları |
-| `MistikLauncher/ReleaseSecurity.cs` | Update and uninstall safeguards / Güvenlik |
-| `scripts/Build-Protected.ps1` | Protected package / Korumalı paket |
-| `Validation/Program.cs` | Ordinary/protected checks and WPF renders / Normal-korumalı denetimler |
-| `Validation/GameRuntimeHealthTests.cs` | Integrity and repair fixtures / Bütünlük ve onarım denetimleri |
-| `Validation/LaunchReadinessTests.cs` | Readiness and safe crash recovery checks / Hazırlık ve güvenli çökme kurtarma denetimleri |
-| `Validation/LauncherUpdateTests.cs` | Release-note parsing and update safeguards / Duyuru ve güncelleme denetimleri |
-| `Validation/WebsiteReleaseTests.js` | Stable-release and download-link checks / Kararlı sürüm ve indirme bağlantısı denetimleri |
-| `site/assets/release.js` | Latest stable release, announcements and matching download digests / Güncel kararlı sürüm, duyuru ve dosya özetleri |
-| `.github/workflows/validate.yml` | Windows CI / Windows doğrulama |
-
-See [audit and outstanding work](docs/AUDIT.md). / [Denetim ve kalan işler](docs/AUDIT.md).
-
-## Auto-MCS güncellemeleri / Auto-MCS updates
-
-Sunucular sayfasındaki **Güncellemeleri denetle / güncelle** düğmesi resmî `macarooni-man/auto-mcs` deposunun son kararlı Windows ZIP paketini bulur. Eski sabit v5.3.0 bağlantısı kaldırıldı. Paket SHA-256 ve uzunluk ile doğrulanır, geçici klasörde hazırlanır ve EXE atomik değiştirilir. Önceki EXE `.bak` olarak korunur; oyun/sunucu ayarlarına dokunulmaz.
-
-**Açılışta otomatik güncelleme** varsayılan olarak açıktır; Sunucular sayfasından kapatılabilir. Yüklü Auto-MCS başlatıcı açıldığında arka planda güncellenir. İlk kurulum kullanıcı düğmesiyle başlar. Açık Auto-MCS için güncelleme ertelenir; internet veya doğrulama hatası eski kurulumu korur. Güncel ve doğrulanmış sürüm tekrar indirilmez. Sunucu sayfasına girince uygulama otomatik açılmaz.
-
-The **Check for updates / update** button selects the latest stable official Windows ZIP instead of the fixed mirrored release. Package size and official SHA-256 are verified before atomic EXE replacement, with the previous binary retained as `.bak`. Automatic startup updates are enabled by default and configurable on Servers. First installation requires the install button. Running Auto-MCS defers replacement; offline/digest failures preserve the old executable. Existing server data is left untouched.
-
-The server page now displays installed/latest versions, progress, actionable status and release notes in Turkish and English. Ordinary/protected validation includes updater fixtures; an optional live check successfully downloaded and verified official v2.3.9 without executing it.
-
-```powershell
-dotnet run --project Validation -c Release -- artifacts/screenshots --live-mcs
-```
-
-![Türkçe sunucu çalışma alanı](docs/screenshots/server-tr.png)
-![English server workspace](docs/screenshots/server-en.png)
-
-## Otomatik launcher güncellemesi / Automatic launcher updates
-
-**Ayarlar → Launcher güncellemeleri** bölümünde otomatik güncelleme varsayılan olarak açıktır. Başlatıcı açılışta ve açık kaldığı sürece her 30 dakikada resmî GitHub deposunun son **kararlı Release** sürümünü denetler. Daha yeni sürüm varsa Windows x64 ZIP paketinin resmî SHA-256 değeri, boyutu ve iç dosya manifesti doğrulanır. İndirme/ayar düzenleme gibi açık bir işlem sürüyorsa güncelleme ertelenir. Launcher güncelleme yardımcısı hazır olunca kapanır; yardımcı dosyaları yedekleyip değiştirir ve launcher'ı yeniden açar. Oyun dünyaları, ayarlar ve Auto-MCS kurulumuna dokunulmaz. Dosya değiştirme hatasında değiştirilen dosyalar geri alınır; yedekler geçici güncelleme klasöründe korunur.
-
-**Bu paketi bir kez çıkartıp yeni EXE'yi açmanız gerekir.** Eski launcher sürümlerinde yeni yardımcı program bulunmaz. Kaynak kod commitleri otomatik güncelleme tetiklemez; yeni Windows ZIP içeren bir GitHub Release gerekir. Önizleme/prerelease ve eski sürümler otomatik yüklenmez.
-
-Automatic updates are enabled under **Settings → Launcher updates**. The official latest stable GitHub Release is checked at startup and every 30 minutes. Newer Windows ZIPs are verified against the official SHA-256, declared size and complete internal manifest. Active work defers updates. A separate self-contained helper waits for the launcher to close, backs up/replaces package files and restarts it. Settings, worlds and Auto-MCS data are preserved. File replacement failures roll back changed files. Install this portable package once to bootstrap the new updater; source commits alone do not trigger updates.
-
-### Yeni sürüm yayımlama / Publishing a new release
-
-1. `MistikLauncher.csproj` içindeki `Version` değerini artırın ve değişiklikleri commit edin.
-2. Aynı sürümle `vX.Y.Z` etiketi oluşturup GitHub'a gönderin.
-3. `.github/workflows/release.yml` Windows üzerinde korumalı paketi derleyip doğrular ve ZIP içeren Release oluşturur. GitHub, asset SHA-256 değerini hesaplar; launcher bu değeri kullanır.
-
-Bump the project Version, commit and push a matching `vX.Y.Z` tag. The release workflow validates the tag/version, builds/tests the protected package and publishes it. Tags containing a suffix create prereleases, which automatic updates skip. Packaging includes `MistikUpdater.exe` and `update-manifest.json`.
-
-### Tasarım yenilemesi / Design refresh
-
-Gece laciverti `#0D1727`, yüzey `#192C46`, açık metin `#EFF5FF`, ikincil metin `#ADBED6`, turkuaz/mavi vurgu ve Minecraft'a özgü blok çizimi. Ana panel, gezinme, eski kart renkleri ve ayarlar tutarlı palete geçirildi. Kaydet düğmesi kaydırmadan bağımsız alt alanda kalır. Önbellekli yeni sayfaların dil geçişi ayrıca doğrulanır.
-
-Midnight navy, blue surfaces, turquoise accents, consistent typography and a Minecraft block illustration unify the home, shell and settings. Shared legacy cards inherit the new palette. Settings keep Save changes in a fixed footer. Cached bilingual pages are explicitly refreshed and validated.
-# Forge ve renk temaları / Forge and color themes
-
-**6.0.0-preview.4:** Pencere stilleri artık önizlemeli kartlardan seçiliyor. Mod merkezi → Kurulu Modlar altında modları silmeden etkinleştirebilir/devre dışı bırakabilirsiniz; dosyalar korunur ve oyun yeniden açıldığında durum uygulanır. [Kullanım ve doğrulama](docs/MOD-TOGGLES.md).
-
-**6.0.0-preview.4:** Choose window styles from preview cards. Installed mods can be enabled/disabled without deletion; files are preserved and the next game start applies the change. [Usage and validation](docs/MOD-TOGGLES.md).
-
-**Historical — 6.0.0-preview.5:** Gezinme üst çubuğa taşındı, yazılar ve ikonlar ortalandı. Oyuncu adı ve skin yüzü sağ üsttedir. Tüm pencere stilleri tek özel başlık çubuğu kullanır; büyütülmüş pencerede çerçeve payı ayrılır. Firebase profil eşitlemesi bu eski preview'da vardı; preview.8'de kaldırıldı. [Arşiv bulut profili notu](docs/CLOUD-PROFILES.md).
-
-**Historical — 6.0.0-preview.5:** Navigation is centered at the top; player name and skin face appear at the right. All window styles use one custom caption with a maximized frame inset. Firebase profile synchronization existed in this old preview and was removed in preview.8. [Archived cloud profile note](docs/CLOUD-PROFILES.md).
-
-Historical preview.5 results: protected portable validation **136 checks**; protected live Firebase validation **143 checks**. These counts describe the old cloud-enabled preview, not current Preview.9. Actual Minecraft/Forge gameplay and multiple-monitor taskbar behavior still require manual verification.
-
-**Historical — 6.0.0-preview.6:** Mod sürüm taşımasındaki dosya kaybı ve çakışmalar, NeoForge algısı, yanlış otomatik askılama, eski sürüm etiketi ve o preview'daki bulut doğrulaması düzeltildi. Mod indirmeleri SHA-512 ile doğrulanır, atomik yüklenir ve önceki dosyalar yedeklenir. Kapalı modun durumu korunur. [Tarihsel hata ve koruma raporu](docs/AUDIT-PREVIEW-6.md).
-
-**Historical — 6.0.0-preview.6:** Fixes destructive mod transfers, collisions, NeoForge classification, false suspension, stale version labels and that preview's cloud skin/session validation. Mod downloads require SHA-512 verification and use atomic installation with backups, preserving disabled state. [Archived audit and protection report](docs/AUDIT-PREVIEW-6.md).
-
-Historical preview.6 results: protected package **159 checks passed**; protected live Firebase plus official Modrinth installation **167 checks passed**. These counts are not current Preview.9 results. The broader stable-release limitations above still apply.
-
-Üst kısayol çubuğunu ve 16 pencere düğmesi görünümünü Ayarlardan kişiselleştirebilirsiniz. Temalar üst çubuğa ve başlatma alanına uygulanır; yan menü kaldırılmıştır. [Pencere ve üst çubuk rehberi](docs/WINDOW-AND-TOOLBAR.md).
-
-Customize the top shortcut bar and 16 window control appearances in Settings. Themes coordinate toolbar and launch actions; the sidebar was removed. [Window and toolbar guide](docs/WINDOW-AND-TOOLBAR.md).
-
-Forge profillerinin görünmemesi ve seçim kaydının başarısız olması düzeltildi. Kurulum artık resmî Forge yükleyicisini kullanır. Ayarlardan 20 uyumlu renk temasını anında seçebilirsiniz. Ayrıntılar, test kapsamı ve Java gereksinimleri: [Forge ve tema notları](docs/FORGE-AND-THEMES.md).
-
-Official inherited Forge profiles are now selectable and selection persists. Installation uses the official Forge installer. Settings offers 20 coordinated, immediately applied color themes. See [Forge and theme notes](docs/FORGE-AND-THEMES.md) for validation limits and Java requirements.
+A bilingual Windows x64 Minecraft launcher with local player settings, version and mod management, skins and local server tools. Download the latest published installer or extract the complete portable ZIP. If an installation breaks, close the launcher and use the matching or newer repair EXE; settings, mods and worlds are preserved. Build and validation commands are above. Firebase account services and telemetry are retired; deployment mappings and credentials remain local.

@@ -22,7 +22,7 @@ namespace MistikLauncher.Pages
         string? _renderedVersion;
 
         static JArray? _mojangVersions = null;
-        static bool _isLoadingVersions = false;
+        static readonly System.Threading.SemaphoreSlim _versionsGate = new(1, 1);
         static JObject? _forgePromotions;
 
         public VersionManagerPage(MainWindow main)
@@ -35,14 +35,15 @@ namespace MistikLauncher.Pages
 
             var refreshBtn = PageHelpers.MkBtn("\uD83D\uDD04 Yenile", "#00A3FF", 100);
             refreshBtn.Margin = new Thickness(15, 0, 0, 0);
-            refreshBtn.Click += (_, _) => {
-                refreshBtn.Content = "Yenileniyor...";
+            refreshBtn.Name = "VersionRefresh";
+            refreshBtn.Click += async (_, _) => {
+                refreshBtn.Content = Localization.T("Yenileniyor...");
                 refreshBtn.IsEnabled = false;
-                _mojangVersions = null;
-                _ = LoadMojangVersionsAsync().ContinueWith(_ => Dispatcher.Invoke(() => {
-                    refreshBtn.Content = "\uD83D\uDD04 Yenile";
+                try { await LoadMojangVersionsAsync(force: true); }
+                finally {
+                    refreshBtn.Content = Localization.T("\uD83D\uDD04 Yenile");
                     refreshBtn.IsEnabled = true;
-                }));
+                }
             };
             headerRow.Children.Add(refreshBtn);
             sp.Children.Add(headerRow);
@@ -86,16 +87,16 @@ namespace MistikLauncher.Pages
             Dispatcher.Invoke(RenderList);
         }
 
-        async Task LoadMojangVersionsAsync()
+        async Task LoadMojangVersionsAsync(bool force = false, HttpClient? client = null)
         {
-            if (_mojangVersions != null || _isLoadingVersions) return;
-            _isLoadingVersions = true;
+            await _versionsGate.WaitAsync();
             try
             {
+                if (!force && _mojangVersions != null) return;
                 var url = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
-                var manifestStr = await _http.GetStringAsync(url);
+                var manifestStr = await (client ?? _http).GetStringAsync(url);
                 var mj = JObject.Parse(manifestStr);
-                _mojangVersions = mj["versions"] as JArray;
+                _mojangVersions = mj["versions"] as JArray ?? throw new InvalidDataException("Missing version catalog.");
 
                 // Cache the manifest in case we are offline next time
                 var cachePath = Path.Combine(App.GameDir, "version_manifest_cache.json");
@@ -107,7 +108,7 @@ namespace MistikLauncher.Pages
                 App.Log($"Failed to fetch Mojang versions online: {ex.Message}");
                 // Load cached file if exists
                 var cachePath = Path.Combine(App.GameDir, "version_manifest_cache.json");
-                if (File.Exists(cachePath))
+                if (_mojangVersions == null && File.Exists(cachePath))
                 {
                     try
                     {
@@ -120,8 +121,8 @@ namespace MistikLauncher.Pages
             }
             finally
             {
-                _isLoadingVersions = false;
-                Dispatcher.Invoke(() => RenderList());
+                _versionsGate.Release();
+                if (!Dispatcher.HasShutdownStarted) await Dispatcher.InvokeAsync(RenderList);
             }
         }
 
@@ -248,9 +249,10 @@ namespace MistikLauncher.Pages
             foreach (var name in installedNames)
             {
                 var profile=GameProfiles.Read(App.GameDir,name)!;
-                versionsMap[name]=(name,GameProfiles.Kind(profile));
-                if(GameProfiles.Kind(profile)=="Forge" && profile["inheritsFrom"]!=null)
-                    versionsMap.Remove("forge-"+profile["inheritsFrom"]!.ToString());
+                var kind=GameProfiles.Kind(profile);
+                versionsMap[name]=(name,kind);
+                if(kind is "Forge" or "Fabric" && profile["inheritsFrom"]!=null)
+                    versionsMap.Remove(kind.ToLowerInvariant()+"-"+profile["inheritsFrom"]!.ToString());
             }
 
             // Build final list with accurate installation flag
@@ -369,6 +371,7 @@ namespace MistikLauncher.Pages
                 _listPanel.Children.Add(more);
             }
             _renderedVersion=_main.Config.Version;
+            Localization.TranslateTree(_listPanel);
         }
 
         public void RefreshSelection()
@@ -1205,8 +1208,6 @@ namespace MistikLauncher.Pages
                     ModFiles.Install(App.ModsDir,fname,bytes,targetVersionObj["files"]?[0]?["hashes"]?["sha512"]?.ToString());
                     App.Log($"Mod installed directly (compatible with {mcVersion}): {fname}");
 
-                    // Firebase Analytics: Mod kurulum istatistiği
-                    try { _ = MistikAnalytics.TrackModInstallAsync(_main.Config.User ?? "Oyuncu", name, targetVersionObj["version_number"]?.ToString() ?? "", mcVersion); } catch { }
                 }
 
                 if (!installedList.Contains(name))

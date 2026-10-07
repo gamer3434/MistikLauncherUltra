@@ -97,11 +97,17 @@ namespace MistikLauncher.Pages
 
             // Apply Button
             var applyBtn = PageHelpers.MkBtn("✨ Karakteri Oyuna Kur", "#2EB82E");
+            applyBtn.Name = "SkinApplyUsername";
             applyBtn.Height = 40;
             applyBtn.Margin = new Thickness(0, 16, 0, 0);
             applyBtn.Click += async (_, _) => {
                 var n = tb.Text.Trim();
-                if (string.IsNullOrEmpty(n)) return;
+                if (!System.Text.RegularExpressions.Regex.IsMatch(n, @"^[A-Za-z0-9_]{3,16}$")) {
+                    previewStatusLbl.Text = Localization.T("usernameHelp");
+                    previewStatusLbl.Foreground = PageHelpers.HexBrush("#FF4B4B");
+                    tb.Focus();
+                    return;
+                }
                 applyBtn.IsEnabled = false;
                 applyBtn.Content = "Kuruluyor...";
                 try
@@ -444,7 +450,10 @@ namespace MistikLauncher.Pages
             try {
                 // Kalici olarak AppData icine kopyala
                 string localDest = Path.Combine(App.AppData, "custom_skin.png");
-                File.Copy(filePath, localDest, true);
+                SkinValidator.Validate(await File.ReadAllBytesAsync(filePath));
+                Directory.CreateDirectory(App.AppData);
+                if (!Path.GetFullPath(filePath).Equals(Path.GetFullPath(localDest), StringComparison.OrdinalIgnoreCase))
+                    File.Copy(filePath, localDest, true);
 
                 main.Config.SkinType = "local";
                 main.Config.SkinUser = localDest;

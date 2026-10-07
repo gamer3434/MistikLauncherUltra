@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained><PublishSingleFile>true</PublishSingleFile><IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <AssemblyName>MistikRepair</AssemblyName><ApplicationIcon>../MistikLauncher/mistik_icon.ico</ApplicationIcon>
+    <DefineConstants>$(DefineConstants);MISTIK_REPAIR</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Installer/Program.cs" Link="Program.cs" />
+    <Compile Include="../Installer/InstallEngine.cs" Link="InstallEngine.cs" />
+    <Compile Include="../Updater/UpdateEngine.cs" Link="UpdateEngine.cs" />
+    <EmbeddedResource Include="$(PayloadZipPath)" LogicalName="MistikPayload.zip" WithCulture="false" Condition="'$(PayloadZipPath)' != ''" />
+  </ItemGroup>
+</Project>

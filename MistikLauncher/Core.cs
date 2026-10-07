@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
@@ -212,6 +212,12 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.1.8","2026-10-07","#00D4AA", new[]{
+                "Sürüm yenileme istekleri sıralanır; bağlantı hatasında çalışan liste korunur",
+                "Yenilenen sürüm kartları seçili dili korur; Fabric kartları yinelenmez",
+                "Geçersiz oyuncu adı ve bozuk skin dosyaları mevcut ayarlara dokunmadan reddedilir",
+                "Güncelleme kurulum hataları yeniden denenebilir; bağımsız onarıcı eksik program dosyalarını geri yükler"
+            }),
             new("v6.1.7","2026-10-01","#00D4AA", new[]{
                 "Sürümler sayfasında seçili filtre vurgusu filtre değişince doğru düğmeyi gösterir",
                 "Oyun profili başka menüden değişince sürüm kartları son seçimi gösterir",
@@ -1793,36 +1799,5 @@ namespace MistikLauncher
             }
             catch { return false; }
         }
-    }
-    // ── Firebase Realtime Database Analytics ─────────────────────────────────────
-    // Google Firebase REST API ile kullanıcı veritabanı.
-    // Firebase Console: https://console.firebase.google.com
-    // Veritabanı URL'sini kendi projenizle değiştirin.
-    // Compatibility surface: telemetry and unauthenticated remote administration removed.
-    public static class MistikAnalytics
-    {
-        public static Task TrackSessionStartAsync(string username, string launcherVersion, string selectedGameVersion) => Task.CompletedTask;
-        public static Task TrackGameLaunchAsync(string username, string gameVersion, int ramGb) => Task.CompletedTask;
-        public static Task TrackModInstallAsync(string username, string modName, string modVersion, string gameVersion) => Task.CompletedTask;
-        public static Task TrackServerStartAsync(string username, string serverVersion, int port) => Task.CompletedTask;
-        public static Task TrackSessionEndAsync(string username) => Task.CompletedTask;
-        public static Task TrackVersionChangeAsync(string username, string newVersion) => Task.CompletedTask;
-        public static Task TrackFriendAddedAsync(string username, string friendName) => Task.CompletedTask;
-        public static Task TrackCrashAsync(string username, string errorMessage, string stackTrace) => Task.CompletedTask;
-        public static Task<string?> GetAllUsersAsync() => Task.FromResult<string?>(null);
-        public static Task<string?> GetStatsAsync() => Task.FromResult<string?>(null);
-        public static string GetExactOSName() => Environment.OSVersion.ToString();
-        public static Task TrackBanUserAsync(string username, bool banned) => Task.CompletedTask;
-        public static Task SendAlertMessageAsync(string username, string message) => Task.CompletedTask;
-        public static Task SendRemoteModAsync(string username, string modName, string modUrl) => Task.CompletedTask;
-        public static Task DeleteUserLogsAsync(string username) => Task.CompletedTask;
-        public static Task SyncInstalledModsAsync(string username, System.Collections.Generic.List<string> modNames) => Task.CompletedTask;
-        public static Task SendBroadcastMessageAsync(string message) => Task.CompletedTask;
-        public static Task BanMultipleUsersAsync(List<string> usernames, bool ban) => Task.CompletedTask;
-        public static Task DeleteAllCrashLogsAsync() => Task.CompletedTask;
-        public static Task<string?> ExportDatabaseAsync() => Task.FromResult<string?>(null);
-        public static Task<int> CleanInactiveUsersAsync(int daysThreshold) => Task.FromResult(0);
-        public static Task TrackGpuInfoAsync(string user, string gpuName) => Task.CompletedTask;
-        public static Task<string> UploadFileToCatboxAsync(string filePath) => Task.FromResult("Remote services disabled");
     }
 }

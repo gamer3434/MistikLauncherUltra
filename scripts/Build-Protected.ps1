@@ -1,6 +1,11 @@
 param([string]$Dotnet = 'dotnet', [string]$SigningThumbprint, [switch]$AllowLocalTestSignature)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
+function Assert-ArtifactPath([string]$Path) {
+    $resolved = [IO.Path]::GetFullPath($Path)
+    $allowed = [IO.Path]::GetFullPath((Join-Path $repo 'artifacts')) + [IO.Path]::DirectorySeparatorChar
+    if (!$resolved.StartsWith($allowed, [StringComparison]::OrdinalIgnoreCase)) { throw 'Output path must remain inside artifacts' }
+}
 Push-Location $repo
 try {
     & $Dotnet tool restore
@@ -9,11 +14,13 @@ try {
     [xml]$projectXml = Get-Content MistikLauncher/MistikLauncher.csproj
     $version = [string]$projectXml.SelectSingleNode("/Project/PropertyGroup/Version").InnerText
     $portableDir = Join-Path $repo "artifacts/portable-$version"
+    Assert-ArtifactPath $portableDir
     if (Test-Path -LiteralPath $portableDir) { Remove-Item -LiteralPath $portableDir -Recurse -Force }
     & $Dotnet publish MistikLauncher/MistikLauncher.csproj -c Release --self-contained true -p:PublishSingleFile=false "-p:BaseOutputPath=$buildRoot/" -o $portableDir
     if ($LASTEXITCODE) { throw 'Build failed / Derleme başarısız' }
     $inputPath = (Resolve-Path $portableDir).Path
     $outputPath = Join-Path $repo artifacts/obfuscated
+    Assert-ArtifactPath $outputPath
     if (Test-Path -LiteralPath $outputPath) { Remove-Item -LiteralPath $outputPath -Recurse -Force }
     New-Item -ItemType Directory -Force $outputPath | Out-Null
     # Find framework directories without assuming a specific SDK patch version.

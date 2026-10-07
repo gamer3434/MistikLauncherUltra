@@ -95,107 +95,31 @@ MistikLauncher\Pages\SettingsAndMorePages.cs:165 | Gorunum
 MistikLauncher\Pages\SettingsAndMorePages.cs:176 | Tema Rengi
 MistikLauncher\Pages\SettingsAndMorePages.cs:219 | Yonetici Modu
 MistikLauncher\Pages\SettingsAndMorePages.cs:220 | Yonetici Panelini Ac
-MistikLauncher\Pages\SettingsAndMorePages.cs:230 | Yönetici Şifresini Girin
-MistikLauncher\Pages\SettingsAndMorePages.cs:232 | Kilidi Aç
-MistikLauncher\Pages\SettingsAndMorePages.cs:265 | Masaustu Kisayolu
-MistikLauncher\Pages\SettingsAndMorePages.cs:266 | Launcher'i masaustune veya gorev cubuguna sabitle
-MistikLauncher\Pages\SettingsAndMorePages.cs:268 | Masaustune Kisayol Olustur
-MistikLauncher\Pages\SettingsAndMorePages.cs:270 | Baslangica Ekle
-MistikLauncher\Pages\SettingsAndMorePages.cs:280 | ☕ Java 21 Kurulum Merkezi
-MistikLauncher\Pages\SettingsAndMorePages.cs:281 | Minecraft 1.17+ ve tüm Fabric/Forge modları için Java 21 zorunludur. Aşağıdaki butona tıklayarak kalıcı olarak kurun.
-MistikLauncher\Pages\SettingsAndMorePages.cs:282 |
-MistikLauncher\Pages\SettingsAndMorePages.cs:284 | ☕ Java 21'i İndir ve Kalıcı Kur
-MistikLauncher\Pages\SettingsAndMorePages.cs:337 | 🔄 Launcher Güncelleme
-MistikLauncher\Pages\SettingsAndMorePages.cs:339 | Launcher'ınızın en son sürümde olup olmadığını kontrol etmek için aşağıdaki butona tıklayın.
-MistikLauncher\Pages\SettingsAndMorePages.cs:341 |
-MistikLauncher\Pages\SettingsAndMorePages.cs:344 | 🔄 Güncellemeleri Denetle
-MistikLauncher\Pages\SettingsAndMorePages.cs:376 | ℹ️ Yardım & Ek Bilgiler
-MistikLauncher\Pages\SettingsAndMorePages.cs:377 | Launcher ile ilgili kurulum rehberleri, sürüm güncelleme notları ve lisans detaylarına buradan ulaşabilirsiniz.
-MistikLauncher\Pages\SettingsAndMorePages.cs:381 | 📝 Güncelleme Notları
-MistikLauncher\Pages\SettingsAndMorePages.cs:385 | 📖 Kurulum Rehberi
-MistikLauncher\Pages\SettingsAndMorePages.cs:390 | 📜 Lisanslar
-MistikLauncher\Pages\SettingsAndMorePages.cs:456 | Optimizasyon Merkezi
-MistikLauncher\Pages\SettingsAndMorePages.cs:499 | 🔧 Kernel Düzeyinde Optimizasyonlar
-MistikLauncher\Pages\SettingsAndMorePages.cs:500 | Oyun başlatılınca otomatik uygulanır, kapanınca geri alınır. GPU'ya dokunmaz.
-MistikLauncher\Pages\SettingsAndMorePages.cs:535 | Optimizasyon Durumunu Göster
-MistikLauncher\Pages\SettingsAndMorePages.cs:543 | KERNEL AYARLARINI KAYDET
-MistikLauncher\Pages\SettingsAndMorePages.cs:566 | ⚡ Gelişmiş Mistik Performans Motoru
-MistikLauncher\Pages\SettingsAndMorePages.cs:567 | Sisteminizdeki gereksiz yükleri kaldırın ve oyun ayarlarını en yüksek performansa uyarlayın.
-MistikLauncher\Pages\SettingsAndMorePages.cs:576 | 🧹 Mistik Sistem & Disk Temizleyici
-MistikLauncher\Pages\SettingsAndMorePages.cs:577 | Eski hata raporlarını, Minecraft log dosyalarını temizler ve Windows DNS önbelleğini temizleyerek pingi düşürür.
-MistikLauncher\Pages\SettingsAndMorePages.cs:579 | Temizle & Hızlandır
-MistikLauncher\Pages\SettingsAndMorePages.cs:595 | ⚙️ Tek Tıkla Grafik FPS Ayarlayıcı
-MistikLauncher\Pages\SettingsAndMorePages.cs:596 | Minecraft'ın kendi grafik ayarlarını (options.txt) ultra-düşük ayarlara çekerek ekran kartı yükünü tamamen sıfıra indirir.
-MistikLauncher\Pages\SettingsAndMorePages.cs:598 | Grafikleri Optimize Et
-MistikLauncher\Pages\SettingsAndMorePages.cs:768 | Kurulum Rehberi
-MistikLauncher\Pages\SettingsAndMorePages.cs:797 | Lisanslar
-MistikLauncher\Pages\SettingsAndMorePages.cs:838 | Yonetici Sifresi
-MistikLauncher\Pages\SettingsAndMorePages.cs:845 | DOGRULA
-MistikLauncher\Pages\SettingsAndMorePages.cs:869 | 👑  Yönetici Konsolu (Firebase Dashboard)
-MistikLauncher\Pages\SettingsAndMorePages.cs:932 | 📊 CANLI İSTATİSTİKLER DASHBOARD
-MistikLauncher\Pages\SettingsAndMorePages.cs:933 | Firebase veritabanından anlık çekilen premium istatistikler
-MistikLauncher\Pages\SettingsAndMorePages.cs:940 | 📊 İSTATİSTİKLERİ YÜKLE / YENİLE
-MistikLauncher\Pages\SettingsAndMorePages.cs:949 | 🔄 Firebase'den veriler çekiliyor...
-MistikLauncher\Pages\SettingsAndMorePages.cs:957 | Veritabanında henüz veri yok.
-MistikLauncher\Pages\SettingsAndMorePages.cs:1068 | ⚠️ Son Çökmeler
-MistikLauncher\Pages\SettingsAndMorePages.cs:1116 | ⚡ TOPLU İŞLEMLER MERKEZİ
-MistikLauncher\Pages\SettingsAndMorePages.cs:1117 | Birden fazla oyuncuyu aynı anda yönetin — premium yönetici araçları
-MistikLauncher\Pages\SettingsAndMorePages.cs:1122 | 📢 TÜM OYUNCULARA TOPLU MESAJ GÖNDER
-MistikLauncher\Pages\SettingsAndMorePages.cs:1123 | Bu mesaj tüm kayıtlı oyuncuların Launcher'ında pop-up olarak görünecektir.
-MistikLauncher\Pages\SettingsAndMorePages.cs:1131 | 📢 HERKESE GÖNDER
-MistikLauncher\Pages\SettingsAndMorePages.cs:1166 | 🚫 TOPLU BANLAMA
-MistikLauncher\Pages\SettingsAndMorePages.cs:1167 | Birden fazla oyuncuyu virgülle ayırarak girin. Tümü aynı anda banlanır.
-MistikLauncher\Pages\SettingsAndMorePages.cs:1173 | ❌ HEPSİNİ BANLA
-MistikLauncher\Pages\SettingsAndMorePages.cs:1203 | 🟢 HEPSİNİN BANINI KALDIR
-MistikLauncher\Pages\SettingsAndMorePages.cs:1234 | 🧹 TÜM ÇÖKME LOGLARINI TEMİZLE
-MistikLauncher\Pages\SettingsAndMorePages.cs:1235 | Firebase veritabanındaki TÜM oyuncuların çökme/hata kayıtlarını sıfırlar. Bu işlem geri alınamaz!
-MistikLauncher\Pages\SettingsAndMorePages.cs:1237 | 🧹 TÜM LOGLARI SİL
-MistikLauncher\Pages\SettingsAndMorePages.cs:1276 | 💾 VERİTABANI YÖNETİMİ
-MistikLauncher\Pages\SettingsAndMorePages.cs:1277 | Firebase Realtime Database üzerinde gelişmiş yönetim araçları
-MistikLauncher\Pages\SettingsAndMorePages.cs:1282 | 📥 VERİTABANI DIŞA AKTARMA (JSON EXPORT)
-MistikLauncher\Pages\SettingsAndMorePages.cs:1283 | Tüm Firebase verilerini JSON dosyası olarak bilgisayarınıza indirin. Yedekleme ve analiz için idealdir.
-MistikLauncher\Pages\SettingsAndMorePages.cs:1285 | 📥 JSON OLARAK İNDİR
-MistikLauncher\Pages\SettingsAndMorePages.cs:1338 | 🗑 İNAKTİF KULLANICILARI TEMİZLE
-MistikLauncher\Pages\SettingsAndMorePages.cs:1339 | Belirli süre boyunca hiç aktif olmayan kullanıcıları veritabanından otomatik temizler. Veritabanı boyutunu küçültür ve performansı artırır.
-MistikLauncher\Pages\SettingsAndMorePages.cs:1342 | İnaktif Eşiği (Gün):
-MistikLauncher\Pages\SettingsAndMorePages.cs:1349 | 🗑 İNAKTİF KULLANICILARI SİL
-MistikLauncher\Pages\SettingsAndMorePages.cs:1388 | 🏥 VERİTABANI SAĞLIK KONTROLÜ
-MistikLauncher\Pages\SettingsAndMorePages.cs:1393 | 🏥 SAĞLIK KONTROLÜ BAŞLAT
-MistikLauncher\Pages\SettingsAndMorePages.cs:1406 | ⚠️ Veritabanı boş.
-MistikLauncher\Pages\SettingsAndMorePages.cs:1424 | ⚠️ ÖNERİ: Veritabanı büyük. İnaktif kullanıcıları temizleyin veya eski logları silin.
-MistikLauncher\Pages\SettingsAndMorePages.cs:1426 | ✅ Veritabanı sağlığı iyi durumda.
-MistikLauncher\Pages\SettingsAndMorePages.cs:1452 | Veriler Firebase'den yükleniyor...
-MistikLauncher\Pages\SettingsAndMorePages.cs:1471 | 🔄 VERİLERİ YENİLE
-MistikLauncher\Pages\SettingsAndMorePages.cs:1491 | 🔄 Firebase Realtime Database verileri çekiliyor, lütfen bekleyin...
-MistikLauncher\Pages\SettingsAndMorePages.cs:1499 | 📭 Kayıtlı aktif oyuncu bulunamadı. Launcher'ı ilk kez kullanan biri olduğunda veriler burada listelenecektir.
-MistikLauncher\Pages\SettingsAndMorePages.cs:1576 | 🔍 DETAYLARI GÖR
-MistikLauncher\Pages\SettingsAndMorePages.cs:1595 | 🔍 Arama kriterlerinize uyan oyuncu bulunamadı.
-MistikLauncher\Pages\SettingsAndMorePages.cs:1715 | Oyun başlatma geçmişi bulunamadı.
-MistikLauncher\Pages\SettingsAndMorePages.cs:1759 | Kurulu mod bilgisi bulunamadı.
-MistikLauncher\Pages\SettingsAndMorePages.cs:1781 | Kurulu mod bilgisi bulunamadı.
-MistikLauncher\Pages\SettingsAndMorePages.cs:1811 | Kayıtlı çökme veya sistem hatası bulunamadı. Mistik temiz!
-MistikLauncher\Pages\SettingsAndMorePages.cs:1876 | 👑 Yönetici Hızlı Aksiyonları
-MistikLauncher\Pages\SettingsAndMorePages.cs:1914 | ✉️ MESAJ GÖNDER
-MistikLauncher\Pages\SettingsAndMorePages.cs:1941 | GÖNDER
-MistikLauncher\Pages\SettingsAndMorePages.cs:1970 | 🧹 LOGLARI TEMİZLE
-MistikLauncher\Pages\SettingsAndMorePages.cs:1997 | 🔄 ZORLA GÜNCELLE
-MistikLauncher\Pages\SettingsAndMorePages.cs:2029 | 📦 MOD KUR
-MistikLauncher\Pages\SettingsAndMorePages.cs:2050 | Mod Dosya Adı (Örn: InvMove.jar)
-MistikLauncher\Pages\SettingsAndMorePages.cs:2054 | Mod İndirme Linki (Doğrudan .jar İndirme Bağlantısı)
-MistikLauncher\Pages\SettingsAndMorePages.cs:2060 | 📁 VEYA bilgisayarınızdan yerel bir mod (.jar) dosyası seçip yükleyin:
-MistikLauncher\Pages\SettingsAndMorePages.cs:2063 | 📂 YEREL MOD SEÇ & BULUTA YÜKLE
-MistikLauncher\Pages\SettingsAndMorePages.cs:2067 |
-MistikLauncher\Pages\SettingsAndMorePages.cs:2073 | MODU GÖNDER & KUR
-MistikLauncher\Pages\SettingsAndMorePages.cs:2160 | ☁️ BULUTTAN GÜNCELLEME DAĞITIMI
-MistikLauncher\Pages\SettingsAndMorePages.cs:2161 | Aktif olan tüm oyuncuların Launcher'larına anında güncelleme uyarısı gönderin ve dosyayı otomatik indirtin.
-MistikLauncher\Pages\SettingsAndMorePages.cs:2163 | Yeni Sürüm Kodu (Örn: v5.3.0)
-MistikLauncher\Pages\SettingsAndMorePages.cs:2167 | Güncelleme İndirme URL'si (Doğrudan .exe Bağlantısı)
-MistikLauncher\Pages\SettingsAndMorePages.cs:2171 | Yenilikler / Güncelleme Notları
-MistikLauncher\Pages\SettingsAndMorePages.cs:2178 | GÜNCELLEMEYİ BULUTA YAYINLA
-MistikLauncher\Pages\SettingsAndMorePages.cs:2249 | ⏪ HATALI GÜNCELLEMEYİ GERİ AL (ROLLBACK)
-MistikLauncher\Pages\SettingsAndMorePages.cs:2266 | 🔄 LİSTEYİ YENİLE
-MistikLauncher\Pages\SettingsAndMorePages.cs:2284 | Henüz yayınlanmış güncelleme geçmişi bulunamadı.
-MistikLauncher\Pages\SettingsAndMorePages.cs:2295 | Geçmiş okunamadı.
+MistikLauncher\Pages\SettingsAndMorePages.cs:230 | Minecraft 1.17+ ve tüm Fabric/Forge modları için Java 21 zorunludur. Aşağıdaki butona tıklayarak kalıcı olarak kurun.
+MistikLauncher\Pages\SettingsAndMorePages.cs:231 |
+MistikLauncher\Pages\SettingsAndMorePages.cs:233 | ☕ Java 21'i İndir ve Kalıcı Kur
+MistikLauncher\Pages\SettingsAndMorePages.cs:286 | 🔄 Launcher Güncelleme
+MistikLauncher\Pages\SettingsAndMorePages.cs:288 | Launcher'ınızın en son sürümde olup olmadığını kontrol etmek için aşağıdaki butona tıklayın.
+MistikLauncher\Pages\SettingsAndMorePages.cs:290 |
+MistikLauncher\Pages\SettingsAndMorePages.cs:293 | 🔄 Güncellemeleri Denetle
+MistikLauncher\Pages\SettingsAndMorePages.cs:325 | ℹ️ Yardım & Ek Bilgiler
+MistikLauncher\Pages\SettingsAndMorePages.cs:326 | Launcher ile ilgili kurulum rehberleri, sürüm güncelleme notları ve lisans detaylarına buradan ulaşabilirsiniz.
+MistikLauncher\Pages\SettingsAndMorePages.cs:330 | 📝 Güncelleme Notları
+MistikLauncher\Pages\SettingsAndMorePages.cs:334 | 📖 Kurulum Rehberi
+MistikLauncher\Pages\SettingsAndMorePages.cs:339 | 📜 Lisanslar
+MistikLauncher\Pages\SettingsAndMorePages.cs:405 | Optimizasyon Merkezi
+MistikLauncher\Pages\SettingsAndMorePages.cs:448 | 🔧 Kernel Düzeyinde Optimizasyonlar
+MistikLauncher\Pages\SettingsAndMorePages.cs:449 | Oyun başlatılınca otomatik uygulanır, kapanınca geri alınır. GPU'ya dokunmaz.
+MistikLauncher\Pages\SettingsAndMorePages.cs:484 | Optimizasyon Durumunu Göster
+MistikLauncher\Pages\SettingsAndMorePages.cs:492 | KERNEL AYARLARINI KAYDET
+MistikLauncher\Pages\SettingsAndMorePages.cs:515 | ⚡ Gelişmiş Mistik Performans Motoru
+MistikLauncher\Pages\SettingsAndMorePages.cs:516 | Sisteminizdeki gereksiz yükleri kaldırın ve oyun ayarlarını en yüksek performansa uyarlayın.
+MistikLauncher\Pages\SettingsAndMorePages.cs:525 | 🧹 Mistik Sistem & Disk Temizleyici
+MistikLauncher\Pages\SettingsAndMorePages.cs:526 | Eski hata raporlarını, Minecraft log dosyalarını temizler ve Windows DNS önbelleğini temizleyerek pingi düşürür.
+MistikLauncher\Pages\SettingsAndMorePages.cs:528 | Temizle & Hızlandır
+MistikLauncher\Pages\SettingsAndMorePages.cs:544 | ⚙️ Tek Tıkla Grafik FPS Ayarlayıcı
+MistikLauncher\Pages\SettingsAndMorePages.cs:545 | Minecraft'ın kendi grafik ayarlarını (options.txt) ultra-düşük ayarlara çekerek ekran kartı yükünü tamamen sıfıra indirir.
+MistikLauncher\Pages\SettingsAndMorePages.cs:547 | Grafikleri Optimize Et
 MistikLauncher\Pages\VersionAndModPages.cs:33 | \uD83D\uDD04 Yenile
 MistikLauncher\Pages\VersionAndModPages.cs:755 | Mod Merkezi (Modrinth)
 MistikLauncher\Pages\VersionAndModPages.cs:756 | Modrinth'den binlerce mod - tek tiklama kurulum

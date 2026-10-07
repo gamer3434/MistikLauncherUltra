@@ -56,12 +56,19 @@ public static class UpdateEngine
         if(!actual.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(names)) throw new InvalidDataException("Unlisted payload file.");
         return manifest;
     }
-    public static void Apply(string payload,string target,string? expectedVersion=null)
+    public static void VerifyInstalled(string target,UpdateManifest manifest)
+    {
+        foreach(var file in manifest.Files) {
+            using var stream=File.OpenRead(SafePath(target,file.Path));
+            if(!Convert.ToHexString(SHA256.HashData(stream)).Equals(file.Hash,StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Installed file digest mismatch.");
+        }
+    }
+    public static void Apply(string payload,string target,string? expectedVersion=null,bool repair=false)
     {
         var manifest=Verify(payload);
         if(!string.IsNullOrWhiteSpace(expectedVersion) && !string.Equals(manifest.Version,expectedVersion.TrimStart('v'),StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Update package version does not match the selected release.");
-        if(!File.Exists(SafePath(target,"MistikLauncher.exe"))) throw new InvalidDataException("Launcher installation not found.");
+        if(!repair && !File.Exists(SafePath(target,"MistikLauncher.exe"))) throw new InvalidDataException("Launcher installation not found.");
         string installedManifest=SafePath(target,"update-manifest.json");
         if(File.Exists(installedManifest))
         {
@@ -72,7 +79,7 @@ public static class UpdateEngine
                 if(ReleaseNumber(manifest.Version) < ReleaseNumber(currentVersion))
                     throw new InvalidDataException("Downgrade blocked; the installed launcher is newer.");
             }
-            catch(JsonException) { throw new InvalidDataException("Installed update manifest is invalid."); }
+            catch(Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException) { if(!repair) throw new InvalidDataException("Installed update manifest is invalid."); }
         }
         // Validate every destination before modifying any installed file.
         foreach(var item in manifest.Files) SafePath(target,item.Path);
@@ -83,8 +90,11 @@ public static class UpdateEngine
             var replacements=manifest.Files.Select(item=>(item.Path,Source:SafePath(payload,item.Path))).ToList();
             replacements.Add(("update-manifest.json",SafePath(payload,"update-manifest.json")));
             string marker=SafePath(target,"install-state.json");
-            if(File.Exists(marker))
+            if(File.Exists(marker) || repair)
             {
+                var owned=Array.Empty<string>();
+                try {
+                if(File.Exists(marker)) {
                 using var state=JsonDocument.Parse(File.ReadAllText(marker));
                 var record=state.RootElement;
                 var product=record.GetProperty("Product").GetString();
@@ -96,9 +106,11 @@ public static class UpdateEngine
                 // registry entry confirms that same target, repair the marker while
                 // carrying forward only its validated relative file list.
                 if(!SamePath(recordedRoot,target) && !RegistryTargetMatches(target)) throw new InvalidDataException("Invalid installation record.");
-                var owned=record.GetProperty("Files").EnumerateArray().Select(entry=>entry.GetString()!).ToArray();
+                owned=record.GetProperty("Files").EnumerateArray().Select(entry=>entry.GetString()!).ToArray();
                 if(owned.Length>3000) throw new InvalidDataException("Invalid ownership record.");
                 foreach(var path in owned) { SafePath(target,path); if(path.Equals("install-state.json",StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Invalid ownership record."); }
+                }
+                } catch(Exception ex) when(repair && (ex is JsonException or KeyNotFoundException or InvalidOperationException or InvalidDataException)) { owned=Array.Empty<string>(); }
                 string updated=backup+".install-state.json";
                 File.WriteAllText(updated,JsonSerializer.Serialize(new UpdateInstallState("MistikLauncher",System.IO.Path.GetFullPath(target),manifest.Version,owned.Concat(manifest.Files.Select(item=>item.Path)).Append("update-manifest.json").Distinct(StringComparer.OrdinalIgnoreCase).ToArray())));
                 replacements.Add(("install-state.json",updated));
