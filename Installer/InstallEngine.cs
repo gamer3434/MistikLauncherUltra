@@ -53,8 +53,8 @@ public static class InstallEngine
     {
         root=ValidateRoot(root);
         var state=JsonSerializer.Deserialize<InstallState>(File.ReadAllText(UpdateEngine.SafePath(root,Marker)))??throw new IOException("Missing installation record / Kurulum kaydı bulunamadı.");
-        if(state.Product!="MistikLauncher" || !Path.GetFullPath(state.Root).Equals(root,StringComparison.OrdinalIgnoreCase) || state.Files is null || state.Files.Length>3000) throw new IOException("Invalid installation record / Geçersiz kurulum kaydı.");
-        foreach(var file in state.Files) { UpdateEngine.SafePath(root,file); if(file==Marker) throw new IOException("Invalid installation record"); }
+        if(state.Product!="MistikLauncher" || string.IsNullOrWhiteSpace(state.Root) || !Path.GetFullPath(state.Root).Equals(root,StringComparison.OrdinalIgnoreCase) || state.Files is null || state.Files.Length>3000) throw new IOException("Invalid installation record / Geçersiz kurulum kaydı.");
+        foreach(var file in state.Files) { UpdateEngine.SafePath(root,file); if(file.Equals(Marker,StringComparison.OrdinalIgnoreCase)) throw new IOException("Invalid installation record"); }
         return state;
     }
     public static void Repair(string payload,string root,bool shortcuts,CancellationToken cancellation=default,bool shell=true)
@@ -66,7 +66,7 @@ public static class InstallEngine
         string? installedVersion=null;
         bool recognized=false;
         try { var state=ReadState(root); installedVersion=state.Version; recognized=true; }
-        catch(Exception ex) when(ex is IOException or JsonException or InvalidOperationException) { }
+        catch(Exception ex) when(ex is IOException or JsonException or InvalidOperationException or ArgumentException) { }
         if(shell) {
             using var key=Registry.CurrentUser.OpenSubKey(RegistryKey);
             if(key?.GetValue("InstallLocation") is string location && Path.GetFullPath(location).TrimEnd(Path.DirectorySeparatorChar).Equals(root,StringComparison.OrdinalIgnoreCase)) {

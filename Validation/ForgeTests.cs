@@ -31,6 +31,11 @@ public static class ForgeTests
         Check(GameProfiles.Arguments(args).SequenceEqual(new[]{"--launchTarget","forgeclient","--add-opens","java.base/java.lang=ALL-UNNAMED"}),"Forge launch arguments and Windows JVM rules retained");
         Profile("1.20.1-neoforge-47.1.106","{\"inheritsFrom\":\"1.20.1\",\"libraries\":[{\"name\":\"net.neoforged:neoforge:47.1.106\"}]}");
         Check(GameProfiles.Kind(GameProfiles.Read(root,"1.20.1-neoforge-47.1.106")!)=="NeoForge" && GameProfiles.IsInstalled(root,"1.20.1-neoforge-47.1.106"),"NeoForge profiles remain distinct and selectable");
+        Profile("quilt-custom","{\"inheritsFrom\":\"26.1\",\"libraries\":[{\"name\":\"net.fabricmc:fabric-loader:1\"},{\"name\":\"org.quiltmc:quilt-loader:1\"}]}");
+        Check(GameProfiles.MinecraftVersion(root,"quilt-custom")=="26.1" && GameProfiles.Loader(root,"quilt-custom")=="quilt","mod identity follows inherited year-based version and distinguishes Quilt");
+        Profile("custom-alias","{\"inheritsFrom\":\"quilt-custom\",\"libraries\":[]}");
+        Check(GameProfiles.MinecraftVersion(root,"custom-alias")=="26.1" && GameProfiles.Loader(root,"custom-alias")=="quilt","custom profile without loader libraries inherits its parent loader and mod pool identity");
+        Check(GameProfiles.MinecraftVersion(root,"fabric-loader-0.16.10-26.1")=="26.1" && GameProfiles.VersionPoolKey("26.1","NeoForge")=="26.1_neoforge" && GameProfiles.VersionPoolKey("","vanilla")=="vanilla","pool keys preserve exact version and loader for queued and active mods");
         return checks;
     }
 }

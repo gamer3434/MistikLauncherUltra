@@ -53,7 +53,9 @@ static class LauncherUpdateTests
         void DeferDuringVerify() { if(service.StatusKey=="luVerifying") { verifyingWasBusy=service.Busy; canUpdate=false; } }
         service.Changed+=DeferDuringVerify;
         var stagePlan=Path.Combine(Path.GetDirectoryName(service.PreparedPayload!)!,"plan.json");
+        File.WriteAllText(Path.Combine(target,"MistikUpdater.exe"),"corrupt installed helper");
         Check(!await service.StartInstallerAsync() && verifyingWasBusy && !service.Busy && service.StatusKey=="luDeferred" && !File.Exists(stagePlan),"launcher becoming busy during payload verification prevents helper handoff");
+        Check(File.ReadAllText(Path.Combine(Path.GetDirectoryName(stagePlan)!,"MistikUpdater.exe"))=="new MistikUpdater.exe","handoff copies the verified new package helper even when the installed helper is corrupt");
         service.Changed-=DeferDuringVerify;
         canUpdate=true;
         Check(File.ReadAllText(Path.Combine(target,names[0]))=="old "+names[0],"preparation leaves installed files untouched");
@@ -80,6 +82,8 @@ static class LauncherUpdateTests
         using var deferredClient=new HttpClient(new Stub(metadata,zip));
         var deferred=new LauncherUpdater(()=>false,deferredClient,target,"6.0.0");
         Check(!await deferred.CheckAsync(true) && deferred.StatusKey=="luDeferred","busy launcher defers automatic update");
+        string stagesRoot=Path.Combine(Path.GetTempPath(),"MistikLauncherUpdates");
+        var stagesBeforeFailure=Directory.GetDirectories(stagesRoot).ToHashSet(StringComparer.OrdinalIgnoreCase);
         using var corruptClient=new HttpClient(new Stub(metadata,zip.Select(b=>(byte)(b^1)).ToArray()));
         var corrupt=new LauncherUpdater(()=>true,corruptClient,target,"6.0.0");
         Check(!await corrupt.CheckAsync(true) && corrupt.PreparedPayload==null && corrupt.StatusKey=="luError","corrupt launcher package rejected");
@@ -87,6 +91,7 @@ static class LauncherUpdateTests
         var stalled=new LauncherUpdater(()=>true,stalledClient,target,"6.0.0");
         var stalledCheck=stalled.CheckAsync(true);
         Check(await Task.WhenAny(stalledCheck,Task.Delay(5000))==stalledCheck && !await stalledCheck && !stalled.Busy && stalled.PreparedPayload==null && stalled.StatusKey=="luError","stalled launcher download times out and releases busy state");
+        Check(Directory.GetDirectories(stagesRoot).ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(stagesBeforeFailure),"corrupt and stalled update downloads remove their abandoned staging directories");
         rejected=false;
         try { LauncherUpdater.ParseRelease(metadata.Replace("github.com/gamer3434","example.com/gamer3434"),"6.0.0"); } catch(InvalidDataException) { rejected=true; }
         Check(rejected,"untrusted launcher release host rejected");
@@ -94,8 +99,9 @@ static class LauncherUpdateTests
         try { UpdateEngine.Verify(payload); } catch(InvalidDataException) { rejected=true; }
         Check(rejected,"staged payload tampering rejected");
         File.WriteAllText(Path.Combine(service.PreparedPayload!,names[0]),"tampered staged helper payload");
-        Check(!await service.StartInstallerAsync() && !service.Busy && service.StatusKey=="luError" && !string.IsNullOrWhiteSpace(service.Error),"failed update handoff reports a usable error and releases busy state");
-        Check(!await service.StartInstallerAsync() && !service.Busy && service.StatusKey=="luError","update handoff failure releases the gate for retry");
+        var damagedPayload=service.PreparedPayload;
+        Check(!await service.StartInstallerAsync() && service.PreparedPayload==null && !Directory.Exists(Path.GetDirectoryName(damagedPayload!)) && !service.Busy && service.StatusKey=="luError" && !string.IsNullOrWhiteSpace(service.Error),"failed update handoff removes unusable stage and releases busy state");
+        Check(await service.CheckAsync(true) && service.PreparedPayload!=null && service.PreparedPayload!=damagedPayload && UpdateEngine.Verify(service.PreparedPayload).Version=="7.0.0" && !service.Busy,"update handoff failure permits downloading and verifying a fresh package on retry");
         return checks;
     }
     sealed class StalledStream : MemoryStream

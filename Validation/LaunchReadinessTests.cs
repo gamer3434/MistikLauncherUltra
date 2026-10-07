@@ -28,6 +28,12 @@ static class LaunchReadinessTests
 
         var excessiveMemory=LaunchReadiness.Evaluate(game,version,15,"java.exe",21,sixteenGb,tenGb);
         Check(!excessiveMemory.MemoryReady && excessiveMemory.RecommendedPage=="Settings","launch readiness leaves memory for Windows");
+        foreach (int totalGb in new[] { 2, 3, 4, 8 })
+        {
+            int heap=LaunchReadiness.ClampRamMb(totalGb,(ulong)totalGb*1024*1024*1024);
+            Check(heap==Math.Max(1,totalGb-2)*1024 && heap<totalGb*1024,"RAM clamp reserves Windows memory on a "+totalGb+" GB system");
+        }
+        Check(LaunchReadiness.ClampRamMb(2,sixteenGb)==2048 && LaunchReadiness.ClampRamMb(6,0)==6144,"RAM clamp never raises a valid request and keeps it when physical memory detection is unavailable");
 
         var missing=LaunchReadiness.Evaluate(game,"missing",4,"java.exe",21,sixteenGb,tenGb);
         Check(!missing.VersionInstalled && missing.RecommendedPage=="Vers","launch readiness routes a missing profile to Versions");

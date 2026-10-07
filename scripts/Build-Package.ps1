@@ -47,6 +47,10 @@ try {
     <SkipType name="MistikLauncher.Application" skipMethods="true" skipFields="true" skipProperties="true" skipEvents="true" />
     <SkipType name="MistikLauncher.Windows.*" skipMethods="true" skipFields="true" skipProperties="true" skipEvents="true" />
     <SkipType name="MistikLauncher.LauncherConfig" skipMethods="true" skipFields="true" skipProperties="true" skipEvents="true" />
+    <SkipType name="MistikLauncher.MistikRelay" skipMethods="true" skipFields="true" skipProperties="true" skipEvents="true" />
+    <SkipType name="MistikLauncher.Pages.ModManagerPage" skipMethods="true" skipFields="true" skipProperties="true" skipEvents="true" />
+    <SkipType name="MistikLauncher.Pages.MapManagerPage" skipMethods="true" skipFields="true" skipProperties="true" skipEvents="true" />
+    <SkipType name="MistikLauncher.Pages.ModernSettingsPage" skipMethods="true" skipFields="true" skipProperties="true" skipEvents="true" />
   </Module>
 </Obfuscator>
 "@

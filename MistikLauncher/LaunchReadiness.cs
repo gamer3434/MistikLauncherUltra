@@ -23,6 +23,15 @@ public sealed record LaunchReadinessSnapshot(
 
 public static class LaunchReadiness
 {
+    public static int ClampRamMb(int requestedGb, ulong totalMemoryBytes)
+    {
+        int requestedMb = Math.Clamp(requestedGb, 1, 32) * 1024;
+        if (totalMemoryBytes == 0) return requestedMb;
+        ulong totalMb = totalMemoryBytes / (1024 * 1024);
+        ulong availableMb = totalMb > 2048 ? totalMb - 2048 : totalMb / 2;
+        return (int)Math.Min((ulong)requestedMb, Math.Max(256UL, availableMb));
+    }
+
     public static LaunchReadinessSnapshot Evaluate(
         string gameRoot,
         string version,

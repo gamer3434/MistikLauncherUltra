@@ -25,6 +25,7 @@ public static class GitHubReleaseCache
         try
         {
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             if (response.StatusCode == HttpStatusCode.NotModified && cached is not null)
                 return cached.Json;
 
@@ -38,7 +39,7 @@ public static class GitHubReleaseCache
             Write(cachePath, new Entry { Json=json, ETag=response.Headers.ETag?.Tag, SavedAt=DateTimeOffset.UtcNow });
             return json;
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested && (ex is HttpRequestException or TaskCanceledException))
         {
             if (Usable(cached)) return cached!.Json;
             throw;

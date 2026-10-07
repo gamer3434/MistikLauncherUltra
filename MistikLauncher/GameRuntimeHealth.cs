@@ -107,6 +107,7 @@ public static class GameRuntimeHealth
         }
 
         var libraries = new Dictionary<string, ArtifactSpec>(StringComparer.OrdinalIgnoreCase);
+        var natives = new Dictionary<string, (ArtifactSpec Artifact, string[] Exclude)>(StringComparer.OrdinalIgnoreCase);
         foreach (var profile in profiles.AsEnumerable().Reverse())
         {
             if (profile.Json["libraries"] is not JArray entries) continue;
@@ -119,31 +120,49 @@ public static class GameRuntimeHealth
 
                 string name = library["name"]?.ToString() ?? "library";
                 var artifact = library["downloads"]?["artifact"] as JObject;
-                string? relativePath = artifact?["path"]?.ToString();
-                string? url = artifact?["url"]?.ToString();
-                long? size = ReadSize(artifact?["size"]);
-                string? sha1 = artifact?["sha1"]?.ToString();
-
-                if (artifact?["size"] != null && size == null)
-                    return Failed(repaired, "library:" + name, profile.Path, "Library size metadata is invalid.");
-                if (!string.IsNullOrWhiteSpace(sha1) && !IsSha1(sha1))
-                    return Failed(repaired, "library:" + name, profile.Path, "Library SHA-1 metadata is invalid.");
-
-                if (string.IsNullOrWhiteSpace(relativePath))
+                // Legacy native-only libraries have classifiers, but no ordinary JAR.
+                if (artifact != null || library["downloads"]?["classifiers"] is not JObject)
                 {
-                    if (!TryMavenArtifact(name, out relativePath))
-                        return Failed(repaired, "library:" + name, profile.Path, "Library path metadata is invalid.");
-                    string baseUrl = library["url"]?.ToString() ?? "https://libraries.minecraft.net/";
-                    url = baseUrl.TrimEnd('/') + "/" + relativePath;
+                    string? relativePath = artifact?["path"]?.ToString();
+                    string? url = artifact?["url"]?.ToString();
+                    long? size = ReadSize(artifact?["size"]);
+                    string? sha1 = artifact?["sha1"]?.ToString();
+
+                    if (artifact?["size"] != null && size == null)
+                        return Failed(repaired, "library:" + name, profile.Path, "Library size metadata is invalid.");
+                    if (!string.IsNullOrWhiteSpace(sha1) && !IsSha1(sha1))
+                        return Failed(repaired, "library:" + name, profile.Path, "Library SHA-1 metadata is invalid.");
+
+                    if (string.IsNullOrWhiteSpace(relativePath))
+                    {
+                        if (!TryMavenArtifact(name, out relativePath))
+                            return Failed(repaired, "library:" + name, profile.Path, "Library path metadata is invalid.");
+                        string baseUrl = library["url"]?.ToString() ?? "https://libraries.minecraft.net/";
+                        url = baseUrl.TrimEnd('/') + "/" + relativePath;
+                    }
+
+                    if (!TryChildPath(Path.Combine(root, "libraries"), relativePath!, out string fullPath))
+                        return Failed(repaired, "library:" + name, relativePath, "Library path escapes the libraries directory.");
+
+                    var created = CreateArtifact("library:" + name, fullPath, url, size, sha1);
+                    if (created.Error != null)
+                        return Failed(repaired, "library:" + name, fullPath, created.Error);
+                    if (Regex.IsMatch(name, @":natives-windows(?:-[A-Za-z0-9_]+)?$"))
+                        natives[fullPath] = (created.Spec! with { Name = "native:" + name }, new[] { "META-INF/" });
+                    else libraries[fullPath] = created.Spec!;
                 }
-
-                if (!TryChildPath(Path.Combine(root, "libraries"), relativePath!, out string fullPath))
-                    return Failed(repaired, "library:" + name, relativePath, "Library path escapes the libraries directory.");
-
-                var created = CreateArtifact("library:" + name, fullPath, url, size, sha1);
-                if (created.Error != null)
-                    return Failed(repaired, "library:" + name, fullPath, created.Error);
-                libraries[fullPath] = created.Spec!;
+                if (library["natives"]?["windows"]?.ToString() is { Length: > 0 } classifier)
+                {
+                    classifier = classifier.Replace("${arch}", "64");
+                    var native = library["downloads"]?["classifiers"]?[classifier] as JObject;
+                    string? nativePath = native?["path"]?.ToString();
+                    if (native == null || nativePath == null || !TryChildPath(Path.Combine(root, "libraries"), nativePath, out string nativeFullPath))
+                        return Failed(repaired, "native:" + name, profile.Path, "Windows native classifier metadata is invalid.");
+                    var createdNative = CreateArtifact("native:" + name, nativeFullPath, native);
+                    if (createdNative.Error != null) return Failed(repaired, "native:" + name, nativeFullPath, createdNative.Error);
+                    var exclude = (library["extract"]?["exclude"] as JArray)?.Where(value => value.Type == JTokenType.String).Select(value => value.ToString()).ToArray() ?? Array.Empty<string>();
+                    natives[nativeFullPath] = (createdNative.Spec!, exclude);
+                }
             }
         }
 
@@ -155,7 +174,65 @@ public static class GameRuntimeHealth
             if (outcome.Repaired) repaired++;
         }
 
+        foreach (var native in natives.Values)
+        {
+            var outcome = await EnsureArtifactAsync(native.Artifact, httpClient, true, cancellationToken, progress).ConfigureAwait(false);
+            if (!outcome.Success) return Failed(repaired, outcome.Artifact, outcome.Path, outcome.Reason!);
+            if (outcome.Repaired) repaired++;
+            try
+            {
+                // Inherited profiles launch with the selected child's native directory.
+                repaired += await ExtractNativesAsync(native.Artifact.Path, Path.Combine(root, "versions", versionId, "natives"), native.Exclude, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+            {
+                return Failed(repaired, native.Artifact.Name, native.Artifact.Path, "Native extraction failed: " + ex.Message);
+            }
+        }
+
         return new(true, repaired, repaired == 0 ? "Runtime files are healthy." : $"Runtime repaired ({repaired} file(s)).");
+    }
+
+    static async Task<int> ExtractNativesAsync(string jar, string directory, string[] exclude, CancellationToken cancellationToken)
+    {
+        using var archive = ZipFile.OpenRead(jar);
+        if (archive.Entries.Count > 1024) throw new InvalidDataException("Too many native archive entries.");
+        var entries = new List<(ZipArchiveEntry Entry, string Destination)>();
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        long size = 0;
+        // Validate the entire archive before replacing any existing native file.
+        foreach (var entry in archive.Entries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (entry.FullName.EndsWith('/')) continue;
+            if (!TryChildPath(directory, entry.FullName, out string destination) || !names.Add(destination))
+                throw new InvalidDataException("Unsafe or duplicate native archive path.");
+            size += entry.Length;
+            if (size > 256L * 1024 * 1024) throw new InvalidDataException("Native archive is too large.");
+            if (!exclude.Any(prefix => entry.FullName.StartsWith(prefix, StringComparison.Ordinal))) entries.Add((entry, destination));
+        }
+        int repaired = 0;
+        foreach (var (entry, destination) in entries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (File.Exists(destination) && new FileInfo(destination).Length == entry.Length)
+            {
+                using var source = entry.Open(); using var installed = File.OpenRead(destination);
+                if (SHA256.HashData(source).SequenceEqual(SHA256.HashData(installed))) continue;
+            }
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            string temp = destination + ".mistik-" + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                await using (var source = entry.Open())
+                await using (var output = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, true))
+                    await source.CopyToAsync(output, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                File.Move(temp, destination, true); repaired++;
+            }
+            finally { try { if (File.Exists(temp)) File.Delete(temp); } catch { } }
+        }
+        return repaired;
     }
 
     static async Task<ArtifactOutcome> EnsureArtifactAsync(
@@ -176,35 +253,42 @@ public static class GameRuntimeHealth
             return ArtifactOutcome.Fail(artifact, healthy + " No secure repair URL is available.");
 
         string temp = Path.Combine(Path.GetDirectoryName(artifact.Path)!, "." + Path.GetFileName(artifact.Path) + ".mistik-" + Guid.NewGuid().ToString("N") + ".tmp");
+        using var downloadTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        downloadTimeout.CancelAfter(httpClient.Timeout == Timeout.InfiniteTimeSpan ? TimeSpan.FromMinutes(10) : httpClient.Timeout);
+        var repairToken = downloadTimeout.Token;
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(artifact.Path)!);
             progress?.Report(new("Repairing", artifact.Name, artifact.Path));
-            using var response = await httpClient.GetAsync(artifact.Url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            using var response = await httpClient.GetAsync(artifact.Url, HttpCompletionOption.ResponseHeadersRead, repairToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
-            await using var input = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            await using var input = await response.Content.ReadAsStreamAsync(repairToken).ConfigureAwait(false);
             await using (var output = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous | FileOptions.SequentialScan))
             {
                 var buffer = new byte[81920];
                 long total = 0;
                 while (true)
                 {
-                    int read = await input.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false);
+                    int read = await input.ReadAsync(buffer.AsMemory(), repairToken).ConfigureAwait(false);
                     if (read == 0) break;
                     total += read;
                     long limit = artifact.Size ?? MaxUnspecifiedDownloadBytes;
                     if (total > limit) throw new InvalidDataException("Download exceeds the expected size.");
-                    await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                    await output.WriteAsync(buffer.AsMemory(0, read), repairToken).ConfigureAwait(false);
                 }
-                await output.FlushAsync(cancellationToken).ConfigureAwait(false);
+                await output.FlushAsync(repairToken).ConfigureAwait(false);
             }
 
-            var downloadedError = await ValidateFileAsync(artifact with { Path = temp }, requireZipWithoutDigest, cancellationToken).ConfigureAwait(false);
+            var downloadedError = await ValidateFileAsync(artifact with { Path = temp }, requireZipWithoutDigest, repairToken).ConfigureAwait(false);
             if (downloadedError != null) throw new InvalidDataException(downloadedError);
-            cancellationToken.ThrowIfCancellationRequested();
+            repairToken.ThrowIfCancellationRequested();
             File.Move(temp, artifact.Path, true);
             progress?.Report(new("Repaired", artifact.Name, artifact.Path));
             return ArtifactOutcome.Ok(artifact, true);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return ArtifactOutcome.Fail(artifact, "Repair failed: Download timed out.");
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex) when (ex is HttpRequestException or IOException or UnauthorizedAccessException or InvalidDataException)
@@ -283,12 +367,16 @@ public static class GameRuntimeHealth
     static bool TryChildPath(string root, string relativePath, out string fullPath)
     {
         fullPath = "";
-        if (string.IsNullOrWhiteSpace(relativePath) || Path.IsPathRooted(relativePath) || relativePath.Contains(':')) return false;
+        if (string.IsNullOrWhiteSpace(relativePath) || Path.IsPathRooted(relativePath) || relativePath.Contains(':') ||
+            relativePath.Split('/', '\\').Any(part => part is "." or ".." or "" || part.TrimEnd(' ', '.') != part || part.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)) return false;
         try
         {
             string basePath = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
             fullPath = Path.GetFullPath(Path.Combine(basePath, relativePath.Replace('/', Path.DirectorySeparatorChar)));
-            return fullPath.StartsWith(basePath, StringComparison.OrdinalIgnoreCase);
+            if (!fullPath.StartsWith(basePath, StringComparison.OrdinalIgnoreCase)) return false;
+            for (string? current = fullPath; current != null; current = Path.GetDirectoryName(current))
+                if ((File.Exists(current) || Directory.Exists(current)) && (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) return false;
+            return true;
         }
         catch { return false; }
     }

@@ -96,13 +96,9 @@ namespace MistikLauncher
                 catch (Exception ex)
                 {
                     App.Log("Configuration recovery: " + ex.Message);
-                    try
-                    {
-                        if (File.Exists(Path + ".bak"))
-                            return Read(Path + ".bak");
-                    }
-                    catch (Exception backupError) { App.Log("Configuration backup recovery: " + backupError.Message); }
                 }
+                try { if (File.Exists(Path + ".bak")) return Read(Path + ".bak"); }
+                catch (Exception backupError) { App.Log("Configuration backup recovery: " + backupError.Message); }
                 return Normalize(new());
             }
         }
@@ -116,10 +112,10 @@ namespace MistikLauncher
                 if (Encrypted(bytes))
                 {
                     byte[] plain = WindowsSecret.Transform(bytes[Header.Length..], false);
-                    try { return Normalize(JsonConvert.DeserializeObject<LauncherConfig>(Encoding.UTF8.GetString(plain)) ?? new()); }
+                    try { return Normalize(JsonConvert.DeserializeObject<LauncherConfig>(Encoding.UTF8.GetString(plain)) ?? throw new InvalidDataException("Configuration must be an object.")); }
                     finally { CryptographicOperations.ZeroMemory(plain); }
                 }
-                return Normalize(JsonConvert.DeserializeObject<LauncherConfig>(Encoding.UTF8.GetString(bytes)) ?? new());
+                return Normalize(JsonConvert.DeserializeObject<LauncherConfig>(Encoding.UTF8.GetString(bytes)) ?? throw new InvalidDataException("Configuration must be an object."));
             }
             finally { CryptographicOperations.ZeroMemory(bytes); }
         }
@@ -212,6 +208,13 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.1","2026-10-07","#00D4AA", new[]{
+                "Harita yeniden kurulunca mevcut dünyalar korunur; yeni kopya oluşturulur",
+                "Mod bağımlılıkları tam sürüm ve yükleyici uyumuyla doğrulanır",
+                "Skin indirme yarışları ve başarısız yenilemeler mevcut skinleri bozmaz",
+                "Eski oyun sürümlerinin native dosyaları onarılır; düşük RAM sınırı düzeltildi",
+                "Güncelleme yeniden denemesi, ayar yedeği ve tünel süreç sahipliği düzeltildi"
+            }),
             new("v6.2.0","2026-10-07","#00D4AA", new[]{
                 "Normal derleme: dağıtım paketinde kod gizleme yok",
                 "Ana panel sadeleştirildi; hızlı işlemler küçük pencerede de görünür",
@@ -616,7 +619,11 @@ namespace MistikLauncher
         PeerInfo _myInfo = new();
         CancellationTokenSource _cts = new();
         Process? _tunnelProc;
-        int _openedPort = 25565;
+        readonly object _tunnelGate = new();
+        readonly SemaphoreSlim _upnpGate = new(1, 1);
+        int _tunnelGeneration;
+        int? _mappedPort;
+        int _mappedGeneration;
 
         public MistikRelay(string username)
         {
@@ -851,10 +858,10 @@ namespace MistikLauncher
         public void StartTunnel(int localPort = 25565, string gateway = "playit.gg",
                                  string? customSubdomain = null, string? customHost = null)
         {
-            // Clean up any existing tunnels first to prevent conflicts
-            StopTunnel();
-
-            _openedPort = localPort;
+            int generation;
+            lock (_tunnelGate) { StopTunnel(); generation = _tunnelGeneration; }
+            void Log(string message) { lock (_tunnelGate) { if (IsCurrentTunnel(generation)) OnTunnelLog?.Invoke(message); } }
+            void Ready(string? address) => NotifyTunnelAddress(generation, null, address);
 
             // Otomatik olarak tüm server.properties dosyalarını çevrimdışı moda ayarla
             EnforceOfflineModeInProperties();
@@ -862,70 +869,22 @@ namespace MistikLauncher
             // ── UPnP (Otomatik Modem Port Yönlendirme) ───────────────────────────
             if (gateway == "upnp")
             {
-                OnTunnelLog?.Invoke("[SİSTEM] 🎯 UPnP otomatik port yönlendirme başlatılıyor...");
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        var (ok, msg) = await MistikUpnp.AddUpnpPortMappingWithTimeoutAsync(localPort);
-                        if (ok)
-                        {
-                            OnTunnelLog?.Invoke($"[SİSTEM] ✓ Modem port yönlendirme başarılı! Yerel IP: {MistikUpnp.GetLocalIPAddress()}");
-                            OnTunnelLog?.Invoke("[SİSTEM] Dış IP adresi sorgulanıyor...");
-                            string? publicIp = await MistikUpnp.GetPublicIPAddressAsync();
-                            if (!string.IsNullOrEmpty(publicIp))
-                            {
-                                string addr = $"{publicIp}:{localPort}";
-                                TunnelAddress = addr;
-                                _myInfo = _myInfo with { Tunnel = addr };
-                                _ = Publish();
-                                OnTunnelReady?.Invoke(addr);
-                                OnTunnelLog?.Invoke($"[SİSTEM] ✅ Bağlantı Başarılı! Arkadaşlarına ver: {addr}");
-                            }
-                            else
-                            {
-                                OnTunnelLog?.Invoke("[UYARI] Dış IP adresi alınamadı. Ancak port modeminizde açıldı!");
-                                OnTunnelReady?.Invoke($"DışIP:{localPort}");
-                            }
-                        }
-                        else
-                        {
-                            OnTunnelLog?.Invoke($"[HATA] Modem portu açamadı: {msg}");
-                            OnTunnelLog?.Invoke("[İPUCU] Modem arayüzünden UPnP özelliğinin açık olduğunu kontrol edin veya playit.gg seçin.");
-                            OnTunnelReady?.Invoke(null);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        OnTunnelLog?.Invoke($"[HATA] UPnP işlemi sırasında hata: {ex.Message}");
-                        OnTunnelReady?.Invoke(null);
-                    }
-                });
+                _ = StartUpnpTunnelAsync(generation, localPort);
                 return;
             }
 
             // ── PLAYIT.GG — hesap bazlı tünel, yüksek stabilite ──────────────────
             if (gateway == "playit.gg")
             {
-                OnTunnelLog?.Invoke("[SİSTEM] 🎯 playit.gg tüneli başlatılıyor...");
-                OnTunnelLog?.Invoke("[İPUCU] playit.gg ilk kez başlatılıyorsa, doğrulamak için konsoldaki linke tıklayın.");
+                Log("[SİSTEM] 🎯 playit.gg tüneli başlatılıyor...");
+                Log("[İPUCU] playit.gg ilk kez başlatılıyorsa, doğrulamak için konsoldaki linke tıklayın.");
 
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        // Kill any existing playit processes to prevent conflicts
-                        try
-                        {
-                            foreach (var proc in Process.GetProcessesByName("playit"))
-                            {
-                                try { proc.Kill(true); } catch { }
-                            }
-                        }
-                        catch { }
-
-                        bool ok = await EnsurePlayitAsync(msg => OnTunnelLog?.Invoke(msg));
-                        if (!ok) { OnTunnelReady?.Invoke(null); return; }
+                        bool ok = await EnsurePlayitAsync(msg => Log(msg));
+                        if (!ok) { Ready(null); return; }
 
                         var secretFile = Path.Combine(Path.GetDirectoryName(PlayitExePath())!, "playit.toml");
 
@@ -941,17 +900,14 @@ namespace MistikLauncher
                             CreateNoWindow         = true
                         };
 
-                        try { _tunnelProc = Process.Start(psi)!; }
-                        catch (Exception ex) { OnTunnelLog?.Invoke($"[HATA] {ex.Message}"); OnTunnelReady?.Invoke(null); return; }
+                        Process? process;
+                        try { process = StartTunnelProcess(generation, psi); if (process == null) return; }
+                        catch (Exception ex) { Log($"[HATA] {ex.Message}"); Ready(null); return; }
 
                         void NotifyPlayit(string addr)
                         {
-                            if (TunnelAddress != null) return;
-                            TunnelAddress = addr;
-                            _myInfo = _myInfo with { Tunnel = addr };
-                            _ = Publish();
-                            OnTunnelReady?.Invoke(addr);
-                            OnTunnelLog?.Invoke($"[SİSTEM] ✅ Bağlantı Başarılı! Arkadaşlarına ver: {addr}");
+                            NotifyTunnelAddress(generation, process, addr);
+                            Log($"[SİSTEM] ✅ Bağlantı Başarılı! Arkadaşlarına ver: {addr}");
                         }
 
                         bool claimOpened  = false;
@@ -964,20 +920,20 @@ namespace MistikLauncher
                             try
                             {
                                 string? line;
-                                while (_tunnelProc != null && (line = _tunnelProc.StandardOutput.ReadLine()) != null)
+                                while (IsCurrentTunnel(generation, process) && (line = process.StandardOutput.ReadLine()) != null)
                                 {
                                     line = Regex.Replace(line, @"\x1b\[[0-9;]*[a-zA-Z]", "");
-                                    OnTunnelLog?.Invoke($"[PLAYIT] {line}");
+                                    Log($"[PLAYIT] {line}");
 
                                     var claimMatch = Regex.Match(line, @"https?://playit\.gg/claim/[\w\-]+");
                                     if (claimMatch.Success)
                                     {
-                                        OnTunnelLog?.Invoke($"[SİSTEM] 🔑 LİNK YAKALANDI → {claimMatch.Value}");
-                                        if (!claimOpened)
+                                        Log($"[SİSTEM] 🔑 LİNK YAKALANDI → {claimMatch.Value}");
+                                        if (!claimOpened && IsCurrentTunnel(generation, process))
                                         {
                                             claimOpened = true;
                                             try { Process.Start(new ProcessStartInfo(claimMatch.Value) { UseShellExecute = true }); } catch { }
-                                            OnTunnelLog?.Invoke("[SİSTEM] 🌐 Doğrulama sayfası tarayıcıda açıldı.");
+                                            Log("[SİSTEM] 🌐 Doğrulama sayfası tarayıcıda açıldı.");
                                         }
                                     }
 
@@ -985,7 +941,7 @@ namespace MistikLauncher
                                     if (!agentStarted && line.Contains("tunnel running", StringComparison.OrdinalIgnoreCase))
                                     {
                                         agentStarted = true;
-                                        OnTunnelLog?.Invoke("[SİSTEM] ✔ Ajan bağlantısı kuruldu, tünel adresi bekleniyor...");
+                                        Log("[SİSTEM] ✔ Ajan bağlantısı kuruldu, tünel adresi bekleniyor...");
                                     }
 
                                     // Adresi yeni regex ile yakala: port olmak zorunda değil (joinmc.link için)
@@ -999,10 +955,10 @@ namespace MistikLauncher
                             }
                             catch { }
 
-                            if (TunnelAddress == null)
+                            if (IsCurrentTunnel(generation, process) && TunnelAddress == null)
                             {
-                                OnTunnelLog?.Invoke("[HATA] playit kapandı — tünel sonlandı.");
-                                OnTunnelReady?.Invoke(null);
+                                Log("[HATA] playit kapandı — tünel sonlandı.");
+                                Ready(null);
                             }
                         });
 
@@ -1013,16 +969,16 @@ namespace MistikLauncher
                             try
                             {
                                 string? line;
-                                while (_tunnelProc != null && (line = _tunnelProc.StandardError.ReadLine()) != null)
+                                while (IsCurrentTunnel(generation, process) && (line = process.StandardError.ReadLine()) != null)
                                 {
                                     line = Regex.Replace(line, @"\x1b\[[0-9;]*[a-zA-Z]", "");
-                                    OnTunnelLog?.Invoke($"[PLAYIT] {line}");
+                                    Log($"[PLAYIT] {line}");
 
                                     var claimMatch = Regex.Match(line, @"https?://playit\.gg/claim/[\w\-]+");
                                     if (claimMatch.Success)
                                     {
-                                        OnTunnelLog?.Invoke($"[SİSTEM] 🔑 LİNK YAKALANDI → {claimMatch.Value}");
-                                        if (!claimOpened)
+                                        Log($"[SİSTEM] 🔑 LİNK YAKALANDI → {claimMatch.Value}");
+                                        if (!claimOpened && IsCurrentTunnel(generation, process))
                                         {
                                             claimOpened = true;
                                             try { Process.Start(new ProcessStartInfo(claimMatch.Value) { UseShellExecute = true }); } catch { }
@@ -1032,7 +988,7 @@ namespace MistikLauncher
                                     if (!agentStarted && line.Contains("tunnel running", StringComparison.OrdinalIgnoreCase))
                                     {
                                         agentStarted = true;
-                                        OnTunnelLog?.Invoke("[SİSTEM] ✔ Ajan bağlantısı kuruldu (stderr), tünel adresi bekleniyor...");
+                                        Log("[SİSTEM] ✔ Ajan bağlantısı kuruldu (stderr), tünel adresi bekleniyor...");
                                     }
 
                                     var m = Regex.Match(line, @"([\w\-\.]+\.(?:ply\.gg|playit\.gg|joinmc\.link|playit\.cloud))(:(\d+))?");
@@ -1049,8 +1005,8 @@ namespace MistikLauncher
                     catch (Exception ex)
                     {
 
-                        OnTunnelLog?.Invoke($"[HATA] Tünel arka plan görevi çöktü: {ex.Message}");
-                        OnTunnelReady?.Invoke(null);
+                        Log($"[HATA] Tünel arka plan görevi çöktü: {ex.Message}");
+                        Ready(null);
                     }
                 });
                 return;
@@ -1059,25 +1015,15 @@ namespace MistikLauncher
             // ── BORE.PUB — gerçek TCP tüneli, hesap gerektirmez ──────────────────
             if (gateway == "bore.pub")
             {
-                OnTunnelLog?.Invoke("[SİSTEM] 🎯 bore.pub TCP tüneli başlatılıyor...");
-                OnTunnelLog?.Invoke($"[BİLGİ] Yerel port: {localPort} → bore.pub:XXXXX");
+                Log("[SİSTEM] 🎯 bore.pub TCP tüneli başlatılıyor...");
+                Log($"[BİLGİ] Yerel port: {localPort} → bore.pub:XXXXX");
 
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        // Kill any existing bore processes to prevent conflicts
-                        try
-                        {
-                            foreach (var proc in Process.GetProcessesByName("bore"))
-                            {
-                                try { proc.Kill(true); } catch { }
-                            }
-                        }
-                        catch { }
-
-                        bool ok = await EnsureBoreAsync(msg => OnTunnelLog?.Invoke(msg));
-                        if (!ok) { OnTunnelReady?.Invoke(null); return; }
+                        bool ok = await EnsureBoreAsync(msg => Log(msg));
+                        if (!ok) { Ready(null); return; }
 
                         var psi = new ProcessStartInfo
                         {
@@ -1088,19 +1034,16 @@ namespace MistikLauncher
                             RedirectStandardError  = true,
                             CreateNoWindow         = true
                         };
-                        OnTunnelLog?.Invoke($"[DEBUG] {psi.FileName} {psi.Arguments}");
+                        Log($"[DEBUG] {psi.FileName} {psi.Arguments}");
 
-                        try { _tunnelProc = Process.Start(psi)!; }
-                        catch (Exception ex) { OnTunnelLog?.Invoke($"[HATA] {ex.Message}"); OnTunnelReady?.Invoke(null); return; }
+                        Process? process;
+                        try { process = StartTunnelProcess(generation, psi); if (process == null) return; }
+                        catch (Exception ex) { Log($"[HATA] {ex.Message}"); Ready(null); return; }
 
                         void NotifyBore(string addr)
                         {
-                            if (TunnelAddress != null) return;
-                            TunnelAddress = addr;
-                            _myInfo = _myInfo with { Tunnel = addr };
-                            _ = Publish();
-                            OnTunnelReady?.Invoke(addr);
-                            OnTunnelLog?.Invoke($"[SİSTEM] ✅ Bağlantı Başarılı! Arkadaşlarına ver: {addr}");
+                            NotifyTunnelAddress(generation, process, addr);
+                            Log($"[SİSTEM] ✅ Bağlantı Başarılı! Arkadaşlarına ver: {addr}");
                         }
 
                         // bore output: "listening at bore.pub:PORT" on stderr
@@ -1109,20 +1052,20 @@ namespace MistikLauncher
                             try
                             {
                                 string? line;
-                                while (_tunnelProc != null && (line = _tunnelProc.StandardError.ReadLine()) != null)
+                                while (IsCurrentTunnel(generation, process) && (line = process.StandardError.ReadLine()) != null)
                                 {
                                     // Strip ANSI escape color sequences from line to prevent regex match failure
                                     line = Regex.Replace(line, @"\x1b\[[0-9;]*[a-zA-Z]", "");
-                                    OnTunnelLog?.Invoke($"[BORE] {line}");
+                                    Log($"[BORE] {line}");
                                     var m = Regex.Match(line, @"listening at ([\w\.\-]+):(\d+)");
                                     if (m.Success) NotifyBore($"{m.Groups[1].Value}:{m.Groups[2].Value}");
                                 }
                             }
                             catch { }
-                            if (TunnelAddress == null)
+                            if (IsCurrentTunnel(generation, process) && TunnelAddress == null)
                             {
-                                OnTunnelLog?.Invoke("[HATA] bore kapandı — bağlantı kurulamadı.");
-                                OnTunnelReady?.Invoke(null);
+                                Log("[HATA] bore kapandı — bağlantı kurulamadı.");
+                                Ready(null);
                             }
                         });
 
@@ -1132,11 +1075,11 @@ namespace MistikLauncher
                             try
                             {
                                 string? line;
-                                while (_tunnelProc != null && (line = _tunnelProc.StandardOutput.ReadLine()) != null)
+                                while (IsCurrentTunnel(generation, process) && (line = process.StandardOutput.ReadLine()) != null)
                                 {
                                     // Strip ANSI escape color sequences from line to prevent regex match failure
                                     line = Regex.Replace(line, @"\x1b\[[0-9;]*[a-zA-Z]", "");
-                                    OnTunnelLog?.Invoke($"[BORE] {line}");
+                                    Log($"[BORE] {line}");
                                     var m = Regex.Match(line, @"listening at ([\w\.\-]+):(\d+)");
                                     if (m.Success) NotifyBore($"{m.Groups[1].Value}:{m.Groups[2].Value}");
                                 }
@@ -1146,8 +1089,8 @@ namespace MistikLauncher
                     }
                     catch (Exception ex)
                     {
-                        OnTunnelLog?.Invoke($"[HATA] Tünel arka plan görevi çöktü: {ex.Message}");
-                        OnTunnelReady?.Invoke(null);
+                        Log($"[HATA] Tünel arka plan görevi çöktü: {ex.Message}");
+                        Ready(null);
                     }
                 });
                 return; // bore kendi task'ında çalışıyor
@@ -1157,11 +1100,11 @@ namespace MistikLauncher
             string ssh = FindSsh();
             if (string.IsNullOrEmpty(ssh))
             {
-                OnTunnelLog?.Invoke("[HATA] OpenSSH bulunamadı!");
-                OnTunnelReady?.Invoke(null);
+                Log("[HATA] OpenSSH bulunamadı!");
+                Ready(null);
                 return;
             }
-            OnTunnelLog?.Invoke($"[SİSTEM] SSH: {ssh}");
+            Log($"[SİSTEM] SSH: {ssh}");
 
             // Ensure SSH key exists
             EnsureSshKey();
@@ -1201,10 +1144,10 @@ namespace MistikLauncher
             }
 
             args = $"{commonOpts}{keyArg}{portOpt}-R 0:localhost:{localPort} {target}";
-            OnTunnelLog?.Invoke($"[SİSTEM] SSH tüneli başlatılıyor → {target} (Yerel Port: {localPort})...");
+            Log($"[SİSTEM] SSH tüneli başlatılıyor → {target} (Yerel Port: {localPort})...");
 
             // SSH komutunu log'a yaz — kullanıcı tam olarak ne çalıştığını görsün
-            OnTunnelLog?.Invoke($"[DEBUG] SSH komutu: ssh {args}");
+            Log($"[DEBUG] SSH komutu: ssh {args}");
 
             var psi = new ProcessStartInfo
             {
@@ -1216,23 +1159,20 @@ namespace MistikLauncher
                 CreateNoWindow         = true
             };
 
-            try { _tunnelProc = Process.Start(psi)!; }
+            Process? sshProcess;
+            try { sshProcess = StartTunnelProcess(generation, psi); if (sshProcess == null) return; }
             catch (Exception ex)
             {
-                OnTunnelLog?.Invoke($"[HATA] Tünel başlatılırken sistem hatası oluştu: {ex.Message}");
-                OnTunnelReady?.Invoke(null);
+                Log($"[HATA] Tünel başlatılırken sistem hatası oluştu: {ex.Message}");
+                Ready(null);
                 return;
             }
 
             // Helper: fire tunnel ready once
             void NotifyReady(string addr)
             {
-                if (TunnelAddress != null) return;
-                TunnelAddress = addr;
-                _myInfo = _myInfo with { Tunnel = addr };
-                _ = Publish();
-                OnTunnelReady?.Invoke(addr);
-                OnTunnelLog?.Invoke($"[SİSTEM] ✅ Bağlantı Başarılı! Adresiniz: {addr}");
+                NotifyTunnelAddress(generation, sshProcess, addr);
+                Log($"[SİSTEM] ✅ Bağlantı Başarılı! Adresiniz: {addr}");
             }
 
             // ── Read stdout ─────────────────────────────────────────────────────────
@@ -1241,9 +1181,9 @@ namespace MistikLauncher
                 try
                 {
                     string? line;
-                    while (_tunnelProc != null && (line = _tunnelProc.StandardOutput.ReadLine()) != null)
+                    while (IsCurrentTunnel(generation, sshProcess) && (line = sshProcess.StandardOutput.ReadLine()) != null)
                     {
-                        OnTunnelLog?.Invoke($"[OUT] {line}");
+                        Log($"[OUT] {line}");
 
                         // serveo.net TCP: "Forwarding TCP connections from serveo.net:XXXXX"
                         var mServeo = Regex.Match(line, @"Forwarding TCP connections from (serveo\.net):(\d+)");
@@ -1268,14 +1208,14 @@ namespace MistikLauncher
                         }
                     }
                 }
-                catch (Exception ex) { OnTunnelLog?.Invoke($"[HATA] Çıkış kanalı: {ex.Message}"); }
+                catch (Exception ex) { Log($"[HATA] Çıkış kanalı: {ex.Message}"); }
 
                 // Process exited
-                if (TunnelAddress == null)
+                if (IsCurrentTunnel(generation, sshProcess) && TunnelAddress == null)
                 {
-                    OnTunnelLog?.Invoke("[HATA] SSH tüneli kapandı — bağlantı kurulamadı.");
-                    OnTunnelLog?.Invoke("[İPUCU] Özel SSH veya serveo.net seçerek tekrar deneyin.");
-                    OnTunnelReady?.Invoke(null);
+                    Log("[HATA] SSH tüneli kapandı — bağlantı kurulamadı.");
+                    Log("[İPUCU] Özel SSH veya serveo.net seçerek tekrar deneyin.");
+                    Ready(null);
                 }
             });
 
@@ -1285,7 +1225,7 @@ namespace MistikLauncher
                 try
                 {
                     string? line;
-                    while (_tunnelProc != null && (line = _tunnelProc.StandardError.ReadLine()) != null)
+                    while (IsCurrentTunnel(generation, sshProcess) && (line = sshProcess.StandardError.ReadLine()) != null)
                     {
                         // serveo.net TCP in stderr
                         var mServeo = Regex.Match(line, @"Forwarding TCP connections from (serveo\.net):(\d+)");
@@ -1299,90 +1239,131 @@ namespace MistikLauncher
                             var mLhr = Regex.Match(line, @"([\w\-]+\.lhr\.(?:life|pro|run))");
                             if (mLhr.Success) NotifyReady($"{mLhr.Groups[1].Value}:25565");
                         }
-                        else OnTunnelLog?.Invoke($"[UYARI] {line}");
+                        else Log($"[UYARI] {line}");
                     }
                 }
-                catch (Exception ex) { OnTunnelLog?.Invoke($"[HATA] Hata kanalı okuma hatası: {ex.Message}"); }
+                catch (Exception ex) { Log($"[HATA] Hata kanalı okuma hatası: {ex.Message}"); }
             });
+        }
+
+        bool IsCurrentTunnel(int generation, Process? process = null)
+        {
+            lock (_tunnelGate) return generation == _tunnelGeneration && !_cts.IsCancellationRequested &&
+                (process == null || ReferenceEquals(_tunnelProc, process));
+        }
+
+        Process? StartTunnelProcess(int generation, ProcessStartInfo info)
+        {
+            lock (_tunnelGate)
+            {
+                if (!IsCurrentTunnel(generation)) return null;
+                var process = Process.Start(info) ?? throw new IOException("Tunnel process could not start.");
+                _tunnelProc = process;
+                _ = MonitorTunnelProcessAsync(generation, process);
+                return process;
+            }
+        }
+
+        async Task MonitorTunnelProcessAsync(int generation, Process process)
+        {
+            try
+            {
+                await process.WaitForExitAsync();
+                lock (_tunnelGate)
+                {
+                    if (!IsCurrentTunnel(generation, process)) return;
+                    NotifyTunnelAddress(generation, process, null);
+                    _tunnelProc = null;
+                }
+            }
+            catch { }
+            finally { process.Dispose(); }
+        }
+
+        void NotifyTunnelAddress(int generation, Process? process, string? address)
+        {
+            lock (_tunnelGate)
+            {
+                if (!IsCurrentTunnel(generation, process) || (address != null && TunnelAddress != null)) return;
+                TunnelAddress = address;
+                _myInfo = _myInfo with { Tunnel = address };
+                _ = Publish();
+                OnTunnelReady?.Invoke(address);
+            }
+        }
+
+        async Task StartUpnpTunnelAsync(int generation, int port,
+            Func<int, Task<(bool success, string message)>>? add = null,
+            Func<Task<string?>>? address = null, Func<int, Task<bool>>? remove = null)
+        {
+            add ??= value => MistikUpnp.AddUpnpPortMappingWithTimeoutAsync(value);
+            address ??= MistikUpnp.GetPublicIPAddressAsync;
+            remove ??= value => MistikUpnp.RemoveUpnpPortMappingAsync(value);
+            await _upnpGate.WaitAsync();
+            try
+            {
+                if (!IsCurrentTunnel(generation)) return;
+                int? previousPort;
+                lock (_tunnelGate) { previousPort = _mappedPort; _mappedPort = null; }
+                if (previousPort.HasValue) await remove(previousPort.Value);
+                if (!IsCurrentTunnel(generation)) return;
+                var result = await add(port);
+                if (!result.success) { NotifyTunnelAddress(generation, null, null); return; }
+                bool retained = false;
+                try
+                {
+                    if (!IsCurrentTunnel(generation)) return;
+                    var publicAddress = await address();
+                    lock (_tunnelGate)
+                    {
+                        if (!IsCurrentTunnel(generation)) return;
+                        _mappedPort = port; _mappedGeneration = generation; retained = true;
+                        NotifyTunnelAddress(generation, null, string.IsNullOrWhiteSpace(publicAddress) ? null : $"{publicAddress}:{port}");
+                    }
+                }
+                finally { if (!retained) await remove(port); }
+            }
+            catch (Exception ex)
+            {
+                lock (_tunnelGate)
+                {
+                    if (IsCurrentTunnel(generation)) { OnTunnelLog?.Invoke("[HATA] UPnP: " + ex.Message); NotifyTunnelAddress(generation, null, null); }
+                }
+            }
+            finally { _upnpGate.Release(); }
+        }
+
+        async Task RemoveTunnelMappingAsync(int generation)
+        {
+            await _upnpGate.WaitAsync();
+            try
+            {
+                int? port;
+                lock (_tunnelGate)
+                {
+                    if (_mappedGeneration != generation) return;
+                    port = _mappedPort; _mappedPort = null;
+                }
+                if (port.HasValue) await MistikUpnp.RemoveUpnpPortMappingAsync(port.Value);
+            }
+            catch { }
+            finally { _upnpGate.Release(); }
         }
 
         public void StopTunnel()
         {
-            try { _tunnelProc?.Kill(true); } catch { }
-            _tunnelProc  = null;
-            TunnelAddress = null;
-            _myInfo = _myInfo with { Tunnel = null };
-
-            // UPnP portunu kapat
-            try { _ = MistikUpnp.RemoveUpnpPortMappingAsync(_openedPort); } catch { }
-
-            // Kill any stray playit or bore processes using standard Process.Kill
-            try
+            Process? process;
+            int? mappedGeneration;
+            lock (_tunnelGate)
             {
-                foreach (var proc in Process.GetProcessesByName("playit"))
-                {
-                    try { proc.Kill(true); } catch { }
-                }
+                ++_tunnelGeneration;
+                process = _tunnelProc; _tunnelProc = null;
+                mappedGeneration = _mappedPort.HasValue ? _mappedGeneration : null;
+                TunnelAddress = null;
+                _myInfo = _myInfo with { Tunnel = null };
             }
-            catch { }
-
-            try
-            {
-                foreach (var proc in Process.GetProcessesByName("bore"))
-                {
-                    try { proc.Kill(true); } catch { }
-                }
-            }
-            catch { }
-
-            try
-            {
-                foreach (var proc in Process.GetProcessesByName("ssh"))
-                {
-                    try { proc.Kill(true); } catch { }
-                }
-            }
-            catch { }
-
-            // Force-kill all playit, bore, and ssh processes using taskkill to guarantee complete release
-            try
-            {
-                var psiPlayit = new ProcessStartInfo
-                {
-                    FileName = "taskkill.exe",
-                    Arguments = "/f /im playit.exe",
-                    CreateNoWindow = true,
-                    UseShellExecute = false
-                };
-                Process.Start(psiPlayit)?.WaitForExit(1000);
-            }
-            catch {}
-
-            try
-            {
-                var psiBore = new ProcessStartInfo
-                {
-                    FileName = "taskkill.exe",
-                    Arguments = "/f /im bore.exe",
-                    CreateNoWindow = true,
-                    UseShellExecute = false
-                };
-                Process.Start(psiBore)?.WaitForExit(1000);
-            }
-            catch {}
-
-            try
-            {
-                var psiSsh = new ProcessStartInfo
-                {
-                    FileName = "taskkill.exe",
-                    Arguments = "/f /im ssh.exe",
-                    CreateNoWindow = true,
-                    UseShellExecute = false
-                };
-                Process.Start(psiSsh)?.WaitForExit(1000);
-            }
-            catch {}
+            try { process?.Kill(true); } catch { }
+            if (mappedGeneration.HasValue) _ = RemoveTunnelMappingAsync(mappedGeneration.Value);
         }
 
         static string FindSsh()
@@ -1699,7 +1680,7 @@ namespace MistikLauncher
             return null;
         }
 
-        private static async Task<bool> SendSoapActionAsync(string controlUrl, string action, string soapBody)
+        private static async Task<bool> SendSoapActionAsync(string controlUrl, string action, string soapBody, HttpClient? client = null)
         {
             try
             {
@@ -1710,24 +1691,24 @@ namespace MistikLauncher
                                 "  </SOAP-ENV:Body>\r\n" +
                                 "</SOAP-ENV:Envelope>";
 
-                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
-                http.DefaultRequestHeaders.ConnectionClose = true;
-                var content = new StringContent(reqXml, Encoding.UTF8, "text/xml");
+                using var owned = client == null ? new HttpClient { Timeout = TimeSpan.FromSeconds(3) } : null;
+                var http = client ?? owned!;
+                using var content = new StringContent(reqXml, Encoding.UTF8, "text/xml");
                 
                 string serviceType = controlUrl.Contains("WANPPPConnection") ? "urn:schemas-upnp-org:service:WANPPPConnection:1" : "urn:schemas-upnp-org:service:WANIPConnection:1";
                 content.Headers.Add("SOAPAction", $"\"{serviceType}#{action}\"");
 
-                var resp = await http.PostAsync(controlUrl, content);
+                using var resp = await http.PostAsync(controlUrl, content);
                 return resp.IsSuccessStatusCode;
             }
             catch { return false; }
         }
 
-        public static async Task<(bool success, string message)> AddUpnpPortMappingWithTimeoutAsync(int port, string description = "Mistik Launcher", int timeoutMs = 4000)
+        public static async Task<(bool success, string message)> AddUpnpPortMappingWithTimeoutAsync(int port, string description = "Mistik Launcher", int timeoutMs = 4000, string? controlUrl = null, HttpClient? client = null)
         {
             try
             {
-                string? controlUrl = await DiscoverControlUrlAsync(2500);
+                controlUrl ??= await DiscoverControlUrlAsync(2500);
                 if (string.IsNullOrEmpty(controlUrl))
                 {
                     return (false, "Yerel aginizda UPnP destekli bir modem bulunamadi. UPnP ayarinin modeminizde acik oldugundan emin olun.");
@@ -1735,10 +1716,7 @@ namespace MistikLauncher
 
                 string localIp = GetLocalIPAddress();
 
-                // 1. Clear existing mappings first
-                await RemoveUpnpPortMappingAsync(port);
-
-                // 2. Add TCP Mapping
+                // Java game tunnels use TCP; let the router reject an occupied port.
                 string soapBodyTcp = $"    <u:AddPortMapping xmlns:u=\"{(controlUrl.Contains("WANPPPConnection") ? "urn:schemas-upnp-org:service:WANPPPConnection:1" : "urn:schemas-upnp-org:service:WANIPConnection:1")}\">\r\n" +
                                      $"      <NewRemoteHost></NewRemoteHost>\r\n" +
                                      $"      <NewExternalPort>{port}</NewExternalPort>\r\n" +
@@ -1750,25 +1728,11 @@ namespace MistikLauncher
                                      $"      <NewLeaseDuration>0</NewLeaseDuration>\r\n" +
                                      $"    </u:AddPortMapping>\r\n";
 
-                bool okTcp = await SendSoapActionAsync(controlUrl, "AddPortMapping", soapBodyTcp);
+                bool okTcp = await SendSoapActionAsync(controlUrl, "AddPortMapping", soapBodyTcp, client);
                 if (!okTcp)
                 {
                     return (false, "Modem port yonlendirme istegini reddetti.");
                 }
-
-                // 3. Add UDP Mapping
-                string soapBodyUdp = $"    <u:AddPortMapping xmlns:u=\"{(controlUrl.Contains("WANPPPConnection") ? "urn:schemas-upnp-org:service:WANPPPConnection:1" : "urn:schemas-upnp-org:service:WANIPConnection:1")}\">\r\n" +
-                                     $"      <NewRemoteHost></NewRemoteHost>\r\n" +
-                                     $"      <NewExternalPort>{port}</NewExternalPort>\r\n" +
-                                     $"      <NewProtocol>UDP</NewProtocol>\r\n" +
-                                     $"      <NewInternalPort>{port}</NewInternalPort>\r\n" +
-                                     $"      <NewInternalClient>{localIp}</NewInternalClient>\r\n" +
-                                     $"      <NewEnabled>1</NewEnabled>\r\n" +
-                                     $"      <NewPortMappingDescription>{description}</NewPortMappingDescription>\r\n" +
-                                     $"      <NewLeaseDuration>0</NewLeaseDuration>\r\n" +
-                                     $"    </u:AddPortMapping>\r\n";
-                
-                await SendSoapActionAsync(controlUrl, "AddPortMapping", soapBodyUdp); // Optional, don't fail if UDP fails
 
                 return (true, "Basarili");
             }
@@ -1778,11 +1742,11 @@ namespace MistikLauncher
             }
         }
 
-        public static async Task<bool> RemoveUpnpPortMappingAsync(int port)
+        public static async Task<bool> RemoveUpnpPortMappingAsync(int port, string? controlUrl = null, HttpClient? client = null)
         {
             try
             {
-                string? controlUrl = await DiscoverControlUrlAsync(1500);
+                controlUrl ??= await DiscoverControlUrlAsync(1500);
                 if (string.IsNullOrEmpty(controlUrl)) return false;
 
                 string serviceType = controlUrl.Contains("WANPPPConnection") ? "urn:schemas-upnp-org:service:WANPPPConnection:1" : "urn:schemas-upnp-org:service:WANIPConnection:1";
@@ -1793,15 +1757,7 @@ namespace MistikLauncher
                                      $"      <NewProtocol>TCP</NewProtocol>\r\n" +
                                      $"    </u:DeletePortMapping>\r\n";
 
-                string soapBodyUdp = $"    <u:DeletePortMapping xmlns:u=\"{serviceType}\">\r\n" +
-                                     $"      <NewRemoteHost></NewRemoteHost>\r\n" +
-                                     $"      <NewExternalPort>{port}</NewExternalPort>\r\n" +
-                                     $"      <NewProtocol>UDP</NewProtocol>\r\n" +
-                                     $"    </u:DeletePortMapping>\r\n";
-
-                await SendSoapActionAsync(controlUrl, "DeletePortMapping", soapBodyTcp);
-                await SendSoapActionAsync(controlUrl, "DeletePortMapping", soapBodyUdp);
-                return true;
+                return await SendSoapActionAsync(controlUrl, "DeletePortMapping", soapBodyTcp, client);
             }
             catch { return false; }
         }

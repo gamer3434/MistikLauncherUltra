@@ -173,7 +173,7 @@ public class ModernSettingsPage : Page, ILanguagePage
     {
         main=window;
         this.updatesOnly=updatesOnly;
-        Loaded += (_,_) => main.LauncherUpdates.Changed += UpdateStatusAsync;
+        Loaded += (_,_) => { main.LauncherUpdates.Changed += UpdateStatusAsync; UpdateStatus(); };
         Unloaded += (_,_) => main.LauncherUpdates.Changed -= UpdateStatusAsync;
         Render();
     }

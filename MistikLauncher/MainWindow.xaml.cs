@@ -31,6 +31,7 @@ namespace MistikLauncher
         Page? _pendingPage;
         readonly HttpClient _http = new();
         readonly HttpClient _skinHttp = new() { Timeout=TimeSpan.FromSeconds(6),MaxResponseContentBufferSize=65536 };
+        int _avatarGeneration, _skinPackGeneration;
         string _accent = "#00A3FF";
         string _currentNav = "Dash";
         bool _isPopulatingVersionBox = false;
@@ -497,62 +498,23 @@ namespace MistikLauncher
             }
         }
 
-        public void LoadAvatar()
+        (string Type, string Skin, string User) SkinSelection() => (Config.SkinType, Config.SkinUser, Config.User);
+
+        public void LoadAvatar() => _ = LoadAvatarAsync();
+        public async Task LoadAvatarAsync(HttpClient? client = null)
         {
-            _ = Task.Run(async () => {
-                // 1. Yerel skin dosyası varsa onu kullan
-                if (Config.SkinType == "local" && !string.IsNullOrEmpty(Config.SkinUser) && File.Exists(Config.SkinUser))
-                {
-                    Dispatcher.Invoke(() => {
-                        try {
-                            var face = GetSkinFace(Config.SkinUser);
-                            if (face != null) {
-                                AvatarImg.Source = face;
-                                System.Windows.Media.RenderOptions.SetBitmapScalingMode(AvatarImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
-                            }
-                        } catch { }
-                    });
-                    return;
-                }
-
-                // 2. Her zaman Ely.by'den skin çekmeyi dene (AuthType ne olursa olsun)
-                var uname = Config.SkinType == "username" ? Config.SkinUser : Config.User;
-                if (!string.IsNullOrEmpty(uname))
-                {
-                    var cache = Path.Combine(App.AppData, $"elyby_{uname}.png");
-                    bool success = false;
-                    try {
-                        if (!File.Exists(cache) || (DateTime.Now - File.GetLastWriteTime(cache)).TotalDays > 1) {
-                            var jsonStr = await _skinHttp.GetStringAsync($"https://skinsystem.ely.by/textures/{Uri.EscapeDataString(uname)}");
-                            var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
-                            var texUrl = SkinTextureUrl(jObj["SKIN"]?["url"]?.ToString());
-                            if (!string.IsNullOrEmpty(texUrl)) {
-                                var bytes = await _skinHttp.GetByteArrayAsync(texUrl); SkinValidator.Validate(bytes);
-                                Directory.CreateDirectory(App.AppData);
-                                await File.WriteAllBytesAsync(cache, bytes);
-                            }
-                        }
-                        if (File.Exists(cache)) {
-                            Dispatcher.Invoke(() => {
-                                var face = GetSkinFace(cache);
-                                if (face != null) {
-                                    AvatarImg.Source = face;
-                                    System.Windows.Media.RenderOptions.SetBitmapScalingMode(AvatarImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
-                                    success = true;
-                                }
-                            });
-                        }
-                    } catch { }
-
-                    if (success) return;
-
-                    // 3. Ely.by başarısız olduysa mc-heads fallback
-                    try {
-                        var img = await FetchAvatarAsync(uname, 40);
-                        Dispatcher.Invoke(() => { if (img != null) AvatarImg.Source = img; });
-                    } catch { }
-                }
-            });
+            int generation = ++_avatarGeneration;
+            var selection = SkinSelection();
+            try
+            {
+                var image = selection.Type == "local" && File.Exists(selection.Skin)
+                    ? GetSkinFace(selection.Skin)
+                    : await FetchAvatarAsync(selection.Type == "username" ? selection.Skin : selection.User, 40, client);
+                if (generation != _avatarGeneration || selection != SkinSelection() || image == null) return;
+                AvatarImg.Source = image;
+                System.Windows.Media.RenderOptions.SetBitmapScalingMode(AvatarImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
+            }
+            catch (Exception ex) { App.Log("Avatar refresh: " + ex.Message); }
         }
 
         public static string? SkinTextureUrl(string? raw)
@@ -561,8 +523,9 @@ namespace MistikLauncher
                 !(url.Host.Equals("ely.by",StringComparison.OrdinalIgnoreCase) || url.Host.EndsWith(".ely.by",StringComparison.OrdinalIgnoreCase) || url.Host.Equals("textures.minecraft.net",StringComparison.OrdinalIgnoreCase))) return null;
             return new UriBuilder(url) { Scheme="https",Port=-1 }.Uri.AbsoluteUri;
         }
-        public async Task<System.Windows.Media.ImageSource?> FetchAvatarAsync(string username, int size = 64)
+        public async Task<System.Windows.Media.ImageSource?> FetchAvatarAsync(string username, int size = 64, HttpClient? client = null)
         {
+            client ??= _skinHttp;
             username??="";
             if(!Regex.IsMatch(username,@"^[A-Za-z0-9_]{3,16}$")) return null;
             size=Math.Clamp(size,16,128);
@@ -572,11 +535,11 @@ namespace MistikLauncher
                 // Önce Ely.by'den skin denemesi yapalım
                 try {
                     if (!File.Exists(elybyCache) || (DateTime.Now - File.GetLastWriteTime(elybyCache)).TotalDays > 1) {
-                        var jsonStr = await _skinHttp.GetStringAsync($"https://skinsystem.ely.by/textures/{Uri.EscapeDataString(username)}");
+                        var jsonStr = await client.GetStringAsync($"https://skinsystem.ely.by/textures/{Uri.EscapeDataString(username)}");
                         var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
                         var texUrl = SkinTextureUrl(jObj["SKIN"]?["url"]?.ToString());
                         if (!string.IsNullOrEmpty(texUrl)) {
-                            var elyBytes = await _skinHttp.GetByteArrayAsync(texUrl); SkinValidator.Validate(elyBytes);
+                            var elyBytes = await client.GetByteArrayAsync(texUrl); SkinValidator.Validate(elyBytes);
                             Directory.CreateDirectory(App.AppData);
                             await File.WriteAllBytesAsync(elybyCache, elyBytes);
                         }
@@ -593,7 +556,7 @@ namespace MistikLauncher
                 if (File.Exists(cache))
                     bytes = await File.ReadAllBytesAsync(cache);
                 else {
-                    bytes = await _skinHttp.GetByteArrayAsync($"https://mc-heads.net/avatar/{Uri.EscapeDataString(username)}/{size}");
+                    bytes = await client.GetByteArrayAsync($"https://mc-heads.net/avatar/{Uri.EscapeDataString(username)}/{size}");
                     Directory.CreateDirectory(App.AppData);
                     await File.WriteAllBytesAsync(cache, bytes);
                 }
@@ -758,24 +721,12 @@ namespace MistikLauncher
                 }
 
                 // 4. Argumanlari olustur
-                // ★ RAM Güvenlik Sınırı (Out of Memory ve Shader Çökmelerini Önler)
-                var rawRamGb = Math.Max(Config.Ram, 1);
-                var ram = rawRamGb * 1024;
+                var requestedRam = Math.Clamp(Config.Ram,1,32) * 1024;
+                var ram = requestedRam;
                 try
                 {
-                    ulong totalPhysBytes = KernelOptimizer.GetTotalPhysicalMemory();
-                    if (totalPhysBytes > 0)
-                    {
-                        int totalPhysGb = (int)(totalPhysBytes / (1024.0 * 1024.0 * 1024.0));
-                        if (rawRamGb >= totalPhysGb)
-                        {
-                            // Fiziksel RAM'in hepsini vermeye çalışırsa otomatik olarak güvenli bir sınır koy (Toplam RAM - 4GB, en az 4GB, en fazla 8GB shaderlar için)
-                            int safeRamGb = Math.Max(4, totalPhysGb - 4);
-                            if (safeRamGb > 8) safeRamGb = 8; // Shaderlar ve sistem için en ideal dengeli dağılım
-                            ram = safeRamGb * 1024;
-                            App.Log($"[RAMOpt] Sistem fiziksel belleği ({totalPhysGb}GB) yetersiz! RAM kilidi uygulandı: {rawRamGb}GB -> {safeRamGb}GB");
-                        }
-                    }
+                    ram = LaunchReadiness.ClampRamMb(Config.Ram,KernelOptimizer.GetTotalPhysicalMemory());
+                    if(ram<requestedRam) App.Log($"[RAMOpt] RAM allocation reduced: {requestedRam}MB -> {ram}MB");
                 }
                 catch { }
 
@@ -1024,19 +975,9 @@ namespace MistikLauncher
                     var currentVer = requestedVersion ?? Config.Version ?? "";
                     if (string.IsNullOrEmpty(currentVer) || !string.Equals(Config.Version,currentVer,StringComparison.Ordinal)) return false;
 
-                    // 1. Determine loader type for current version
-                    string currentLoader = "vanilla";
-                    if (currentVer.Contains("fabric", StringComparison.OrdinalIgnoreCase)) currentLoader = "fabric";
-                    else if (currentVer.Contains("neoforge", StringComparison.OrdinalIgnoreCase)) currentLoader = "neoforge";
-                    else if (currentVer.Contains("forge", StringComparison.OrdinalIgnoreCase)) currentLoader = "forge";
-
-                    // Extract exact MC version (e.g. 1.21.1) from folder name
-                    var mcVersion = "1.21.1";
-                    var mcMatch = System.Text.RegularExpressions.Regex.Match(currentVer, @"1\.\d+(\.\d+)?");
-                    if (mcMatch.Success) mcVersion = mcMatch.Value;
-
-                    // Dynamic pool key: e.g. "1.21.1_fabric" or "1.20.1_forge"
-                    string currentPoolKey = currentLoader == "vanilla" ? "vanilla" : $"{mcVersion}_{currentLoader}";
+                    string currentLoader = GameProfiles.Loader(App.GameDir,currentVer);
+                    string mcVersion = GameProfiles.MinecraftVersion(App.GameDir,currentVer);
+                    string currentPoolKey = GameProfiles.VersionPoolKey(mcVersion,currentLoader);
 
                     var lastSynced = Config.LastSyncedVersion ?? "";
 
@@ -1046,11 +987,8 @@ namespace MistikLauncher
                     var modsPoolDir = Path.Combine(App.AppData, "mods_pool");
                     Directory.CreateDirectory(modsPoolDir);
 
-                    string lastLoader = lastSynced.Contains("neoforge",StringComparison.OrdinalIgnoreCase)?"neoforge":
-                        lastSynced.Contains("forge",StringComparison.OrdinalIgnoreCase)?"forge":
-                        lastSynced.Contains("fabric",StringComparison.OrdinalIgnoreCase)?"fabric":"vanilla";
-                    var lastMcMatch=Regex.Match(lastSynced,@"1\.\d+(\.\d+)?");
-                    string lastPoolKey=lastLoader=="vanilla"?"vanilla":$"{(lastMcMatch.Success?lastMcMatch.Value:"1.21.1")}_{lastLoader}";
+                    string lastLoader = GameProfiles.Loader(App.GameDir,lastSynced);
+                    string lastPoolKey=GameProfiles.VersionPoolKey(GameProfiles.MinecraftVersion(App.GameDir,lastSynced),lastLoader);
                     // Never clear leftovers: a locked file or collision must preserve both pools and the active set.
                     ModFiles.SyncPools(App.ModsDir,Path.Combine(modsPoolDir,lastPoolKey),currentLoader=="vanilla"?null:Path.Combine(modsPoolDir,currentPoolKey));
 
@@ -1116,9 +1054,9 @@ namespace MistikLauncher
                         {
                             // Uyumsuz modu ilgili havuza taşı
                             string reason = loaderMismatch ? $"loader ({modLoader} != {currentLoader})" : $"sürüm ({string.Join(",", modMcVersions ?? new List<string>())} !~ {mcVersion})";
-                            var safeVersion=Regex.Match(modMcVersions?.FirstOrDefault()??"",@"^1\.\d+(\.\d+)?$");
-                            string poolKey = new[]{"fabric","forge","neoforge"}.Contains(modLoader) && safeVersion.Success
-                                ? $"{safeVersion.Value}_{modLoader}"
+                            var safeVersion=Regex.Match(modMcVersions?.FirstOrDefault()??"",@"^\d+\.\d+(\.\d+)?$");
+                            string poolKey = new[]{"fabric","quilt","forge","neoforge"}.Contains(modLoader) && safeVersion.Success
+                                ? GameProfiles.VersionPoolKey(safeVersion.Value,modLoader!)
                                 : "incompatible";
                             var poolDir = Path.Combine(modsPoolDir, poolKey);
                             Directory.CreateDirectory(poolDir);
@@ -1158,6 +1096,10 @@ namespace MistikLauncher
             try
             {
                 using var zip = ZipFile.OpenRead(jarPath);
+
+                // A jar declaring multiple loaders cannot safely be classified as one.
+                if(zip.GetEntry("quilt.mod.json")!=null)
+                    return (zip.GetEntry("fabric.mod.json")!=null || zip.GetEntry("META-INF/mods.toml")!=null || zip.GetEntry("META-INF/neoforge.mods.toml")!=null?null:"quilt",null);
 
                 // 1. Fabric: fabric.mod.json
                 var fabricEntry = zip.GetEntry("fabric.mod.json");
@@ -1358,19 +1300,21 @@ namespace MistikLauncher
             return 1;
         }
 
-        public async Task<bool> PrepareSkinPackAsync(string version)
+        public async Task<bool> PrepareSkinPackAsync(string version, HttpClient? client = null)
         {
+            int generation = ++_skinPackGeneration;
+            var selection = SkinSelection();
+            var selectedVersion = Config.Version;
+            bool Current() => generation == _skinPackGeneration && selection == SkinSelection() && selectedVersion == Config.Version;
+            client ??= _skinHttp;
             try
             {
                 var packDir = Path.Combine(App.GameDir, "resourcepacks", "MistikSkinPack");
-                var textureDirOld = Path.Combine(packDir, "assets", "minecraft", "textures", "entity");
-                var textureDirNewWide = Path.Combine(packDir, "assets", "minecraft", "textures", "entity", "player", "wide");
-                var textureDirNewSlim = Path.Combine(packDir, "assets", "minecraft", "textures", "entity", "player", "slim");
                 int format = GetPackFormatForVersion(version);
 
-                if (Config.SkinType == "username")
+                if (selection.Type == "username")
                 {
-                    var user = !string.IsNullOrEmpty(Config.SkinUser) ? Config.SkinUser : Config.User;
+                    var user = !string.IsNullOrEmpty(selection.Skin) ? selection.Skin : selection.User;
                     if (!Regex.IsMatch(user ?? "", @"^[A-Za-z0-9_]{3,16}$")) return false;
                     if (string.IsNullOrEmpty(user) || user == "Oyuncu")
                     {
@@ -1378,32 +1322,22 @@ namespace MistikLauncher
                         return true;
                     }
 
-                    // Clear cached avatar files so the bottom circular preview updates immediately!
-                    try
-                    {
-                        var cache1 = Path.Combine(App.AppData, $"elyby_{user}.png");
-                        var cache2 = Path.Combine(App.AppData, $"avatar_{user}_40.png");
-                        var cache3 = Path.Combine(App.AppData, $"avatar_{user}_64.png");
-                        if (File.Exists(cache1)) File.Delete(cache1);
-                        if (File.Exists(cache2)) File.Delete(cache2);
-                        if (File.Exists(cache3)) File.Delete(cache3);
-                    }
-                    catch { }
-
                     byte[]? skinBytes = null;
                     try {
-                        var jsonStr = await _http.GetStringAsync($"https://skinsystem.ely.by/textures/{Uri.EscapeDataString(user)}");
+                        var jsonStr = await client.GetStringAsync($"https://skinsystem.ely.by/textures/{Uri.EscapeDataString(user)}");
                         var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
                         var texUrl = SkinTextureUrl(jObj["SKIN"]?["url"]?.ToString());
                         if (!string.IsNullOrEmpty(texUrl)) {
-                            skinBytes = await _http.GetByteArrayAsync(texUrl);
-                            SkinValidator.Validate(skinBytes);
+                            var downloaded = await client.GetByteArrayAsync(texUrl);
+                            SkinValidator.Validate(downloaded);
+                            skinBytes = downloaded;
                         }
                     } catch { }
 
+                    if (!Current()) return false;
                     if (skinBytes == null) {
                         try {
-                            using var response = await _http.GetAsync($"https://mc-heads.net/skin/{Uri.EscapeDataString(user)}");
+                            using var response = await client.GetAsync($"https://mc-heads.net/skin/{Uri.EscapeDataString(user)}");
                             if (response.IsSuccessStatusCode) {
                                 skinBytes = await response.Content.ReadAsByteArrayAsync();
                             }
@@ -1413,66 +1347,37 @@ namespace MistikLauncher
                     if (skinBytes != null)
                     {
                         SkinValidator.Validate(skinBytes);
-                        if (Directory.Exists(packDir))
+                        if (!Current()) return false;
+                        CommitSkinPack(packDir, skinBytes, format);
+                        // Clear old previews only after a replacement skin has been committed.
+                        try
                         {
-                            try { Directory.Delete(packDir, true); } 
-                            catch { 
-                                // Directory delete failed (locked by game), but we'll try to write files directly
+                            foreach (var cache in new[] { $"elyby_{user}.png", $"avatar_{user}_40.png", $"avatar_{user}_64.png" })
+                            {
+                                var path = Path.Combine(App.AppData, cache);
+                                if (File.Exists(path)) File.Delete(path);
                             }
                         }
-                        Directory.CreateDirectory(textureDirOld);
-                        Directory.CreateDirectory(textureDirNewWide);
-                        Directory.CreateDirectory(textureDirNewSlim);
-                        
-                        await File.WriteAllBytesAsync(Path.Combine(textureDirOld, "steve.png"), skinBytes);
-                        await File.WriteAllBytesAsync(Path.Combine(textureDirOld, "alex.png"), skinBytes);
-                        await File.WriteAllBytesAsync(Path.Combine(textureDirNewWide, "steve.png"), skinBytes);
-                        await File.WriteAllBytesAsync(Path.Combine(textureDirNewSlim, "alex.png"), skinBytes);
-
-                        var mcmetaPath = Path.Combine(packDir, "pack.mcmeta");
-                        var mcmetaContent = "{\n  \"pack\": {\n    \"pack_format\": " + format + ",\n    \"description\": \"Mistik Launcher Ozel Skin Kaynak Paketi\"\n  }\n}";
-                        await File.WriteAllTextAsync(mcmetaPath, mcmetaContent);
-
+                        catch { }
                         EnsureMistikSkinPackEnabled(true);
                         App.Log($"Skin for '{user}' successfully downloaded and applied with pack_format {format}.");
                         return true;
                     }
                     else
                     {
-                        App.Log($"Failed to download skin for '{user}'. Disabling custom skin pack.");
-                        EnsureMistikSkinPackEnabled(false);
-                        if (Directory.Exists(packDir))
-                        {
-                            try { Directory.Delete(packDir, true); } catch { }
-                        }
+                        App.Log($"Failed to download skin for '{user}'. Keeping the existing custom skin pack.");
                         return false;
                     }
                 }
-                else if (Config.SkinType == "local")
+                else if (selection.Type == "local")
                 {
-                    var filePath = Config.SkinUser;
+                    var filePath = selection.Skin;
                     if (File.Exists(filePath))
                     {
-                        SkinValidator.Validate(await File.ReadAllBytesAsync(filePath));
-                        if (Directory.Exists(packDir))
-                        {
-                            try { Directory.Delete(packDir, true); } 
-                            catch { 
-                                // Directory delete failed, try to copy files directly
-                            }
-                        }
-                        Directory.CreateDirectory(textureDirOld);
-                        Directory.CreateDirectory(textureDirNewWide);
-                        Directory.CreateDirectory(textureDirNewSlim);
-                        
-                        File.Copy(filePath, Path.Combine(textureDirOld, "steve.png"), true);
-                        File.Copy(filePath, Path.Combine(textureDirOld, "alex.png"), true);
-                        File.Copy(filePath, Path.Combine(textureDirNewWide, "steve.png"), true);
-                        File.Copy(filePath, Path.Combine(textureDirNewSlim, "alex.png"), true);
-
-                        var mcmetaPath = Path.Combine(packDir, "pack.mcmeta");
-                        var mcmetaContent = "{\n  \"pack\": {\n    \"pack_format\": " + format + ",\n    \"description\": \"Mistik Launcher Ozel Skin Kaynak Paketi\"\n  }\n}";
-                        File.WriteAllText(mcmetaPath, mcmetaContent);
+                        var skinBytes = await File.ReadAllBytesAsync(filePath);
+                        SkinValidator.Validate(skinBytes);
+                        if (!Current()) return false;
+                        CommitSkinPack(packDir, skinBytes, format);
 
                         EnsureMistikSkinPackEnabled(true);
                         App.Log($"Local skin applied successfully from: {filePath} with pack_format {format}.");
@@ -1498,6 +1403,32 @@ namespace MistikLauncher
             {
                 App.Log($"PrepareSkinPackAsync error: {ex.Message}");
                 return false;
+            }
+        }
+
+        static void CommitSkinPack(string packDir, byte[] skinBytes, int format)
+        {
+            string stage = packDir + ".stage-" + Guid.NewGuid().ToString("N");
+            string backup = packDir + ".backup-" + Guid.NewGuid().ToString("N");
+            bool committed = false;
+            try
+            {
+                foreach (var relative in new[] { "steve.png", "alex.png", "player/wide/steve.png", "player/slim/alex.png" })
+                {
+                    var path = Path.Combine(stage, "assets", "minecraft", "textures", "entity", relative);
+                    Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                    File.WriteAllBytes(path, skinBytes);
+                }
+                File.WriteAllText(Path.Combine(stage, "pack.mcmeta"), "{\"pack\":{\"pack_format\":" + format + ",\"description\":\"Mistik Launcher Ozel Skin Kaynak Paketi\"}}");
+                if (Directory.Exists(packDir)) Directory.Move(packDir, backup);
+                try { Directory.Move(stage, packDir); committed = true; }
+                catch { if (Directory.Exists(backup)) Directory.Move(backup, packDir); throw; }
+            }
+            finally
+            {
+                try { if (Directory.Exists(stage)) Directory.Delete(stage, true); } catch { }
+                // Keep the backup if a failed swap could not be rolled back.
+                try { if (committed && Directory.Exists(backup)) Directory.Delete(backup, true); } catch { }
             }
         }
 

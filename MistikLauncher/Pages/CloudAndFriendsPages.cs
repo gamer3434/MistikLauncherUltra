@@ -14,6 +14,12 @@ namespace MistikLauncher.Pages
     // ─── Skin Page ────────────────────────────────────────────────────────────
     public class SkinPage : Page
     {
+        static readonly DependencyProperty PreviewRequestProperty = DependencyProperty.RegisterAttached("PreviewRequest", typeof(object), typeof(SkinPage));
+        public static void SetPreview(Image image, ImageSource? source)
+        {
+            image.SetValue(PreviewRequestProperty, new object());
+            image.Source = source;
+        }
         public SkinPage(MainWindow main)
         {
             Background = Brushes.Transparent;
@@ -69,6 +75,7 @@ namespace MistikLauncher.Pages
             var previewDetails = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             TextBlock previewNameLbl;
             TextBlock previewStatusLbl;
+            int searchGeneration = 0;
 
             if (main.Config.SkinType == "local" && !string.IsNullOrEmpty(main.Config.SkinUser) && File.Exists(main.Config.SkinUser)) {
                 try {
@@ -115,6 +122,7 @@ namespace MistikLauncher.Pages
                     main.Config.User = n; main.Config.SkinType = "username"; main.Config.SkinUser = n;
                     ConfigManager.Save(main.Config); main.ReloadConfig();
                     bool success = await main.PrepareSkinPackAsync(main.Config.Version);
+                    if (main.Config.SkinType != "username" || main.Config.SkinUser != n) return;
                     if (success)
                     {
                         MessageBox.Show($"Karakteriniz '{n}' skini başarıyla indirildi ve kuruldu!\n\nEğer oyununuz açıkken değiştirdiyseniz, oyun içinde F3 + T tuşlarına basarak kaynak paketini yenileyin.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -182,12 +190,14 @@ namespace MistikLauncher.Pages
 
             // Search action
             Func<Task> doSearch = async () => {
+                int generation = ++searchGeneration;
                 var n = tb.Text.Trim();
                 if (string.IsNullOrEmpty(n)) return;
                 previewNameLbl.Text = n;
                 previewStatusLbl.Text = Localization.T("skinPreviewLoading");
                 previewStatusLbl.Foreground = PageHelpers.HexBrush("#FFB100");
                 bool loaded = await LoadImgAsync(previewImg, n, 80);
+                if (generation != searchGeneration) return;
                 previewStatusLbl.Text = Localization.T(loaded ? "skinPreviewReady" : "skinPreviewFailed");
                 previewStatusLbl.Foreground = PageHelpers.HexBrush(loaded ? "#2EB82E" : "#FF4B4B");
             };
@@ -241,7 +251,8 @@ namespace MistikLauncher.Pages
                     pathBox.Text = currentLocalPath;
                     
                     // Aninda onizleme
-                    previewImg.Source = face;
+                    searchGeneration++;
+                    SetPreview(previewImg, face);
                     System.Windows.Media.RenderOptions.SetBitmapScalingMode(previewImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
                     previewNameLbl.Text = "Ozel Skin (Secildi)";
                     previewStatusLbl.Text = "Uygula butonuna basarak oyuna kurun.";
@@ -268,7 +279,8 @@ namespace MistikLauncher.Pages
                     bool applied = await ApplyLocalSkin(main, targetPath);
                     applyLocalBtn.IsEnabled = true;
                     if (applied) try {
-                        previewImg.Source = face;
+                        searchGeneration++;
+                        SetPreview(previewImg, face);
                         System.Windows.Media.RenderOptions.SetBitmapScalingMode(previewImg, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
                         previewNameLbl.Text = Localization.T("skinCustom");
                         previewStatusLbl.Text = Localization.T("skinPreviewReady");
@@ -321,14 +333,10 @@ namespace MistikLauncher.Pages
             
             cslInstallBtn.Click += async (_, _) => {
                 var currentVer = main.Config.Version ?? "";
-                var mcVersion = "1.21.1";
-                var mcMatch = System.Text.RegularExpressions.Regex.Match(currentVer, @"1\.\d+(\.\d+)?");
-                if (mcMatch.Success) mcVersion = mcMatch.Value;
-
-                var isFabric = currentVer.Contains("fabric", StringComparison.OrdinalIgnoreCase);
-                var isForge = currentVer.Contains("forge", StringComparison.OrdinalIgnoreCase);
+                var mcVersion = GameProfiles.MinecraftVersion(App.GameDir, currentVer);
+                var loader = GameProfiles.Loader(App.GameDir, currentVer);
                 
-                if (!isFabric && !isForge)
+                if (loader is not ("fabric" or "quilt" or "forge" or "neoforge"))
                 {
                     MessageBox.Show("CustomSkinLoader yamasını kurabilmek için öncelikle Fabric veya Forge tabanlı bir sürüm seçmelisiniz.\n\nLütfen sol menüden 'Sürüm İndir' sayfasına giderek bir Fabric veya Forge sürümü yükleyin ve seçin.", "Uyumsuz Sürüm", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
@@ -339,29 +347,27 @@ namespace MistikLauncher.Pages
 
                 try
                 {
-                    using var http = new HttpClient();
+                    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30), MaxResponseContentBufferSize = 128 * 1024 * 1024 };
                     http.DefaultRequestHeaders.Add("User-Agent", "MistikLauncher/5.0");
                     var resp = await http.GetStringAsync("https://api.modrinth.com/v2/project/customskinloader/version");
                     var versions = Newtonsoft.Json.Linq.JArray.Parse(resp);
 
-                    var targetVersionObj = ModManagerPage.FindCompatibleVersionSmart(versions, mcVersion, isFabric, isForge);
+                    var targetVersionObj = ModManagerPage.FindCompatibleVersion(versions, mcVersion, loader);
                     if (targetVersionObj != null)
                     {
                         var fileUrl = targetVersionObj["files"]?[0]?["url"]?.ToString();
                         var fname   = targetVersionObj["files"]?[0]?["filename"]?.ToString() ?? "CustomSkinLoader.jar";
                         if (string.IsNullOrEmpty(fileUrl)) throw new Exception("İndirme adresi (URL) bulunamadı!");
 
-                        Directory.CreateDirectory(App.ModsDir);
-                        var destFile = Path.Combine(App.ModsDir, fname);
-
-                        var bytes = await http.GetByteArrayAsync(fileUrl);
-                        await File.WriteAllBytesAsync(destFile, bytes);
+                        var bytes = await http.GetByteArrayAsync(ModFiles.DownloadUrl(fileUrl));
+                        if (main.Config.Version != currentVer) throw new IOException("Seçili oyun sürümü değişti. Kurulumu yeni sürüm için tekrar başlatın.");
+                        ModFiles.Install(App.ModsDir, fname, bytes, targetVersionObj["files"]?[0]?["hashes"]?["sha512"]?.ToString());
 
                         MessageBox.Show($"CustomSkinLoader ({fname}) başarıyla indirildi ve mod klasörünüze kuruldu!\n\nArtık oyunda diğer oyuncuların skinlerini görebilirsiniz.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     else
                     {
-                        MessageBox.Show($"Şu anki oyun sürümünüz ({mcVersion}) veya mod yükleyiciniz ({ (isFabric ? "Fabric" : "Forge") }) için uyumlu bir CustomSkinLoader sürümü Modrinth üzerinde bulunamadı!", "Uyumsuz Sürüm", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        MessageBox.Show($"Şu anki oyun sürümünüz ({mcVersion}) veya mod yükleyiciniz ({loader}) için uyumlu bir CustomSkinLoader sürümü Modrinth üzerinde bulunamadı!", "Uyumsuz Sürüm", MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                 }
                 catch (Exception ex)
@@ -383,14 +389,18 @@ namespace MistikLauncher.Pages
             Content = new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         }
 
-        public static async Task<bool> LoadImgAsync(Image img, string user, int size)
+        public static async Task<bool> LoadImgAsync(Image img, string user, int size, HttpClient? client = null)
         {
+            var request = new object();
+            img.SetValue(PreviewRequestProperty, request);
+            bool applied = false;
             try {
                 user ??= "";
                 if (!System.Text.RegularExpressions.Regex.IsMatch(user, @"^[A-Za-z0-9_]{3,16}$")) return false;
                 size=Math.Clamp(size,16,128);
-                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-                http.DefaultRequestHeaders.Add("User-Agent", "MistikLauncher/5.0");
+                using var ownedHttp = client == null ? new HttpClient { Timeout = TimeSpan.FromSeconds(5), MaxResponseContentBufferSize = 65536 } : null;
+                var http = client ?? ownedHttp!;
+                if (!http.DefaultRequestHeaders.UserAgent.Any()) http.DefaultRequestHeaders.Add("User-Agent", "MistikLauncher/5.0");
                 byte[]? skinBytes = null;
 
                 // Önce Ely.by'den JSON texture verisi çekmeyi dene
@@ -399,14 +409,15 @@ namespace MistikLauncher.Pages
                     var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
                     var texUrl = MainWindow.SkinTextureUrl(jObj["SKIN"]?["url"]?.ToString());
                     if (!string.IsNullOrEmpty(texUrl)) {
-                        skinBytes = await http.GetByteArrayAsync(texUrl);
-                    SkinValidator.Validate(skinBytes);
+                        var downloaded = await http.GetByteArrayAsync(texUrl);
+                        SkinValidator.Validate(downloaded);
+                        skinBytes = downloaded;
                     }
                 } catch { }
 
-                if (skinBytes != null && skinBytes.Length > 100) {
+                if (skinBytes != null) {
                     img.Dispatcher.Invoke(() => {
-                        try {
+                            if (!ReferenceEquals(img.GetValue(PreviewRequestProperty), request)) return;
                             var bmp = new BitmapImage();
                             using var ms = new System.IO.MemoryStream(skinBytes);
                             bmp.BeginInit(); bmp.CacheOption = BitmapCacheOption.OnLoad;
@@ -430,9 +441,9 @@ namespace MistikLauncher.Pages
                             } else {
                                 img.Source = bmp;
                             }
-                        } catch { }
+                            applied = true;
                     });
-                    return true;
+                    return applied;
                 }
 
                 var avatarBytes = await http.GetByteArrayAsync($"https://mc-heads.net/avatar/{user}/{size}");
@@ -440,8 +451,12 @@ namespace MistikLauncher.Pages
                 using var ams = new System.IO.MemoryStream(avatarBytes);
                 avatarBmp.BeginInit(); avatarBmp.CacheOption = BitmapCacheOption.OnLoad;
                 avatarBmp.StreamSource = ams; avatarBmp.EndInit(); avatarBmp.Freeze();
-                img.Dispatcher.Invoke(() => img.Source = avatarBmp);
-                return true;
+                img.Dispatcher.Invoke(() => {
+                    if (!ReferenceEquals(img.GetValue(PreviewRequestProperty), request)) return;
+                    img.Source = avatarBmp;
+                    applied = true;
+                });
+                return applied;
             } catch { return false; }
         }
 
@@ -450,10 +465,11 @@ namespace MistikLauncher.Pages
             try {
                 // Kalici olarak AppData icine kopyala
                 string localDest = Path.Combine(App.AppData, "custom_skin.png");
-                SkinValidator.Validate(await File.ReadAllBytesAsync(filePath));
+                var skinBytes = File.ReadAllBytes(filePath);
+                SkinValidator.Validate(skinBytes);
                 Directory.CreateDirectory(App.AppData);
                 if (!Path.GetFullPath(filePath).Equals(Path.GetFullPath(localDest), StringComparison.OrdinalIgnoreCase))
-                    File.Copy(filePath, localDest, true);
+                    File.WriteAllBytes(localDest, skinBytes);
 
                 main.Config.SkinType = "local";
                 main.Config.SkinUser = localDest;
@@ -461,6 +477,7 @@ namespace MistikLauncher.Pages
 
                 // Ortak skin paketi hazirlama mantigini cagir (boylece dinamik pack_format ve en yuksek oncelik kurallari uygulanir)
                 bool success = await main.PrepareSkinPackAsync(main.Config.Version);
+                if (main.Config.SkinType != "local" || main.Config.SkinUser != localDest) return false;
                 main.LoadAvatar();
 
                 if (success)

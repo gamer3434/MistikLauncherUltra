@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
+using Newtonsoft.Json.Linq;
 using MistikLauncher;
 
 public static class GameRuntimeHealthTests
@@ -92,6 +93,60 @@ public static class GameRuntimeHealthTests
         result = await GameRuntimeHealth.VerifyAndRepairAsync(blocked, "1.21", new HttpClient(noRequest));
         Check(!result.CanLaunch && result.FailedArtifact == "library:fixture:lib:1" && result.FailureReason!.Contains("Repair failed") && File.ReadAllText(Path.Combine(blocked, "libraries", "fixture")) == "preserve this file", "repair directory failure reports the artifact and preserves existing files");
 
+        byte[] dll = "native fixture"u8.ToArray();
+        byte[] nativeJar = Jar(("lwjgl64.dll", dll), ("META-INF/fixture.txt", "excluded"u8.ToArray()));
+        string nativeRoot = Path.Combine(root, "native-classifier");
+        NativeProfile(nativeRoot, "base", clientJar, nativeJar);
+        Write(Path.Combine(nativeRoot, "versions", "base", "base.jar"), clientJar);
+        Profile(nativeRoot, "child", "{\"inheritsFrom\":\"base\",\"libraries\":[]}");
+        var nativeHandler = new FakeHandler(_ => Bytes(nativeJar));
+        string dllPath = Path.Combine(nativeRoot, "versions", "child", "natives", "lwjgl64.dll");
+        result = await GameRuntimeHealth.VerifyAndRepairAsync(nativeRoot, "child", new HttpClient(nativeHandler));
+        Check(result.CanLaunch && nativeHandler.Requests == 1 && File.ReadAllBytes(dllPath).SequenceEqual(dll) && !Directory.Exists(Path.Combine(nativeRoot, "versions", "child", "natives", "META-INF")), "Windows classifier-only library downloads and extracts into selected inherited profile, respecting exclusions");
+        result = await GameRuntimeHealth.VerifyAndRepairAsync(nativeRoot, "child", new HttpClient(noRequest));
+        Check(result.CanLaunch && result.RepairedCount == 0, "healthy native classifier and extracted DLL verify offline without rewriting files");
+        File.WriteAllText(dllPath, "broken DLL");
+        result = await GameRuntimeHealth.VerifyAndRepairAsync(nativeRoot, "child", new HttpClient(noRequest));
+        Check(result.CanLaunch && result.RepairedCount == 1 && File.ReadAllBytes(dllPath).SequenceEqual(dll), "corrupt extracted native DLL repairs from verified local classifier archive");
+
+        string modernNativeRoot = Path.Combine(root, "modern-native-artifact");
+        Profile(modernNativeRoot, "base", ProfileJson("base", clientJar, ("org.lwjgl:lwjgl:3.3.3:natives-windows", "org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-windows.jar", nativeJar)));
+        Write(Path.Combine(modernNativeRoot, "versions", "base", "base.jar"), clientJar);
+        result = await GameRuntimeHealth.VerifyAndRepairAsync(modernNativeRoot, "base", new HttpClient(new FakeHandler(_ => Bytes(nativeJar))));
+        string modernDll = Path.Combine(modernNativeRoot, "versions", "base", "natives", "lwjgl64.dll");
+        Check(result.CanLaunch && File.ReadAllBytes(modernDll).SequenceEqual(dll) && !Directory.Exists(Path.Combine(Path.GetDirectoryName(modernDll)!, "META-INF")), "modern Windows native artifact is verified and extracted with metadata excluded");
+        File.Delete(modernDll);
+        result = await GameRuntimeHealth.VerifyAndRepairAsync(modernNativeRoot, "base", new HttpClient(noRequest));
+        Check(result.CanLaunch && result.RepairedCount == 1 && File.ReadAllBytes(modernDll).SequenceEqual(dll), "missing modern native DLL repairs from the verified local archive offline");
+
+        string invalidNativeRoot = Path.Combine(root, "native-digest-mismatch");
+        NativeProfile(invalidNativeRoot, "base", clientJar, nativeJar);
+        Write(Path.Combine(invalidNativeRoot, "versions", "base", "base.jar"), clientJar);
+        string preservedDll = Path.Combine(invalidNativeRoot, "versions", "base", "natives", "lwjgl64.dll");
+        Write(preservedDll, dll);
+        result = await GameRuntimeHealth.VerifyAndRepairAsync(invalidNativeRoot, "base", new HttpClient(new FakeHandler(_ => Bytes(new byte[nativeJar.Length]))));
+        Check(!result.CanLaunch && result.FailedArtifact == "native:fixture:natives:1" && File.ReadAllBytes(preservedDll).SequenceEqual(dll), "native archive digest mismatch blocks extraction and preserves previous DLL");
+
+        byte[] traversalJar = Jar(("lwjgl64.dll", "replacement"u8.ToArray()), ("../outside.dll", dll));
+        string traversalRoot = Path.Combine(root, "native-traversal");
+        NativeProfile(traversalRoot, "base", clientJar, traversalJar);
+        Write(Path.Combine(traversalRoot, "versions", "base", "base.jar"), clientJar);
+        string existingDll = Path.Combine(traversalRoot, "versions", "base", "natives", "lwjgl64.dll");
+        Write(existingDll, dll);
+        result = await GameRuntimeHealth.VerifyAndRepairAsync(traversalRoot, "base", new HttpClient(new FakeHandler(_ => Bytes(traversalJar))));
+        Check(!result.CanLaunch && result.FailedArtifact == "native:fixture:natives:1" && File.ReadAllBytes(existingDll).SequenceEqual(dll) && !File.Exists(Path.Combine(traversalRoot, "versions", "base", "outside.dll")), "native ZIP traversal is rejected before replacing any existing DLL");
+
+        string stalledRoot = Path.Combine(root, "stalled-runtime");
+        Profile(stalledRoot, "base", ProfileJson("base", clientJar, ("fixture:lib:1", "fixture/lib/1/lib-1.jar", libraryJar)));
+        Write(Path.Combine(stalledRoot, "versions", "base", "base.jar"), clientJar);
+        string stalledPath = Path.Combine(stalledRoot, "libraries", "fixture", "lib", "1", "lib-1.jar");
+        Write(stalledPath, "preserve existing file"u8.ToArray());
+        using var stalledClient = new HttpClient(new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new StalledStream()) })) { Timeout = TimeSpan.FromMilliseconds(100) };
+        var stalledRepair = GameRuntimeHealth.VerifyAndRepairAsync(stalledRoot, "base", stalledClient);
+        Check(await Task.WhenAny(stalledRepair, Task.Delay(5000)) == stalledRepair, "stalled runtime response body respects the repair timeout");
+        result = await stalledRepair;
+        Check(!result.CanLaunch && result.FailedArtifact == "library:fixture:lib:1" && result.FailureReason!.Contains("timed out") && File.ReadAllText(stalledPath) == "preserve existing file" && !Directory.EnumerateFiles(Path.GetDirectoryName(stalledPath)!, ".*.mistik-*.tmp").Any(), "runtime timeout reports the artifact, preserves existing bytes and removes its temporary file");
+
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
         bool cancellationObserved = false;
@@ -115,17 +170,30 @@ public static class GameRuntimeHealthTests
         File.WriteAllText(Path.Combine(directory, id + ".json"), json);
     }
 
+    static void NativeProfile(string root, string id, byte[] client, byte[] natives)
+    {
+        var json = JObject.Parse(ProfileJson(id, client));
+        json["libraries"] = new JArray(new JObject {
+            ["name"] = "fixture:natives:1", ["natives"] = new JObject { ["windows"] = "natives-windows-${arch}" },
+            ["downloads"] = new JObject { ["classifiers"] = new JObject { ["natives-windows-64"] = new JObject {
+                ["path"] = "fixture/natives/1/natives-1-windows-64.jar", ["url"] = "https://fixture.invalid/natives.jar", ["size"] = natives.Length, ["sha1"] = Sha1(natives)
+            } } }, ["extract"] = new JObject { ["exclude"] = new JArray("META-INF/") }
+        });
+        Profile(root, id, json.ToString());
+    }
+
     static void Write(string path, byte[] bytes)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllBytes(path, bytes);
     }
 
-    static byte[] Jar(string text)
+    static byte[] Jar(string text) => Jar(("fixture.txt", System.Text.Encoding.UTF8.GetBytes(text)));
+    static byte[] Jar(params (string Path, byte[] Bytes)[] entries)
     {
         using var memory = new MemoryStream();
         using (var zip = new ZipArchive(memory, ZipArchiveMode.Create, true))
-        using (var writer = new StreamWriter(zip.CreateEntry("fixture.txt").Open())) writer.Write(text);
+            foreach (var entry in entries) { using var file = zip.CreateEntry(entry.Path).Open(); file.Write(entry.Bytes); }
         return memory.ToArray();
     }
 
@@ -140,6 +208,12 @@ public static class GameRuntimeHealthTests
             Requests++;
             return Task.FromResult(response(request));
         }
+    }
+
+    sealed class StalledStream : MemoryStream
+    {
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        { await Task.Delay(Timeout.Infinite, cancellationToken); return 0; }
     }
 
     sealed class ThrowingStream(byte[] bytes, int bytesBeforeFailure) : Stream

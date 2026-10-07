@@ -5,14 +5,43 @@ namespace MistikLauncher;
 public static class GameProfiles
 {
     public static bool SafeId(string id) => Regex.IsMatch(id, @"^[A-Za-z0-9][A-Za-z0-9._-]{0,150}$") && !id.Contains("..");
+    public static string VersionPoolKey(string gameVersion,string loader)
+    {
+        if(loader.Equals("vanilla",StringComparison.OrdinalIgnoreCase)) return "vanilla";
+        if(!SafeId(gameVersion) || !new[]{"fabric","quilt","forge","neoforge"}.Contains(loader.ToLowerInvariant())) throw new InvalidDataException("Invalid mod pool profile.");
+        return $"{gameVersion}_{loader.ToLowerInvariant()}";
+    }
+    public static string MinecraftVersion(string root,string id)
+    {
+        var current=id; var seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        while(SafeId(current) && seen.Count<16 && seen.Add(current)) {
+            var parent=Read(root,current)?["inheritsFrom"]?.ToString();
+            if(string.IsNullOrWhiteSpace(parent)) break;
+            current=parent;
+        }
+        var match=Regex.Match(current,@"^(?:fabric-loader-[^-]+-|fabric-|quilt-loader-[^-]+-|quilt-|forge-|neoforge-)?(\d+\.\d+(?:\.\d+)?)(?:-|$)");
+        return match.Success?match.Groups[1].Value:current;
+    }
+    public static string Loader(string root,string id)
+    {
+        var current=id; var seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        while(SafeId(current) && seen.Count<16 && seen.Add(current)) {
+            var json=Read(root,current); if(json==null) break;
+            var kind=Kind(json); if(kind!="Vanilla") return kind.ToLowerInvariant();
+            var parent=json["inheritsFrom"]?.ToString(); if(string.IsNullOrWhiteSpace(parent)) break;
+            current=parent;
+        }
+        return id.Contains("neoforge",StringComparison.OrdinalIgnoreCase)?"neoforge":id.Contains("forge",StringComparison.OrdinalIgnoreCase)?"forge":id.Contains("quilt",StringComparison.OrdinalIgnoreCase)?"quilt":id.Contains("fabric",StringComparison.OrdinalIgnoreCase)?"fabric":"vanilla";
+    }
     public static JObject? Read(string root, string id)
     {
         if (!SafeId(id)) return null;
         try { return JObject.Parse(File.ReadAllText(Path.Combine(root,"versions",id,id+".json"))); } catch { return null; }
     }
-    public static string Kind(JObject json) => (json["libraries"] as JArray)?.Any(x => x["name"]?.ToString().StartsWith("net.neoforged:",StringComparison.Ordinal)==true)==true ? "NeoForge" :
-        (json["libraries"] as JArray)?.Any(x => x["name"]?.ToString().StartsWith("net.minecraftforge:",StringComparison.Ordinal)==true)==true ? "Forge" :
-        (json["libraries"] as JArray)?.Any(x => x["name"]?.ToString().StartsWith("net.fabricmc:",StringComparison.Ordinal)==true)==true ? "Fabric" : "Vanilla";
+    public static string Kind(JObject json) => (json["libraries"] as JArray)?.OfType<JObject>().Any(x => x["name"]?.ToString().StartsWith("net.neoforged:",StringComparison.Ordinal)==true)==true ? "NeoForge" :
+        (json["libraries"] as JArray)?.OfType<JObject>().Any(x => x["name"]?.ToString().StartsWith("net.minecraftforge:",StringComparison.Ordinal)==true)==true ? "Forge" :
+        (json["libraries"] as JArray)?.OfType<JObject>().Any(x => x["name"]?.ToString().StartsWith("org.quiltmc:",StringComparison.Ordinal)==true)==true ? "Quilt" :
+        (json["libraries"] as JArray)?.OfType<JObject>().Any(x => x["name"]?.ToString().StartsWith("net.fabricmc:",StringComparison.Ordinal)==true)==true ? "Fabric" : "Vanilla";
     public static bool IsInstalled(string root,string id) => Installed(root,id,new HashSet<string>(StringComparer.OrdinalIgnoreCase));
     public static int RequiredJava(string root,string id)
     {

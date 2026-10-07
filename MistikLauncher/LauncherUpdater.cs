@@ -87,6 +87,7 @@ public sealed class LauncherUpdater
     public async Task<bool> CheckAsync(bool prepare)
     {
         if(!await gate.WaitAsync(0)) return false;
+        string? stage=null;
         try
         {
             Busy=true; Error=null; ResetTransfer(); Publish("luChecking");
@@ -108,7 +109,7 @@ public sealed class LauncherUpdater
             if(release==null) { Publish("luCurrent"); return false; }
             if(!prepare) { Publish("luAvailable"); return false; }
             if(!idle()) { Publish("luDeferred"); return false; }
-            string stage=Path.Combine(Path.GetTempPath(),"MistikLauncherUpdates",Guid.NewGuid().ToString("N")); Directory.CreateDirectory(stage);
+            stage=Path.Combine(Path.GetTempPath(),"MistikLauncherUpdates",Guid.NewGuid().ToString("N")); Directory.CreateDirectory(stage);
             string zip=Path.Combine(stage,"package.zip");
             TotalBytes=release.Size; PublishTransfer("luDownloading",0,true);
             using var downloadTimeout=new CancellationTokenSource(http.Timeout==Timeout.InfiniteTimeSpan?TimeSpan.FromMinutes(10):http.Timeout);
@@ -137,7 +138,10 @@ public sealed class LauncherUpdater
             PreparedPayload=payload; Publish(idle()?"luReady":"luDeferred",100); return idle();
         }
         catch(Exception ex) { Error=ex.Message; Publish("luError"); App.Log("Launcher update: "+ex.Message); return false; }
-        finally { Busy=false; Changed?.Invoke(); gate.Release(); }
+        finally {
+            if(stage!=null && PreparedPayload!=Path.Combine(stage,"payload")) DeleteStage(stage);
+            Busy=false; Changed?.Invoke(); gate.Release();
+        }
     }
     void ResetTransfer()
     {
@@ -152,27 +156,26 @@ public sealed class LauncherUpdater
     public async Task<bool> StartInstallerAsync()
     {
         if(!await gate.WaitAsync(0)) return false;
+        Process? child=null;
+        bool abandon=false;
         try
         {
             if(PreparedPayload is not string payload||!idle()) { Publish("luDeferred"); return false; }
             Error=null;
             Busy=true; Publish("luVerifying",90);
-            string helper=UpdateEngine.SafePath(directory,"MistikUpdater.exe");
+            string helper=UpdateEngine.SafePath(payload,"MistikUpdater.exe");
             string stage=Path.GetDirectoryName(payload)!;
             string externalHelper=Path.Combine(stage,"MistikUpdater.exe");
-            bool hasHelper=await Task.Run(()=> {
+            await Task.Run(()=> {
                 UpdateEngine.Verify(payload);
-                if(!File.Exists(helper)) return false;
                 File.Copy(helper,externalHelper,true);
-                return true;
             });
             if(!idle()) { Publish("luDeferred",100); return false; }
-            if(!hasHelper) { Publish("luManual"); return false; }
             using var current=Process.GetCurrentProcess();
             string plan=Path.Combine(stage,"plan.json");
             File.WriteAllText(plan,JsonSerializer.Serialize(new UpdatePlan(directory,payload,current.Id,current.StartTime.ToUniversalTime().Ticks,Localization.Language,LatestVersion)));
             var start=new ProcessStartInfo(externalHelper) { UseShellExecute=false, CreateNoWindow=true, WindowStyle=ProcessWindowStyle.Hidden };
-            start.ArgumentList.Add(plan); using var child=Process.Start(start)??throw new IOException("Cannot start update helper.");
+            start.ArgumentList.Add(plan); child=Process.Start(start)??throw new IOException("Cannot start update helper.");
             for(int count=0;count<100;count++)
             {
                 if(File.Exists(plan+".ready")) { Publish("luRestarting",100); return true; }
@@ -180,9 +183,35 @@ public sealed class LauncherUpdater
                 await Task.Delay(100);
             }
             Error="Update helper did not signal readiness.";
+            abandon=true;
             Publish("luError"); return false;
         }
-        catch(Exception ex) { Error=ex.Message; Publish("luError"); App.Log("Launcher update handoff: "+ex.Message); return false; }
-        finally { Busy=false; Changed?.Invoke(); gate.Release(); }
+        catch(Exception ex) { abandon=true; Error=ex.Message; Publish("luError"); App.Log("Launcher update handoff: "+ex.Message); return false; }
+        finally {
+            if(abandon) {
+                bool stopped=child==null;
+                if(child!=null) try {
+                    if(!child.HasExited) { child.Kill(true); child.WaitForExit(5000); }
+                    stopped=child.HasExited;
+                } catch(Exception ex) { App.Log("Update helper cleanup: "+ex.Message); }
+                // An active helper still needs its plan and payload.
+                if(stopped) { var payload=PreparedPayload; PreparedPayload=null; if(payload!=null) DeleteStage(Path.GetDirectoryName(payload)); }
+            }
+            child?.Dispose(); Busy=false; Changed?.Invoke(); gate.Release();
+        }
+    }
+
+    static void DeleteStage(string? stage)
+    {
+        if(stage==null) return;
+        try {
+            string root=Path.GetFullPath(Path.Combine(Path.GetTempPath(),"MistikLauncherUpdates"));
+            string target=Path.GetFullPath(stage).TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar);
+            if(!string.Equals(Path.GetDirectoryName(target),root,StringComparison.OrdinalIgnoreCase) || !Guid.TryParseExact(Path.GetFileName(target),"N",out _)) return;
+            if(!Directory.Exists(target)) return;
+            for(string? current=target;current!=null;current=Path.GetDirectoryName(current))
+                if(Directory.Exists(current) && (File.GetAttributes(current)&FileAttributes.ReparsePoint)!=0) return;
+            Directory.Delete(target,true);
+        } catch(Exception ex) when(ex is IOException or UnauthorizedAccessException or ArgumentException) { App.Log("Update stage cleanup: "+ex.Message); }
     }
 }

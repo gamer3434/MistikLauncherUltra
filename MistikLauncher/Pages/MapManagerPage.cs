@@ -108,13 +108,15 @@ namespace MistikLauncher.Pages
         {
             btn.IsEnabled = false;
             var originalText = btn.Content.ToString();
+            string? zipPath = null;
             try
             {
                 btn.Content = "İndiriliyor...";
                 var savesDir = Path.Combine(App.GameDir, "saves");
                 Directory.CreateDirectory(savesDir);
 
-                var zipPath = Path.Combine(App.AppData, $"{mapName}.zip");
+                Directory.CreateDirectory(App.AppData);
+                zipPath = Path.Combine(App.AppData, "map-" + Guid.NewGuid().ToString("N") + ".zip");
 
                 // Download
                 var bytes = await Http.GetByteArrayAsync(zipUrl);
@@ -122,42 +124,7 @@ namespace MistikLauncher.Pages
 
                 // Extract
                 btn.Content = "Kuruluyor...";
-                await Task.Run(() =>
-                {
-                    var tempExtract = Path.Combine(savesDir, "temp_" + Guid.NewGuid().ToString("N"));
-                    if (Directory.Exists(tempExtract)) Directory.Delete(tempExtract, true);
-                    Directory.CreateDirectory(tempExtract);
-
-                    // Extract zip to temporary directory
-                    ZipFile.ExtractToDirectory(zipPath, tempExtract);
-
-                    // Find level.dat recursively (makes it 100% path-independent!)
-                    var levelDats = Directory.GetFiles(tempExtract, "level.dat", SearchOption.AllDirectories);
-                    if (levelDats.Length == 0)
-                    {
-                        throw new FileNotFoundException("Harita veri dosyası (level.dat) zip içeriğinde bulunamadı.");
-                    }
-
-                    var worldFolder = Path.GetDirectoryName(levelDats[0])!;
-                    var targetDir = Path.Combine(savesDir, mapName);
-                    if (Directory.Exists(targetDir))
-                    {
-                        Directory.Delete(targetDir, true);
-                    }
-
-                    // Move the actual world directory to target saves folder
-                    Directory.Move(worldFolder, targetDir);
-
-                    // Cleanup temp extract and zip
-                    if (Directory.Exists(tempExtract))
-                    {
-                        Directory.Delete(tempExtract, true);
-                    }
-                    if (File.Exists(zipPath))
-                    {
-                        File.Delete(zipPath);
-                    }
-                });
+                await Task.Run(() => ExtractMap(zipPath, savesDir, mapName));
 
                 btn.Content = "✓ KURULDU!";
                 MessageBox.Show($"'{mapName}' haritası başarıyla kuruldu!\n\nOyunu başlattıktan sonra Tek Oyunculu dünyalarınız arasında görünecektir.", "Harita Kuruldu", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -169,9 +136,36 @@ namespace MistikLauncher.Pages
             }
             finally
             {
+                if (zipPath != null && File.Exists(zipPath))
+                {
+                    try { File.Delete(zipPath); } catch (Exception ex) { App.Log("Map download cleanup: " + ex.Message); }
+                }
                 await Task.Delay(3000);
                 btn.Content = originalText;
                 btn.IsEnabled = true;
+            }
+        }
+
+        internal static string ExtractMap(string zipPath, string savesDir, string mapName)
+        {
+            if (string.IsNullOrWhiteSpace(mapName) || mapName is "." or ".." || mapName != Path.GetFileName(mapName) || mapName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                throw new InvalidDataException("Invalid map name.");
+            var tempExtract = Path.Combine(savesDir, "temp_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempExtract);
+            try
+            {
+                ZipFile.ExtractToDirectory(zipPath, tempExtract);
+                var levelDat = Directory.GetFiles(tempExtract, "level.dat", SearchOption.AllDirectories).FirstOrDefault()
+                    ?? throw new FileNotFoundException("Harita veri dosyası (level.dat) zip içeriğinde bulunamadı.");
+                var targetDir = Path.Combine(savesDir, mapName);
+                for (int copy = 2; Directory.Exists(targetDir) || File.Exists(targetDir); copy++)
+                    targetDir = Path.Combine(savesDir, $"{mapName} ({copy})");
+                Directory.Move(Path.GetDirectoryName(levelDat)!, targetDir);
+                return targetDir;
+            }
+            finally
+            {
+                if (Directory.Exists(tempExtract)) Directory.Delete(tempExtract, true);
             }
         }
     }

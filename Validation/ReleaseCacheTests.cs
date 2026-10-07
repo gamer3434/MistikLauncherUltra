@@ -17,6 +17,11 @@ static class ReleaseCacheTests
         Check(await MistikLauncher.GitHubReleaseCache.GetAsync(notModified,"https://example.invalid/releases/latest",path,CancellationToken.None)==metadata,"release metadata cache handles ETag response");
         using var limited=new HttpClient(new Response(HttpStatusCode.Forbidden,"rate limit",null));
         Check(await MistikLauncher.GitHubReleaseCache.GetAsync(limited,"https://example.invalid/releases/latest",path,CancellationToken.None)==metadata,"release metadata cache survives API rate limits");
+        using var cancelled=new CancellationTokenSource(); cancelled.Cancel();
+        bool stopped=false;
+        try { await MistikLauncher.GitHubReleaseCache.GetAsync(limited,"https://example.invalid/releases/latest",path,cancelled.Token); }
+        catch(OperationCanceledException) { stopped=true; }
+        Check(stopped,"cancelled release request cannot succeed from cached metadata");
         return checks;
     }
 

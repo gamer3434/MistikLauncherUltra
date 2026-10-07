@@ -52,6 +52,8 @@ class Program
             var invalidLighting=ConfigManager.Normalize(new LauncherConfig { CloseLighting="bad",CloseRgb="invalid" });
             Check(invalidLighting.CloseLighting=="Theme" && invalidLighting.CloseRgb=="#FFB000","close lighting settings validation");
             checks += ModToggleTests.Run(Path.Combine(testRoot,"mod-toggle"));
+            checks += ModAndMapRegressionTests.Run(Path.Combine(testRoot,"mod-map-regressions")).GetAwaiter().GetResult();
+            checks += TunnelLifecycleTests.Run(testRoot).GetAwaiter().GetResult();
             if(args.Contains("--live-mod")) checks+=ModToggleTests.Live(Path.Combine(testRoot,"official-mod")).GetAwaiter().GetResult();
             checks += ForgeTests.Run(Path.Combine(testRoot,"forge-tests"));
             checks += AutoMcsTests.Run(testRoot).GetAwaiter().GetResult();
@@ -64,7 +66,11 @@ class Program
                 Check(packaged.Version==current,"actual portable manifest matches compiled version and file hashes");
             }
             int helperIndex=Array.IndexOf(args,"--helper-smoke");
-            if(helperIndex>=0) { HelperSmoke.Run(testRoot,Path.GetFullPath(args[helperIndex+1]),Path.GetFullPath(args[helperIndex+2])).GetAwaiter().GetResult(); checks++; }
+            if(helperIndex>=0) {
+                var fixture=Path.GetFullPath(args[helperIndex+2]);
+                HelperSmoke.Run(testRoot,Path.GetFullPath(args[helperIndex+1]),fixture).GetAwaiter().GetResult(); checks++;
+                checks+=TunnelLifecycleTests.Run(testRoot,fixture).GetAwaiter().GetResult();
+            }
             if(args.Contains("--live-mcs"))
             {
                 var official=new AutoMcsUpdater(dataDirectory:Path.Combine(testRoot,"official-auto-mcs"),running:()=>false);
@@ -79,6 +85,11 @@ class Program
             config.User="TestPlayer"; config.Ram=4; ConfigManager.Save(config);
             Check(File.Exists(Path.Combine(testRoot,"config.json.bak")), "atomic settings backup");
             Check(!File.ReadAllText(Path.Combine(testRoot,"config.json.bak")).Contains("Player"), "settings backup is encrypted");
+            File.Delete(Path.Combine(testRoot,"config.json"));
+            Check(ConfigManager.Load().Ram==32 && ConfigManager.Load().User=="Player", "missing primary settings restores encrypted backup");
+            ConfigManager.Save(ConfigManager.Load());
+            File.WriteAllText(Path.Combine(testRoot,"config.json"), "null");
+            Check(ConfigManager.Load().Ram==32 && ConfigManager.Load().User=="Player", "null settings are rejected and restore healthy backup");
             File.WriteAllText(Path.Combine(testRoot,"config.json"), "{broken");
             Check(ConfigManager.Load().Ram==32 && ConfigManager.Load().User=="Player", "corrupt settings restores previous backup");
             ConfigManager.Save(ConfigManager.Load());
@@ -112,8 +123,19 @@ class Program
             checks+=GameRuntimeHealthTests.Run(Path.Combine(testRoot,"runtime-health")).GetAwaiter().GetResult();
             checks+=LaunchReadinessTests.Run(Path.Combine(testRoot,"readiness-tests"));
             var window=new MainWindow { Width=1200, Height=820 };
+            var quiltJar=Path.Combine(testRoot,"quilt-metadata.jar");
+            using(var archive=System.IO.Compression.ZipFile.Open(quiltJar,System.IO.Compression.ZipArchiveMode.Create))
+                using(var writer=new StreamWriter(archive.CreateEntry("quilt.mod.json").Open())) writer.Write("{}");
+            var inspect=typeof(MainWindow).GetMethod("InspectModJar",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!;
+            var quiltMetadata=((string? loader,List<string>? versions))inspect.Invoke(window,new object[]{quiltJar})!;
+            Check(quiltMetadata.loader=="quilt","Quilt-only jar is classified without suspending a compatible Quilt mod");
+            using(var archive=System.IO.Compression.ZipFile.Open(quiltJar,System.IO.Compression.ZipArchiveMode.Update))
+                using(var writer=new StreamWriter(archive.CreateEntry("fabric.mod.json").Open())) writer.Write("{}");
+            quiltMetadata=((string? loader,List<string>? versions))inspect.Invoke(window,new object[]{quiltJar})!;
+            Check(quiltMetadata.loader==null,"multi-loader jar is not automatically misclassified as incompatible");
             checks+=VersionListTests.Run(window);
             checks+=SkinWorkflowTests.Run(window);
+            checks+=SettingsLifecycleTests.Run(window);
             checks+=FriendsPageTests.Run(window);
             Check(MainWindow.SkinTextureUrl("http://textures.minecraft.net/texture/test")=="https://textures.minecraft.net/texture/test" && MainWindow.SkinTextureUrl("https://ely.by.attacker.invalid/test")==null && MainWindow.SkinTextureUrl("file:///C:/Windows/test.png")==null,"skin texture URLs enforce trusted HTTPS hosts");
             Check(window.FetchAvatarAsync("../../outside").GetAwaiter().GetResult()==null,"avatar username traversal is rejected before network or cache access");

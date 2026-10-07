@@ -27,6 +27,12 @@ static class InstallerTests
         File.WriteAllText(marker,JsonSerializer.Serialize(new InstallState("MistikLauncher",root,"test",new[]{"../escape"})));
         Reject(()=>InstallEngine.Uninstall(root,false),"uninstaller rejects traversal before deleting any files");
         check(File.Exists(Path.Combine(root,names[0])),"malformed uninstall record leaves installation intact"); File.WriteAllText(marker,valid);
+        File.WriteAllText(marker,JsonSerializer.Serialize(new InstallState("MistikLauncher",null!,"test",names)));
+        bool nullRootRejected=false; try { InstallEngine.ReadState(root); } catch(IOException) { nullRootRejected=true; }
+        check(nullRootRejected && File.Exists(Path.Combine(root,names[0])),"null installation root is rejected as a recoverable invalid record");
+        File.WriteAllText(marker,JsonSerializer.Serialize(new InstallState("MistikLauncher",root,"test",new[]{"INSTALL-STATE.JSON"})));
+        Reject(()=>InstallEngine.ReadState(root),"ownership record rejects its marker regardless of Windows filename casing");
+        File.WriteAllText(marker,valid);
         using(var locked=File.Open(Path.Combine(root,names[0]),FileMode.Open,FileAccess.Read,FileShare.None)) Reject(()=>InstallEngine.Uninstall(root,false),"uninstaller rejects running/locked app before deletion");
         InstallEngine.Uninstall(root,false);
         check(!File.Exists(Path.Combine(root,names[0])) && File.ReadAllText(Path.Combine(root,"user-notes.txt"))=="keep","uninstaller removes owned files and preserves unknown user files");
