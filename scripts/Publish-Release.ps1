@@ -73,6 +73,6 @@ try {
         if($uploaded.digest -ne "sha256:$hash"){ throw "GitHub digest mismatch: $name" }
         Write-Host "Verified upload: $name ($($uploaded.size) bytes)"
     }
-    if($Publish -and $release.draft){ $payload=@{draft=$false} | ConvertTo-Json; $release=Invoke-RestMethod -Uri "$api/releases/$($release.id)" -Method Patch -Headers $headers -ContentType 'application/json' -Body $payload }
+    if($Publish -and $release.draft){ $payload=@{draft=$false;prerelease=$version.Contains('-');make_latest=if($version.Contains('-')){'false'}else{'true'}} | ConvertTo-Json; $release=Invoke-RestMethod -Uri "$api/releases/$($release.id)" -Method Patch -Headers $headers -ContentType 'application/json' -Body $payload }
     Write-Host "Release: $($release.html_url); draft=$($release.draft)"
 } finally { $raw=$null; $credentials=$null; $headers=$null; Pop-Location }
