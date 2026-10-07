@@ -1,4 +1,4 @@
-param([switch]$Publish)
+param([switch]$Publish, [ValidatePattern('^[a-fA-F0-9]{40}$')][string]$TargetCommit)
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
 Push-Location $repo
@@ -15,7 +15,11 @@ try {
     $headers=@{Authorization="Bearer $($credentials.password)";Accept='application/vnd.github+json';'X-GitHub-Api-Version'='2022-11-28';'User-Agent'='MistikRelease'}
     $identity=Invoke-RestMethod -Uri 'https://api.github.com/user' -Headers $headers
     if($identity.login -ne 'gamer3434'){ throw 'Expected gamer3434 GitHub account' }
-    $head=(git rev-parse HEAD).Trim()
+    $head=if($TargetCommit){$TargetCommit}else{(git rev-parse HEAD).Trim()}
+    if($TargetCommit){
+        $remoteMain=(git ls-remote origin refs/heads/main)
+        if($LASTEXITCODE -or !$remoteMain -or ($remoteMain -split '\s+')[0] -ne $TargetCommit){ throw 'Release target must match the published main branch' }
+    }
     $assets=@('artifacts/installers/SHA256SUMS.txt',"artifacts/MistikLauncher-$version-win-x64.zip","artifacts/installers/MistikSetup-Online-$version.exe","artifacts/installers/MistikSetup-Offline-$version.exe","artifacts/installers/MistikRepair-$version.exe")
     foreach($asset in $assets){ if(!(Test-Path -LiteralPath $asset -PathType Leaf)){ throw "Missing release file: $asset" } }
     foreach($line in Get-Content artifacts/installers/SHA256SUMS.txt){

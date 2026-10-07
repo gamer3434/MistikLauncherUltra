@@ -3,6 +3,7 @@
     "rules": "database.rules.json"
   },
   "hosting": {
+    "target": "launcher",
     "public": "site",
     "redirects": [
       { "source": "/hesap", "destination": "/", "type": 301 },

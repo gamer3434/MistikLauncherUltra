@@ -26,6 +26,9 @@ test('tracked source excludes deployment credentials and generated outputs', () 
     assert.equal(forbiddenValues.some(pattern => pattern.test(content)), false, `Credential pattern found: ${path}`);
   }
   assert.equal(JSON.parse(read('../firebase.json')).hosting.site, undefined);
+  const hosting = JSON.parse(read('../firebase.json')).hosting;
+  const example = JSON.parse(read('../.firebaserc.example'));
+  assert.deepEqual(example.targets.YOUR_FIREBASE_PROJECT_ID.hosting[hosting.target], ['YOUR_HOSTING_SITE_ID']);
 });
 
 test('retired account data and active sessions deny access', () => {
