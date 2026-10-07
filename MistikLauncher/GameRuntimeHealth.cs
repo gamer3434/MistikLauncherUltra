@@ -175,10 +175,10 @@ public static class GameRuntimeHealth
         if (artifact.Url == null)
             return ArtifactOutcome.Fail(artifact, healthy + " No secure repair URL is available.");
 
-        Directory.CreateDirectory(Path.GetDirectoryName(artifact.Path)!);
         string temp = Path.Combine(Path.GetDirectoryName(artifact.Path)!, "." + Path.GetFileName(artifact.Path) + ".mistik-" + Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
+            Directory.CreateDirectory(Path.GetDirectoryName(artifact.Path)!);
             progress?.Report(new("Repairing", artifact.Name, artifact.Path));
             using var response = await httpClient.GetAsync(artifact.Url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();

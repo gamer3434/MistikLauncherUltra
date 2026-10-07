@@ -1,4 +1,4 @@
-name: Publish protected launcher release
+name: Publish launcher release
 on:
   push:
     tags: ['v*']
@@ -25,9 +25,9 @@ jobs:
         run: |
           node --test Validation/WebsiteReleaseTests.js Validation/WebsitePrivacyTests.js
           dotnet run --project Validation -c Release -- artifacts/screenshots-ordinary
-      - name: Build protected package
+      - name: Build regular package
         shell: pwsh
-        run: ./scripts/Build-Protected.ps1
+        run: ./scripts/Build-Package.ps1
       - name: Build online and offline installers
         shell: pwsh
         run: ./scripts/Build-Installers.ps1

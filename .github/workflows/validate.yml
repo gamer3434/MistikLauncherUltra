@@ -14,9 +14,9 @@ jobs:
           dotnet-version: '8.0.x'
       - name: Validate ordinary build
         run: dotnet run --project Validation -c Release -- artifacts/screenshots-ordinary
-      - name: Build and validate protected package
+      - name: Build and validate regular package
         shell: pwsh
-        run: ./scripts/Build-Protected.ps1
+        run: ./scripts/Build-Package.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: mistik-portable

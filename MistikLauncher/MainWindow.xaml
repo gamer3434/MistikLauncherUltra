@@ -134,12 +134,12 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="5"/>
-            <RowDefinition Height="86"/>
+            <RowDefinition Height="78"/>
         </Grid.RowDefinitions>
 
         <!-- ═══ CONTENT ═══════════════════════════════════════════════════════ -->
         <DockPanel Grid.Column="0" Grid.Row="0">
-            <Grid DockPanel.Dock="Top" Margin="24,12,24,4">
+            <Grid DockPanel.Dock="Top" Margin="24,8,24,4">
                 <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock x:Name="LogoText" Text="MISTIK" FontSize="22" FontWeight="Black" Foreground="{DynamicResource Theme00A3FF}" VerticalAlignment="Center"/>
@@ -157,7 +157,7 @@
                     </Button>
                 </StackPanel>
             </Grid>
-            <Border x:Name="QuickBarHost" DockPanel.Dock="Top" Background="{DynamicResource Theme0D1727}" BorderBrush="{DynamicResource Theme365574}" BorderThickness="0,0,0,1" Padding="12,8">
+            <Border x:Name="QuickBarHost" DockPanel.Dock="Top" Background="{DynamicResource Theme0D1727}" BorderBrush="{DynamicResource Theme365574}" BorderThickness="0,0,0,1" Padding="12,4">
                 <WrapPanel x:Name="QuickBarPanel" HorizontalAlignment="Center"/>
             </Border>
         <Frame x:Name="MainFrame"
@@ -189,9 +189,9 @@
                         </ComboBox.Resources>
                     </ComboBox>
                     <Button x:Name="BtnLaunch" Content="OYUNA GIR"
-                            Width="200" Height="54"
-                            FontSize="18" FontWeight="Black"
-                            FontFamily="Segoe UI Black"
+                            Width="200" Height="48"
+                            FontSize="16" FontWeight="SemiBold"
+                            FontFamily="Segoe UI"
                             Style="{StaticResource AccentBtn}"/>
                 </StackPanel>
             </Grid>

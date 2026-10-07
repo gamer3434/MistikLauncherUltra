@@ -14,14 +14,14 @@
     <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>6.1.8</Version>
+    <Version>6.2.0</Version>
     <AssemblyVersion>6.0.0.0</AssemblyVersion>
     <FileVersion>$(Version)</FileVersion>
     <Authors>Mustafa</Authors>
     <Company>Mustafa Developer</Company>
     <Product>Mistik Launcher</Product>
     <Copyright>Copyright © 2026 Mustafa. Tüm Hakları Saklıdır.</Copyright>
-    <Description>Kendi bilgisayarınızda tek tıkla yüksek performanslı Minecraft sunucuları kurun, yönetin ve tünelleme ile arkadaşlarınızla paylaşın.</Description>
+    <Description>Minecraft sürümlerini, modları, skinleri ve yerel sunucuları yöneten Türkçe / English Windows launcher.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
   <ItemGroup>

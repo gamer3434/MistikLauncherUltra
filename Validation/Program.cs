@@ -235,6 +235,8 @@ class Program
                 Check(ConfigManager.Load().Lang==(code=="tr"?"Turkce":"English"), "language persistence " + code);
                 window.Navigate("Dash"); Capture(window,Path.Combine(output,"home-"+code+".png"));
                 Check(Texts(window.Content as DependencyObject).Contains(Localization.T("welcome")),"cached home language " + code);
+                var homeVersion=window.Config.Version; window.SetVersion("1.21"); window.SetVersion(homeVersion); Flush(window);
+                Check(Texts(window.Content as DependencyObject).Contains(homeVersion),"home version follows shared profile selection: "+code);
                 Check(Texts(window.Content as DependencyObject).Contains(Localization.T("readinessTitle")),"home launch readiness card language " + code);
                 var readinessNames=new[]{Localization.T("readinessRefresh"),Localization.T("readinessVerifyRepair"),Localization.T("readinessOpenVersions"),Localization.T("readinessOpenSettings")};
                 Check(Nodes((DependencyObject)window.Content).OfType<Button>().Any(button=>button.MinHeight>=44 && readinessNames.Contains(System.Windows.Automation.AutomationProperties.GetName(button))),"home readiness action remains keyboard-sized " + code);
@@ -247,6 +249,8 @@ class Program
                 var settingsScroll=((DockPanel)settingsPage.Content).Children.OfType<ScrollViewer>().Single();
                 var player=Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="PlayerNameBox");
                 var memory=Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="MemoryBox");
+                var appearance=Nodes(settingsPage).OfType<Expander>().Single(expander=>expander.Name=="AppearanceExpander");
+                Check(!appearance.IsExpanded && player.TranslatePoint(new Point(0,player.ActualHeight),settingsScroll).Y<=settingsScroll.ViewportHeight && memory.TranslatePoint(new Point(0,memory.ActualHeight),settingsScroll).Y<=settingsScroll.ViewportHeight,"essential settings visible before appearance options: "+code);
                 player.Text="PendingName"; memory.Text="invalid";
                 window.SwitchLanguage(code=="tr"?"en":"tr"); Flush(window);
                 Check(!ReferenceEquals(settingsPage.Content,cachedSettingsContent),"language change rebuilds cached settings: "+code);
@@ -258,8 +262,11 @@ class Program
                 Check(feedback.Text==Localization.T("invalid") && !Nodes(settingsScroll).Contains(feedback),"validation feedback remains in fixed footer: "+code);
                 Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="PlayerNameBox").Text=window.Config.User;
                 Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="MemoryBox").Text=window.Config.Ram.ToString();
+                Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="MemoryBox").BorderBrush=MistikLauncher.Pages.PageHelpers.HexBrush("#365574");
                 feedback.Text="";
+                appearance=Nodes(settingsPage).OfType<Expander>().Single(expander=>expander.Name=="AppearanceExpander"); appearance.IsExpanded=true; Flush(window);
                 var lighting=Nodes(settingsPage).OfType<ComboBox>().Single(box=>box.Name=="CloseLightingBox");
+                Check(Nodes(appearance).OfType<Button>().Count(button=>ColorThemes.Names.Any(name=>System.Windows.Automation.AutomationProperties.GetName(button)==Localization.T("theme"+name)))==ColorThemes.Names.Length,"all themes remain available in appearance options: "+code);
                 Check(!Texts(settingsPage).Contains(Localization.T("cloudTitle")) && !Nodes(settingsPage).OfType<PasswordBox>().Any(),"cloud account UI removed: "+code);
                 Check(lighting.Items.Count==3 && !lighting.Items.Cast<string>().Any(item=>item.Contains("Rainbow") || item.Contains("Gökkuşağı")),"single RGB mode replaces Rainbow: "+code);
                 lighting.SelectedIndex=2; Flush(window); Localization.TranslateTree(settingsPage);
@@ -289,7 +296,15 @@ class Program
                 Check(status.TranslatePoint(new Point(status.ActualWidth,0),root).X<=selector.TranslatePoint(new Point(0,0),root).X,"long status cannot overlap launch controls at compact width: "+code);
                 var captionTitle=(TextBlock)window.FindName("CaptionTitle");
                 Check(Math.Abs(captionTitle.TranslatePoint(new Point(captionTitle.ActualWidth/2,0),root).X-root.ActualWidth/2)<1,"caption title remains centered regardless of button position: "+code);
-                status.Text=previousStatus; window.Navigate("Settings"); Capture(window,Path.Combine(output,"settings-compact-"+code+".png"),960,640);
+                var homeActions=Nodes((DependencyObject)((Frame)window.FindName("MainFrame")).Content).OfType<WrapPanel>().Single(panel=>panel.Name=="HomeActions");
+                var homeScroll=Nodes((DependencyObject)((Frame)window.FindName("MainFrame")).Content).OfType<ScrollViewer>().First();
+                Check(homeActions.TranslatePoint(new Point(0,homeActions.ActualHeight),homeScroll).Y<=homeScroll.ViewportHeight,"quick actions visible at compact size: "+code);
+                status.Text=previousStatus; window.Navigate("Settings");
+                Nodes(settingsPage).OfType<Expander>().Single(expander=>expander.Name=="AppearanceExpander").IsExpanded=false;
+                Capture(window,Path.Combine(output,"settings-compact-"+code+".png"),960,640);
+                settingsScroll.ScrollToTop(); Flush(window);
+                player=Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="PlayerNameBox"); memory=Nodes(settingsPage).OfType<TextBox>().Single(box=>box.Name=="MemoryBox");
+                Check(player.TranslatePoint(new Point(0,player.ActualHeight),settingsScroll).Y<=settingsScroll.ViewportHeight && memory.TranslatePoint(new Point(0,memory.ActualHeight),settingsScroll).Y<=settingsScroll.ViewportHeight,"essential settings visible at compact size: "+code);
                 window.Navigate("Vers"); Capture(window,Path.Combine(output,"versions-"+code+".png"));
                 window.Navigate("Mods"); Capture(window,Path.Combine(output,"mods-"+code+".png"),960,640);
                 var currentModPage=(DependencyObject)((Frame)window.FindName("MainFrame")).Content;

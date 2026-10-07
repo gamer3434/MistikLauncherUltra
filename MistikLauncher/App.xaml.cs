@@ -25,7 +25,7 @@ public partial class Application : System.Windows.Application
             {
                 var target = ReleaseSecurity.ValidateUninstallTarget(e.Args[1]);
                 // Explicit uninstall only; preserve game data until a separate migration is ready.
-                throw new InvalidOperationException("Uninstall is disabled in this preview. Remove the portable application folder manually.");
+                throw new InvalidOperationException(Localization.T("portableOnly"));
             }
             catch (Exception ex) { MessageBox.Show(ex.Message, Localization.T("error")); }
             Shutdown(); return;

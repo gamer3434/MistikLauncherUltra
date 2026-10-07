@@ -25,39 +25,30 @@ public class ModernHomePage : Page, ILanguagePage
     }
     void Render()
     {
-        var stack = new StackPanel { Margin = new Thickness(32),MaxWidth=1120 };
-        var hero = new Border { Background = ColorThemes.Brush("#192C46"), BorderBrush=ColorThemes.Brush("#365574"),BorderThickness=new Thickness(1),CornerRadius = new CornerRadius(18), Padding = new Thickness(28) };
+        var stack = new StackPanel { Margin = new Thickness(24),MaxWidth=1120 };
+        var hero = new Border { Background = ColorThemes.Brush("#192C46"), BorderBrush=ColorThemes.Brush("#365574"),BorderThickness=new Thickness(1),CornerRadius = new CornerRadius(12), Padding = new Thickness(20) };
         var copy = new StackPanel();
-        copy.Children.Add(PageHelpers.Lbl("MINECRAFT · JAVA EDITION",12,"#ADBED6",true,pad:new Thickness(0,0,0,12)));
-        copy.Children.Add(PageHelpers.Lbl(Localization.T("welcome"), 30, "#FFFFFF", true, wrap: TextWrapping.Wrap));
-        copy.Children.Add(PageHelpers.Lbl(Localization.T("intro"), 15, "#D5E5F2", pad: new Thickness(0,12,0,0), wrap: TextWrapping.Wrap));
-        var heroGrid=new Grid(); heroGrid.ColumnDefinitions.Add(new ColumnDefinition()); heroGrid.ColumnDefinitions.Add(new ColumnDefinition { Width=new GridLength(200) });
-        copy.Margin=new Thickness(0,0,24,0);
-        var explore=PageHelpers.MkBtn(Localization.T("explore"),"#226DA0"); explore.Margin=new Thickness(0,20,0,0); explore.HorizontalAlignment=HorizontalAlignment.Left; explore.Click+=(_,_)=>main.Navigate("Vers"); copy.Children.Add(explore);
-        var scene=new StackPanel { VerticalAlignment=VerticalAlignment.Center };
-        var blocks=new Canvas { Width=150,Height=98,HorizontalAlignment=HorizontalAlignment.Center,IsHitTestVisible=false };
-        void Face(string points,string color) { var polygon=new System.Windows.Shapes.Polygon { Points=PointCollection.Parse(points),Fill=PageHelpers.HexBrush(color) }; blocks.Children.Add(polygon); }
-        Face("75,8 135,38 75,68 15,38","#77D8D0"); Face("15,38 75,68 75,98 15,68","#3486A9"); Face("75,68 135,38 135,68 75,98","#245882");
-        scene.Children.Add(blocks); scene.Children.Add(PageHelpers.Lbl(Localization.T("version"),12,"#BFD5EB",pad:new Thickness(0,16,0,4))); scene.Children.Add(PageHelpers.Lbl(main.Config.Version,17,"#FFFFFF",true,wrap:TextWrapping.Wrap));
-        Grid.SetColumn(scene,1); heroGrid.Children.Add(copy); heroGrid.Children.Add(scene); hero.Child=heroGrid; stack.Children.Add(hero);
+        copy.Children.Add(PageHelpers.Lbl(Localization.T("welcome"), 24, "#FFFFFF", true, wrap: TextWrapping.Wrap));
+        copy.Children.Add(PageHelpers.Lbl(Localization.T("intro"), 14, "#D5E5F2", pad: new Thickness(0,8,0,0), wrap: TextWrapping.Wrap));
+        hero.Child=copy; stack.Children.Add(hero);
         var row = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3 };
         foreach (var item in new[] { ("profile",main.Config.User), ("version",main.Config.Version), ("memory",$"{main.Config.Ram} GB") })
         {
-            var section = new StackPanel { Margin = new Thickness(0,20,16,20) };
+            var section = new StackPanel { Margin = new Thickness(0,12,12,12) };
             section.Children.Add(PageHelpers.Lbl(Localization.T(item.Item1),14,"#BDCAD8"));
-            section.Children.Add(PageHelpers.Lbl(item.Item2,22,"#FFFFFF",true,wrap:TextWrapping.Wrap));
-            row.Children.Add(new Border { Child=section, Background=PageHelpers.HexBrush("#13253C"),BorderBrush=ColorThemes.Brush("#365574"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(12),Padding=new Thickness(18,0,0,0),Margin=new Thickness(0,18,12,24) });
+            section.Children.Add(PageHelpers.Lbl(item.Item2,18,"#FFFFFF",true,wrap:TextWrapping.Wrap));
+            row.Children.Add(new Border { Child=section, Background=PageHelpers.HexBrush("#13253C"),BorderBrush=ColorThemes.Brush("#365574"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(12),Padding=new Thickness(16,0,0,0),Margin=new Thickness(0,12,8,16) });
         }
         stack.Children.Add(row);
-        stack.Children.Add(BuildReadinessCard());
-        stack.Children.Add(PageHelpers.Lbl(Localization.T("quick"),20,"#FFFFFF",true));
-        var actions = new WrapPanel { Margin = new Thickness(0,12,0,18) };
+        stack.Children.Add(PageHelpers.Lbl(Localization.T("quick"),18,"#FFFFFF",true));
+        var actions = new WrapPanel { Name="HomeActions", Margin = new Thickness(0,8,0,4) };
         foreach (var item in new[] { ("versions","Vers"),("mods","Mods"),("server","Server"),("settings","Settings") })
         {
             var button = PageHelpers.MkBtn(Localization.T(item.Item1),"#28445E");
             button.Margin = new Thickness(0,0,12,12); button.Click += (_,_) => main.Navigate(item.Item2); actions.Children.Add(button);
         }
         stack.Children.Add(actions);
+        stack.Children.Add(BuildReadinessCard());
         var tools = new WrapPanel();
         foreach (var item in new[] { ("files",App.GameDir),("logs",App.LogFile) })
         {
@@ -74,15 +65,15 @@ public class ModernHomePage : Page, ILanguagePage
         reportButton.Margin = new Thickness(0,0,12,12);
         reportButton.Click += (_,_) => CrashDiagnostics.Show(main, CrashDiagnostics.ManualReport());
         tools.Children.Add(reportButton);
-        stack.Children.Add(tools);
-        stack.Children.Add(PageHelpers.Lbl(Localization.T("help"),20,"#FFFFFF",true,pad:new Thickness(0,20,0,10)));
-        stack.Children.Add(PageHelpers.Lbl(Localization.T("helpText"),15,"#BDCAD8",wrap:TextWrapping.Wrap));
+        var help=new StackPanel(); help.Children.Add(tools);
+        help.Children.Add(PageHelpers.Lbl(Localization.T("helpText"),14,"#BDCAD8",pad:new Thickness(0,8,0,0),wrap:TextWrapping.Wrap));
+        stack.Children.Add(new Expander { Header=Localization.T("help"),Foreground=Brushes.White,FontSize=14,Content=help });
         Content = new ScrollViewer { Content = stack, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
     }
 
     Border BuildReadinessCard()
     {
-        var card=new Border { Background=PageHelpers.HexBrush("#192C46"),BorderBrush=ColorThemes.Brush("#365574"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(14),Padding=new Thickness(20),Margin=new Thickness(0,0,0,24) };
+        var card=new Border { Background=PageHelpers.HexBrush("#192C46"),BorderBrush=ColorThemes.Brush("#365574"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(12),Padding=new Thickness(16),Margin=new Thickness(0,0,0,16) };
         var grid=new Grid(); grid.ColumnDefinitions.Add(new ColumnDefinition()); grid.ColumnDefinitions.Add(new ColumnDefinition { Width=GridLength.Auto });
         var copy=new StackPanel { Margin=new Thickness(0,0,18,0) };
         copy.Children.Add(PageHelpers.Lbl(Localization.T("readinessTitle"),18,"#EFF5FF",true));
@@ -177,6 +168,7 @@ public class ModernSettingsPage : Page, ILanguagePage
     TextBlock result = null!, updateStatus = null!, updateNotes = null!;
     Button updateButton = null!;
     ProgressBar updateProgress = null!;
+    Expander? appearance;
     public ModernSettingsPage(MainWindow window, bool updatesOnly=false)
     {
         main=window;
@@ -192,7 +184,8 @@ public class ModernSettingsPage : Page, ILanguagePage
         var draftRam=ram?.Text??main.Config.Ram.ToString();
         var draftProvider=provider?.SelectedIndex??(main.Config.AuthType=="elyby"?1:0);
         var draftClose=close?.IsChecked??main.Config.AutoClose;
-        var stack = new StackPanel { Margin = new Thickness(32), MaxWidth=1040 };
+        bool appearanceExpanded=appearance?.IsExpanded==true;
+        var stack = new StackPanel { Margin = new Thickness(24), MaxWidth=1040 };
         stack.Children.Add(PageHelpers.Lbl(updatesOnly?(Localization.Language=="en"?"Updates":"Güncellemeler"):Localization.T("settings"),28,"#FFFFFF",true));
         if(!updatesOnly) stack.Children.Add(PageHelpers.Lbl(Localization.T("settingsIntro"),15,"#BDCAD8",pad:new Thickness(0,8,0,18),wrap:TextWrapping.Wrap));
         var updateCard=new Border { Background=PageHelpers.HexBrush("#192C46"), CornerRadius=new CornerRadius(14), Padding=new Thickness(20), Margin=new Thickness(0,0,0,12) };
@@ -209,7 +202,8 @@ public class ModernSettingsPage : Page, ILanguagePage
         updateContent.Children.Add(updateProgress);
         updateCard.Child=updateContent; stack.Children.Add(updateCard); UpdateStatus();
         if(updatesOnly) { Content=new ScrollViewer { Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto }; return; }
-        void Label(string key) => stack.Children.Add(PageHelpers.Lbl(Localization.T(key),15,"#FFFFFF",true,pad:new Thickness(0,16,0,6)));
+        stack.Children.Remove(updateCard);
+        var appearanceContent=new StackPanel();
         var themeCard=new Border { Background=PageHelpers.HexBrush("#192C46"), Padding=new Thickness(20), CornerRadius=new CornerRadius(14) };
         var themeContent=new StackPanel();
         themeContent.Children.Add(PageHelpers.Lbl(Localization.T("themeTitle"),18,"#EFF5FF",true));
@@ -246,7 +240,7 @@ public class ModernSettingsPage : Page, ILanguagePage
             };
             tiles.Add((name,tile,mark)); swatches.Children.Add(choice);
         }
-        UpdateSelection(); themeContent.Children.Add(swatches); themeCard.Child=themeContent; stack.Children.Insert(2,themeCard);
+        UpdateSelection(); themeContent.Children.Add(swatches); themeCard.Child=themeContent; appearanceContent.Children.Add(themeCard);
         var barCard=new Border { Background=PageHelpers.HexBrush("#192C46"),Padding=new Thickness(20),CornerRadius=new CornerRadius(14),Margin=new Thickness(0,12,0,0) };
         var barContent=new StackPanel();
         barContent.Children.Add(PageHelpers.Lbl(Localization.T("barTitle"),18,"#EFF5FF",true));
@@ -262,7 +256,7 @@ public class ModernSettingsPage : Page, ILanguagePage
             };
             options.Children.Add(option);
         }
-        barContent.Children.Add(options); barCard.Child=barContent; stack.Children.Insert(3,barCard);
+        barContent.Children.Add(options); barCard.Child=barContent;
         var windowCard=new Border { Background=PageHelpers.HexBrush("#192C46"),Padding=new Thickness(20),CornerRadius=new CornerRadius(14),Margin=new Thickness(0,12,0,12) };
         var windowContent=new StackPanel();
         windowContent.Children.Add(PageHelpers.Lbl(Localization.T("windowStyleTitle"),18,"#EFF5FF",true));
@@ -295,7 +289,7 @@ public class ModernSettingsPage : Page, ILanguagePage
             button.Click+=(_,_)=> { main.SetWindowButtons(style); UpdateWindowSelection(); };
             styleTiles.Add((style,tile,tick)); styleGrid.Children.Add(button);
         }
-        UpdateWindowSelection(); windowContent.Children.Add(styleGrid); windowCard.Child=windowContent; stack.Children.Insert(3,windowCard);
+        UpdateWindowSelection(); windowContent.Children.Add(styleGrid); windowCard.Child=windowContent; appearanceContent.Children.Add(windowCard); appearanceContent.Children.Add(barCard);
         windowContent.Children.Add(PageHelpers.Lbl("closeLightingTitle",14,"#EFF5FF",true));
         var lightRow=new WrapPanel { Margin=new Thickness(0,8,0,0) };
         var modes=new[]{"Theme","RGB","Off"};
@@ -307,21 +301,30 @@ public class ModernSettingsPage : Page, ILanguagePage
         };
         lightRow.Children.Add(lighting); windowContent.Children.Add(lightRow);
         windowContent.Children.Add(PageHelpers.Lbl("closeLightingHelp",12,"#ADBED6",wrap:TextWrapping.Wrap));
-        Label("username"); user=PageHelpers.DarkTextBox(draftUser); user.Name="PlayerNameBox"; user.MaxLength=16; System.Windows.Automation.AutomationProperties.SetName(user,Localization.T("username")); stack.Children.Add(user);
-        stack.Children.Add(PageHelpers.Lbl(Localization.T("usernameHelp"),13,"#BDCAD8",wrap:TextWrapping.Wrap));
-        Label("memory"); ram=PageHelpers.DarkTextBox(draftRam); ram.Name="MemoryBox"; System.Windows.Automation.AutomationProperties.SetName(ram,Localization.T("memory")); stack.Children.Add(ram);
-        stack.Children.Add(PageHelpers.Lbl(Localization.T("ramHelp"),13,"#BDCAD8",wrap:TextWrapping.Wrap));
-        Label("language"); language=new ComboBox { ItemsSource=new[] { "Türkçe", "English" }, SelectedIndex=Localization.Language=="en"?1:0, MinHeight=36 }; stack.Children.Add(language);
+        var fields=new Grid(); fields.ColumnDefinitions.Add(new ColumnDefinition()); fields.ColumnDefinitions.Add(new ColumnDefinition());
+        fields.RowDefinitions.Add(new RowDefinition { Height=GridLength.Auto }); fields.RowDefinitions.Add(new RowDefinition { Height=GridLength.Auto });
+        void Field(string key,Control control,int row,int column,string? help=null) {
+            var field=new StackPanel { Margin=new Thickness(0,0,column==0?16:0,16) };
+            field.Children.Add(PageHelpers.Lbl(Localization.T(key),14,"#FFFFFF",true,pad:new Thickness(0,0,0,6))); field.Children.Add(control);
+            if(help!=null) field.Children.Add(PageHelpers.Lbl(Localization.T(help),12,"#BDCAD8",pad:new Thickness(0,6,0,0),wrap:TextWrapping.Wrap));
+            System.Windows.Automation.AutomationProperties.SetName(control,Localization.T(key)); Grid.SetRow(field,row); Grid.SetColumn(field,column); fields.Children.Add(field);
+        }
+        user=PageHelpers.DarkTextBox(draftUser); user.Name="PlayerNameBox"; user.MaxLength=16; Field("username",user,0,0,"usernameHelp");
+        ram=PageHelpers.DarkTextBox(draftRam); ram.Name="MemoryBox"; Field("memory",ram,0,1,"ramHelp");
+        language=new ComboBox { ItemsSource=new[] { "Türkçe", "English" }, SelectedIndex=Localization.Language=="en"?1:0, MinHeight=40 }; Field("language",language,1,0);
         System.Windows.Automation.AutomationProperties.SetName(language,Localization.T("language"));
-        Label("auth"); provider=new ComboBox { ItemsSource=new[] { Localization.T("offline"), "Ely.by" }, SelectedIndex=draftProvider, MinHeight=40 }; stack.Children.Add(provider);
+        provider=new ComboBox { ItemsSource=new[] { Localization.T("offline"), "Ely.by" }, SelectedIndex=draftProvider, MinHeight=40 }; Field("auth",provider,1,1); stack.Children.Add(fields);
         System.Windows.Automation.AutomationProperties.SetName(provider,Localization.T("auth"));
-        close=new CheckBox { Content=Localization.T("close"), IsChecked=draftClose, Foreground=Brushes.White, Margin=new Thickness(0,20,0,20) }; stack.Children.Add(close);
+        close=new CheckBox { Content=Localization.T("close"), IsChecked=draftClose, Foreground=Brushes.White, MinHeight=32, VerticalContentAlignment=VerticalAlignment.Center, Margin=new Thickness(0,0,0,12) }; stack.Children.Add(close);
+        appearance=new Expander { Name="AppearanceExpander", Header=Localization.T("appearanceTitle"),Foreground=Brushes.White,FontSize=16,IsExpanded=appearanceExpanded,Content=appearanceContent,Margin=new Thickness(0,0,0,16) }; stack.Children.Add(appearance);
+        stack.Children.Add(updateCard);
         var save=PageHelpers.MkBtn(Localization.T("save"),"#226DA0"); save.Name="SaveSettingsButton"; save.HorizontalAlignment=HorizontalAlignment.Right;
         save.Click += (_,_) => Save();
         result=PageHelpers.Lbl("",13,"#F0CF84",wrap:TextWrapping.Wrap); result.Name="SettingsResult"; result.Margin=new Thickness(0,0,24,0);
-        Label("privacy"); stack.Children.Add(PageHelpers.Lbl(Localization.T("privacyText"),14,"#BDCAD8",wrap:TextWrapping.Wrap));
+        var privacy=PageHelpers.Lbl(Localization.T("privacyText"),13,"#BDCAD8",wrap:TextWrapping.Wrap);
+        stack.Children.Add(new Expander { Header=Localization.T("privacy"),Foreground=Brushes.White,Content=privacy });
         var layout=new DockPanel();
-        var footer=new Border { Background=PageHelpers.HexBrush("#152A43"), Padding=new Thickness(36,16,36,16), BorderBrush=PageHelpers.HexBrush("#365574"), BorderThickness=new Thickness(0,1,0,0) };
+        var footer=new Border { Background=PageHelpers.HexBrush("#152A43"), Padding=new Thickness(24,12,24,12), BorderBrush=PageHelpers.HexBrush("#365574"), BorderThickness=new Thickness(0,1,0,0) };
         var footerContent=new DockPanel { MaxWidth=1040 }; DockPanel.SetDock(save,Dock.Right); footerContent.Children.Add(save); footerContent.Children.Add(result);
         footer.Child=footerContent; DockPanel.SetDock(footer,Dock.Bottom); layout.Children.Add(footer);
         layout.Children.Add(new ScrollViewer { Content=stack, VerticalScrollBarVisibility=ScrollBarVisibility.Auto }); Content=layout;

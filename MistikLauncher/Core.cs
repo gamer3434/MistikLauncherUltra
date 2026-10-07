@@ -212,6 +212,12 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.0","2026-10-07","#00D4AA", new[]{
+                "Normal derleme: dağıtım paketinde kod gizleme yok",
+                "Ana panel sadeleştirildi; hızlı işlemler küçük pencerede de görünür",
+                "Oyuncu adı ve bellek ayarları öne alındı; görünüm seçenekleri açılır bölümde",
+                "Onarım sırasında klasör oluşturma hataları dosyalara dokunmadan bildirilir"
+            }),
             new("v6.1.8","2026-10-07","#00D4AA", new[]{
                 "Sürüm yenileme istekleri sıralanır; bağlantı hatasında çalışan liste korunur",
                 "Yenilenen sürüm kartları seçili dili korur; Fabric kartları yinelenmez",

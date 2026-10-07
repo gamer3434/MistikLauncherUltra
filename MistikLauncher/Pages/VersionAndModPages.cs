@@ -29,11 +29,11 @@ namespace MistikLauncher.Pages
         {
             _main = main;
             Background = Brushes.Transparent;
-            var sp = new StackPanel { Margin = new Thickness(40, 30, 40, 30) };
+            var sp = new StackPanel { Margin = new Thickness(24) };
             var headerRow = new StackPanel { Orientation = Orientation.Horizontal };
             headerRow.Children.Add(PageHelpers.Lbl("Surum Yoneticisi", 24, "#FFFFFF", true));
 
-            var refreshBtn = PageHelpers.MkBtn("\uD83D\uDD04 Yenile", "#00A3FF", 100);
+            var refreshBtn = PageHelpers.MkBtn("versionRefresh", "#00A3FF", 100);
             refreshBtn.Margin = new Thickness(15, 0, 0, 0);
             refreshBtn.Name = "VersionRefresh";
             refreshBtn.Click += async (_, _) => {
@@ -41,7 +41,7 @@ namespace MistikLauncher.Pages
                 refreshBtn.IsEnabled = false;
                 try { await LoadMojangVersionsAsync(force: true); }
                 finally {
-                    refreshBtn.Content = Localization.T("\uD83D\uDD04 Yenile");
+                    refreshBtn.Content = Localization.T("versionRefresh");
                     refreshBtn.IsEnabled = true;
                 }
             };

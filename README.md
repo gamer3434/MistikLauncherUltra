@@ -2,13 +2,13 @@
 
 Windows x64 için Türkçe / English Minecraft launcher. Oyuncu ayarları cihazında saklanır; sürüm, mod, skin ve yerel sunucu yönetimi içerir.
 
-[Yayımlanan sürümleri indir](https://github.com/gamer3434/MistikLauncherUltra/releases/latest) · [Web sitesi](https://mistiklauncherultra.web.app/) · [6.1.8 değişiklikleri](docs/RELEASE-6.1.8.md)
+[Yayımlanan sürümleri indir](https://github.com/gamer3434/MistikLauncherUltra/releases/latest) · [Web sitesi](https://mistiklauncherultra.web.app/) · [6.2.0 değişiklikleri](docs/RELEASE-6.2.0.md)
 
 ## Kurulum ve onarım
 
 Sürüm sayfasından online veya offline kurulum EXE'sini seçin. Taşınabilir kullanım için ZIP'in tüm dosyalarını aynı klasöre çıkartıp `MistikLauncher.exe` dosyasını açın. .NET çalışma zamanı pakete dahildir.
 
-Program bozulursa launcher'ı kapatın, aynı veya daha yeni sürümün `MistikRepair-6.1.8.exe` dosyasını açıp kurulum klasöründe **Onar** seçin. Onarıcı internet gerektirmez; program dosyalarını doğrular ve yeniler. Ayarlar, modlar ve dünyalar korunur. Onarıcı 6.1.8 paketine eklenmiştir; indirme için bu sürümün yayımlanmış olması gerekir.
+Program bozulursa launcher'ı kapatın, aynı veya daha yeni sürümün `MistikRepair-6.2.0.exe` dosyasını açıp kurulum klasöründe **Onar** seçin. Onarıcı internet gerektirmez; program dosyalarını doğrular ve yeniler. Ayarlar, modlar ve dünyalar korunur.
 
 Varsayılan kurulum: `%LOCALAPPDATA%\Programs\MistikLauncherUltra`. Oyuncu verileri: `%APPDATA%\.mistik_ultra`. Şifreli ayarlar aynı Windows kullanıcı hesabında açılır. Paket şu anda genel yayıncı sertifikasıyla imzalı değildir.
 
@@ -29,11 +29,11 @@ Windows ve .NET 8 SDK gerekir:
 dotnet build MistikLauncher/MistikLauncher.csproj -c Release
 dotnet run --project Validation -c Release -- artifacts/screenshots-ordinary
 node --test Validation/WebsiteReleaseTests.js Validation/WebsitePrivacyTests.js
-./scripts/Build-Protected.ps1
+./scripts/Build-Package.ps1
 ./scripts/Build-Installers.ps1
 ```
 
-Paketler `artifacts/` altında üretilir. Sürüm yayımlama iş akışı yalnızca proje sürümüyle eşleşen `v*` etiketlerinde çalışır. EXE, ZIP, PDB ve kişisel yapılandırmalar kaynak deposuna eklenmez.
+Normal paket kod gizleme olmadan derlenir. İsteğe bağlı korumalı derleme için `./scripts/Build-Protected.ps1` kullanılabilir. Paketler `artifacts/` altında üretilir. Sürüm yayımlama iş akışı yalnızca proje sürümüyle eşleşen `v*` etiketlerinde çalışır. EXE, ZIP, PDB ve kişisel yapılandırmalar kaynak deposuna eklenmez.
 
 ## Depo yapısı
 

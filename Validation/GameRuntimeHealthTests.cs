@@ -85,6 +85,13 @@ public static class GameRuntimeHealthTests
         result = await GameRuntimeHealth.VerifyAndRepairAsync(guards, "broken", new HttpClient(new FakeHandler(_ => throw new Exception())));
         Check(!result.CanLaunch && result.FailedArtifact == "profile:broken" && result.FailedPath!.EndsWith("broken.json") && result.FailureReason!.Contains("invalid", StringComparison.OrdinalIgnoreCase), "invalid profile reports its exact path and reason");
 
+        string blocked = Path.Combine(root, "blocked-directory");
+        Profile(blocked, "1.21", ProfileJson("1.21", clientJar, ("fixture:lib:1", "fixture/lib/1/lib-1.jar", libraryJar)));
+        Write(Path.Combine(blocked, "versions", "1.21", "1.21.jar"), clientJar);
+        Write(Path.Combine(blocked, "libraries", "fixture"), "preserve this file"u8.ToArray());
+        result = await GameRuntimeHealth.VerifyAndRepairAsync(blocked, "1.21", new HttpClient(noRequest));
+        Check(!result.CanLaunch && result.FailedArtifact == "library:fixture:lib:1" && result.FailureReason!.Contains("Repair failed") && File.ReadAllText(Path.Combine(blocked, "libraries", "fixture")) == "preserve this file", "repair directory failure reports the artifact and preserves existing files");
+
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
         bool cancellationObserved = false;

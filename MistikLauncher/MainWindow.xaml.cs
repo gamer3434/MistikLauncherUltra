@@ -71,7 +71,6 @@ namespace MistikLauncher
                     SetVersion(selected);
                     StatusLbl.Text = $"{Localization.T("version")}: {selected}";
                     QueueBackgroundModSync();
-                    if(_pageCache.TryGetValue("Dash", out var homePage) && homePage is Pages.ModernHomePage home) { home.RefreshLanguage(); home.InvalidateReadiness(); }
                 }
             };
 
@@ -445,6 +444,7 @@ namespace MistikLauncher
             }
             if(_pageCache.TryGetValue("Vers",out var page) && page is Pages.VersionManagerPage versions && versions.IsLoaded)
                 versions.RefreshSelection();
+            if(_pageCache.TryGetValue("Dash", out var homePage) && homePage is Pages.ModernHomePage home) { home.RefreshLanguage(); home.InvalidateReadiness(); }
         }
 
         static List<int> GetVersionNumbers(string input)
