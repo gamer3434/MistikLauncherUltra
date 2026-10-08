@@ -50,6 +50,24 @@ static class SkinWorkflowTests
             var encoder=new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
             using var png=new MemoryStream(); encoder.Save(png);
             var bytes=png.ToArray();
+            var repairedAvatar=Path.Combine(App.AppData,"avatar_CacheRepair_40.png");
+            File.WriteAllText(repairedAvatar,"cached HTML instead of PNG");
+            var avatarRepairHandler=new SkinHandler(bytes);
+            using var avatarRepairClient=new HttpClient(avatarRepairHandler);
+            Check(Wait(window.FetchAvatarAsync("CacheRepair",40,avatarRepairClient))!=null && avatarRepairHandler.FallbackRequests==1 && File.ReadAllBytes(repairedAvatar).SequenceEqual(bytes),"corrupt fallback avatar cache is downloaded once and replaced by decoded image bytes");
+            Check(Wait(window.FetchAvatarAsync("CacheRepair",40,avatarRepairClient))!=null && avatarRepairHandler.FallbackRequests==1,"repaired avatar cache is reused without another fallback download");
+            var invalidAvatarCache=Path.Combine(App.AppData,"avatar_BadAvatar_40.png");
+            using var badAvatarClient=new HttpClient(new SkinHandler("<html>not an avatar</html>"u8.ToArray()));
+            Check(Wait(window.FetchAvatarAsync("BadAvatar",40,badAvatarClient))==null && !File.Exists(invalidAvatarCache),"invalid avatar response is rejected before a cache file is created");
+            Check(Wait(window.FetchAvatarAsync("BadAvatar",40,avatarRepairClient))!=null && File.ReadAllBytes(invalidAvatarCache).SequenceEqual(bytes),"avatar fetch recovers after a prior invalid network response");
+            var healthyElyCache=Path.Combine(App.AppData,"elyby_KeepSkin.png");
+            File.WriteAllBytes(healthyElyCache,bytes); File.SetLastWriteTimeUtc(healthyElyCache,DateTime.UtcNow.AddDays(-2));
+            Check(Wait(window.FetchAvatarAsync("KeepSkin",40,badAvatarClient))!=null && File.ReadAllBytes(healthyElyCache).SequenceEqual(bytes),"invalid Ely.by refresh preserves and displays the previous healthy skin cache");
+            var corruptElyCache=Path.Combine(App.AppData,"elyby_RepairEly.png");
+            File.WriteAllText(corruptElyCache,"fresh but corrupt skin cache");
+            var elyRepairHandler=new DelayedSkinHandler(bytes); elyRepairHandler.Release();
+            using var elyRepairClient=new HttpClient(elyRepairHandler);
+            Check(Wait(window.FetchAvatarAsync("RepairEly",40,elyRepairClient))!=null && File.ReadAllBytes(corruptElyCache).SequenceEqual(bytes),"fresh corrupt Ely.by cache is refreshed instead of blocking a valid skin download");
             var fallbackHandler=new SkinHandler(bytes);
             using var fallback=new HttpClient(fallbackHandler);
             Check(Wait(window.PrepareSkinPackAsync("1.20.1",fallback)) && fallbackHandler.FallbackRequests==1 && File.ReadAllBytes(Path.Combine(pack,"assets","minecraft","textures","entity","steve.png")).SequenceEqual(bytes),"corrupt Ely.by skin falls back to a validated Minecraft skin and installs it");
@@ -122,11 +140,22 @@ static class SkinWorkflowTests
             using(var locked=new FileStream(packMetadata,FileMode.Open,FileAccess.Read,FileShare.None))
                 Check(!Wait(window.PrepareSkinPackAsync("1.20.1",offline)) && File.ReadAllBytes(installedSkin).SequenceEqual(bytes) && File.ReadAllText(options)==localOptions,"locked skin pack replacement fails without damaging the installed textures or options");
             Check(File.ReadAllText(packMetadata)==metadataBefore,"failed skin pack commit preserves original metadata");
+
+            const string originalOptions="resourcePacks:[\"vanilla\"]\nrenderDistance:17\nlang:tr_tr\n";
+            File.WriteAllText(options,originalOptions);
+            using(var lockedOptions=new FileStream(options,FileMode.Open,FileAccess.Read,FileShare.Read))
+                Check(!Wait(window.PrepareSkinPackAsync("1.20.1",offline)) && File.ReadAllText(options)==originalOptions,"locked options prevent skin activation success while preserving all original game settings");
+            Check(!Directory.GetFiles(App.GameDir,"options.txt.*.tmp").Any(),"failed atomic skin options update cleans its temporary file");
+            Check(Wait(window.PrepareSkinPackAsync("1.20.1",offline)) && File.ReadAllText(options).Contains("file/MistikSkinPack") && File.ReadAllText(options).Contains("renderDistance:17") && File.ReadAllText(options).Contains("lang:tr_tr"),"skin activation retries successfully after unlocking options and retains unrelated settings");
+            var enabledOptions=File.ReadAllText(options);
+            window.Config.SkinType="none";
+            using(var lockedOptions=new FileStream(options,FileMode.Open,FileAccess.Read,FileShare.Read))
+                Check(!Wait(window.PrepareSkinPackAsync("1.20.1",offline)) && File.ReadAllText(options)==enabledOptions && Directory.Exists(pack),"failed options update during explicit reset reports failure and leaves the active pack intact");
         }
         finally { window.Config=original; }
         return checks;
     }
-    static bool Wait(Task<bool> task)
+    static T Wait<T>(Task<T> task)
     {
         Wait((Task)task);
         return task.GetAwaiter().GetResult();

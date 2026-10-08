@@ -34,8 +34,23 @@ public static class ModToggleTests
             Check(rejected && File.Exists(original) && File.Exists(blocked) && !File.Exists(Path.Combine(previous,"a.jar")),"locked mod transfer preserves active set and rolls back");
         }
         File.WriteAllText(Path.Combine(next,"new.jar.disabled"),"disabled bytes");
-        ModFiles.SyncPools(active,previous,next);
+        var retained=Path.Combine(previous,"retained.jar"); File.WriteAllText(retained,"untouched pool bytes");
+        bool finalized=false; rejected=false;
+        try { ModFiles.SyncPools(active,previous,next,finalize:()=> {
+            finalized=true;
+            Check(File.Exists(Path.Combine(active,"new.jar.disabled")) && File.Exists(Path.Combine(previous,"a.jar")),"config finalizer runs after both pool transfers");
+            throw new IOException("Simulated config persistence failure");
+        }); } catch(IOException) { rejected=true; }
+        Check(rejected && finalized && File.ReadAllText(original)=="first bytes" && File.ReadAllText(blocked)=="second bytes" &&
+            File.ReadAllText(Path.Combine(next,"new.jar.disabled"))=="disabled bytes" && File.ReadAllText(retained)=="untouched pool bytes" &&
+            !File.Exists(Path.Combine(previous,"a.jar")) && !File.Exists(Path.Combine(active,"new.jar.disabled")),"failed config finalizer reverses only transaction moves and retains pre-existing pool files");
+        finalized=false;
+        ModFiles.SyncPools(active,previous,next,finalize:()=>finalized=true);
+        Check(finalized,"successful mod transfer also commits configuration");
         Check(File.ReadAllText(Path.Combine(active,"new.jar.disabled"))=="disabled bytes" && File.ReadAllText(Path.Combine(previous,"a.jar"))=="first bytes" && File.ReadAllText(Path.Combine(previous,"b.jar"))=="second bytes","successful pool transfer preserves active and disabled mod bytes");
+        finalized=false;
+        ModFiles.SyncPools(active,next,next,finalize:()=>finalized=true);
+        Check(finalized && File.ReadAllText(Path.Combine(active,"new.jar.disabled"))=="disabled bytes" && !ModFiles.List(next).Any(),"same pool profile change commits config without moving active mods");
         ModFiles.SyncPools(active,next,null);
         Check(!ModFiles.List(active).Any() && File.ReadAllText(Path.Combine(next,"new.jar.disabled"))=="disabled bytes","Vanilla transition archives mods without deletion");
         byte[] update=System.Text.Encoding.UTF8.GetBytes("verified replacement bytes");

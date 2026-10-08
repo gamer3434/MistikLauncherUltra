@@ -1,5 +1,7 @@
 using System.IO;
 using System.Text.Json;
+using System.Net.Http;
+using System.Security.Cryptography;
 using MistikLauncher.Updates;
 using Microsoft.Win32;
 namespace MistikLauncher.Installation;
@@ -10,6 +12,35 @@ public static class InstallEngine
     public const string Marker="install-state.json";
     public const string RegistryKey=@"Software\Microsoft\Windows\CurrentVersion\Uninstall\MistikLauncherUltra";
     public static string DefaultRoot=>Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Programs","MistikLauncherUltra");
+    public static async Task<string> DownloadPayloadAsync(string work,string version,HttpClient http,IProgress<double>? progress=null,CancellationToken cancellation=default)
+    {
+        var zip=UpdateEngine.SafePath(work,"payload.zip");
+        var partial=UpdateEngine.SafePath(work,"payload-"+Guid.NewGuid().ToString("N")+".part");
+        using var deadline=CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+        deadline.CancelAfter(http.Timeout==Timeout.InfiniteTimeSpan?TimeSpan.FromMinutes(15):http.Timeout);
+        var token=deadline.Token;
+        try {
+            using var metadata=await http.GetAsync("https://api.github.com/repos/gamer3434/MistikLauncherUltra/releases/tags/v"+Uri.EscapeDataString(version),HttpCompletionOption.ResponseHeadersRead,token).ConfigureAwait(false);
+            metadata.EnsureSuccessStatusCode();
+            if(metadata.Content.Headers.ContentLength>512*1024) throw new IOException("Release metadata too large / Sürüm bilgisi çok büyük.");
+            using var stream=await metadata.Content.ReadAsStreamAsync(token).ConfigureAwait(false); using var buffer=new MemoryStream();
+            var data=new byte[65536]; int read;
+            while((read=await stream.ReadAsync(data,token).ConfigureAwait(false))>0) { if(buffer.Length+read>512*1024) throw new IOException("Release metadata too large"); await buffer.WriteAsync(data.AsMemory(0,read),token).ConfigureAwait(false); }
+            using var json=JsonDocument.Parse(buffer.ToArray());
+            var asset=json.RootElement.GetProperty("assets").EnumerateArray().Single(a=>a.GetProperty("name").GetString()=="MistikLauncher-"+version+"-win-x64.zip");
+            var uri=new Uri(asset.GetProperty("browser_download_url").GetString()!); var size=asset.GetProperty("size").GetInt64(); var digest=asset.GetProperty("digest").GetString();
+            if(uri.Scheme!="https" || uri.Host!="github.com" || !uri.AbsolutePath.StartsWith("/gamer3434/MistikLauncherUltra/releases/download/",StringComparison.Ordinal) || size<=0 || size>512L*1024*1024 || digest is null || !System.Text.RegularExpressions.Regex.IsMatch(digest,@"^sha256:[a-fA-F0-9]{64}$")) throw new IOException("Unverified release / Doğrulanamayan sürüm.");
+            using var response=await http.GetAsync(uri,HttpCompletionOption.ResponseHeadersRead,token).ConfigureAwait(false); response.EnsureSuccessStatusCode();
+            var final=response.RequestMessage!.RequestUri!; if(final.Scheme!="https" || !(final.Host=="github.com" || final.Host=="release-assets.githubusercontent.com" || final.Host=="objects.githubusercontent.com")) throw new IOException("Invalid download host");
+            using var download=await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false); using var hash=IncrementalHash.CreateHash(HashAlgorithmName.SHA256); long total=0;
+            using(var file=new FileStream(partial,FileMode.CreateNew,FileAccess.Write,FileShare.None,65536,true)) {
+                while((read=await download.ReadAsync(data,token).ConfigureAwait(false))>0) { total+=read; if(total>size) throw new IOException("Download exceeds expected size"); hash.AppendData(data,0,read); await file.WriteAsync(data.AsMemory(0,read),token).ConfigureAwait(false); progress?.Report(total*100.0/size); }
+                if(total!=size || !Convert.ToHexString(hash.GetHashAndReset()).Equals(digest[7..],StringComparison.OrdinalIgnoreCase)) throw new IOException("Download checksum mismatch / İndirme doğrulaması başarısız.");
+            }
+            token.ThrowIfCancellationRequested(); File.Move(partial,zip,true); return zip;
+        } catch(OperationCanceledException ex) when(!cancellation.IsCancellationRequested) { throw new IOException("Download timed out / İndirme zaman aşımına uğradı.",ex); }
+        finally { if(File.Exists(partial)) File.Delete(partial); }
+    }
     public static string ValidateRoot(string root)
     {
         root=Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar);

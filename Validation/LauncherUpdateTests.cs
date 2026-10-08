@@ -68,11 +68,27 @@ static class LauncherUpdateTests
         Check(names.All(name=>File.ReadAllText(Path.Combine(target,name))=="new "+name),"full package replacement");
         Check(File.ReadAllText(Path.Combine(target,"config.json"))=="user preferences" && File.ReadAllText(Path.Combine(target,"game","world.dat"))=="world","launcher update preserves settings and worlds");
         Check(JsonSerializer.Deserialize<UpdateManifest>(File.ReadAllText(Path.Combine(target,"update-manifest.json")))!.Version=="7.0.0","update replaces the installed manifest");
+        Check(!Directory.EnumerateDirectories(root,"backup-*").Any(),"successful update removes its private backup directory");
         foreach(var name in names) File.WriteAllText(Path.Combine(target,name),"old "+name);
         bool failed=false;
         using(var locked=new FileStream(Path.Combine(target,names[2]),FileMode.Open,FileAccess.Read,FileShare.None))
             try { UpdateEngine.Apply(payload,target); } catch(IOException) { failed=true; }
         Check(failed && names.All(name=>File.ReadAllText(Path.Combine(target,name))=="old "+name),"locked-file failure rolls back earlier replacements");
+        Check(!Directory.EnumerateDirectories(root,"backup-*").Any(),"completed update rollback removes its private backup directory");
+        bool readOnlyRejected=false;
+        File.SetAttributes(Path.Combine(target,names[0]),FileAttributes.ReadOnly);
+        try { UpdateEngine.Apply(payload,target); } catch(Exception ex) when(ex is IOException or UnauthorizedAccessException) { readOnlyRejected=true; }
+        finally { File.SetAttributes(Path.Combine(target,names[0]),FileAttributes.Normal); }
+        Check(readOnlyRejected && names.All(name=>File.ReadAllText(Path.Combine(target,name))=="old "+name) && !Directory.EnumerateDirectories(root,"backup-*").Any(),"read-only installed file failure preserves the installation and cleans its read-only backup copy");
+        bool rollbackFailed=false;
+        File.SetAttributes(Path.Combine(payload,names[0]),FileAttributes.ReadOnly);
+        try {
+            using var locked=new FileStream(Path.Combine(target,names[1]),FileMode.Open,FileAccess.Read,FileShare.None);
+            try { UpdateEngine.Apply(payload,target); } catch(UnauthorizedAccessException) { rollbackFailed=true; }
+        } finally { File.SetAttributes(Path.Combine(payload,names[0]),FileAttributes.Normal); File.SetAttributes(Path.Combine(target,names[0]),FileAttributes.Normal); }
+        var recovery=Directory.EnumerateDirectories(root,"backup-*").SingleOrDefault();
+        Check(rollbackFailed && recovery!=null && File.ReadAllText(Path.Combine(recovery,names[0]))=="old "+names[0],"failed update rollback retains the original executable in its recovery backup");
+        foreach(var name in names) File.WriteAllText(Path.Combine(target,name),"old "+name);
         bool rejected=false;
         try { UpdateEngine.SafePath(target,"../outside.exe"); } catch(InvalidDataException) { rejected=true; }
         Check(rejected,"update path traversal rejected");

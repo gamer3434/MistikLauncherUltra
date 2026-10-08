@@ -91,6 +91,17 @@ static class ModAndMapRegressionTests
         Check(File.ReadAllBytes(Path.Combine(mods, "library.jar")).SequenceEqual(modBytes),
             "queued mod activates through the same version and loader pool used by launcher synchronization");
 
+        var profileRoot = Path.Combine(root, "migration-profiles");
+        const string sourceProfile = "fabric-loader-0.16.10-26.1";
+        var profileFolder = Path.Combine(profileRoot, "versions", sourceProfile); Directory.CreateDirectory(profileFolder);
+        File.WriteAllText(Path.Combine(profileFolder, sourceProfile + ".json"), new JObject {
+            ["inheritsFrom"] = "26.1", ["libraries"] = new JArray(new JObject { ["name"] = "net.fabricmc:fabric-loader:0.16.10" })
+        }.ToString());
+        bool SameMigration(string target, string loader) => Call<bool>(typeof(ModManagerPage), "IsSameMigrationPool", profileRoot, sourceProfile, target, loader);
+        Check(SameMigration("26.1", "Fabric"), "migration to the current inherited Minecraft and loader pool is a no-op");
+        Check(!SameMigration("26.1", "forge") && !SameMigration("26.1.1", "fabric"),
+            "migration still permits a different exact loader or Minecraft version");
+
         var saves = Path.Combine(root, "saves");
         var existing = Path.Combine(saves, "SkyBlock"); Directory.CreateDirectory(existing);
         File.WriteAllText(Path.Combine(existing, "level.dat"), "player progress");
@@ -116,5 +127,50 @@ static class ModAndMapRegressionTests
         Check(File.Exists(Path.Combine(rootWorld, "level.dat")) && !Directory.GetDirectories(saves, "temp_*").Any(),
             "map archive with level.dat at its root installs and cleans staging");
         return checks;
+    }
+
+    public static int SyncFailure(MainWindow window, string root)
+    {
+        Directory.CreateDirectory(root);
+        var originalVersion = window.Config.Version;
+        var originalSynced = window.Config.LastSyncedVersion;
+        const string previousVersion = "96.101-fabric", nextVersion = "96.102-fabric";
+        var previous = Path.Combine(App.AppData, "mods_pool", GameProfiles.VersionPoolKey("96.101", "fabric"));
+        var next = Path.Combine(App.AppData, "mods_pool", GameProfiles.VersionPoolKey("96.102", "fabric"));
+        var holding = Path.Combine(root, "existing-mods");
+        ModFiles.SyncPools(App.ModsDir, holding, null);
+        Directory.CreateDirectory(next);
+        var oldMod = Path.Combine(App.ModsDir, "sync-old.jar");
+        var newMod = Path.Combine(next, "sync-new.jar.disabled");
+        int checks = 0;
+        void Check(bool condition, string name) { if (!condition) throw new Exception(name); Console.WriteLine("PASS " + name); checks++; }
+        try
+        {
+            File.WriteAllText(oldMod, "original active bytes"); File.WriteAllText(newMod, "target disabled bytes");
+            window.Config.Version = nextVersion; window.Config.LastSyncedVersion = previousVersion;
+            ConfigManager.Save(window.Config);
+            using (var locked = new FileStream(Path.Combine(App.AppData, "config.json"), FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                Check(!window.SyncModsForCurrentVersion() && window.Config.LastSyncedVersion == previousVersion &&
+                    File.ReadAllText(oldMod) == "original active bytes" && File.ReadAllText(newMod) == "target disabled bytes" &&
+                    !File.Exists(Path.Combine(previous, "sync-old.jar")) && !File.Exists(Path.Combine(App.ModsDir, "sync-new.jar.disabled")),
+                    "failed config save restores previous sync identity and both complete mod sets");
+            }
+            Check(ConfigManager.Load().LastSyncedVersion == previousVersion, "failed sync never changes persisted pool identity");
+            Check(window.SyncModsForCurrentVersion() && window.Config.LastSyncedVersion == nextVersion &&
+                ConfigManager.Load().LastSyncedVersion == nextVersion && File.ReadAllText(Path.Combine(previous, "sync-old.jar")) == "original active bytes" &&
+                File.ReadAllText(Path.Combine(App.ModsDir, "sync-new.jar.disabled")) == "target disabled bytes",
+                "retry after failed config save performs and persists the full transfer");
+            return checks;
+        }
+        finally
+        {
+            foreach (var folder in new[] { App.ModsDir, previous, next })
+                foreach (var name in new[] { "sync-old.jar", "sync-new.jar.disabled" })
+                    File.Delete(Path.Combine(folder, name));
+            ModFiles.SyncPools(App.ModsDir, next, holding);
+            window.Config.Version = originalVersion; window.Config.LastSyncedVersion = originalSynced;
+            ConfigManager.Save(window.Config);
+        }
     }
 }

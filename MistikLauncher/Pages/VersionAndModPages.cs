@@ -1425,10 +1425,20 @@ namespace MistikLauncher.Pages
                 loaders.Any(value => value.ToString().Equals(loader, StringComparison.OrdinalIgnoreCase));
         }
 
+        private static bool IsSameMigrationPool(string root, string sourceProfile, string targetVer, string loader)
+            => GameProfiles.VersionPoolKey(GameProfiles.MinecraftVersion(root, sourceProfile), GameProfiles.Loader(root, sourceProfile))
+                .Equals(GameProfiles.VersionPoolKey(targetVer, loader), StringComparison.OrdinalIgnoreCase);
+
         private async Task MigrateAndDownloadMods(string targetVer, string loader, Button btn)
         {
             try
             {
+                var sourceVersion = _main.Config.Version ?? "";
+                if (IsSameMigrationPool(App.GameDir, sourceVersion, targetVer, loader))
+                {
+                    MessageBox.Show("Seçilen sürüm ve mod yükleyici zaten aktif. Modlarınız mevcut klasörde korunmuştur.", "Mod Sürüm Taşıma", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
                 if (!Directory.Exists(App.ModsDir))
                 {
                     MessageBox.Show("Aktif mod klasöründe taşıyacak hiç mod bulunamadı!", "Mod Yok", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -1478,6 +1488,7 @@ namespace MistikLauncher.Pages
                 }
 
                 // 2. Mevcut modları güvenle askıya al (SyncModsForCurrentVersion)
+                if (_main.Config.Version != sourceVersion) throw new IOException("The selected Minecraft version changed during mod migration.");
                 if(!_main.SyncModsForCurrentVersion()) throw new IOException(Localization.T("modSyncFailed"));
 
                 // 3. Launcher ana sürümünü hedef sürüme geçir (VerBox listesinde arayarak)

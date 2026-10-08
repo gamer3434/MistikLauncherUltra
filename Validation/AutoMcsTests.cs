@@ -36,6 +36,23 @@ static class AutoMcsTests
         File.WriteAllText(updater.ExecutablePath,"damaged executable");
         Check(await updater.CheckAsync(true) && transport.AssetRequests==2,"damaged installed executable repaired");
 
+        var commitFolder=Path.Combine(root,"mcs-receipt-locked"); Directory.CreateDirectory(commitFolder);
+        byte[] oldExecutable=(byte[])executable.Clone(); oldExecutable[^1]=42;
+        string oldReceipt=JsonSerializer.Serialize(new AutoMcsReceipt("v8.0.0",Convert.ToHexString(SHA256.HashData(oldExecutable))));
+        string receiptPath=Path.Combine(commitFolder,"auto-mcs.version.json");
+        File.WriteAllBytes(Path.Combine(commitFolder,"auto-mcs.exe"),oldExecutable); File.WriteAllText(receiptPath,oldReceipt);
+        using var commitClient=new HttpClient(new Stub(Manifest(digest),zip));
+        var commitUpdater=new AutoMcsUpdater(commitClient,commitFolder,()=>false);
+        using(var locked=File.Open(receiptPath,FileMode.Open,FileAccess.Read,FileShare.Read))
+            Check(!await commitUpdater.CheckAsync(true) && commitUpdater.StatusKey=="mcsError" && commitUpdater.InstalledVersion=="v8.0.0" && File.ReadAllBytes(commitUpdater.ExecutablePath).SequenceEqual(oldExecutable) && File.ReadAllText(receiptPath)==oldReceipt,"receipt commit failure restores the previous Auto-MCS executable and leaves its receipt unchanged");
+        Check(!Directory.EnumerateDirectories(commitFolder,".auto-mcs-*").Any(),"receipt commit rollback removes its staging directory");
+        Check(await commitUpdater.CheckAsync(true) && File.ReadAllBytes(commitUpdater.ExecutablePath).SequenceEqual(executable) && commitUpdater.InstalledVersion=="v9.1.0","Auto-MCS receipt commit retry succeeds after the lock is released");
+
+        var firstFolder=Path.Combine(root,"mcs-first-receipt-conflict"); Directory.CreateDirectory(Path.Combine(firstFolder,"auto-mcs.version.json"));
+        using var firstClient=new HttpClient(new Stub(Manifest(digest),zip));
+        var firstUpdater=new AutoMcsUpdater(firstClient,firstFolder,()=>false);
+        Check(!await firstUpdater.CheckAsync(true) && !File.Exists(firstUpdater.ExecutablePath) && Directory.Exists(Path.Combine(firstFolder,"auto-mcs.version.json")) && !Directory.EnumerateDirectories(firstFolder,".auto-mcs-*").Any(),"failed first Auto-MCS receipt commit removes only its newly installed executable and staging files");
+
         var failureFolder=Path.Combine(root,"mcs-failure"); Directory.CreateDirectory(failureFolder);
         string installed=Path.Combine(failureFolder,"auto-mcs.exe"); File.WriteAllText(installed,"existing installation");
         using var badClient=new HttpClient(new Stub(Manifest(new string('0',64)),zip));

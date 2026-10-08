@@ -1,12 +1,15 @@
 using System.IO;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Net;
+using System.Net.Http;
 using MistikLauncher.Installation;
 using MistikLauncher.Updates;
 static class InstallerTests
 {
     public static void Run(string temp,Action<bool,string> check)
     {
+        DownloadTests(Path.Combine(temp,"installer-downloads"),check).GetAwaiter().GetResult();
         var payload=Path.Combine(temp,"setup-payload"); Directory.CreateDirectory(payload);
         var names=new[]{"MistikLauncher.exe","MistikLauncher.dll","MistikUpdater.exe","MistikUninstall.exe"};
         foreach(var name in names) File.WriteAllText(Path.Combine(payload,name),"test "+name);
@@ -68,5 +71,49 @@ static class InstallerTests
         Reject(()=>InstallEngine.Install(payload,cancelled,false,token.Token,false),"cancelled installer rejects commit"); check(!Directory.Exists(cancelled),"cancelled install leaves no destination");
         File.WriteAllText(Path.Combine(payload,names[0]),"corrupted");
         Reject(()=>InstallEngine.Install(payload,cancelled,false,shell:false),"installer refuses corrupted manifest payload"); check(!Directory.Exists(cancelled),"corrupted payload leaves no destination");
+    }
+    static async Task DownloadTests(string root,Action<bool,string> check)
+    {
+        Directory.CreateDirectory(root);
+        var zip=Path.Combine(root,"payload.zip");
+        var bytes="verified payload fixture"u8.ToArray();
+        var digest="sha256:"+Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+        using(var client=new HttpClient(new DownloadHandler(bytes,digest))) {
+            check(await InstallEngine.DownloadPayloadAsync(root,"6.2.1",client)==zip && File.ReadAllBytes(zip).SequenceEqual(bytes),"online installer commits only a fully downloaded checksum-verified payload");
+        }
+        File.WriteAllText(zip,"previous verified payload");
+        using(var client=new HttpClient(new DownloadHandler(bytes,"sha256:"+new string('0',64)))) {
+            bool rejected=false; try { await InstallEngine.DownloadPayloadAsync(root,"6.2.1",client); } catch(IOException) { rejected=true; }
+            check(rejected && File.ReadAllText(zip)=="previous verified payload" && !Directory.EnumerateFiles(root,"*.part").Any(),"installer checksum failure preserves previous payload and removes only its partial download");
+        }
+        foreach(bool metadata in new[]{true,false}) {
+            using var client=new HttpClient(new DownloadHandler(bytes,digest,stall:metadata?"metadata":"download")) { Timeout=TimeSpan.FromMilliseconds(150) };
+            var download=InstallEngine.DownloadPayloadAsync(root,"6.2.1",client);
+            check(await Task.WhenAny(download,Task.Delay(5000))==download,"installer "+(metadata?"metadata":"payload")+" body cannot stall beyond its deadline");
+            bool timedOut=false; try { await download; } catch(IOException error) { timedOut=error.Message.Contains("timed out"); }
+            check(timedOut && File.ReadAllText(zip)=="previous verified payload" && !Directory.EnumerateFiles(root,"*.part").Any(),"installer "+(metadata?"metadata":"payload")+" timeout reports failure while preserving previous bytes and cleaning staging");
+        }
+        using(var client=new HttpClient(new DownloadHandler(bytes,digest,stall:"download")) { Timeout=Timeout.InfiniteTimeSpan })
+        using(var cancellation=new CancellationTokenSource(TimeSpan.FromMilliseconds(150))) {
+            bool cancelled=false; try { await InstallEngine.DownloadPayloadAsync(root,"6.2.1",client,cancellation:cancellation.Token); } catch(OperationCanceledException) { cancelled=true; }
+            check(cancelled && File.ReadAllText(zip)=="previous verified payload" && !Directory.EnumerateFiles(root,"*.part").Any(),"explicit installer cancellation remains cancellation and preserves the previous payload");
+        }
+    }
+    sealed class DownloadHandler(byte[] bytes,string digest,string? stall=null) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken cancellationToken)
+        {
+            bool metadata=request.RequestUri!.Host=="api.github.com";
+            HttpContent content;
+            if(stall==(metadata?"metadata":"download")) content=new StreamContent(new StalledStream());
+            else if(metadata) content=new StringContent(JsonSerializer.Serialize(new { assets=new[]{new { name="MistikLauncher-6.2.1-win-x64.zip",browser_download_url="https://github.com/gamer3434/MistikLauncherUltra/releases/download/v6.2.1/payload.zip",size=bytes.Length,digest }} }));
+            else content=new ByteArrayContent(bytes);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content=content,RequestMessage=request });
+        }
+    }
+    sealed class StalledStream : MemoryStream
+    {
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer,CancellationToken cancellationToken=default)
+        { await Task.Delay(Timeout.Infinite,cancellationToken); return 0; }
     }
 }

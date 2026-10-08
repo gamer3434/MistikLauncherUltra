@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Reflection;
-using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -56,22 +55,7 @@ internal static class Program
         var zip=Path.Combine(work,"payload.zip");
         if(Offline) { using var input=Assembly.GetExecutingAssembly().GetManifestResourceStream("MistikPayload.zip")!; using var output=File.Create(zip); await input.CopyToAsync(output,cancellation); progress?.Report(100); return zip; }
         using var http=new HttpClient { Timeout=TimeSpan.FromMinutes(15) }; http.DefaultRequestHeaders.UserAgent.ParseAdd("MistikSetup/"+Version);
-        using var metadata=await http.GetAsync("https://api.github.com/repos/gamer3434/MistikLauncherUltra/releases/tags/v"+Version,HttpCompletionOption.ResponseHeadersRead,cancellation);
-        metadata.EnsureSuccessStatusCode();
-        if(metadata.Content.Headers.ContentLength>512*1024) throw new IOException("Release metadata too large / Sürüm bilgisi çok büyük.");
-        using var stream=await metadata.Content.ReadAsStreamAsync(cancellation); using var buffer=new MemoryStream();
-        var data=new byte[65536]; int read;
-        while((read=await stream.ReadAsync(data,cancellation))>0) { if(buffer.Length+read>512*1024) throw new IOException("Release metadata too large"); await buffer.WriteAsync(data.AsMemory(0,read),cancellation); }
-        using var json=JsonDocument.Parse(buffer.ToArray());
-        var asset=json.RootElement.GetProperty("assets").EnumerateArray().Single(a=>a.GetProperty("name").GetString()=="MistikLauncher-"+Version+"-win-x64.zip");
-        var uri=new Uri(asset.GetProperty("browser_download_url").GetString()!); var size=asset.GetProperty("size").GetInt64(); var digest=asset.GetProperty("digest").GetString();
-        if(uri.Scheme!="https" || uri.Host!="github.com" || !uri.AbsolutePath.StartsWith("/gamer3434/MistikLauncherUltra/releases/download/",StringComparison.Ordinal) || size<=0 || size>512L*1024*1024 || digest is null || !System.Text.RegularExpressions.Regex.IsMatch(digest,@"^sha256:[a-fA-F0-9]{64}$")) throw new IOException("Unverified release / Doğrulanamayan sürüm.");
-        using var response=await http.GetAsync(uri,HttpCompletionOption.ResponseHeadersRead,cancellation); response.EnsureSuccessStatusCode();
-        var final=response.RequestMessage!.RequestUri!; if(final.Scheme!="https" || !(final.Host=="github.com" || final.Host=="release-assets.githubusercontent.com" || final.Host=="objects.githubusercontent.com")) throw new IOException("Invalid download host");
-        using var download=await response.Content.ReadAsStreamAsync(cancellation); using var file=File.Create(zip); using var hash=IncrementalHash.CreateHash(HashAlgorithmName.SHA256); long total=0;
-        while((read=await download.ReadAsync(data,cancellation))>0) { total+=read; if(total>size) throw new IOException("Download exceeds expected size"); hash.AppendData(data,0,read); await file.WriteAsync(data.AsMemory(0,read),cancellation); progress?.Report(total*100.0/size); }
-        if(total!=size || !Convert.ToHexString(hash.GetHashAndReset()).Equals(digest[7..],StringComparison.OrdinalIgnoreCase)) throw new IOException("Download checksum mismatch / İndirme doğrulaması başarısız.");
-        return zip;
+        return await InstallEngine.DownloadPayloadAsync(work,Version,http,progress,cancellation);
     }
 }
 

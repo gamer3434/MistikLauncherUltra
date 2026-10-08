@@ -130,13 +130,19 @@ public sealed class AutoMcsUpdater
             using(var executable=File.OpenRead(prepared))
                 if(executable.ReadByte()!=0x4d || executable.ReadByte()!=0x5a) throw new InvalidDataException("Invalid executable.");
             string executableHash=await HashFile(prepared);
-            if(isRunning()) { Publish("mcsRunning"); return false; }
-            // Replacement is atomic; download, digest and extraction failures preserve the installed EXE.
-            if(File.Exists(ExecutablePath)) File.Replace(prepared,ExecutablePath,ExecutablePath+".bak");
-            else File.Move(prepared,ExecutablePath);
             string receiptTemp=Path.Combine(staging,"receipt.json");
             File.WriteAllText(receiptTemp,JsonSerializer.Serialize(new AutoMcsReceipt(cached.Version,executableHash)));
-            File.Move(receiptTemp,ReceiptPath,true);
+            if(isRunning()) { Publish("mcsRunning"); return false; }
+            bool existed=File.Exists(ExecutablePath);
+            string backup=ExecutablePath+".bak";
+            if(existed) File.Replace(prepared,ExecutablePath,backup);
+            else File.Move(prepared,ExecutablePath);
+            try { File.Move(receiptTemp,ReceiptPath,true); }
+            catch {
+                if(existed) File.Move(backup,ExecutablePath,true);
+                else File.Delete(ExecutablePath);
+                throw;
+            }
             InstalledVersion=cached.Version; Publish("mcsUpdated",100); return true;
         }
         catch(Exception ex)

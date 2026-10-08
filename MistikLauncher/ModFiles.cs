@@ -34,15 +34,16 @@ public static class ModFiles
     }
     public static IEnumerable<string> List(string root)=>Directory.Exists(root)?Directory.GetFiles(root).Where(p=>p.EndsWith(".jar",StringComparison.OrdinalIgnoreCase)||p.EndsWith(".jar.disabled",StringComparison.OrdinalIgnoreCase)):Array.Empty<string>();
     public static bool Enabled(string path)=>path.EndsWith(".jar",StringComparison.OrdinalIgnoreCase);
-    public static void SyncPools(string active,string previous,string? next)
+    public static void SyncPools(string active,string previous,string? next,Action? finalize=null)
     {
-        if(next!=null && string.Equals(Path.GetFullPath(previous),Path.GetFullPath(next),StringComparison.OrdinalIgnoreCase)) return;
+        if(next!=null && string.Equals(Path.GetFullPath(previous),Path.GetFullPath(next),StringComparison.OrdinalIgnoreCase)) { finalize?.Invoke(); return; }
         foreach(var root in new[]{active,previous,next}.OfType<string>()) EnsureRoot(root);
         var moved=new List<(string from,string to)>();
         void Move(string from,string to) { if((File.GetAttributes(from)&FileAttributes.ReparsePoint)!=0) throw new IOException(Localization.T("modToggleInvalid")); File.Move(from,to); moved.Add((from,to)); }
         try {
             foreach(var file in List(active)) Move(file,Path.Combine(previous,Path.GetFileName(file)));
             if(next!=null) foreach(var file in List(next)) Move(file,Path.Combine(active,Path.GetFileName(file)));
+            finalize?.Invoke();
         } catch(Exception original) {
             var failures=new List<Exception>{original};
             foreach(var move in moved.AsEnumerable().Reverse()) { try { File.Move(move.to,move.from); } catch(Exception error) { failures.Add(error); } }

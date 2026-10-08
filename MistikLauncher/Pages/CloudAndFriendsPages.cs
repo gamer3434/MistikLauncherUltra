@@ -183,7 +183,10 @@ namespace MistikLauncher.Pages
                 main.Config.SkinUser = "";
                 ConfigManager.Save(main.Config);
                 main.ReloadConfig();
-                await main.PrepareSkinPackAsync(main.Config.Version);
+                if (!await main.PrepareSkinPackAsync(main.Config.Version)) {
+                    MessageBox.Show(Localization.T("skinApplyFailed"), Localization.T("error"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
                 MessageBox.Show("Skin ayarı sıfırlandı ve kaynak paketi kapatıldı.\nOyunda varsayılan (Steve/Alex) skini göreceksiniz.", "Sıfırlandı", MessageBoxButton.OK, MessageBoxImage.Information);
             };
             searchSp.Children.Add(resetBtn);

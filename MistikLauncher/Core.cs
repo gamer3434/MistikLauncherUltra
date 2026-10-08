@@ -153,8 +153,8 @@ namespace MistikLauncher
                 finally { CryptographicOperations.ZeroMemory(plain); }
                 if (!File.Exists(Path))
                 {
-                    File.Move(temporary, Path);
                     ProtectLegacyBackup();
+                    File.Move(temporary, Path);
                 }
                 else
                 {
@@ -169,16 +169,19 @@ namespace MistikLauncher
                         {
                             // Never replace a healthy backup with a broken primary.
                             string backupTemporary = Path + ".bak.tmp";
-                            if (valid) File.WriteAllBytes(backupTemporary, Protect(previous));
-                            File.Replace(temporary, Path, null);
-                            if (valid) File.Move(backupTemporary, Path + ".bak", true);
+                            if (valid) {
+                                File.WriteAllBytes(backupTemporary, Protect(previous));
+                                File.Move(backupTemporary, Path + ".bak", true);
+                            }
                             else ProtectLegacyBackup();
+                            File.Replace(temporary, Path, null);
                         }
                     }
                     finally { CryptographicOperations.ZeroMemory(previous); }
                 }
             }
-            Saved?.Invoke(cfg);
+            try { Saved?.Invoke(cfg); }
+            catch(Exception ex) { App.Log("Settings saved; notification failed: "+ex.Message); }
         }
     }
 
@@ -208,6 +211,13 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.2","2026-10-08","#00D4AA", new[]{
+                "Takılan online kurulum indirmeleri sonlanır; sağlıklı paket korunur",
+                "Mod havuzu geçişi ayar kaydı başarısız olduğunda geri alınır",
+                "Bozuk avatar önbelleği yenilenir; başarısız skin sıfırlaması bildirilir",
+                "Sunucu yöneticisi güncellemesi kayıt hatasında önceki dosyayı geri yükler",
+                "Tamamlanan güncellemelerin geçici yedekleri temizlenir"
+            }),
             new("v6.2.1","2026-10-07","#00D4AA", new[]{
                 "Harita yeniden kurulunca mevcut dünyalar korunur; yeni kopya oluşturulur",
                 "Mod bağımlılıkları tam sürüm ve yükleyici uyumuyla doğrulanır",

@@ -83,8 +83,10 @@ public static class UpdateEngine
         }
         // Validate every destination before modifying any installed file.
         foreach(var item in manifest.Files) SafePath(target,item.Path);
-        string backup=System.IO.Path.Combine(System.IO.Path.GetDirectoryName(payload)!,"backup-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(backup);
+        string backupParent=System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(payload))!;
+        string backup=System.IO.Path.Combine(backupParent,"backup-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(backup);
         var completed=new List<(string Destination,string? Backup)>();
+        bool cleanBackup=false;
         try
         {
             var replacements=manifest.Files.Select(item=>(item.Path,Source:SafePath(payload,item.Path))).ToList();
@@ -128,14 +130,29 @@ public static class UpdateEngine
             }
             using var key=Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\MistikLauncherUltra",true);
             if(key?.GetValue("InstallLocation") is string location && System.IO.Path.GetFullPath(location).Equals(System.IO.Path.GetFullPath(target),StringComparison.OrdinalIgnoreCase)) key.SetValue("DisplayVersion",manifest.Version);
+            cleanBackup=true;
         }
         catch
         {
             foreach(var item in completed.AsEnumerable().Reverse())
                 if(item.Backup!=null) File.Copy(item.Backup,item.Destination,true); else File.Delete(item.Destination);
+            cleanBackup=true;
             throw;
         }
-        finally { if(File.Exists(backup+".install-state.json")) File.Delete(backup+".install-state.json"); }
+        finally {
+            // A failed rollback keeps its recovery files; cleanup cannot undo a committed update.
+            if(cleanBackup) try {
+                if(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(backup))!=backupParent) throw new InvalidDataException("Invalid backup path.");
+                SafePath(backup,"cleanup-check");
+                foreach(var file in Directory.EnumerateFiles(backup,"*",new EnumerationOptions { RecurseSubdirectories=true, AttributesToSkip=FileAttributes.ReparsePoint })) {
+                    SafePath(backup,System.IO.Path.GetRelativePath(backup,file).Replace('\\','/'));
+                    var attributes=File.GetAttributes(file);
+                    if((attributes&FileAttributes.ReadOnly)!=0) File.SetAttributes(file,attributes&~FileAttributes.ReadOnly);
+                }
+                Directory.Delete(backup,true);
+                if(File.Exists(backup+".install-state.json")) File.Delete(backup+".install-state.json");
+            } catch(Exception ex) when(ex is IOException or UnauthorizedAccessException) { System.Diagnostics.Trace.TraceWarning("Update backup cleanup: "+ex.Message); }
+        }
     }
 
     static Version ReleaseNumber(string? value)

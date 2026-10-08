@@ -97,8 +97,20 @@ class Program
             Check(ConfigManager.Load().User=="Player", "saving recovered settings keeps a healthy backup");
             File.WriteAllText(Path.Combine(testRoot,"config.json"), "{\"user\":\"LegacyUser\",\"ram\":8}");
             Check(ConfigManager.Load().User=="LegacyUser", "legacy plaintext settings remain readable");
+            var pendingConfig=ConfigManager.Load(); pendingConfig.User="BlockedUser";
+            var primaryBeforeSave=File.ReadAllBytes(Path.Combine(testRoot,"config.json"));
+            var backupBeforeSave=File.ReadAllBytes(Path.Combine(testRoot,"config.json.bak"));
+            using(var lockedBackup=File.Open(Path.Combine(testRoot,"config.json.bak"),FileMode.Open,FileAccess.Read,FileShare.Read)) {
+                bool failed=false; try { ConfigManager.Save(pendingConfig); } catch(Exception ex) when(ex is IOException or UnauthorizedAccessException) { failed=true; }
+                Check(failed && File.ReadAllBytes(Path.Combine(testRoot,"config.json")).SequenceEqual(primaryBeforeSave) && File.ReadAllBytes(Path.Combine(testRoot,"config.json.bak")).SequenceEqual(backupBeforeSave),"failed legacy backup commit leaves primary settings and backup unchanged");
+            }
             ConfigManager.Save(ConfigManager.Load());
             Check(ConfigManager.Load().User=="LegacyUser" && !File.ReadAllText(Path.Combine(testRoot,"config.json")).Contains("LegacyUser") && !File.ReadAllText(Path.Combine(testRoot,"config.json.bak")).Contains("LegacyUser"), "legacy settings and backup migrate to encrypted files");
+            bool notificationRan=false;
+            Action<LauncherConfig> failedNotification=_=> { notificationRan=true; throw new IOException("test subscriber failure"); };
+            ConfigManager.Saved+=failedNotification;
+            try { ConfigManager.Save(ConfigManager.Load()); Check(notificationRan && ConfigManager.Load().User=="LegacyUser","post-commit settings notification failure cannot turn a successful save into rollback"); }
+            finally { ConfigManager.Saved-=failedNotification; }
             Check(!ReleaseSecurity.AutomaticUpdatesEnabled && !MistikLauncher.App.AdminAccessEnabled, "unsafe remote controls disabled");
             bool rejected=false;
             try { ReleaseSecurity.ValidateUninstallTarget(Path.GetTempPath()); } catch(InvalidOperationException) { rejected=true; }
@@ -123,6 +135,7 @@ class Program
             checks+=GameRuntimeHealthTests.Run(Path.Combine(testRoot,"runtime-health")).GetAwaiter().GetResult();
             checks+=LaunchReadinessTests.Run(Path.Combine(testRoot,"readiness-tests"));
             var window=new MainWindow { Width=1200, Height=820 };
+            checks+=ModAndMapRegressionTests.SyncFailure(window,Path.Combine(testRoot,"sync-commit"));
             var quiltJar=Path.Combine(testRoot,"quilt-metadata.jar");
             using(var archive=System.IO.Compression.ZipFile.Open(quiltJar,System.IO.Compression.ZipArchiveMode.Create))
                 using(var writer=new StreamWriter(archive.CreateEntry("quilt.mod.json").Open())) writer.Write("{}");
