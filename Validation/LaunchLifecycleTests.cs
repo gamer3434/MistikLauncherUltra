@@ -15,6 +15,12 @@ static class LaunchLifecycleTests
         int checks=0;
         try
         {
+            var queue=typeof(MainWindow).GetMethod("QueueBackgroundModSync",flags)!;
+            Task.Run(()=>queue.Invoke(window,null)).GetAwaiter().GetResult();
+            var frame=new System.Windows.Threading.DispatcherFrame();
+            window.Dispatcher.BeginInvoke(new Action(()=>frame.Continue=false));
+            System.Windows.Threading.Dispatcher.PushFrame(frame);
+            Console.WriteLine("PASS worker mod synchronization retry returns without accessing WPF controls"); checks++;
             foreach(var state in new[]{"launchPreparing","gameRunning"})
             {
                 var field=typeof(MainWindow).GetField(state,flags)!;

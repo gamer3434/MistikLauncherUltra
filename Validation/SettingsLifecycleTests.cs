@@ -17,6 +17,7 @@ static class SettingsLifecycleTests
         var updater=window.LauncherUpdates;
         var originalConfig=window.Config;
         var originalAutoUpdate=originalConfig.LauncherAutoUpdate;
+        var originalCurseForgeKey=originalConfig.CurseForgeApiKey;
         var originalLanguage=Localization.Language;
         var syncGate=typeof(MainWindow).GetField("_modSyncGate",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
         var configurationGate=typeof(MainWindow).GetProperty("ConfigurationGate",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
@@ -31,6 +32,10 @@ static class SettingsLifecycleTests
         T Control<T>(ModernSettingsPage page,string name)=>(T)typeof(ModernSettingsPage).GetField(name,BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(page)!;
         try
         {
+            const string savedFixtureKey="$2a$10$settings_saved_fixture_key_0123456789012345678901234567";
+            const string pendingFixtureKey="$2a$10$settings_pending_fixture_key_01234567890123456789012345";
+            window.Config.CurseForgeApiKey=savedFixtureKey;
+            ConfigManager.Save(window.Config);
             Check(ReferenceEquals(configurationGate,syncGate),"settings persistence shares the existing mod synchronization gate");
             foreach(var updatesOnly in new[]{false,true})
             {
@@ -53,6 +58,8 @@ static class SettingsLifecycleTests
             var updates=new ModernSettingsPage(window,updatesOnly:true);
             var user=Control<TextBox>(settings,"user"); var memory=Control<TextBox>(settings,"ram");
             user.Text="PendingName"; memory.Text="7";
+            Control<PasswordBox>(settings,"curseForgeKey").Password=pendingFixtureKey;
+            Check(!Control<Expander>(settings,"integrations").IsExpanded && Control<PasswordBox>(updates,"curseForgeKey")==null,"CurseForge key remains masked inside optional settings integration and is absent from updates-only page");
             var cachedContent=settings.Content;
             var updatesAutomatic=Control<CheckBox>(updates,"autoUpdate");
             updatesAutomatic.IsChecked=!originalAutoUpdate;
@@ -95,6 +102,19 @@ static class SettingsLifecycleTests
             }
             Check(ReferenceEquals(window.Config,originalConfig) && (window.Config.User,window.Config.Ram,window.Config.AuthType,window.Config.AutoClose,window.Config.Lang)==previous && File.ReadAllBytes(configPath).SequenceEqual(savedBytes),"failed settings persistence preserves the active player profile and saved preferences");
             Check(user.Text=="PendingName" && memory.Text=="7" && Control<TextBlock>(settings,"result").Text.StartsWith(Localization.T("error")),"failed settings save retains the draft and displays an error for retry");
+            Check(window.Config.CurseForgeApiKey==savedFixtureKey && ConfigManager.Load().CurseForgeApiKey==savedFixtureKey && Control<PasswordBox>(settings,"curseForgeKey").Password==pendingFixtureKey,"locked settings save preserves the current CurseForge key and the pending masked draft");
+            Control<Expander>(settings,"integrations").IsExpanded=true;
+            settings.RefreshLanguage();
+            user=Control<TextBox>(settings,"user"); memory=Control<TextBox>(settings,"ram");
+            Check(Control<PasswordBox>(settings,"curseForgeKey").Password==pendingFixtureKey && Control<Expander>(settings,"integrations").IsExpanded,"settings language refresh preserves the pending CurseForge key and integration expansion");
+            user.Text=previous.User; memory.Text=previous.Ram.ToString();
+            foreach(var invalidKey in new[]{"fixture\r\nheader", "fixture\u0131key"})
+            {
+                Control<PasswordBox>(settings,"curseForgeKey").Password=invalidKey;
+                typeof(ModernSettingsPage).GetMethod("Save",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(settings,null);
+                Check(window.Config.CurseForgeApiKey==savedFixtureKey && File.ReadAllBytes(configPath).SequenceEqual(savedBytes) && Control<TextBlock>(settings,"result").Text==Localization.T("curseForgeKeyInvalid"),"invalid CurseForge API key is rejected visibly without altering saved settings");
+            }
+            Control<PasswordBox>(settings,"curseForgeKey").Password=" "+pendingFixtureKey+" ";
 
             var skin=Path.Combine(App.AppData,"settings-avatar-fixture.png");
             var bitmap=BitmapSource.Create(64,64,96,96,PixelFormats.Bgra32,null,new byte[64*64*4],64*4);
@@ -121,6 +141,9 @@ static class SettingsLifecycleTests
                 typeof(ModernSettingsPage).GetMethod("Save",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(settings,null);
                 var savedLanguage=ConfigManager.Load().Lang;
                 var feedback=Control<TextBlock>(settings,"result").Text;
+                Check(window.Config.CurseForgeApiKey==pendingFixtureKey && ConfigManager.Load().CurseForgeApiKey==pendingFixtureKey,"masked CurseForge API key trims and round-trips through settings persistence");
+                bool ContainsFixtureSecret(string path)=>new[]{savedFixtureKey,pendingFixtureKey}.Any(key=>File.ReadAllBytes(path).AsSpan().IndexOf(System.Text.Encoding.UTF8.GetBytes(key))>=0);
+                Check(!ContainsFixtureSecret(configPath) && !ContainsFixtureSecret(configPath+".bak"),"primary and backup settings contain no plaintext CurseForge API key");
                 Check(settingsSavedUnderGate && notifiedSyncedProfile==synchronizedProfile && window.Config.LastSyncedVersion==synchronizedProfile && ConfigManager.Load().LastSyncedVersion==synchronizedProfile,"settings snapshot and persistence retain completed mod synchronization under the shared gate");
                 Check(saveNotifications==1 && window.Config.Lang==targetLanguage && Localization.Language==(targetLanguage=="English"?"en":"tr") && savedLanguage==targetLanguage && feedback==Localization.T("saved"),$"successful settings language save updates the interface without a second write after reload (notifications={saveNotifications}, target={targetLanguage}, runtime={window.Config.Lang}, disk={savedLanguage}, UI={Localization.Language}, result={feedback})");
             }
@@ -130,6 +153,7 @@ static class SettingsLifecycleTests
         {
             window.Config=originalConfig;
             window.Config.LauncherAutoUpdate=originalAutoUpdate;
+            window.Config.CurseForgeApiKey=originalCurseForgeKey;
             ConfigManager.Save(window.Config);
             Localization.SetLanguage(originalLanguage);
             var temporaryConfig=Path.Combine(App.AppData,"config.json.tmp");

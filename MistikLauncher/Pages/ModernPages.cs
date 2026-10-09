@@ -25,30 +25,29 @@ public class ModernHomePage : Page, ILanguagePage
     }
     void Render()
     {
-        var stack = new StackPanel { Margin = new Thickness(24),MaxWidth=1120 };
-        var hero = new Border { Background = ColorThemes.Brush("#192C46"), BorderBrush=ColorThemes.Brush("#365574"),BorderThickness=new Thickness(1),CornerRadius = new CornerRadius(12), Padding = new Thickness(20) };
+        var stack = new StackPanel { Margin = new Thickness(20,16,20,16),MaxWidth=1120 };
+        var hero = new Border { Background = ColorThemes.Brush("#192C46"), BorderBrush=ColorThemes.Brush("#365574"),BorderThickness=new Thickness(1),CornerRadius = new CornerRadius(14), Padding = new Thickness(16,12,16,12),Margin=new Thickness(0,0,0,12) };
         var copy = new StackPanel();
-        copy.Children.Add(PageHelpers.Lbl(Localization.T("welcome"), 24, "#FFFFFF", true, wrap: TextWrapping.Wrap));
-        copy.Children.Add(PageHelpers.Lbl(Localization.T("intro"), 14, "#D5E5F2", pad: new Thickness(0,8,0,0), wrap: TextWrapping.Wrap));
-        hero.Child=copy; stack.Children.Add(hero);
-        var row = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3 };
+        copy.Children.Add(PageHelpers.Lbl(Localization.T("welcome"), 22, "#FFFFFF", true, wrap: TextWrapping.Wrap));
+        copy.Children.Add(PageHelpers.Lbl(Localization.T("intro"), 13, "#BDCAD8", pad: new Thickness(0,4,0,0), wrap: TextWrapping.Wrap));
+        var row = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3,Margin=new Thickness(0,10,0,0) };
         foreach (var item in new[] { ("profile",main.Config.User), ("version",main.Config.Version), ("memory",$"{main.Config.Ram} GB") })
         {
-            var section = new StackPanel { Margin = new Thickness(0,12,12,12) };
-            section.Children.Add(PageHelpers.Lbl(Localization.T(item.Item1),14,"#BDCAD8"));
-            section.Children.Add(PageHelpers.Lbl(item.Item2,18,"#FFFFFF",true,wrap:TextWrapping.Wrap));
-            row.Children.Add(new Border { Child=section, Background=PageHelpers.HexBrush("#13253C"),BorderBrush=ColorThemes.Brush("#365574"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(12),Padding=new Thickness(16,0,0,0),Margin=new Thickness(0,12,8,16) });
+            var section = new StackPanel { Margin=new Thickness(0,0,12,0) };
+            section.Children.Add(PageHelpers.Lbl(Localization.T(item.Item1),12,"#ADBED6"));
+            section.Children.Add(PageHelpers.Lbl(item.Item2,16,"#FFFFFF",true,pad:new Thickness(0,3,0,0),wrap:TextWrapping.Wrap));
+            row.Children.Add(section);
         }
-        stack.Children.Add(row);
-        stack.Children.Add(PageHelpers.Lbl(Localization.T("quick"),18,"#FFFFFF",true));
-        var actions = new WrapPanel { Name="HomeActions", Margin = new Thickness(0,8,0,4) };
+        copy.Children.Add(row); hero.Child=copy; stack.Children.Add(hero);
+        stack.Children.Add(BuildReadinessCard());
+        stack.Children.Add(PageHelpers.Lbl(Localization.T("quick"),16,"#FFFFFF",true));
+        var actions = new WrapPanel { Name="HomeActions", Margin = new Thickness(0,6,0,4) };
         foreach (var item in new[] { ("versions","Vers"),("mods","Mods"),("server","Server"),("settings","Settings") })
         {
             var button = PageHelpers.MkBtn(Localization.T(item.Item1),"#28445E");
-            button.Margin = new Thickness(0,0,12,12); button.Click += (_,_) => main.Navigate(item.Item2); actions.Children.Add(button);
+            button.MinHeight=44; button.Margin = new Thickness(0,0,10,8); button.Click += (_,_) => main.Navigate(item.Item2); actions.Children.Add(button);
         }
         stack.Children.Add(actions);
-        stack.Children.Add(BuildReadinessCard());
         var tools = new WrapPanel();
         foreach (var item in new[] { ("files",App.GameDir),("logs",App.LogFile) })
         {
@@ -73,15 +72,17 @@ public class ModernHomePage : Page, ILanguagePage
 
     Border BuildReadinessCard()
     {
-        var card=new Border { Background=PageHelpers.HexBrush("#192C46"),BorderBrush=ColorThemes.Brush("#365574"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(12),Padding=new Thickness(16),Margin=new Thickness(0,0,0,16) };
+        var card=new Border { Name="HomeReadinessCard",Background=PageHelpers.HexBrush("#13253C"),BorderBrush=ColorThemes.Brush("#365574"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(14),Padding=new Thickness(16,12,16,12),Margin=new Thickness(0,0,0,12) };
         var grid=new Grid(); grid.ColumnDefinitions.Add(new ColumnDefinition()); grid.ColumnDefinitions.Add(new ColumnDefinition { Width=GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height=GridLength.Auto }); grid.RowDefinitions.Add(new RowDefinition { Height=GridLength.Auto });
         var copy=new StackPanel { Margin=new Thickness(0,0,18,0) };
-        copy.Children.Add(PageHelpers.Lbl(Localization.T("readinessTitle"),18,"#EFF5FF",true));
-        readinessState=PageHelpers.Lbl(Localization.T("readinessChecking"),14,"#F0CF84",true,pad:new Thickness(0,8,0,4),wrap:TextWrapping.Wrap);
+        copy.Children.Add(PageHelpers.Lbl(Localization.T("readinessTitle"),16,"#EFF5FF",true));
+        readinessState=PageHelpers.Lbl(Localization.T("readinessChecking"),14,"#F0CF84",true,pad:new Thickness(0,4,0,0),wrap:TextWrapping.Wrap);
         System.Windows.Automation.AutomationProperties.SetLiveSetting(readinessState,System.Windows.Automation.AutomationLiveSetting.Polite);
         copy.Children.Add(readinessState);
-        readinessDetails=PageHelpers.Lbl(Localization.T("readinessCheckingHelp"),13,"#ADBED6",wrap:TextWrapping.Wrap);
-        copy.Children.Add(readinessDetails); grid.Children.Add(copy);
+        readinessDetails=PageHelpers.Lbl(Localization.T("readinessCheckingHelp"),13,"#BDCAD8",pad:new Thickness(0,10,0,0),wrap:TextWrapping.Wrap);
+        readinessDetails.LineHeight=18;
+        grid.Children.Add(copy); Grid.SetRow(readinessDetails,1); Grid.SetColumnSpan(readinessDetails,2); grid.Children.Add(readinessDetails);
         readinessAction=PageHelpers.MkBtn(Localization.T("readinessRefresh"),"#226DA0",190);
         readinessAction.MinHeight=44; readinessAction.VerticalAlignment=VerticalAlignment.Center;
         System.Windows.Automation.AutomationProperties.SetName(readinessAction,Localization.T("readinessRefresh"));
@@ -103,7 +104,7 @@ public class ModernHomePage : Page, ILanguagePage
     }
 
     Task RefreshReadinessAsync() => RefreshReadinessAsync(async (version,ram) => {
-        string? java=await Task.Run(async ()=>await MainWindow.FindJavaAsync());
+        string? java=await MainWindow.FindJavaAsync();
         return await Task.Run(()=>LaunchReadiness.Evaluate(App.GameDir,version,ram,java,java==null?0:MainWindow.GetJavaMajorVersion(java),KernelOptimizer.GetTotalPhysicalMemory(),LaunchReadiness.FreeDiskBytes(App.GameDir)));
     });
 
@@ -193,12 +194,13 @@ public class ModernSettingsPage : Page, ILanguagePage
     readonly MainWindow main;
     readonly bool updatesOnly;
     TextBox user = null!, ram = null!;
+    PasswordBox curseForgeKey = null!;
     ComboBox language = null!, provider = null!;
     CheckBox close = null!, autoUpdate = null!;
     TextBlock result = null!, updateStatus = null!, updateNotes = null!;
     Button updateButton = null!;
     ProgressBar updateProgress = null!;
-    Expander? appearance;
+    Expander? appearance, integrations;
     public ModernSettingsPage(MainWindow window, bool updatesOnly=false)
     {
         main=window;
@@ -214,7 +216,9 @@ public class ModernSettingsPage : Page, ILanguagePage
         var draftRam=ram?.Text??main.Config.Ram.ToString();
         var draftProvider=provider?.SelectedIndex??(main.Config.AuthType=="elyby"?1:0);
         var draftClose=close?.IsChecked??main.Config.AutoClose;
+        var draftCurseForgeKey=curseForgeKey?.Password??main.Config.CurseForgeApiKey??"";
         bool appearanceExpanded=appearance?.IsExpanded==true;
+        bool integrationsExpanded=integrations?.IsExpanded==true;
         var stack = new StackPanel { Margin = new Thickness(24), MaxWidth=1040 };
         stack.Children.Add(PageHelpers.Lbl(updatesOnly?(Localization.Language=="en"?"Updates":"Güncellemeler"):Localization.T("settings"),28,"#FFFFFF",true));
         if(!updatesOnly) stack.Children.Add(PageHelpers.Lbl(Localization.T("settingsIntro"),15,"#BDCAD8",pad:new Thickness(0,8,0,18),wrap:TextWrapping.Wrap));
@@ -356,6 +360,13 @@ public class ModernSettingsPage : Page, ILanguagePage
         System.Windows.Automation.AutomationProperties.SetName(provider,Localization.T("auth"));
         close=new CheckBox { Content=Localization.T("close"), IsChecked=draftClose, Foreground=Brushes.White, MinHeight=32, VerticalContentAlignment=VerticalAlignment.Center, Margin=new Thickness(0,0,0,12) }; stack.Children.Add(close);
         appearance=new Expander { Name="AppearanceExpander", Header=Localization.T("appearanceTitle"),Foreground=Brushes.White,FontSize=16,IsExpanded=appearanceExpanded,Content=appearanceContent,Margin=new Thickness(0,0,0,16) }; stack.Children.Add(appearance);
+        var integrationContent=new StackPanel { Margin=new Thickness(0,10,0,0) };
+        integrationContent.Children.Add(PageHelpers.Lbl(Localization.T("curseForgeKey"),14,"#FFFFFF",true,pad:new Thickness(0,0,0,6)));
+        curseForgeKey=new PasswordBox { Name="CurseForgeKeyBox",Password=draftCurseForgeKey,MaxLength=512,MinHeight=44,Padding=new Thickness(10,8,10,8),Background=PageHelpers.HexBrush("#222222"),Foreground=PageHelpers.HexBrush("#FFFFFF"),BorderBrush=PageHelpers.HexBrush("#365574"),BorderThickness=new Thickness(1),FontSize=14 };
+        System.Windows.Automation.AutomationProperties.SetName(curseForgeKey,Localization.T("curseForgeKey"));
+        integrationContent.Children.Add(curseForgeKey);
+        integrationContent.Children.Add(PageHelpers.Lbl(Localization.T("curseForgeKeyHelp"),13,"#ADBED6",pad:new Thickness(0,8,0,0),wrap:TextWrapping.Wrap));
+        integrations=new Expander { Name="IntegrationsExpander",Header=Localization.T("integrationsTitle"),Foreground=Brushes.White,FontSize=16,IsExpanded=integrationsExpanded,Content=integrationContent,Margin=new Thickness(0,0,0,16) }; stack.Children.Add(integrations);
         stack.Children.Add(updateCard);
         var save=PageHelpers.MkBtn(Localization.T("save"),"#226DA0"); save.Name="SaveSettingsButton"; save.HorizontalAlignment=HorizontalAlignment.Right;
         save.Click += (_,_) => Save();
@@ -407,6 +418,10 @@ public class ModernSettingsPage : Page, ILanguagePage
         bool validMemory=int.TryParse(ram.Text,out int memory) && memory>=1 && memory<=32;
         user.BorderBrush=PageHelpers.HexBrush(validUser?"#365574":"#FF4B4B"); ram.BorderBrush=PageHelpers.HexBrush(validMemory?"#365574":"#FF4B4B");
         if(!validUser || !validMemory) { result.Text=Localization.T("invalid"); var field=!validUser?user:ram; field.Focus(); field.BringIntoView(); return; }
+        var apiKey=curseForgeKey.Password;
+        bool validApiKey=apiKey.Length<=512 && apiKey.All(character=>character>=' ' && character<='~');
+        curseForgeKey.BorderBrush=PageHelpers.HexBrush(validApiKey?"#365574":"#FF4B4B");
+        if(!validApiKey) { result.Text=Localization.T("curseForgeKeyInvalid"); integrations!.IsExpanded=true; curseForgeKey.Focus(); curseForgeKey.BringIntoView(); return; }
         try {
             lock(main.ConfigurationGate) {
                 var draft=Newtonsoft.Json.JsonConvert.DeserializeObject<LauncherConfig>(Newtonsoft.Json.JsonConvert.SerializeObject(main.Config))!;
@@ -414,6 +429,7 @@ public class ModernSettingsPage : Page, ILanguagePage
                 draft.AuthType=provider.SelectedIndex==1?"elyby":"offline";
                 draft.AutoClose=close.IsChecked==true;
                 draft.Lang=language.SelectedIndex==1?"English":"Turkce";
+                draft.CurseForgeApiKey=apiKey.Trim();
                 ConfigManager.Save(draft); main.Config=draft;
             }
             main.ReloadConfig();

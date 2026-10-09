@@ -23,6 +23,7 @@ namespace MistikLauncher
         [JsonProperty("close_rgb")] public string CloseRgb { get; set; } = "#FFB000";
         [JsonProperty("launcher_auto_update")] public bool LauncherAutoUpdate { get; set; } = true;
         [JsonProperty("auto_mcs_update")] public bool AutoMcsAutoUpdate { get; set; } = true;
+        [JsonProperty("curseforge_api_key")] public string CurseForgeApiKey { get; set; } = "";
         [JsonProperty("user")]       public string User       { get; set; } = "Oyuncu";
         [JsonProperty("version")]    public string Version    { get; set; } = "1.21";
         [JsonProperty("ram")]        public int    Ram        { get; set; } = 4;
@@ -66,6 +67,7 @@ namespace MistikLauncher
             cfg.Lang = cfg.Lang == "English" || cfg.Lang == "en" ? "English" : "Turkce";
             cfg.Ram = Math.Clamp(cfg.Ram, 1, 32);
             cfg.TunnelPort = Math.Clamp(cfg.TunnelPort, 1, 65535);
+            cfg.CurseForgeApiKey = cfg.CurseForgeApiKey is { Length: <=512 } key && key.All(c=>c is >= ' ' and <= '~') ? key.Trim() : "";
               cfg.User = Regex.IsMatch(cfg.User ?? "", @"^[A-Za-z0-9_]{3,16}$") ? cfg.User! : "Player";
               cfg.Version ??= "";
               cfg.Version = GameProfiles.SafeId(cfg.Version) && cfg.Version.Length<=120 ? cfg.Version : "1.21";
@@ -211,6 +213,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.5","2026-10-09","#00D4AA", new[]{
+                "Ana panelde hazırlık durumu ve hızlı işlemler küçük pencerede de görünür",
+                "Modrinth ve CurseForge kaynakları arasında seçim yapılabilir",
+                "CurseForge anahtarı maskeli alandan girilir; ayarlarda şifrelenerek saklanır",
+                "Mod listesi 40'ar genişler; eski arama yeni sonucu değiştirmez",
+                "Java araması ve başlatma dosya işlemleri arka planda çalışır",
+                "GPU tercihi yalnız seçili Java işlemini değiştirir; geniş disk taraması kaldırıldı"
+            }),
             new("v6.2.4","2026-10-09","#00D4AA", new[]{
                 "Java arşivi SHA-256 ve runtime yapısıyla doğrulanır; mevcut kurulum korunur",
                 "Java onarımı açık oyunları kapatmaz; kilitli kurulum güvenle ertelenir",

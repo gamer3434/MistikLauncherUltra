@@ -1,5 +1,6 @@
 using System.IO;
 using System.Reflection;
+using System.Windows;
 using System.Windows.Controls;
 using MistikLauncher;
 using MistikLauncher.Pages;
@@ -102,6 +103,16 @@ static class LaunchReadinessTests
             oldCheck.SetResult(Ready(window.Config.Version,capturedRam));
             checking.GetAwaiter().GetResult();
             Check(capturedRam==4 && Field<LaunchReadinessSnapshot>(memoryPage,"readiness").AllocatedRamGb==7,"same-profile settings invalidation rejects a delayed readiness result even while the page is hidden");
+
+            window.Config.Version="1.20.1-forge-47.4.10";
+            var compact=new ModernHomePage(window);
+            Refresh(compact,(version,ram)=>Task.FromResult(Ready(version,ram))).GetAwaiter().GetResult();
+            var scroll=(ScrollViewer)compact.Content;
+            scroll.Measure(new Size(960,403)); scroll.Arrange(new Rect(0,0,960,403)); scroll.UpdateLayout();
+            var layout=(StackPanel)scroll.Content;
+            var card=layout.Children.OfType<Border>().Single(border=>border.Name=="HomeReadinessCard");
+            var actions=layout.Children.OfType<WrapPanel>().Single(panel=>panel.Name=="HomeActions");
+            Check(card.TranslatePoint(new Point(0,0),scroll).Y<actions.TranslatePoint(new Point(0,0),scroll).Y && card.TranslatePoint(new Point(0,card.ActualHeight),scroll).Y<=scroll.ViewportHeight && actions.TranslatePoint(new Point(0,actions.ActualHeight),scroll).Y<=scroll.ViewportHeight,"complete readiness card and quick actions fit the compact home viewport");
         }
         finally { window.Config=previous; }
         return checks;

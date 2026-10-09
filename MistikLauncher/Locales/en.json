@@ -314,7 +314,7 @@
   "Ely.by skin doğrulayıcı kontrol ediliyor...": "Checking the Ely.by skin helper…",
   "Minecraft baslatılıyor...": "Launching Minecraft…",
   "Kernel optimizasyonları uygulanıyor...": "Applying selected performance settings…",
-  "modCenterTitle": "Mod center · Modrinth",
+  "modCenterTitle": "Mod center",
   "modCenterIntro": "Discover mods, manage installed files and switch profiles.",
   "modPacksTitle": "Ready-to-install mod packs",
   "modPacksIntro": "Choose a collection. Availability depends on your Minecraft version and loader.",
@@ -400,5 +400,18 @@
   "optGraphicsSaved": "Fast graphics preset saved. It takes effect at the next game launch. Original settings are in options.txt.mistik-backup.",
   "optGraphicsUnchanged": "Fast graphics preset is already active.",
   "optGraphicsFailed": "Could not apply graphics settings:",
-  "versionLoadMore": "Show more versions"
+  "versionLoadMore": "Show more versions",
+  "modLoadMore": "Show more mods",
+  "modSource": "Mod source",
+  "cfKeyRequired": "Add your CurseForge API key in Settings → Integrations to search and install CurseForge mods.",
+  "cfOpenWebsite": "Open on CurseForge",
+  "cfInstallFailure": "CurseForge installation failed",
+  "integrationsTitle": "Integrations",
+  "curseForgeKey": "CurseForge API key",
+  "curseForgeKeyHelp": "The official CurseForge API requires your own API key. It is stored encrypted on this computer. Leave it blank to remove it.",
+  "curseForgeKeyInvalid": "Use at most 512 printable ASCII characters without line breaks.",
+  "cfOpenSettings": "Add key in Settings",
+  "cfSearchFailure": "CurseForge search could not be completed",
+  "cfOpenFailure": "CurseForge website could not be opened",
+  "cfInstalled": "CurseForge mod and its required dependencies were installed."
 }

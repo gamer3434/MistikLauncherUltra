@@ -703,17 +703,25 @@ namespace MistikLauncher.Pages
     {
         readonly MainWindow _main;
         TextBox _searchBox = null!;
+        ComboBox _sourceBox = null!;
         StackPanel _resultsPanel = null!;
         StackPanel _installedPanel = null!;
         TextBlock installedHelp=null!;
         DateTime _installedModsWriteTimeUtc;
-        public void RefreshLanguage() { installedHelp.Text=Localization.T("modToggleHelp"); RenderInstalledMods(); Localization.TranslateTree(this); }
+        int _visibleInstalledMods = 40;
+        int _searchGeneration;
+        System.Threading.CancellationTokenSource? _searchCancellation;
+        readonly HttpClient _client;
+        readonly HttpClient? _curseForgeClient;
+        public void RefreshLanguage() { installedHelp.Text=Localization.T("modToggleHelp"); System.Windows.Automation.AutomationProperties.SetName(_searchBox,Localization.T("modSearch")); RenderInstalledMods(); Localization.TranslateTree(this); }
         static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30),MaxResponseContentBufferSize=128*1024*1024 };
         static ModManagerPage() => Http.DefaultRequestHeaders.UserAgent.ParseAdd("MistikLauncher/6.2 (gamer3434/MistikLauncherUltra)");
 
-        public ModManagerPage(MainWindow main)
+        public ModManagerPage(MainWindow main, HttpClient? client = null)
         {
             _main = main;
+            _client = client ?? Http;
+            _curseForgeClient = client;
             Background = Brushes.Transparent;
             var sp = new StackPanel { Margin = new Thickness(40, 30, 40, 30) };
             sp.Children.Add(PageHelpers.Lbl("modCenterTitle", 28, "#FFFFFF", true));
@@ -798,7 +806,6 @@ namespace MistikLauncher.Pages
 
             packsSp.Children.Add(packsGrid);
             packsCard.Child = packsSp;
-            sp.Children.Add(packsCard);
 
             // OptiFine Card
             var optiCard = PageHelpers.Card("#192C46", 14, "#365574");
@@ -838,8 +845,19 @@ namespace MistikLauncher.Pages
             optiSp.Children.Add(optiBtns);
 
             optiCard.Child = optiSp;
-            sp.Children.Add(optiCard);
 
+            var sourceRow = new WrapPanel { Margin = new Thickness(0, 16, 0, 0) };
+            sourceRow.Children.Add(PageHelpers.Lbl("modSource", 14, "#FFFFFF", true, pad: new Thickness(0, 8, 12, 0)));
+            _sourceBox = new ComboBox { Name = "ModSource", MinWidth = 180, MinHeight = 44,
+                Background = PageHelpers.HexBrush("#203853"), Foreground = Brushes.White };
+            _sourceBox.Items.Add("Modrinth"); _sourceBox.Items.Add("CurseForge"); _sourceBox.SelectedIndex = 0;
+            _sourceBox.SelectionChanged += async (_, _) => {
+                ++_searchGeneration; _searchCancellation?.Cancel();
+                if (_resultsPanel == null) return;
+                _resultsPanel.Children.Clear();
+                await SearchMods();
+            };
+            sourceRow.Children.Add(_sourceBox); sp.Children.Add(sourceRow);
             var searchRow = new Grid { Margin = new Thickness(0, 16, 0, 12) };
             searchRow.ColumnDefinitions.Add(new ColumnDefinition());
             for(int column=0;column<3;column++) searchRow.ColumnDefinitions.Add(new ColumnDefinition { Width=GridLength.Auto });
@@ -890,6 +908,8 @@ namespace MistikLauncher.Pages
 
             _resultsPanel = new StackPanel();
             sp.Children.Add(_resultsPanel);
+            sp.Children.Add(packsCard);
+            sp.Children.Add(optiCard);
 
             // ── Toplu Mod Sürüm Taşıyıcı (Migrator) Kartı ──
             var migCard = PageHelpers.Card("#192C46", 14, "#365574");
@@ -1043,11 +1063,12 @@ namespace MistikLauncher.Pages
             RenderInstalledMods();
             Loaded += (_, _) => {
                 if (InstalledModsWriteTimeUtc() != _installedModsWriteTimeUtc) RenderInstalledMods();
+                if (_sourceBox.SelectedIndex == 1) _ = SearchMods();
             };
         }
 
-        static DateTime InstalledModsWriteTimeUtc() => Directory.Exists(App.ModsDir)
-            ? Directory.GetLastWriteTimeUtc(App.ModsDir) : DateTime.MinValue;
+        static DateTime InstalledModsWriteTimeUtc(string? directory = null) => Directory.Exists(directory ?? App.ModsDir)
+            ? Directory.GetLastWriteTimeUtc(directory ?? App.ModsDir) : DateTime.MinValue;
 
         async Task LoadPopular()
         {
@@ -1057,13 +1078,32 @@ namespace MistikLauncher.Pages
 
         async Task SearchMods()
         {
-            var q = _searchBox.Text.Trim(); if (string.IsNullOrEmpty(q)) return;
+            int generation = ++_searchGeneration;
+            _searchCancellation?.Cancel();
+            var q = _searchBox.Text.Trim();
+            bool curseForge = _sourceBox.SelectedIndex == 1;
+            string apiKey = _main.Config.CurseForgeApiKey ?? "";
+            if (curseForge && string.IsNullOrWhiteSpace(apiKey)) { ShowCurseForgeKeyHelp(q); return; }
+            if (string.IsNullOrEmpty(q)) { _resultsPanel.Children.Clear(); return; }
+            using var cancellation = new System.Threading.CancellationTokenSource();
+            _searchCancellation = cancellation;
             _resultsPanel.Children.Clear();
             _resultsPanel.Children.Add(PageHelpers.Lbl("Aranıyor...", 13, "#A0A0A0"));
             try
             {
-                var resp = await Http.GetStringAsync($"https://api.modrinth.com/v2/search?query={Uri.EscapeDataString(q)}&limit=20&facets=[[\"project_type:mod\"]]");
-                var hits = JObject.Parse(resp)["hits"] as JArray;
+                JArray? hits;
+                if (curseForge)
+                {
+                    var profile = _main.Config.Version ?? "";
+                    using var service = new CurseForgeMods(apiKey, _curseForgeClient);
+                    hits = await service.SearchAsync(q, GameProfiles.MinecraftVersion(App.GameDir, profile), GameProfiles.Loader(App.GameDir, profile), cancellation.Token);
+                }
+                else
+                {
+                    var resp = await _client.GetStringAsync($"https://api.modrinth.com/v2/search?query={Uri.EscapeDataString(q)}&limit=20&facets=[[\"project_type:mod\"]]", cancellation.Token);
+                    hits = JObject.Parse(resp)["hits"] as JArray;
+                }
+                if (generation != _searchGeneration) return;
                 _resultsPanel.Children.Clear();
                 if (hits == null || hits.Count == 0) { _resultsPanel.Children.Add(PageHelpers.Lbl("Mod bulunamadı.", 13, "#A0A0A0")); return; }
                 foreach (var hit in hits)
@@ -1083,23 +1123,99 @@ namespace MistikLauncher.Pages
                     info.Children.Add(PageHelpers.Lbl(name, 14, "#FFFFFF", true));
                     info.Children.Add(PageHelpers.Lbl(desc.Length > 120 ? desc[..120] + "..." : desc, 11, "#A0A0A0", wrap: TextWrapping.Wrap));
                     info.Children.Add(PageHelpers.Lbl($"⬇ {dl:N0} indirme", 10, "#555"));
+                    info.Children.Add(PageHelpers.Lbl(curseForge ? "CurseForge" : "Modrinth", 10, "#ADBED6"));
                     Grid.SetColumn(info, 0); grid.Children.Add(info);
 
                     var installBtn = PageHelpers.MkBtn("KUR", "#00A3FF", 70); installBtn.VerticalAlignment = VerticalAlignment.Center;
                     installBtn.Click += async (_, _) => {
                         installBtn.IsEnabled = false; installBtn.Content = "...";
-                        await InstallMod(cId, mname);
-                        installBtn.Content = "OK";
+                        if (!curseForge) { await InstallMod(cId, mname); installBtn.Content = "OK"; return; }
+                        try
+                        {
+                            if (!int.TryParse(cId, out int project)) throw new InvalidDataException("Invalid CurseForge mod ID.");
+                            await InstallCurseForgeMod(project);
+                            installBtn.Content = "OK";
+                        }
+                        catch (Exception ex) { installBtn.Content = Localization.T("KUR"); MessageBox.Show(Localization.T("cfInstallFailure") + ": " + ex.Message, Localization.T("error"), MessageBoxButton.OK, MessageBoxImage.Warning); }
+                        finally { installBtn.IsEnabled = true; }
                     };
-                    Grid.SetColumn(installBtn, 1); grid.Children.Add(installBtn);
+                    var actions = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; actions.Children.Add(installBtn);
+                    if (curseForge && hit["website"]?.ToString() is string website)
+                    {
+                        var official = PageHelpers.MkBtn("cfOpenWebsite", "#226DA0", 160); official.Margin = new Thickness(0, 8, 0, 0);
+                        official.Click += (_, _) => OpenCurseForgeWebsite(website); actions.Children.Add(official);
+                    }
+                    Grid.SetColumn(actions, 1); grid.Children.Add(actions);
                     card.Child = grid; _resultsPanel.Children.Add(card);
                 }
             }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
             catch (Exception ex)
             {
+                if (generation != _searchGeneration) return;
                 _resultsPanel.Children.Clear();
-                _resultsPanel.Children.Add(PageHelpers.Lbl($"Hata: {ex.Message}", 13, "#FF4B4B"));
+                _resultsPanel.Children.Add(PageHelpers.Lbl((curseForge ? Localization.T("cfSearchFailure") : "Hata") + ": " + ex.Message, 13, "#FF4B4B"));
             }
+            finally { if (ReferenceEquals(_searchCancellation, cancellation)) _searchCancellation = null; }
+        }
+
+        void ShowCurseForgeKeyHelp(string query)
+        {
+            _resultsPanel.Children.Clear();
+            var help = PageHelpers.Lbl("cfKeyRequired", 13, "#ADBED6", wrap: TextWrapping.Wrap); help.Name = "CurseForgeKeyRequired";
+            _resultsPanel.Children.Add(help);
+            var actions = new WrapPanel();
+            var settings = PageHelpers.MkBtn("cfOpenSettings", "#226DA0"); settings.Name = "CurseForgeSettings";
+            settings.Click += (_, _) => _main.Navigate("Settings"); actions.Children.Add(settings);
+            var official = PageHelpers.MkBtn("cfOpenWebsite", "#35546E"); official.Name = "CurseForgeOfficialSearch"; official.Margin = new Thickness(8, 0, 0, 0);
+            official.Click += (_, _) => OpenCurseForgeWebsite("https://www.curseforge.com/minecraft/search?class=mc-mods&search=" + Uri.EscapeDataString(query));
+            actions.Children.Add(official); _resultsPanel.Children.Add(actions);
+        }
+
+        static void OpenCurseForgeWebsite(string raw)
+        {
+            try
+            {
+                if (!Uri.TryCreate(raw, UriKind.Absolute, out var url) || url.Scheme != "https" || !url.Host.Equals("www.curseforge.com", StringComparison.OrdinalIgnoreCase) ||
+                    !url.IsDefaultPort || url.UserInfo.Length != 0) throw new IOException("Invalid CurseForge website URL.");
+                Process.Start(new ProcessStartInfo(url.AbsoluteUri) { UseShellExecute = true });
+            }
+            catch (Exception ex) { MessageBox.Show(Localization.T("cfOpenFailure") + ": " + ex.Message, Localization.T("error")); }
+        }
+
+        async Task InstallCurseForgeMod(int projectId)
+        {
+            var profile = _main.Config.Version ?? "";
+            var game = GameProfiles.MinecraftVersion(App.GameDir, profile);
+            var loader = GameProfiles.Loader(App.GameDir, profile);
+            using var service = new CurseForgeMods(_main.Config.CurseForgeApiKey ?? "", _curseForgeClient);
+            var files = await Task.Run(() => service.DownloadAsync(projectId, game, loader, System.Threading.CancellationToken.None));
+            await Task.Run(() => _main.WithSyncedMods(profile, destination => {
+                InstallCurseForgeBundle(destination, files);
+                return true;
+            }));
+            RenderInstalledMods();
+            MessageBox.Show(Localization.T("cfInstalled"), Localization.T("Basarili"), MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        internal static void InstallCurseForgeBundle(string destination, IReadOnlyList<CurseForgeModFile> files)
+        {
+                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var file in files)
+                {
+                    if (!names.Add(file.Filename) || file.Filename != Path.GetFileName(file.Filename)) throw new IOException("Conflicting CurseForge mod filenames.");
+                    foreach (var other in file.CompatibleFilenames)
+                        if (other == Path.GetFileName(other) && !other.Equals(file.Filename, StringComparison.OrdinalIgnoreCase) &&
+                            (File.Exists(Path.Combine(destination, other)) || File.Exists(Path.Combine(destination, other + ".disabled"))))
+                            throw new IOException("Another version of this mod is installed. Remove it before installing a different version: " + other);
+                    if (File.Exists(Path.Combine(destination, file.Filename + ".disabled"))) throw new IOException("Required mod is disabled: " + file.Filename);
+                    string target = Path.Combine(destination, file.Filename);
+                    if (File.Exists(target) && (File.GetAttributes(target) & (FileAttributes.ReparsePoint | FileAttributes.ReadOnly)) != 0)
+                        throw new IOException("Existing mod cannot be replaced: " + file.Filename);
+                    if (File.Exists(target)) { using var writable = File.Open(target, FileMode.Open, FileAccess.ReadWrite, FileShare.None); }
+                }
+                foreach (var file in files)
+                    ModFiles.Install(destination, file.Filename, file.Bytes, Convert.ToHexString(System.Security.Cryptography.SHA512.HashData(file.Bytes)));
         }
 
         async Task InstallMod(string projectId, string name)
@@ -1165,7 +1281,7 @@ namespace MistikLauncher.Pages
             visited ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var currentVer = expectedProfile ?? _main.Config.Version ?? "";
             if (queueGame == null && _main.Config.Version != currentVer) throw new IOException("The selected Minecraft version changed during mod installation. Please retry.");
-            var http = client ?? Http;
+            var http = client ?? _client;
             var mcVersion = queueGame ?? GameProfiles.MinecraftVersion(App.GameDir, currentVer);
             var loader = queueLoader ?? GameProfiles.Loader(App.GameDir, currentVer);
             JToken? targetVersion;
@@ -1296,25 +1412,26 @@ namespace MistikLauncher.Pages
                 btn.IsEnabled = true;
             }
         }
-        void RenderInstalledMods()
+        void RenderInstalledMods(string? directory = null)
         {
-            _installedModsWriteTimeUtc = InstalledModsWriteTimeUtc();
+            var modDirectory = directory ?? App.ModsDir;
+            _installedModsWriteTimeUtc = InstalledModsWriteTimeUtc(modDirectory);
             _installedPanel.Children.Clear();
 
-            if (!Directory.Exists(App.ModsDir))
+            if (!Directory.Exists(modDirectory))
             {
                 _installedPanel.Children.Add(PageHelpers.Lbl(Localization.T("modsEmpty"), 12, "#555555"));
                 return;
             }
 
-            var jars = ModFiles.List(App.ModsDir).ToArray();
+            var jars = ModFiles.List(modDirectory).OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase).ToArray();
             if (jars.Length == 0)
             {
                 _installedPanel.Children.Add(PageHelpers.Lbl(Localization.T("modsEmpty"), 12, "#555555"));
                 return;
             }
 
-            foreach (var jarPath in jars.OrderBy(f => Path.GetFileName(f)))
+            foreach (var jarPath in jars.Take(_visibleInstalledMods))
             {
                 bool enabled=ModFiles.Enabled(jarPath);
                 var fileName = Path.GetFileName(enabled?jarPath:jarPath[..^9]);
@@ -1349,7 +1466,7 @@ namespace MistikLauncher.Pages
                 var toggle=PageHelpers.MkBtn(Localization.T(enabled?"modDisable":"modEnable"),"#226DA0",120); toggle.Margin=new Thickness(0,0,8,0);
                 toggle.ToolTip=Localization.T("modToggleHelp");
                 toggle.Click+=(_,_)=> {
-                    try { ModFiles.Toggle(App.ModsDir,filePath); RenderInstalledMods(); }
+                    try { ModFiles.Toggle(modDirectory,filePath); RenderInstalledMods(directory); }
                     catch(Exception ex) { MessageBox.Show(Localization.T("modToggleFailed")+"\n"+ex.Message,Localization.T("error")); }
                 };
                 controls.Children.Add(toggle);
@@ -1376,7 +1493,7 @@ namespace MistikLauncher.Pages
                         {
                             MessageBox.Show($"Mod silinemedi:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
                         }
-                        RenderInstalledMods();
+                        RenderInstalledMods(directory);
                     }
                 };
                 controls.Children.Add(delBtn);
@@ -1384,6 +1501,12 @@ namespace MistikLauncher.Pages
 
                 card.Child = grid;
                 _installedPanel.Children.Add(card);
+            }
+            if (jars.Length > _visibleInstalledMods)
+            {
+                var more = PageHelpers.MkBtn("modLoadMore", "#226DA0"); more.Name = "ModLoadMore";
+                more.Click += (_, _) => { _visibleInstalledMods += 40; RenderInstalledMods(directory); };
+                _installedPanel.Children.Add(more);
             }
         }
 

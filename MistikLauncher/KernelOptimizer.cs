@@ -393,149 +393,43 @@ namespace MistikLauncher
         // ══════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Java/Minecraft process'ini NVIDIA ayrık GPU'yu kullanmaya zorlar.
-        /// HKCU\Software\Microsoft\DirectX\UserGpuPreferences registry anahtarını ayarlar.
-        /// Windows 11'in GPU tercih mekanizmasını kullanarak entegre Intel GPU yerine
-        /// RTX 3050 gibi ayrık GPU'nun seçilmesini garanti eder.
+        /// Seçili process'in çalıştırılabilir dosyası için Windows yüksek performans GPU tercihini ayarlar.
+        /// Diğer Java kurulumlarının ve uygulamaların tercihlerini değiştirmez.
         /// </summary>
         public static void ApplyGpuPreference(Process process)
         {
             try
             {
-                // Registry anahtarını aç veya oluştur
-                using var key = Registry.CurrentUser.CreateSubKey(GPU_PREF_REG_PATH);
-                if (key == null)
+                string? executable = process.MainModule?.FileName;
+                if (string.IsNullOrEmpty(executable))
                 {
-                    App.Log("[KernelOpt] GPU Preference registry anahtarı oluşturulamadı.");
+                    App.Log("[KernelOpt] Process yolu alınamadı, GPU tercihi atlandı.");
                     return;
                 }
-
-                string gpuPrefValue = "GpuPreference=2;";
-
-                // ── 1. Mistik Launcher'ın Kendi EXE'sini Kaydet ──
-                try
-                {
-                    string? currentExe = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName;
-                    if (!string.IsNullOrEmpty(currentExe))
-                    {
-                        key.SetValue(currentExe, gpuPrefValue, RegistryValueKind.String);
-                        // Alternatif isimleri de kaydet
-                        string dir = System.IO.Path.GetDirectoryName(currentExe) ?? "";
-                        if (!string.IsNullOrEmpty(dir))
-                        {
-                            key.SetValue(System.IO.Path.Combine(dir, "MistikLauncher.exe"), gpuPrefValue, RegistryValueKind.String);
-                            key.SetValue(System.IO.Path.Combine(dir, "MistikLauncherUltra.exe"), gpuPrefValue, RegistryValueKind.String);
-                        }
-                        App.Log("[KernelOpt] Mistik Launcher EXE'leri NVIDIA Yüksek Performans GPU'ya atandı (NVIDIA App Entegrasyonu).");
-                    }
-                }
-                catch { }
-
-                // ── 2. Aktif Java/Minecraft Process'ini Kaydet ──
-                string? javaPath = null;
-                try { javaPath = process.MainModule?.FileName; } catch { }
-
-                if (!string.IsNullOrEmpty(javaPath))
-                {
-                    _gpuPrefJavaPath = javaPath;
-                    var existingValue = key.GetValue(javaPath);
-                    _gpuPrefOrigValue = existingValue as string;
-
-                    key.SetValue(javaPath, gpuPrefValue, RegistryValueKind.String);
-                    _gpuPreferenceSet = true;
-                    App.Log($"[KernelOpt] Aktif Java GPU tercihi NVIDIA (Yüksek Performans) olarak ayarlandı: {System.IO.Path.GetFileName(javaPath)}");
-                }
-
-                // ── 3. Sistemdeki Diğer Bilinen Tüm Java Sürümlerini Tara ve Kaydet ──
-                try
-                {
-                    var javaPaths = new System.Collections.Generic.List<string>();
-                    
-                    // AppData altındaki jre21 ve jre25
-                    string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                    string localJava21 = System.IO.Path.Combine(appDataPath, ".mistik_ultra", "java", "jre21", "bin", "javaw.exe");
-                    if (System.IO.File.Exists(localJava21)) javaPaths.Add(localJava21);
-                    string localJava25 = System.IO.Path.Combine(appDataPath, ".mistik_ultra", "java", "jre25", "bin", "javaw.exe");
-                    if (System.IO.File.Exists(localJava25)) javaPaths.Add(localJava25);
-
-                    // Sistem Program Files altındaki Java yolları
-                    string pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-                    if (System.IO.Directory.Exists(pf))
-                    {
-                        foreach (var sub in new[] { "Java", "Eclipse Foundation", "Adoptium", "Zulu" })
-                        {
-                            string path = System.IO.Path.Combine(pf, sub);
-                            if (System.IO.Directory.Exists(path))
-                            {
-                                foreach (var exe in System.IO.Directory.GetFiles(path, "javaw.exe", System.IO.SearchOption.AllDirectories))
-                                {
-                                    javaPaths.Add(exe);
-                                }
-                            }
-                        }
-                    }
-
-                    // Hepsini Yüksek Performans yap
-                    foreach (var jp in javaPaths)
-                    {
-                        key.SetValue(jp, gpuPrefValue, RegistryValueKind.String);
-                        // Normal java.exe'yi de ekle
-                        string je = jp.Replace("javaw.exe", "java.exe");
-                        if (System.IO.File.Exists(je)) key.SetValue(je, gpuPrefValue, RegistryValueKind.String);
-                    }
-
-                    App.Log($"[KernelOpt] Toplam {javaPaths.Count} adet sistem Java çalıştırıcısı NVIDIA Yüksek Performans olarak yapılandırıldı.");
-                }
-                catch { }
-
-                // ── 4. NVIDIA App Profil Entegrasyonu ──
-                try
-                {
-                    // NVIDIA App'in kullandığı profil registry yolu
-                    using var nvKey = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\NVIDIA Corporation\Global\NVTweak");
-                    if (nvKey != null)
-                    {
-                        // MistikLauncher'ı NVIDIA App'te yüksek performans profili olarak kaydet
-                        string? exe = Environment.ProcessPath;
-                        if (!string.IsNullOrEmpty(exe))
-                        {
-                            nvKey.SetValue(System.IO.Path.GetFileName(exe), "2", RegistryValueKind.String);
-                        }
-                    }
-                    
-                    // Windows Settings -> Grafik Ayarları -> Uygulama Tercihi
-                    // Bu kayıt Windows Ayarları > Ekran > Grafik'te programı görünür kılar
-                    using var graphicsKey = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\DirectX\UserGpuPreferences");
-                    if (graphicsKey != null)
-                    {
-                        // Minecraft launcher'ı ve javaw'ı da kaydet
-                        string gameDir = App.GameDir;
-                        if (!string.IsNullOrEmpty(gameDir))
-                        {
-                            var extraPaths = new System.Collections.Generic.List<string>();
-                            // Minecraft Launcher
-                            string mcLauncher = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Minecraft Launcher", "MinecraftLauncher.exe");
-                            if (System.IO.File.Exists(mcLauncher)) extraPaths.Add(mcLauncher);
-                            // UWP Minecraft
-                            string mcUwp = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Packages", "Microsoft.4297127D64EC6_8wekyb3d8bbwe", "LocalCache", "Local", "runtime", "java-runtime-delta", "bin", "javaw.exe");
-                            if (System.IO.File.Exists(mcUwp)) extraPaths.Add(mcUwp);
-                            foreach (var p in extraPaths)
-                            {
-                                graphicsKey.SetValue(p, "GpuPreference=2;", RegistryValueKind.String);
-                            }
-                        }
-                    }
-                    App.Log("[KernelOpt] NVIDIA App profil kayıtları tamamlandı.");
-                }
-                catch (Exception nvEx)
-                {
-                    App.Log($"[KernelOpt] NVIDIA App profil kaydı (opsiyonel): {nvEx.Message}");
-                }
+                using var key = Registry.CurrentUser.CreateSubKey(GPU_PREF_REG_PATH);
+                if (key == null) return;
+                string? original = SetGpuPreferenceValue(executable, "GpuPreference=2;",
+                    path => key.GetValue(path) as string,
+                    (path, value) => key.SetValue(path, value!, RegistryValueKind.String));
+                _gpuPrefJavaPath = executable;
+                _gpuPrefOrigValue = original;
+                _gpuPreferenceSet = true;
+                App.Log($"[KernelOpt] Seçili process GPU tercihi yüksek performans olarak ayarlandı: {System.IO.Path.GetFileName(executable)}");
             }
             catch (Exception ex)
             {
                 App.Log($"[KernelOpt] GPU tercihi ayarlanamadı: {ex.Message}");
             }
+        }
+
+        static string? SetGpuPreferenceValue(string executable, string? value,
+            Func<string, string?> read, Action<string, string?> write)
+        {
+            if (!System.IO.Path.IsPathFullyQualified(executable))
+                throw new ArgumentException("GPU preference requires the selected executable's full path.", nameof(executable));
+            string? previous = read(executable);
+            write(executable, value);
+            return previous;
         }
 
         /// <summary>
@@ -1028,16 +922,12 @@ namespace MistikLauncher
                     using var key = Registry.CurrentUser.OpenSubKey(GPU_PREF_REG_PATH, writable: true);
                     if (key != null)
                     {
-                        if (_gpuPrefOrigValue != null)
-                        {
-                            // Orijinal değeri geri yükle
-                            key.SetValue(_gpuPrefJavaPath, _gpuPrefOrigValue, RegistryValueKind.String);
-                        }
-                        else
-                        {
-                            // Daha önce değer yoktu, sil
-                            key.DeleteValue(_gpuPrefJavaPath, throwOnMissingValue: false);
-                        }
+                        SetGpuPreferenceValue(_gpuPrefJavaPath, _gpuPrefOrigValue,
+                            path => key.GetValue(path) as string,
+                            (path, value) => {
+                                if (value != null) key.SetValue(path, value, RegistryValueKind.String);
+                                else key.DeleteValue(path, throwOnMissingValue: false);
+                            });
                     }
                     _gpuPreferenceSet = false;
                     _gpuPrefJavaPath = null;

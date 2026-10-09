@@ -130,7 +130,7 @@ namespace MistikLauncher
                 status?.Invoke(text);
                 SetStatus(text);
             });
-            return await GameRuntimeHealth.VerifyAndRepairAsync(App.GameDir, version, progress: progress);
+            return await Task.Run(() => GameRuntimeHealth.VerifyAndRepairAsync(App.GameDir, version, progress: progress));
         }
 
         public void SwitchLanguage(string code)
@@ -421,6 +421,11 @@ namespace MistikLauncher
 
         void QueueBackgroundModSync()
         {
+            if (!Dispatcher.CheckAccess())
+            {
+                if (!Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(new Action(QueueBackgroundModSync));
+                return;
+            }
             if (!IsLoaded || string.IsNullOrWhiteSpace(Config.Version) || Interlocked.Exchange(ref _backgroundModSync,1)!=0) return;
             var requestedVersion=Config.Version;
             _ = Task.Run(() => {
@@ -588,9 +593,6 @@ namespace MistikLauncher
             }
             SetVersion(ver);
             
-            // Son güvenlik önlemi olarak modları senkronize et
-            if(!SyncModsForCurrentVersion()) { MessageBox.Show(Localization.T("modSyncFailed"),"Mistik Launcher",MessageBoxButton.OK,MessageBoxImage.Warning); return; }
-
             _ = LaunchMinecraftAsync(ver);
         }
 
@@ -609,6 +611,11 @@ namespace MistikLauncher
 
             try
             {
+                if(!await Task.Run(() => SyncModsForCurrentVersion(version)))
+                {
+                    MessageBox.Show(Localization.T("modSyncFailed"),"Mistik Launcher",MessageBoxButton.OK,MessageBoxImage.Warning);
+                    return;
+                }
                 // 1. Java bul
                 SetStatus("Java aranıyor...");
                 var javaPath = await FindJavaAsync();
@@ -751,7 +758,7 @@ namespace MistikLauncher
                     WorkingDirectory=App.GameDir, UseShellExecute=false, CreateNoWindow=true,
                     RedirectStandardOutput=true, RedirectStandardError=true
                 };
-                var process=WithSyncedMods(version, _ => Process.Start(psi)) ?? throw new InvalidOperationException("Java process could not start.");
+                var process=await Task.Run(() => WithSyncedMods(version, _ => Process.Start(psi))) ?? throw new InvalidOperationException("Java process could not start.");
                 void Capture(object sender,DataReceivedEventArgs line) {
                     if(line.Data==null) return;
                     lock(outputGate) {
@@ -771,7 +778,7 @@ namespace MistikLauncher
                 }
                 gameRunning=true;
                 if(Config.KernelPriority || Config.KernelTimer || Config.KernelAffinity || Config.KernelPower || Config.KernelNagle || Config.KernelGpu)
-                    KernelOptimizer.ApplyAll(process,Config);
+                    await Task.Run(() => KernelOptimizer.ApplyAll(process,Config));
                 if(Config.AutoClose) Hide();
                 _ = Task.Run(async ()=> {
                     try {
@@ -1001,15 +1008,15 @@ namespace MistikLauncher
                     var currentVer = requestedVersion ?? Config.Version ?? "";
                     if (string.IsNullOrEmpty(currentVer) || !string.Equals(Config.Version,currentVer,StringComparison.Ordinal)) return false;
 
-                    string currentLoader = GameProfiles.Loader(App.GameDir,currentVer);
-                    string mcVersion = GameProfiles.MinecraftVersion(App.GameDir,currentVer);
-                    string currentPoolKey = GameProfiles.VersionPoolKey(mcVersion,currentLoader);
-
                     var previousSynced = Config.LastSyncedVersion ?? "";
                     var lastSynced = previousSynced;
 
                     // If nothing has changed, do not do anything
                     if (lastSynced == currentVer) return true;
+
+                    string currentLoader = GameProfiles.Loader(App.GameDir,currentVer);
+                    string mcVersion = GameProfiles.MinecraftVersion(App.GameDir,currentVer);
+                    string currentPoolKey = GameProfiles.VersionPoolKey(mcVersion,currentLoader);
 
                     var modsPoolDir = Path.Combine(App.AppData, "mods_pool");
                     Directory.CreateDirectory(modsPoolDir);
@@ -1789,7 +1796,9 @@ namespace MistikLauncher
             }
         }
 
-        internal static async Task<string?> FindJavaAsync()
+        internal static Task<string?> FindJavaAsync() => Task.Run(FindJavaCoreAsync);
+
+        static async Task<string?> FindJavaCoreAsync()
         {
             var candidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 

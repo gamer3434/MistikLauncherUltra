@@ -58,6 +58,7 @@ class Program
             checks += ForgeTests.Run(Path.Combine(testRoot,"forge-tests"));
             checks += AutoMcsTests.Run(testRoot).GetAwaiter().GetResult();
             checks += AutoMcsConcurrencyTests.Run(testRoot).GetAwaiter().GetResult();
+            checks += CurseForgeTests.Run(testRoot).GetAwaiter().GetResult();
             checks += JavaRuntimeInstallerTests.Run(testRoot).GetAwaiter().GetResult();
             if(args.Contains("--live-java"))
             {
@@ -150,6 +151,7 @@ class Program
             var window=new MainWindow { Width=1200, Height=820 };
             checks+=LaunchLifecycleTests.Run(window);
             checks+=LaunchReadinessTests.RunHome(window);
+            checks+=ModPagePerformanceTests.Run(window,Path.Combine(testRoot,"mod-page-performance"));
             checks+=ForgeTests.Classpath(window);
             checks+=ModAndMapRegressionTests.SyncFailure(window,Path.Combine(testRoot,"sync-commit"));
             var quiltJar=Path.Combine(testRoot,"quilt-metadata.jar");
@@ -360,6 +362,10 @@ class Program
                 window.Navigate("Vers"); Capture(window,Path.Combine(output,"versions-"+code+".png"));
                 window.Navigate("Mods"); Capture(window,Path.Combine(output,"mods-"+code+".png"),960,640);
                 var currentModPage=(DependencyObject)((Frame)window.FindName("MainFrame")).Content;
+                var modScroll=Nodes(currentModPage).OfType<ScrollViewer>().First();
+                var modSource=Nodes(currentModPage).OfType<ComboBox>().Single(box=>box.Name=="ModSource");
+                var modSearch=Nodes(currentModPage).OfType<TextBox>().Single(box=>System.Windows.Automation.AutomationProperties.GetName(box)==Localization.T("modSearch"));
+                Check(modSource.TranslatePoint(new Point(0,modSource.ActualHeight),modScroll).Y<=modScroll.ViewportHeight && modSearch.TranslatePoint(new Point(0,modSearch.ActualHeight),modScroll).Y<=modScroll.ViewportHeight,"mod source and search are visible at compact size: "+code);
                 Check(Texts(currentModPage).Contains(Localization.T("modCenterTitle")),"mod center opens in selected language: "+code);
                 window.SwitchLanguage(code=="tr"?"en":"tr"); Flush(window);
                 Check(Texts(currentModPage).Contains(Localization.T("modCenterTitle")),"cached mod center headings follow language switch: "+code);

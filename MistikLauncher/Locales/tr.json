@@ -314,7 +314,7 @@
   "Ely.by skin doğrulayıcı kontrol ediliyor...": "Ely.by skin yardımcısı kontrol ediliyor…",
   "Minecraft baslatılıyor...": "Minecraft başlatılıyor…",
   "Kernel optimizasyonları uygulanıyor...": "Seçili performans ayarları uygulanıyor…",
-  "modCenterTitle": "Mod merkezi · Modrinth",
+  "modCenterTitle": "Mod merkezi",
   "modCenterIntro": "Modları keşfet, kurulu dosyaları yönet ve profiller arasında geçiş yap.",
   "modPacksTitle": "Hazır mod paketleri",
   "modPacksIntro": "Bir koleksiyon seç. Kullanılabilirlik Minecraft sürümüne ve yükleyiciye bağlıdır.",
@@ -400,5 +400,18 @@
   "optGraphicsSaved": "Hızlı grafik profili kaydedildi. Sonraki oyun açılışında uygulanır. Özgün ayarlar options.txt.mistik-backup dosyasında.",
   "optGraphicsUnchanged": "Hızlı grafik profili zaten etkin.",
   "optGraphicsFailed": "Grafik ayarları uygulanamadı:",
-  "versionLoadMore": "Daha fazla sürüm göster"
+  "versionLoadMore": "Daha fazla sürüm göster",
+  "modLoadMore": "Daha fazla mod göster",
+  "modSource": "Mod kaynağı",
+  "cfKeyRequired": "CurseForge modlarını aramak ve kurmak için Ayarlar → Entegrasyonlar bölümüne kendi CurseForge API anahtarınızı ekleyin.",
+  "cfOpenWebsite": "CurseForge'da aç",
+  "cfInstallFailure": "CurseForge kurulumu başarısız",
+  "integrationsTitle": "Entegrasyonlar",
+  "curseForgeKey": "CurseForge API anahtarı",
+  "curseForgeKeyHelp": "CurseForge'un resmî API'si kendi API anahtarınızı gerektirir. Anahtarınız bu bilgisayarda şifrelenerek saklanır. Boş bırakarak kaldırabilirsiniz.",
+  "curseForgeKeyInvalid": "API anahtarı en fazla 512 yazdırılabilir ASCII karakteri içermeli; satır sonu içeremez.",
+  "cfOpenSettings": "Anahtarı ayarlarda ekle",
+  "cfSearchFailure": "CurseForge araması tamamlanamadı",
+  "cfOpenFailure": "CurseForge sitesi açılamadı",
+  "cfInstalled": "CurseForge modu ve zorunlu bağımlılıkları kuruldu."
 }
