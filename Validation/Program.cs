@@ -321,7 +321,7 @@ class Program
                 appearance=Nodes(settingsPage).OfType<Expander>().Single(expander=>expander.Name=="AppearanceExpander"); appearance.IsExpanded=true; Flush(window);
                 var lighting=Nodes(settingsPage).OfType<ComboBox>().Single(box=>box.Name=="CloseLightingBox");
                 Check(Nodes(appearance).OfType<Button>().Count(button=>ColorThemes.Names.Any(name=>System.Windows.Automation.AutomationProperties.GetName(button)==Localization.T("theme"+name)))==ColorThemes.Names.Length,"all themes remain available in appearance options: "+code);
-                Check(!Texts(settingsPage).Contains(Localization.T("cloudTitle")) && !Nodes(settingsPage).OfType<PasswordBox>().Any(),"cloud account UI removed: "+code);
+                Check(!Texts(settingsPage).Contains(Localization.T("cloudTitle")) && Nodes(settingsPage).OfType<PasswordBox>().All(box=>box.Name=="CurseForgeKeyBox"),"cloud account UI removed: "+code);
                 Check(lighting.Items.Count==3 && !lighting.Items.Cast<string>().Any(item=>item.Contains("Rainbow") || item.Contains("Gökkuşağı")),"single RGB mode replaces Rainbow: "+code);
                 lighting.SelectedIndex=2; Flush(window); Localization.TranslateTree(settingsPage);
                 lighting.SelectedIndex=1; Flush(window); Localization.TranslateTree(settingsPage); Flush(window);

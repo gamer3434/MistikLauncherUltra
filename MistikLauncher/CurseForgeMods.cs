@@ -61,6 +61,7 @@ public sealed class CurseForgeMods : IDisposable
         budget.CancelAfter(RequestBudget(TimeSpan.FromMinutes(3)));
         var files = new List<CurseForgeModFile>();
         var resolved = new HashSet<int>();
+        var incompatible = new HashSet<int>();
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         long total = 0;
         try { await ResolveAsync(modId); return files; }
@@ -69,6 +70,7 @@ public sealed class CurseForgeMods : IDisposable
 
         async Task ResolveAsync(int id)
         {
+            if (incompatible.Contains(id)) throw new InvalidDataException("CurseForge dependency bundle contains incompatible mods.");
             if (!resolved.Add(id)) return;
             if (resolved.Count > 32) throw new InvalidDataException("CurseForge dependency bundle exceeds 32 mods.");
             var project = (await MetadataAsync($"mods/{id}", budget.Token))["data"] as JObject ?? throw new InvalidDataException("Invalid CurseForge mod response.");
@@ -77,14 +79,13 @@ public sealed class CurseForgeMods : IDisposable
                 throw new InvalidDataException("CurseForge mod is unavailable or belongs to a different game.");
             string website = Website(project);
             if ((bool?)project["allowModDistribution"] == false) throw new IOException("The author disabled third-party downloads. Open " + website);
-            var candidates = (await MetadataAsync($"mods/{id}/files?gameVersion={Uri.EscapeDataString(gameVersion)}&modLoaderType={loaderType}&pageSize=50", budget.Token))["data"] as JArray
-                ?? throw new InvalidDataException("Invalid CurseForge file response.");
-            var compatible = candidates.OfType<JObject>().Where(candidate =>
+            var candidates = await FileCandidatesAsync(id, gameVersion, loaderType, budget.Token);
+            var compatible = candidates.Where(candidate =>
                 (int?)candidate["modId"] == id && (int?)candidate["gameId"] == 432 && (bool?)candidate["isAvailable"] == true && (bool?)candidate["isServerPack"] != true &&
                 candidate["gameVersions"] is JArray versions && versions.Values<string>().Contains(gameVersion, StringComparer.Ordinal) && versions.Values<string>().Contains(loader, StringComparer.OrdinalIgnoreCase))
                 .ToArray();
             var file = compatible
-                .OrderByDescending(candidate => (string?)candidate["fileDate"], StringComparer.Ordinal).ThenByDescending(candidate => (int?)candidate["id"])
+                .OrderByDescending(candidate => (DateTimeOffset?)candidate["fileDate"]).ThenByDescending(candidate => (int?)candidate["id"])
                 .FirstOrDefault() ?? throw new IOException("No CurseForge file matches the selected Minecraft version and loader.");
             string filename = (string?)file["fileName"] ?? "";
             if (!SafeFilename(filename) || !names.Add(filename))
@@ -98,12 +99,20 @@ public sealed class CurseForgeMods : IDisposable
             if (string.IsNullOrWhiteSpace(download)) throw new IOException("The author does not allow this file to be downloaded here. Open " + website);
             Uri asset = AssetUri(download);
             if (file["dependencies"] is JArray dependencies)
+            {
+                foreach (var conflict in dependencies.OfType<JObject>().Where(item => (int?)item["relationType"] == 5))
+                {
+                    int other = (int?)conflict["modId"] ?? 0;
+                    if (other <= 0 || resolved.Contains(other)) throw new InvalidDataException("CurseForge dependency bundle contains incompatible mods.");
+                    incompatible.Add(other);
+                }
                 foreach (var dependency in dependencies.OfType<JObject>().Where(item => (int?)item["relationType"] == 3))
                 {
                     int required = (int?)dependency["modId"] ?? 0;
                     if (required <= 0) throw new InvalidDataException("Invalid CurseForge required dependency.");
                     await ResolveAsync(required);
                 }
+            }
             using var response = await AssetResponseAsync(asset, budget.Token);
             using var memory = new MemoryStream();
             if (await CopyBoundedAsync(response, memory, size, budget.Token) != size) throw new InvalidDataException("Incomplete CurseForge mod download.");
@@ -119,6 +128,38 @@ public sealed class CurseForgeMods : IDisposable
 
     static bool SafeFilename(string filename) => !string.IsNullOrWhiteSpace(filename) && filename == Path.GetFileName(filename) &&
         filename.IndexOfAny(Path.GetInvalidFileNameChars()) < 0 && !filename.EndsWith(' ') && !filename.EndsWith('.') && filename.EndsWith(".jar", StringComparison.OrdinalIgnoreCase);
+
+    async Task<IReadOnlyList<JObject>> FileCandidatesAsync(int modId, string gameVersion, int loaderType, CancellationToken token)
+    {
+        var files = new List<JObject>();
+        var seen = new HashSet<int>();
+        for (int index = 0; index < 10000;)
+        {
+            var response = await MetadataAsync($"mods/{modId}/files?gameVersion={Uri.EscapeDataString(gameVersion)}&modLoaderType={loaderType}&pageSize=50&index={index}", token);
+            var page = response["data"] as JArray ?? throw new InvalidDataException("Invalid CurseForge file response.");
+            if (page.Count > 50) throw new InvalidDataException("CurseForge file page exceeds its limit.");
+            int next = index + page.Count;
+            long? total = null;
+            if (response["pagination"] is JObject pagination)
+            {
+                total = (long?)pagination["totalCount"];
+                if ((int?)pagination["index"] != index || (int?)pagination["resultCount"] != page.Count ||
+                    (int?)pagination["pageSize"] is not int pageSize || pageSize is < 1 or > 50 || page.Count > pageSize ||
+                    total is null || total < next || total > 10000 || page.Count == 0 && total > index)
+                    throw new InvalidDataException("Incomplete or invalid CurseForge file pagination.");
+            }
+            int added = 0;
+            foreach (var value in page)
+            {
+                if (value is not JObject file || (int?)file["id"] is not int id || id <= 0) throw new InvalidDataException("Invalid CurseForge file metadata.");
+                if (seen.Add(id)) { files.Add(file); added++; }
+            }
+            if (page.Count > 0 && added == 0) throw new InvalidDataException("CurseForge file pagination made no progress.");
+            if (total == next || total == null && page.Count < 50) return files;
+            index = next;
+        }
+        throw new InvalidDataException("CurseForge file history exceeds the API pagination limit.");
+    }
 
     static int LoaderType(string loader) => loader?.ToLowerInvariant() switch
     { "forge" => 1, "fabric" => 4, "quilt" => 5, "neoforge" => 6, _ => throw new ArgumentException("Select a supported mod loader.", nameof(loader)) };

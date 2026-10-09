@@ -195,6 +195,7 @@ public class ModernSettingsPage : Page, ILanguagePage
     readonly bool updatesOnly;
     TextBox user = null!, ram = null!;
     PasswordBox curseForgeKey = null!;
+    string? pendingCurseForgeKey;
     ComboBox language = null!, provider = null!;
     CheckBox close = null!, autoUpdate = null!;
     TextBlock result = null!, updateStatus = null!, updateNotes = null!;
@@ -205,18 +206,49 @@ public class ModernSettingsPage : Page, ILanguagePage
     {
         main=window;
         this.updatesOnly=updatesOnly;
-        Loaded += (_,_) => { main.LauncherUpdates.Changed += UpdateStatusAsync; autoUpdate.IsChecked=main.Config.LauncherAutoUpdate; UpdateStatus(); };
+        Loaded += (_,_) => { RestoreCurseForgeDraft(); main.LauncherUpdates.Changed += UpdateStatusAsync; autoUpdate.IsChecked=main.Config.LauncherAutoUpdate; UpdateStatus(); };
         Unloaded += (_,_) => main.LauncherUpdates.Changed -= UpdateStatusAsync;
         Render();
     }
     public void RefreshLanguage() => Render();
+    internal void PreserveCurseForgeDraft()
+    {
+        if(!updatesOnly) pendingCurseForgeKey??=curseForgeKey.Password;
+    }
+    internal void RestoreCurseForgeDraft()
+    {
+        if(updatesOnly || pendingCurseForgeKey==null) return;
+        curseForgeKey.Password=pendingCurseForgeKey;
+        pendingCurseForgeKey=null;
+    }
+    internal void FocusCurseForgeIntegration()
+    {
+        if(updatesOnly) return;
+        integrations!.IsExpanded=true;
+        void FocusKey() => Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded,new Action(()=> {
+            if(!IsLoaded || !IsVisible) return;
+            curseForgeKey.BringIntoView(); curseForgeKey.Focus();
+        }));
+        if(IsLoaded) FocusKey();
+        else
+        {
+            RoutedEventHandler? loaded=null;
+            loaded=(_,_)=> { Loaded-=loaded; FocusKey(); };
+            Loaded+=loaded;
+        }
+    }
+    void OpenCurseForgeHelp(string url)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute=true }); }
+        catch(Exception ex) { MessageBox.Show(Localization.T("cfOpenFailure")+": "+ex.Message,Localization.T("error")); }
+    }
     void Render()
     {
         var draftUser=user?.Text??main.Config.User;
         var draftRam=ram?.Text??main.Config.Ram.ToString();
         var draftProvider=provider?.SelectedIndex??(main.Config.AuthType=="elyby"?1:0);
         var draftClose=close?.IsChecked??main.Config.AutoClose;
-        var draftCurseForgeKey=curseForgeKey?.Password??main.Config.CurseForgeApiKey??"";
+        var draftCurseForgeKey=pendingCurseForgeKey??curseForgeKey?.Password??main.Config.CurseForgeApiKey??"";
         bool appearanceExpanded=appearance?.IsExpanded==true;
         bool integrationsExpanded=integrations?.IsExpanded==true;
         var stack = new StackPanel { Margin = new Thickness(24), MaxWidth=1040 };
@@ -366,6 +398,14 @@ public class ModernSettingsPage : Page, ILanguagePage
         System.Windows.Automation.AutomationProperties.SetName(curseForgeKey,Localization.T("curseForgeKey"));
         integrationContent.Children.Add(curseForgeKey);
         integrationContent.Children.Add(PageHelpers.Lbl(Localization.T("curseForgeKeyHelp"),13,"#ADBED6",pad:new Thickness(0,8,0,0),wrap:TextWrapping.Wrap));
+        var integrationLinks=new WrapPanel { Margin=new Thickness(0,12,0,0) };
+        foreach(var item in new[]{("cfApplyKey","CurseForgeApplyKey","https://support.curseforge.com/support/solutions/articles/9000208346-about-the-curseforge-api-and-how-to-apply-for-a-key"),("cfManageKey","CurseForgeManageKey","https://console.curseforge.com/")})
+        {
+            var button=PageHelpers.MkBtn(item.Item1,"#35546E"); button.Name=item.Item2; button.Tag=item.Item3; button.MinHeight=44; button.Margin=new Thickness(0,0,10,8);
+            System.Windows.Automation.AutomationProperties.SetName(button,Localization.T(item.Item1));
+            button.Click+=(_,_)=>OpenCurseForgeHelp(item.Item3); integrationLinks.Children.Add(button);
+        }
+        integrationContent.Children.Add(integrationLinks);
         integrations=new Expander { Name="IntegrationsExpander",Header=Localization.T("integrationsTitle"),Foreground=Brushes.White,FontSize=16,IsExpanded=integrationsExpanded,Content=integrationContent,Margin=new Thickness(0,0,0,16) }; stack.Children.Add(integrations);
         stack.Children.Add(updateCard);
         var save=PageHelpers.MkBtn(Localization.T("save"),"#226DA0"); save.Name="SaveSettingsButton"; save.HorizontalAlignment=HorizontalAlignment.Right;

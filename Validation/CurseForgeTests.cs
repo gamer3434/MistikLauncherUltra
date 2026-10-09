@@ -40,9 +40,10 @@ static class CurseForgeTests
                 basic.Requests.Where(request => new Uri(request.Url).Host.EndsWith("forgecdn.net")).All(request => !request.HasKey), "CurseForge skips optional dependencies and sends the API key only to the API host");
         }
         var history = new Stub();
+        int alternateId = 1000;
         JObject Alternate(int project, string filename)
         {
-            var value = (JObject)history.Files[project].DeepClone(); value["fileName"] = filename; value["fileDate"] = "2025-01-01T00:00:00Z"; return value;
+            var value = (JObject)history.Files[project].DeepClone(); value["id"] = alternateId++; value["fileName"] = filename; value["fileDate"] = "2025-01-01T00:00:00Z"; return value;
         }
         var oldRoot = Alternate(1, "fixture-old.jar"); var oldDependency = Alternate(2, "dependency-old.jar");
         var wrongLoader = Alternate(1, "fixture-forge.jar"); wrongLoader["gameVersions"] = new JArray("1.20.1", "Forge");
@@ -61,6 +62,60 @@ static class CurseForgeTests
             Check(bundle.SelectMany(file => file.CompatibleFilenames).All(filename => !filename.Contains('/') && !filename.Contains("forge") && !filename.Contains("other-version") && !filename.Contains("other-project")),
                 "CurseForge omits unsafe alternate names and unrelated or incompatible file candidates");
         }
+        var paged = new Stub();
+        for (int project = 1; project <= 2; project++)
+        {
+            var alternatives = new JArray();
+            for (int index = 0; index < 49; index++)
+            {
+                var candidate = (JObject)paged.Files[project].DeepClone(); candidate["id"] = project * 1000 + index;
+                candidate["fileName"] = $"project-{project}-old-{index}.jar"; candidate["fileDate"] = "2025-01-01T00:00:00Z"; alternatives.Add(candidate);
+            }
+            var later = (JObject)paged.Files[project].DeepClone(); later["id"] = project * 1000 + 50;
+            later["fileName"] = project == 1 ? "fixture-new.jar" : "dependency-old-page-two.jar";
+            later["fileDate"] = project == 1 ? "2027-01-01T00:00:00Z" : "2024-01-01T00:00:00Z"; alternatives.Add(later);
+            paged.AlternateFiles[project] = alternatives;
+        }
+        using (var client = new HttpClient(paged))
+        using (var service = new CurseForgeMods("fixture-api-key", client))
+        {
+            var bundle = await service.DownloadAsync(1, "1.20.1", "fabric");
+            Check(bundle.Single(file => file.Filename == "fixture-new.jar").CompatibleFilenames.Contains("fixture.jar") && paged.Requests.Any(request => request.Url.Contains("/mods/1/files?") && request.Url.EndsWith("index=50")),
+                "CurseForge selects the newest compatible file across all official API pages");
+            Check(bundle.Single(file => file.Filename == "dependency.jar").CompatibleFilenames.Contains("dependency-old-page-two.jar") && paged.Requests.Any(request => request.Url.Contains("/mods/2/files?") && request.Url.EndsWith("index=50")),
+                "CurseForge carries old dependency conflict filenames from later API pages");
+        }
+        paged.Files[1]["isAvailable"] = false;
+        foreach (var candidate in paged.AlternateFiles[1].Take(49)) candidate["isAvailable"] = false;
+        using (var client = new HttpClient(paged))
+        using (var service = new CurseForgeMods("fixture-api-key", client))
+            Check((await service.DownloadAsync(1, "1.20.1", "fabric")).Any(file => file.Filename == "fixture-new.jar"),
+                "CurseForge continues to later pages when the first page has no available compatible file");
+        var yearBoundary = new Stub();
+        var previousYear = (JObject)yearBoundary.Files[1].DeepClone(); previousYear["id"] = 100; previousYear["fileName"] = "previous-december.jar"; previousYear["fileDate"] = "2025-12-31T23:59:59Z";
+        yearBoundary.AlternateFiles[1] = new JArray(previousYear);
+        using (var client = new HttpClient(yearBoundary))
+        using (var service = new CurseForgeMods("fixture-api-key", client))
+            Check((await service.DownloadAsync(1, "1.20.1", "fabric")).Any(file => file.Filename == "fixture.jar"),
+                "CurseForge compares parsed file dates chronologically across the December January boundary");
+        var invalidPagination = new Stub { EmptyFilePage = true };
+        Check(await Reject(invalidPagination) && !invalidPagination.AssetRequests, "CurseForge refuses incomplete zero-progress pagination before downloading mods");
+        invalidPagination = new Stub { InvalidPageIndex = true };
+        Check(await Reject(invalidPagination) && !invalidPagination.AssetRequests, "CurseForge refuses API file pages whose index does not match the request");
+        invalidPagination = new Stub { FileTotalCount = 10001 };
+        Check(await Reject(invalidPagination) && !invalidPagination.AssetRequests, "CurseForge refuses truncated history beyond the documented 10000-result API limit");
+        var repeatedPage = new Stub { RepeatFilePage = true, FileTotalCount = 100 };
+        repeatedPage.AlternateFiles[1] = new JArray(Enumerable.Range(1, 49).Select(index => { var candidate = (JObject)repeatedPage.Files[1].DeepClone(); candidate["id"] = 1000 + index; candidate["fileName"] = "repeat-" + index + ".jar"; return candidate; }));
+        Check(await Reject(repeatedPage) && !repeatedPage.AssetRequests && repeatedPage.Requests.Count(request => request.Url.Contains("/files?")) == 2,
+            "CurseForge detects repeated file pages instead of accepting an incomplete conflict history");
+        var incompatibleBundle = new Stub(); incompatibleBundle.Files[1]["dependencies"]!.Last!.AddAfterSelf(new JObject { ["modId"] = 2, ["relationType"] = 5 });
+        Check(await Reject(incompatibleBundle) && !incompatibleBundle.AssetRequests, "CurseForge refuses a required dependency explicitly incompatible with the selected mod");
+        incompatibleBundle = new Stub(); incompatibleBundle.Files[2]["dependencies"] = new JArray(new JObject { ["modId"] = 1, ["relationType"] = 5 });
+        Check(await Reject(incompatibleBundle) && !incompatibleBundle.AssetRequests, "CurseForge refuses dependency conflicts pointing back at an already resolved root mod");
+        incompatibleBundle = new Stub(); incompatibleBundle.Files[1]["dependencies"]!.Last!.AddAfterSelf(new JObject { ["modId"] = 3, ["relationType"] = 5 });
+        using (var client = new HttpClient(incompatibleBundle))
+        using (var service = new CurseForgeMods("fixture-api-key", client))
+            Check((await service.DownloadAsync(1, "1.20.1", "fabric")).Count == 2, "CurseForge does not install optional incompatible mods and preserves the valid required bundle");
         var incompatible = new Stub(); incompatible.Files[1]["gameVersions"] = new JArray("1.20", "Fabric");
         Check(await Reject(incompatible) && !incompatible.AssetRequests, "CurseForge refuses a neighboring Minecraft version despite API filters");
         incompatible = new Stub(); incompatible.Files[1]["gameVersions"] = new JArray("1.20.1", "Forge");
@@ -144,6 +199,8 @@ static class CurseForgeTests
         public Dictionary<int, JArray> AlternateFiles = new();
         public List<(string Url, bool HasKey)> Requests = new();
         public bool ApiRedirect, AssetRedirect, StallAsset;
+        public bool EmptyFilePage, InvalidPageIndex, RepeatFilePage;
+        public long? FileTotalCount;
         public bool AssetRequests => Requests.Any(request => new Uri(request.Url).Host.EndsWith("forgecdn.net"));
         public Stub(byte[]? jar = null)
         {
@@ -175,7 +232,10 @@ static class CurseForgeTests
                 {
                     var candidates = new JArray(Files[id].DeepClone());
                     if (AlternateFiles.TryGetValue(id, out var alternatives)) foreach (var alternative in alternatives) candidates.Add(alternative.DeepClone());
-                    return Task.FromResult(Json(candidates));
+                    int index = int.Parse(uri.Query.TrimStart('?').Split('&').FirstOrDefault(value => value.StartsWith("index="))?.Split('=')[1] ?? "0");
+                    var page = EmptyFilePage ? new JArray() : new JArray(candidates.Skip(RepeatFilePage ? 0 : index).Take(50).Select(value => value.DeepClone()));
+                    var body = new JObject { ["data"] = page, ["pagination"] = new JObject { ["index"] = InvalidPageIndex ? index + 1 : index, ["pageSize"] = 50, ["resultCount"] = page.Count, ["totalCount"] = FileTotalCount ?? candidates.Count } };
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body.ToString()) });
                 }
                 return Task.FromResult(Json(Projects[id].DeepClone()));
             }

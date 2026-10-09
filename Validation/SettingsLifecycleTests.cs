@@ -2,8 +2,10 @@ using System.Reflection;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using MistikLauncher;
 using MistikLauncher.Pages;
 using Localization = MistikLauncher.Localization;
@@ -148,6 +150,48 @@ static class SettingsLifecycleTests
                 Check(saveNotifications==1 && window.Config.Lang==targetLanguage && Localization.Language==(targetLanguage=="English"?"en":"tr") && savedLanguage==targetLanguage && feedback==Localization.T("saved"),$"successful settings language save updates the interface without a second write after reload (notifications={saveNotifications}, target={targetLanguage}, runtime={window.Config.Lang}, disk={savedLanguage}, UI={Localization.Language}, result={feedback})");
             }
             finally { ConfigManager.Saved-=LockAfterSave; savedLock?.Dispose(); }
+
+            void Flush()
+            {
+                var frame=new DispatcherFrame();
+                window.Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle,new Action(()=>frame.Continue=false));
+                Dispatcher.PushFrame(frame);
+            }
+            window.NavigateToCurseForgeSettings(); Flush();
+            var navigation=(Frame)window.FindName("MainFrame");
+            var setup=(ModernSettingsPage)navigation.Content;
+            var setupContent=setup.Content;
+            Control<TextBox>(setup,"user").Text="SetupDraft";
+            Control<PasswordBox>(setup,"curseForgeKey").Password="unsaved_setup_fixture";
+            Control<Expander>(setup,"integrations").IsExpanded=false;
+            var beforeSetup=File.ReadAllBytes(configPath);
+            window.Navigate("Updates"); Flush();
+            window.NavigateToCurseForgeSettings(); Flush();
+            bool samePage=ReferenceEquals(navigation.Content,setup), sameContent=ReferenceEquals(setup.Content,setupContent);
+            bool expanded=Control<Expander>(setup,"integrations").IsExpanded, userDraft=Control<TextBox>(setup,"user").Text=="SetupDraft";
+            bool keyDraft=Control<PasswordBox>(setup,"curseForgeKey").Password=="unsaved_setup_fixture", unchangedDisk=File.ReadAllBytes(configPath).SequenceEqual(beforeSetup);
+            Check(samePage && sameContent && expanded && userDraft && keyDraft && unchangedDisk,$"CurseForge setup navigation opens the cached integration without rewriting unsaved drafts or saving configuration (page={samePage}, content={sameContent}, expanded={expanded}, userDraft={userDraft}, keyDraft={keyDraft}, disk={unchangedDisk})");
+            Control<PasswordBox>(setup,"curseForgeKey").Password="";
+            window.Navigate("Updates"); Flush();
+            window.NavigateToCurseForgeSettings(); Flush();
+            Check(Control<PasswordBox>(setup,"curseForgeKey").Password.Length==0 && File.ReadAllBytes(configPath).SequenceEqual(beforeSetup),"intentionally cleared CurseForge key stays empty on cached settings navigation without restoring a saved key or writing configuration");
+            var integrationContent=(StackPanel)Control<Expander>(setup,"integrations").Content;
+            var links=integrationContent.Children.OfType<WrapPanel>().Single().Children.OfType<Button>().ToArray();
+            Check(links.Any(button=>button.Name=="CurseForgeApplyKey" && Equals(button.Content,Localization.T("cfApplyKey")) && Equals(button.Tag,"https://support.curseforge.com/support/solutions/articles/9000208346-about-the-curseforge-api-and-how-to-apply-for-a-key")) && links.Any(button=>button.Name=="CurseForgeManageKey" && Equals(button.Content,Localization.T("cfManageKey")) && Equals(button.Tag,"https://console.curseforge.com/")),"CurseForge integration exposes the official application guide and console links");
+            window.Navigate("Updates"); Flush();
+            var key=Control<PasswordBox>(setup,"curseForgeKey");
+            bool broughtIntoView=false;
+            key.RequestBringIntoView+=(_,_)=>broughtIntoView=true;
+            var host=new Window { Content=setup,Width=960,Height=440,Left=-10000,Top=-10000,WindowStyle=WindowStyle.None,ShowActivated=false,ShowInTaskbar=false };
+            try
+            {
+                typeof(ModernSettingsPage).GetMethod("FocusCurseForgeIntegration",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(setup,null);
+                host.Show(); Flush(); host.UpdateLayout();
+                var setupScroll=((DockPanel)setup.Content).Children.OfType<ScrollViewer>().Single();
+                double keyTop=key.TranslatePoint(new Point(0,0),setupScroll).Y;
+                Check(broughtIntoView && ReferenceEquals(FocusManager.GetFocusedElement(host),key) && setupScroll.VerticalOffset>0 && keyTop>=0 && keyTop+key.ActualHeight<=setupScroll.ViewportHeight,"loaded CurseForge setup scrolls the exact masked key field into view and gives it focus");
+            }
+            finally { host.Content=null; host.Close(); }
         }
         finally
         {

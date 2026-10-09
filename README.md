@@ -2,15 +2,15 @@
 
 Windows x64 için Türkçe / English Minecraft launcher. Oyuncu ayarları cihazında saklanır; sürüm, mod, skin ve yerel sunucu yönetimi içerir.
 
-[Yayımlanan sürümleri indir](https://github.com/gamer3434/MistikLauncherUltra/releases/latest) · [Web sitesi](https://mistiklauncherultra.web.app/) · [6.2.5 değişiklikleri](docs/RELEASE-6.2.5.md)
+[Yayımlanan sürümleri indir](https://github.com/gamer3434/MistikLauncherUltra/releases/latest) · [Web sitesi](https://mistiklauncherultra.web.app/) · [6.2.6 değişiklikleri](docs/RELEASE-6.2.6.md)
 
 ## Kurulum ve onarım
 
 Sürüm sayfasından online veya offline kurulum EXE'sini seçin. Taşınabilir kullanım için ZIP'in tüm dosyalarını aynı klasöre çıkartıp `MistikLauncher.exe` dosyasını açın. .NET çalışma zamanı pakete dahildir.
 
-Program bozulursa launcher'ı kapatın, aynı veya daha yeni sürümün `MistikRepair-6.2.5.exe` dosyasını açıp kurulum klasöründe **Onar** seçin. Onarıcı internet gerektirmez; program dosyalarını doğrular ve yeniler. Ayarlar, modlar ve dünyalar korunur.
+Program bozulursa launcher'ı kapatın, aynı veya daha yeni sürümün `MistikRepair-6.2.6.exe` dosyasını açıp kurulum klasöründe **Onar** seçin. Onarıcı internet gerektirmez; program dosyalarını doğrular ve yeniler. Ayarlar, modlar ve dünyalar korunur.
 
-Mod merkezinde **Modrinth** veya **CurseForge** kaynağını seçebilirsiniz. CurseForge arama ve kurulum için **Ayarlar → Entegrasyonlar** bölümüne kendi API anahtarınızı girin; anahtar şifreli ayarlarda saklanır. Anahtar yoksa resmî site araması açılabilir. [CurseForge API bilgisi](https://docs.curseforge.com/rest-api/).
+Mod merkezinde **Modrinth** veya **CurseForge** kaynağını seçebilirsiniz. CurseForge arama ve kurulum için **Ayarlar → Entegrasyonlar** bölümüne resmî başvurunuz onaylandıktan sonra kendi API anahtarınızı girip kaydedin; anahtar şifreli ayarlarda saklanır. Anahtar yoksa resmî site araması açılabilir. [CurseForge API bilgisi](https://docs.curseforge.com/rest-api/).
 
 Varsayılan kurulum: `%LOCALAPPDATA%\Programs\MistikLauncherUltra`. Oyuncu verileri: `%APPDATA%\.mistik_ultra`. Şifreli ayarlar aynı Windows kullanıcı hesabında açılır. Paket şu anda genel yayıncı sertifikasıyla imzalı değildir.
 

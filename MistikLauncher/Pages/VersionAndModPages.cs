@@ -710,6 +710,7 @@ namespace MistikLauncher.Pages
         DateTime _installedModsWriteTimeUtc;
         int _visibleInstalledMods = 40;
         int _searchGeneration;
+        string? _searchProfile;
         System.Threading.CancellationTokenSource? _searchCancellation;
         readonly HttpClient _client;
         readonly HttpClient? _curseForgeClient;
@@ -830,9 +831,8 @@ namespace MistikLauncher.Pages
             var optiFabricBtn = PageHelpers.MkBtn("modOptifabricInstall", "#203853", 170);
             optiFabricBtn.Margin = new Thickness(10, 0, 0, 0);
             optiFabricBtn.Click += async (_, _) => {
-                optiFabricBtn.IsEnabled = false; optiFabricBtn.Content = "Kuruluyor...";
-                await InstallMod("2t19m3zP", "OptiFabric");
-                optiFabricBtn.Content = "Kuruldu!"; optiFabricBtn.IsEnabled = true;
+                await RunInstallButton(optiFabricBtn, () => InstallMod("2t19m3zP", "OptiFabric"),
+                    ex => MessageBox.Show($"Mod kurulamadı: {ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error), "Kuruldu!");
             };
 
             var modsFolderBtn = PageHelpers.MkBtn("Mod Klasorunu Ac", "#333333", 140);
@@ -1063,7 +1063,7 @@ namespace MistikLauncher.Pages
             RenderInstalledMods();
             Loaded += (_, _) => {
                 if (InstalledModsWriteTimeUtc() != _installedModsWriteTimeUtc) RenderInstalledMods();
-                if (_sourceBox.SelectedIndex == 1) _ = SearchMods();
+                if (_sourceBox.SelectedIndex == 1 || _searchProfile != (_main.Config.Version ?? "")) _ = SearchMods();
             };
         }
 
@@ -1083,6 +1083,8 @@ namespace MistikLauncher.Pages
             var q = _searchBox.Text.Trim();
             bool curseForge = _sourceBox.SelectedIndex == 1;
             string apiKey = _main.Config.CurseForgeApiKey ?? "";
+            string profile = _main.Config.Version ?? "";
+            _searchProfile = profile;
             if (curseForge && string.IsNullOrWhiteSpace(apiKey)) { ShowCurseForgeKeyHelp(q); return; }
             if (string.IsNullOrEmpty(q)) { _resultsPanel.Children.Clear(); return; }
             using var cancellation = new System.Threading.CancellationTokenSource();
@@ -1091,19 +1093,23 @@ namespace MistikLauncher.Pages
             _resultsPanel.Children.Add(PageHelpers.Lbl("Aranıyor...", 13, "#A0A0A0"));
             try
             {
+                string game = GameProfiles.MinecraftVersion(App.GameDir, profile);
+                string loader = GameProfiles.Loader(App.GameDir, profile);
                 JArray? hits;
                 if (curseForge)
                 {
-                    var profile = _main.Config.Version ?? "";
                     using var service = new CurseForgeMods(apiKey, _curseForgeClient);
-                    hits = await service.SearchAsync(q, GameProfiles.MinecraftVersion(App.GameDir, profile), GameProfiles.Loader(App.GameDir, profile), cancellation.Token);
+                    hits = await service.SearchAsync(q, game, loader, cancellation.Token);
                 }
                 else
                 {
-                    var resp = await _client.GetStringAsync($"https://api.modrinth.com/v2/search?query={Uri.EscapeDataString(q)}&limit=20&facets=[[\"project_type:mod\"]]", cancellation.Token);
+                    var facets = new JArray(new JArray("project_type:mod"), new JArray("versions:" + game));
+                    if (loader is "fabric" or "forge" or "neoforge" or "quilt") facets.Add(new JArray("categories:" + loader));
+                    var resp = await _client.GetStringAsync($"https://api.modrinth.com/v2/search?query={Uri.EscapeDataString(q)}&limit=20&facets={Uri.EscapeDataString(facets.ToString(Newtonsoft.Json.Formatting.None))}", cancellation.Token);
                     hits = JObject.Parse(resp)["hits"] as JArray;
                 }
                 if (generation != _searchGeneration) return;
+                if ((_main.Config.Version ?? "") != profile) { await SearchMods(); return; }
                 _resultsPanel.Children.Clear();
                 if (hits == null || hits.Count == 0) { _resultsPanel.Children.Add(PageHelpers.Lbl("Mod bulunamadı.", 13, "#A0A0A0")); return; }
                 foreach (var hit in hits)
@@ -1128,16 +1134,12 @@ namespace MistikLauncher.Pages
 
                     var installBtn = PageHelpers.MkBtn("KUR", "#00A3FF", 70); installBtn.VerticalAlignment = VerticalAlignment.Center;
                     installBtn.Click += async (_, _) => {
-                        installBtn.IsEnabled = false; installBtn.Content = "...";
-                        if (!curseForge) { await InstallMod(cId, mname); installBtn.Content = "OK"; return; }
-                        try
-                        {
+                        await RunInstallButton(installBtn, async () => {
+                            if (!curseForge) return await InstallMod(cId, mname);
                             if (!int.TryParse(cId, out int project)) throw new InvalidDataException("Invalid CurseForge mod ID.");
-                            await InstallCurseForgeMod(project);
-                            installBtn.Content = "OK";
-                        }
-                        catch (Exception ex) { installBtn.Content = Localization.T("KUR"); MessageBox.Show(Localization.T("cfInstallFailure") + ": " + ex.Message, Localization.T("error"), MessageBoxButton.OK, MessageBoxImage.Warning); }
-                        finally { installBtn.IsEnabled = true; }
+                            await InstallCurseForgeMod(project); return true;
+                        }, ex => MessageBox.Show((curseForge ? Localization.T("cfInstallFailure") : "Mod kurulamadı") + ": " + ex.Message,
+                            Localization.T("error"), MessageBoxButton.OK, MessageBoxImage.Warning));
                     };
                     var actions = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; actions.Children.Add(installBtn);
                     if (curseForge && hit["website"]?.ToString() is string website)
@@ -1153,6 +1155,7 @@ namespace MistikLauncher.Pages
             catch (Exception ex)
             {
                 if (generation != _searchGeneration) return;
+                if ((_main.Config.Version ?? "") != profile) { await SearchMods(); return; }
                 _resultsPanel.Children.Clear();
                 _resultsPanel.Children.Add(PageHelpers.Lbl((curseForge ? Localization.T("cfSearchFailure") : "Hata") + ": " + ex.Message, 13, "#FF4B4B"));
             }
@@ -1166,7 +1169,7 @@ namespace MistikLauncher.Pages
             _resultsPanel.Children.Add(help);
             var actions = new WrapPanel();
             var settings = PageHelpers.MkBtn("cfOpenSettings", "#226DA0"); settings.Name = "CurseForgeSettings";
-            settings.Click += (_, _) => _main.Navigate("Settings"); actions.Children.Add(settings);
+            settings.Click += (_, _) => _main.NavigateToCurseForgeSettings(); actions.Children.Add(settings);
             var official = PageHelpers.MkBtn("cfOpenWebsite", "#35546E"); official.Name = "CurseForgeOfficialSearch"; official.Margin = new Thickness(8, 0, 0, 0);
             official.Click += (_, _) => OpenCurseForgeWebsite("https://www.curseforge.com/minecraft/search?class=mc-mods&search=" + Uri.EscapeDataString(query));
             actions.Children.Add(official); _resultsPanel.Children.Add(actions);
@@ -1218,32 +1221,34 @@ namespace MistikLauncher.Pages
                     ModFiles.Install(destination, file.Filename, file.Bytes, Convert.ToHexString(System.Security.Cryptography.SHA512.HashData(file.Bytes)));
         }
 
-        async Task InstallMod(string projectId, string name)
+        internal static async Task RunInstallButton(Button button, Func<Task<bool>> install, Action<Exception> failure, string success = "OK")
         {
+            var original = button.Content;
+            button.IsEnabled = false; button.Content = "...";
             try
             {
-                var installedList = new List<string>();
-                var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-                // Start downloading mod and its dependencies recursively
-                await DownloadModAndDependencies(projectId, name, installedList, false, visited);
-
-                RenderInstalledMods();
-
-                if (installedList.Count > 1)
-                {
-                    var depString = string.Join("\n• ", installedList.Where(entry => entry != name));
-                    MessageBox.Show($"'{name}' ve gerekli bağımlılıkları başarıyla kuruldu!\n\nYüklenen Kütüphaneler / Bağımlılıklar:\n• {depString}", "Kurulum Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                else if (installedList.Count == 1)
-                {
-                    MessageBox.Show($"'{name}' başarıyla kuruldu!", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
+                button.Content = await install() ? success : original;
             }
-            catch (Exception ex)
+            catch (Exception ex) { button.Content = original; failure(ex); }
+            finally { button.IsEnabled = true; }
+        }
+
+        async Task<bool> InstallMod(string projectId, string name)
+        {
+            var installedList = new List<string>();
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            await DownloadModAndDependencies(projectId, name, installedList, false, visited);
+            RenderInstalledMods();
+            if (installedList.Count > 1)
             {
-                MessageBox.Show($"Mod kurulamadı: {ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                var depString = string.Join("\n• ", installedList.Where(entry => entry != name));
+                MessageBox.Show($"'{name}' ve gerekli bağımlılıkları başarıyla kuruldu!\n\nYüklenen Kütüphaneler / Bağımlılıklar:\n• {depString}", "Kurulum Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
             }
+            else if (installedList.Count == 1)
+            {
+                MessageBox.Show($"'{name}' başarıyla kuruldu!", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            return installedList.Count > 0;
         }
 
         internal static async Task InstallRequiredDependencies(JToken version, Func<string, string?, Task> install)

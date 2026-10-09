@@ -213,6 +213,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.6","2026-10-09","#00D4AA", new[]{
+                "Mod araması seçili Minecraft sürümünü ve mod yükleyicisini filtreler",
+                "Profil değiştiğinde geciken eski arama sonuçları yenilenir",
+                "Başarısız mod kurulumu başarı göstermez; yeniden denenebilir",
+                "CurseForge dosya sayfaları ve gerçek yayın tarihleri kontrol edilir",
+                "Çakışan zorunlu CurseForge bağımlılıkları kurulmadan reddedilir",
+                "CurseForge ayarı doğrudan açılır; resmî anahtar başvurusu ve yönetimi erişilebilir"
+            }),
             new("v6.2.5","2026-10-09","#00D4AA", new[]{
                 "Ana panelde hazırlık durumu ve hızlı işlemler küçük pencerede de görünür",
                 "Modrinth ve CurseForge kaynakları arasında seçim yapılabilir",

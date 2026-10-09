@@ -116,6 +116,63 @@ static class ModPagePerformanceTests
                 "authenticated CurseForge search displays normalized metadata source caption and official website action");
             Wait(Search("")); source.SelectedIndex=0;
             Check(results.Children.Count==0 && source.SelectedIndex==0,"switching back to Modrinth invalidates CurseForge results");
+
+            var filtered=Search("filtered");
+            var facets=JArray.Parse(Uri.UnescapeDataString(transport.SearchUris["filtered"].Query.TrimStart('?').Split('&')
+                .Single(value=>value.StartsWith("facets=",StringComparison.Ordinal))[7..]));
+            Check(facets.Count==3 && facets.All(value=>value is JArray group && group.Count==1) &&
+                facets.Select(value=>value[0]!.ToString()).ToHashSet().SetEquals(new[]{"project_type:mod","versions:98.1","categories:fabric"}),
+                "Modrinth search AND-filters the exact Minecraft version and loader instead of returning unrelated profiles");
+            transport.Pending["filtered"].Complete("filtered result"); Wait(filtered);
+            foreach(bool error in new[]{false,true})
+            {
+                window.Config.Version="98.1-fabric";
+                string query=error ? "profile-error" : "profile-result";
+                var stale=Search(query);
+                window.Config.Version="98.2-neoforge";
+                if(error) transport.Pending[query].Response.SetException(new HttpRequestException("obsolete profile failed"));
+                else transport.Pending[query].Complete("obsolete profile result");
+                Wait(stale);
+                Check(Result("current profile result") && !Result("obsolete profile result") &&
+                    !Nodes(results).OfType<TextBlock>().Any(text=>text.Text.Contains("obsolete profile failed",StringComparison.Ordinal)) &&
+                    Uri.UnescapeDataString(transport.SearchUris[query].Query).Contains("categories:neoforge",StringComparison.Ordinal) &&
+                    Uri.UnescapeDataString(transport.SearchUris[query].Query).Contains("versions:98.2",StringComparison.Ordinal),
+                    "profile change refreshes current compatibility instead of publishing the old "+(error ? "error" : "results"));
+            }
+            window.Config.Version="98.1-fabric";
+            var loaded=Search("profile-loaded"); transport.Pending["profile-loaded"].Complete("old cached profile result"); Wait(loaded);
+            window.Config.Version="98.2-neoforge"; page.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+            Wait(Dispatcher.CurrentDispatcher.InvokeAsync(()=>{},DispatcherPriority.ContextIdle).Task);
+            Check(Result("current profile result") && !Result("old cached profile result"),
+                "reopening the cached mod page refreshes Modrinth results when the selected profile changed");
+
+            window.Config.Version="98.3";
+            var vanilla=Search("filtered-vanilla");
+            var vanillaFacets=JArray.Parse(Uri.UnescapeDataString(transport.SearchUris["filtered-vanilla"].Query.TrimStart('?').Split('&')
+                .Single(value=>value.StartsWith("facets=",StringComparison.Ordinal))[7..]));
+            Check(vanillaFacets.Count==2 && vanillaFacets.Select(value=>value[0]!.ToString()).ToHashSet().SetEquals(new[]{"project_type:mod","versions:98.3"}),
+                "vanilla search filters the game version without inventing an unsupported vanilla loader facet");
+            transport.Pending["filtered-vanilla"].Complete("vanilla result"); Wait(vanilla);
+
+            var install=fields.GetMethod("InstallMod",BindingFlags.Instance|BindingFlags.NonPublic)!;
+            var runButton=fields.GetMethod("RunInstallButton",BindingFlags.Static|BindingFlags.NonPublic)!;
+            var installButton=new Button { Content="KUR" }; int failures=0;
+            Func<Task<bool>> realFailure=()=>(Task<bool>)install.Invoke(page,new object[]{"fixture-failed","Fixture"})!;
+            Task RunButton(Func<Task<bool>> operation)=>(Task)runButton.Invoke(null,new object[]{installButton,operation,
+                (Action<Exception>)(error=>{ if(error is not HttpRequestException) throw error; failures++; }),"OK"})!;
+            for(int attempt=0;attempt<2;attempt++)
+            {
+                Wait(RunButton(realFailure));
+                Check(installButton.IsEnabled && Equals(installButton.Content,"KUR") && failures==attempt+1,
+                    "failed Modrinth metadata installation restores retry instead of a false OK: attempt "+(attempt+1));
+            }
+            var completion=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var running=RunButton(()=>completion.Task);
+            Check(!installButton.IsEnabled && Equals(installButton.Content,"..."),"mod installation disables duplicate clicks while its operation is pending");
+            completion.SetResult(false); Wait(running);
+            Check(installButton.IsEnabled && Equals(installButton.Content,"KUR"),"queued or skipped mod operation never reports active installation success");
+            Wait(RunButton(()=>Task.FromResult(true)));
+            Check(installButton.IsEnabled && Equals(installButton.Content,"OK"),"successful mod operation alone produces the installation success label");
         }
         finally { window.Config.CurseForgeApiKey=oldKey; window.Config.Version=oldVersion; }
         return checks;
@@ -147,10 +204,13 @@ static class ModPagePerformanceTests
     sealed class SearchTransport : HttpMessageHandler
     {
         public readonly Dictionary<string,PendingSearch> Pending=new();
+        public readonly Dictionary<string,Uri> SearchUris=new();
         public int Requests,CurseForgeRequests;
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken cancellationToken)
         {
             Requests++;
+            if(request.RequestUri!.AbsolutePath=="/v2/project/fixture-failed/version")
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
             if(request.RequestUri!.Host=="api.curseforge.com")
             {
                 CurseForgeRequests++;
@@ -160,7 +220,12 @@ static class ModPagePerformanceTests
                         ["downloadCount"]=2,["slug"]="fixture-mod" }) }.ToString()) });
             }
             string query=Uri.UnescapeDataString(request.RequestUri!.Query.TrimStart('?').Split('&').Single(value=>value.StartsWith("query=",StringComparison.Ordinal))[6..]);
+            SearchUris[query]=request.RequestUri;
             if(query=="optimization") return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content=new StringContent("{\"hits\":[]}") });
+            if(query.StartsWith("profile-",StringComparison.Ordinal) && Pending.ContainsKey(query))
+            {
+                var refreshed=new PendingSearch(cancellationToken); refreshed.Complete("current profile result"); return refreshed.Response.Task;
+            }
             var pending=new PendingSearch(cancellationToken); Pending.Add(query,pending); return pending.Response.Task;
         }
     }
