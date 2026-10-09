@@ -213,6 +213,10 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.7","2026-10-09","#00D4AA", new[]{
+                "Online ve offline kurucuda mevcut kurulumu onarma seçeneği eklendi.",
+                "Installer repair restores verified program files while preserving player data."
+            }),
             new("v6.2.6","2026-10-09","#00D4AA", new[]{
                 "Mod araması seçili Minecraft sürümünü ve mod yükleyicisini filtreler",
                 "Profil değiştiğinde geciken eski arama sonuçları yenilenir",
