@@ -133,9 +133,13 @@ static class CurseForgeTests
         {
             var officialCdn = new Stub(); officialCdn.Files[1]["downloadUrl"] = $"https://{host}/files/1/1/fixture.jar";
             using var client = new HttpClient(officialCdn); using var service = new CurseForgeMods("fixture-api-key", client);
-            Check((await service.DownloadAsync(1, "1.20.1", "fabric")).Count == 2 && officialCdn.Requests.Where(request => new Uri(request.Url).Host.EndsWith("forgecdn.net")).All(request => !request.HasKey),
-                "CurseForge accepts the official " + host + " CDN without sending the API key");
+            Check((await service.DownloadAsync(1, "1.20.1", "fabric")).Count == 2 && officialCdn.Requests.Where(request => new Uri(request.Url).Host.EndsWith("forgecdn.net")).All(request => request.HasKey == (new Uri(request.Url).Host == "edge.forgecdn.net")),
+                "CurseForge authenticates only the documented edge CDN and keeps keys off public media downloads: " + host);
         }
+        var edgeRedirect=new Stub { EdgeRedirect=true }; edgeRedirect.Files[1]["downloadUrl"]="https://edge.forgecdn.net/files/1/1/fixture.jar";
+        using(var client=new HttpClient(edgeRedirect))
+        using(var service=new CurseForgeMods("fixture-api-key",client))
+            Check((await service.DownloadAsync(1,"1.20.1","fabric")).Count==2 && edgeRedirect.Requests.Any(request=>new Uri(request.Url).Host=="edge.forgecdn.net" && request.HasKey) && edgeRedirect.Requests.Where(request=>new Uri(request.Url).Host=="mediafilez.forgecdn.net").All(request=>!request.HasKey),"edge CDN redirects do not forward API credentials to media hosts");
         var badHash = new Stub(); badHash.Files[2]["hashes"]![0]!["value"] = new string('0', 40);
         Check(await Reject(badHash) && !badHash.Requests.Any(request => request.Url.EndsWith("fixture.jar")), "CurseForge bad required dependency checksum aborts the bundle before the main mod is downloaded");
         var noHash = new Stub(); noHash.Files[1]["hashes"] = new JArray(new JObject { ["algo"] = 2, ["value"] = new string('0', 32) });
@@ -198,7 +202,7 @@ static class CurseForgeTests
         public Dictionary<int, JObject> Files = new();
         public Dictionary<int, JArray> AlternateFiles = new();
         public List<(string Url, bool HasKey)> Requests = new();
-        public bool ApiRedirect, AssetRedirect, StallAsset;
+        public bool ApiRedirect, AssetRedirect, EdgeRedirect, StallAsset;
         public bool EmptyFilePage, InvalidPageIndex, RepeatFilePage;
         public long? FileTotalCount;
         public bool AssetRequests => Requests.Any(request => new Uri(request.Url).Host.EndsWith("forgecdn.net"));
@@ -240,6 +244,10 @@ static class CurseForgeTests
                 return Task.FromResult(Json(Projects[id].DeepClone()));
             }
             if (AssetRedirect) return Task.FromResult(Redirect());
+            if(uri.Host=="edge.forgecdn.net") {
+                if(!request.Headers.Contains("x-api-key")) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized));
+                if(EdgeRedirect) { var redirected=new HttpResponseMessage(HttpStatusCode.Redirect); redirected.Headers.Location=new Uri("https://mediafilez.forgecdn.net"+uri.PathAndQuery); return Task.FromResult(redirected); }
+            }
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = StallAsset ? new StreamContent(new StalledStream()) : new ByteArrayContent(Jar) });
         }
         static HttpResponseMessage Json(JToken value) => new(HttpStatusCode.OK) { Content = new StringContent(new JObject { ["data"] = value }.ToString()) };

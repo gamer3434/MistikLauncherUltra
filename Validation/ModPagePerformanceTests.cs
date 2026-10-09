@@ -114,6 +114,11 @@ static class ModPagePerformanceTests
                 Nodes(results).OfType<TextBlock>().Any(text=>text.Text=="CurseForge") &&
                 Nodes(results).OfType<Button>().Any(button=>Equals(button.Content,Localization.T("cfOpenWebsite"))),
                 "authenticated CurseForge search displays normalized metadata source caption and official website action");
+            foreach(var status in new[]{HttpStatusCode.Unauthorized,HttpStatusCode.Forbidden}) {
+                transport.CurseForgeFailure=status; Wait(Search("cf-rejected"));
+                Check(Nodes(results).OfType<TextBlock>().Any(text=>text.Text==Localization.T("cfKeyRejected")) && Nodes(results).OfType<Button>().Any(button=>button.Name=="CurseForgeSettings") && Nodes(results).OfType<Button>().Any(button=>button.Name=="CurseForgeOfficialSearch") && window.Config.CurseForgeApiKey=="fixture-api-key","rejected CurseForge key shows actionable settings help without erasing the stored key: "+status);
+            }
+            transport.CurseForgeFailure=null;
             Wait(Search("")); source.SelectedIndex=0;
             Check(results.Children.Count==0 && source.SelectedIndex==0,"switching back to Modrinth invalidates CurseForge results");
 
@@ -206,6 +211,7 @@ static class ModPagePerformanceTests
         public readonly Dictionary<string,PendingSearch> Pending=new();
         public readonly Dictionary<string,Uri> SearchUris=new();
         public int Requests,CurseForgeRequests;
+        public HttpStatusCode? CurseForgeFailure;
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken cancellationToken)
         {
             Requests++;
@@ -215,6 +221,7 @@ static class ModPagePerformanceTests
             {
                 CurseForgeRequests++;
                 if(!request.Headers.TryGetValues("x-api-key",out var keys) || keys.Single()!="fixture-api-key") throw new Exception("Missing fixture API header.");
+                if(CurseForgeFailure is HttpStatusCode failure) return Task.FromResult(new HttpResponseMessage(failure));
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content=new StringContent(new JObject {
                     ["data"]=new JArray(new JObject { ["id"]=123,["gameId"]=432,["classId"]=6,["name"]="CurseForge fixture",["summary"]="fixture",
                         ["downloadCount"]=2,["slug"]="fixture-mod" }) }.ToString()) });

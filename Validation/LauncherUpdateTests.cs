@@ -36,7 +36,8 @@ static class LauncherUpdateTests
         });
         string target=Path.Combine(root,"launcher-target"); Directory.CreateDirectory(target);
         foreach(var name in names) File.WriteAllText(Path.Combine(target,name),"old "+name);
-        File.WriteAllText(Path.Combine(target,"config.json"),"user preferences");
+        var profileBytes=System.Text.Encoding.ASCII.GetBytes("MLUC1\n").Concat(WindowsSecret.Transform(System.Text.Encoding.UTF8.GetBytes("{\"user\":\"PersistedPlayer\",\"curseforge_api_key\":\"fake_update_fixture_key\"}"),true)).ToArray();
+        File.WriteAllBytes(Path.Combine(target,"config.json"),profileBytes);
         Directory.CreateDirectory(Path.Combine(target,"game")); File.WriteAllText(Path.Combine(target,"game","world.dat"),"world");
         using var client=new HttpClient(new Stub(metadata,zip));
         bool canUpdate=true;
@@ -66,7 +67,7 @@ static class LauncherUpdateTests
         File.Delete(Path.Combine(target,"update-manifest.json"));
         UpdateEngine.Apply(payload,target);
         Check(names.All(name=>File.ReadAllText(Path.Combine(target,name))=="new "+name),"full package replacement");
-        Check(File.ReadAllText(Path.Combine(target,"config.json"))=="user preferences" && File.ReadAllText(Path.Combine(target,"game","world.dat"))=="world","launcher update preserves settings and worlds");
+        Check(File.ReadAllBytes(Path.Combine(target,"config.json")).SequenceEqual(profileBytes) && File.ReadAllText(Path.Combine(target,"game","world.dat"))=="world","launcher update preserves encrypted player name, API key and worlds byte for byte");
         Check(JsonSerializer.Deserialize<UpdateManifest>(File.ReadAllText(Path.Combine(target,"update-manifest.json")))!.Version=="7.0.0","update replaces the installed manifest");
         Check(!Directory.EnumerateDirectories(root,"backup-*").Any(),"successful update removes its private backup directory");
         foreach(var name in names) File.WriteAllText(Path.Combine(target,name),"old "+name);

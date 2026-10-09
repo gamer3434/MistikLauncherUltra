@@ -45,7 +45,7 @@ namespace MistikLauncher
 
             InitializeComponent();
             Config = ConfigManager.Load();
-            LauncherUpdates = new LauncherUpdater(() => BtnLaunch.IsEnabled && !AutoMcs.Busy && !(GlobalProgress.Value > 0 && GlobalProgress.Value < 100) && System.Windows.Input.Keyboard.FocusedElement is not TextBox);
+            LauncherUpdates = new LauncherUpdater(() => BtnLaunch.IsEnabled && !AutoMcs.Busy && !(GlobalProgress.Value > 0 && GlobalProgress.Value < 100) && System.Windows.Input.Keyboard.FocusedElement is not (TextBox or PasswordBox));
             Title = "Mistik Launcher " + LauncherUpdates.CurrentVersion;
             Config.OpenCount++;
             ConfigManager.Save(Config);
@@ -252,10 +252,10 @@ namespace MistikLauncher
         public void BuildQuickBar()
         {
             QuickBarPanel.Children.Clear(); quickButtons.Clear();
-            foreach(var item in new[]{("Dash","home","\uE80F"),("Vers","versions","\uE7FC"),("Mods","mods","\uE74C"),("Skin","skin","\uE77B"),("Server","server","\uE968"),("Updates","updates","\uE777"),("Settings","settings","\uE713"),("Opt","optimization","\uE9D9")})
+            foreach(var item in new[]{("Dash","home","\uE80F"),("Vers","versions","\uE7FC"),("Mods","mods","\uE74C"),("Skin","skin","\uE77B"),("Server","server","\uE968"),("Settings","settings","\uE713"),("Opt","optimization","\uE9D9")})
             {
-                if(item.Item1!="Opt" && item.Item1!="Updates" && !Config.QuickLinks.Contains(item.Item1)) continue;
-                var label=item.Item1 switch { "Updates" => Localization.Language=="en"?"Updates":"Güncellemeler", _ => Localization.T(item.Item2) };
+                if(item.Item1!="Opt" && !Config.QuickLinks.Contains(item.Item1)) continue;
+                var label=Localization.T(item.Item2);
                 var content=new StackPanel { Orientation=Orientation.Horizontal };
                 content.Children.Add(new TextBlock { Text=item.Item3,FontFamily=new FontFamily("Segoe MDL2 Assets"),FontSize=16,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,8,0) });
                 content.Children.Add(new TextBlock { Text=label,VerticalAlignment=VerticalAlignment.Center });
@@ -280,7 +280,7 @@ namespace MistikLauncher
 
         public void Navigate(string key)
         {
-            if (key == "Admin") key = "Settings";
+            if (key is "Admin" or "Updates") key = "Settings";
             _currentNav = key;
             SelectNav(key);
 
@@ -301,7 +301,6 @@ namespace MistikLauncher
                     "Changelog" => new Pages.ChangelogPage(this),
                     "Opt"       => new Pages.OptimizationPage(this),
                     "Guide"     => new Pages.GuidePage(this),
-                    "Updates"   => new Pages.ModernSettingsPage(this, updatesOnly:true),
                     "Settings"  => new Pages.ModernSettingsPage(this),
                     "Licenses"  => new Pages.LicensesPage(this),
                     _           => new Pages.ModernHomePage(this)

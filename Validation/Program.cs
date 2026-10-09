@@ -118,6 +118,15 @@ class Program
             }
             ConfigManager.Save(ConfigManager.Load());
             Check(ConfigManager.Load().User=="LegacyUser" && !File.ReadAllText(Path.Combine(testRoot,"config.json")).Contains("LegacyUser") && !File.ReadAllText(Path.Combine(testRoot,"config.json.bak")).Contains("LegacyUser"), "legacy settings and backup migrate to encrypted files");
+            var previousProfile=ConfigManager.Load();
+            var migrationProfile=new LauncherConfig { User="LegacyUser",VersionCode="v1.0.0",Ram=8,Lang="English",AuthType="elyby",SkinType="username",SkinUser="LegacySkin",CurseForgeApiKey="fake_migration_fixture_key" };
+            var migrationBytes=System.Text.Encoding.ASCII.GetBytes("MLUC1\n").Concat(WindowsSecret.Transform(System.Text.Encoding.UTF8.GetBytes(Newtonsoft.Json.JsonConvert.SerializeObject(migrationProfile)),true)).ToArray();
+            File.WriteAllBytes(Path.Combine(testRoot,"config.json"),migrationBytes);
+            var migratedProfile=ConfigManager.Load();
+            Check(migratedProfile.User==migrationProfile.User && migratedProfile.Ram==8 && migratedProfile.Lang=="English" && migratedProfile.AuthType=="elyby" && migratedProfile.SkinUser=="LegacySkin" && migratedProfile.CurseForgeApiKey==migrationProfile.CurseForgeApiKey && migratedProfile.VersionCode==App.LocalVersion && File.ReadAllBytes(Path.Combine(testRoot,"config.json")).SequenceEqual(migrationBytes),"new launcher version preserves encrypted player profile and API key without rewriting settings on load");
+            ConfigManager.Save(migratedProfile);
+            Check(ConfigManager.Load().User=="LegacyUser" && ConfigManager.Load().CurseForgeApiKey==migrationProfile.CurseForgeApiKey && !File.ReadAllText(Path.Combine(testRoot,"config.json")).Contains(migrationProfile.CurseForgeApiKey),"migrated profile and API key survive an encrypted save and reload");
+            ConfigManager.Save(previousProfile);
             bool notificationRan=false;
             Action<LauncherConfig> failedNotification=_=> { notificationRan=true; throw new IOException("test subscriber failure"); };
             ConfigManager.Saved+=failedNotification;
@@ -236,18 +245,19 @@ class Program
             ((Button)window.FindName("ProfileButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
             Check(((Frame)window.FindName("MainFrame")).Content is MistikLauncher.Pages.ModernSettingsPage,"top-right player profile opens settings");
             var bar=(System.Windows.Controls.WrapPanel)window.FindName("QuickBarPanel");
-            Check(bar.Children.Count==8,"top bar exposes eight bilingual shortcuts by default");
+            Check(bar.Children.Count==7 && !Texts(bar).Contains("Güncellemeler") && !Texts(bar).Contains("Updates"),"top bar exposes seven shortcuts with updates available only in settings");
             window.Config.QuickLinks=new(){"Dash","Settings"}; ConfigManager.Save(window.Config); window.BuildQuickBar();
-            Check(bar.Children.Count==4 && ConfigManager.Load().QuickLinks.SequenceEqual(new[]{"Dash","Settings"}),"shortcut customization persists alongside fixed updates and optimization shortcuts");
-            ((Button)bar.Children[2]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(bar.Children.Count==3 && ConfigManager.Load().QuickLinks.SequenceEqual(new[]{"Dash","Settings"}),"shortcut customization persists alongside fixed optimization shortcut");
+            ((Button)bar.Children[1]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Flush(window);
             Check(((Frame)window.FindName("MainFrame")).Content is MistikLauncher.Pages.ModernSettingsPage,"top shortcut navigates to requested page");
+            var settingsShortcutPage=((Frame)window.FindName("MainFrame")).Content;
             window.Config.QuickLinks.Clear(); window.BuildQuickBar();
-            Check(((Border)window.FindName("QuickBarHost")).Visibility==Visibility.Visible && bar.Children.Count==2,"updates and optimization remain reachable with no optional shortcuts");
+            Check(((Border)window.FindName("QuickBarHost")).Visibility==Visibility.Visible && bar.Children.Count==1,"optimization remains reachable with no optional shortcuts");
             ((Button)bar.Children[0]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
-            Check(((Frame)window.FindName("MainFrame")).Content is MistikLauncher.Pages.ModernSettingsPage,"fixed updates shortcut opens its page");
-            ((Button)bar.Children[1]).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
             Check(((Frame)window.FindName("MainFrame")).Content is MistikLauncher.Pages.OptimizationPage,"optimization shortcut opens its page");
+            window.Navigate("Updates"); Flush(window);
+            Check(ReferenceEquals(((Frame)window.FindName("MainFrame")).Content,settingsShortcutPage),"legacy update navigation reuses the existing full settings page");
             window.Config.QuickLinks=new(){"Dash","Vers","Mods","Skin","Server","Settings"}; ConfigManager.Save(window.Config); window.BuildQuickBar();
             foreach(var name in ColorThemes.Names)
             {

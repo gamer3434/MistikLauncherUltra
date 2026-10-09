@@ -403,6 +403,7 @@
   "versionLoadMore": "Show more versions",
   "modLoadMore": "Show more mods",
   "modSource": "Mod source",
+  "cfKeyRejected": "CurseForge rejected this key. Enter an approved, valid API key in Settings → Integrations.",
   "cfKeyRequired": "Add your CurseForge API key in Settings → Integrations to search and install CurseForge mods.",
   "cfOpenWebsite": "Open on CurseForge",
   "cfInstallFailure": "CurseForge installation failed",

@@ -212,6 +212,7 @@ public sealed class CurseForgeMods : IDisposable
         for (int redirects = 0; redirects <= 5; redirects++)
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            if (uri.Host.Equals("edge.forgecdn.net", StringComparison.OrdinalIgnoreCase)) request.Headers.Add("x-api-key", _apiKey);
             var response = await _client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
             try
             {

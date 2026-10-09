@@ -1157,15 +1157,16 @@ namespace MistikLauncher.Pages
                 if (generation != _searchGeneration) return;
                 if ((_main.Config.Version ?? "") != profile) { await SearchMods(); return; }
                 _resultsPanel.Children.Clear();
+                if(curseForge && ex is HttpRequestException { StatusCode: System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden }) { ShowCurseForgeKeyHelp(q,true); return; }
                 _resultsPanel.Children.Add(PageHelpers.Lbl((curseForge ? Localization.T("cfSearchFailure") : "Hata") + ": " + ex.Message, 13, "#FF4B4B"));
             }
             finally { if (ReferenceEquals(_searchCancellation, cancellation)) _searchCancellation = null; }
         }
 
-        void ShowCurseForgeKeyHelp(string query)
+        void ShowCurseForgeKeyHelp(string query, bool rejected=false)
         {
             _resultsPanel.Children.Clear();
-            var help = PageHelpers.Lbl("cfKeyRequired", 13, "#ADBED6", wrap: TextWrapping.Wrap); help.Name = "CurseForgeKeyRequired";
+            var help = PageHelpers.Lbl(rejected?"cfKeyRejected":"cfKeyRequired", 13, "#ADBED6", wrap: TextWrapping.Wrap); help.Name = "CurseForgeKeyRequired";
             _resultsPanel.Children.Add(help);
             var actions = new WrapPanel();
             var settings = PageHelpers.MkBtn("cfOpenSettings", "#226DA0"); settings.Name = "CurseForgeSettings";
