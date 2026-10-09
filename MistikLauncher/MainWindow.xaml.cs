@@ -38,6 +38,7 @@ namespace MistikLauncher
         int _backgroundModSync;
         // ponytail: one per-window gate; share it if multi-window support is added.
         readonly object _modSyncGate = new();
+        internal object ConfigurationGate => _modSyncGate;
 
         public MainWindow()
         {

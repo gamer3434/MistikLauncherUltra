@@ -2,7 +2,7 @@
 
 ## Türkçe
 
-- Başarısız ayar kaydı aktif oyuncu adı, RAM, giriş yöntemi, kapanma ve dil tercihlerini değiştirmez. Taslak korunur ve hata gösterilir. Otomatik güncelleme tercihi sayfalar arasında yenilenir; başarısız kayıt seçimi geri alır.
+- Başarısız ayar kaydı aktif oyuncu adı, RAM, giriş yöntemi, kapanma ve dil tercihlerini değiştirmez. Taslak korunur ve hata gösterilir. Otomatik güncelleme tercihi sayfalar arasında yenilenir; başarısız kayıt seçimi geri alır. Ayar kaydı ve mod havuzu geçişi aynı kilidi kullanır.
 - Mod bağımlılık zinciri indirme başladığı profile bağlı kalır. İndirme sırasında başka profil seçilirse o profilin modlarına dosya yazılmaz. Aktif mod yazma ve havuz geçişleri birlikte korunur.
 - .minecraft mod aktarımı devre dışı bırakılmış dosyaları yeniden etkinleştirmez; mevcut modları korur. Kopyalar geçici dosyadan tamamlanır ve tek profil havuzuna aktarılır.
 - Oyun başlatma komutu Windows işletim sistemi, sürüm ve mimari kurallarını doğrulamayla aynı şekilde uygular. Native arşivler sıradan kütüphane gibi eklenmez; döngülü profil mirası ve dizin dışına çıkan kütüphane yolları kontrollü biçimde reddedilir.
@@ -10,7 +10,7 @@
 
 ## English
 
-- Failed settings saves preserve the active player name, memory, authentication, close and language preferences. Drafts remain available for retry. Automatic update preferences refresh across cached pages and revert on failed persistence.
+- Failed settings saves preserve the active player name, memory, authentication, close and language preferences. Drafts remain available for retry. Automatic update preferences refresh across cached pages and revert on failed persistence. Settings commits and mod pool transitions share the same lock.
 - Required mod dependencies retain the original selected profile throughout downloads. Changing profiles cannot redirect the old dependency chain into the new active mod directory. Active writes and pool synchronization share the existing lock.
 - Importing .minecraft mods preserves disabled and existing files. Copies commit from temporary files and stay in one profile pool.
 - Launch libraries and JVM arguments use the same Windows OS, version and architecture rules as runtime verification. Native archives are excluded from ordinary classpaths; cyclic inheritance and escaping library paths fail safely.

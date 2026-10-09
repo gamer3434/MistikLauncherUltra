@@ -18,6 +18,8 @@ static class SettingsLifecycleTests
         var originalConfig=window.Config;
         var originalAutoUpdate=originalConfig.LauncherAutoUpdate;
         var originalLanguage=Localization.Language;
+        var syncGate=typeof(MainWindow).GetField("_modSyncGate",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
+        var configurationGate=typeof(MainWindow).GetProperty("ConfigurationGate",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
         var busy=updater.Busy; var status=updater.StatusKey;
         var progress=updater.Progress; var error=updater.Error;
         void State(bool running,string key)
@@ -29,6 +31,7 @@ static class SettingsLifecycleTests
         T Control<T>(ModernSettingsPage page,string name)=>(T)typeof(ModernSettingsPage).GetField(name,BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(page)!;
         try
         {
+            Check(ReferenceEquals(configurationGate,syncGate),"settings persistence shares the existing mod synchronization gate");
             foreach(var updatesOnly in new[]{false,true})
             {
                 State(true,"luChecking");
@@ -53,7 +56,12 @@ static class SettingsLifecycleTests
             var cachedContent=settings.Content;
             var updatesAutomatic=Control<CheckBox>(updates,"autoUpdate");
             updatesAutomatic.IsChecked=!originalAutoUpdate;
-            updatesAutomatic.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            bool automaticSavedUnderGate=false;
+            void ObserveAutomaticSave(LauncherConfig _) => automaticSavedUnderGate=System.Threading.Monitor.IsEntered(syncGate);
+            ConfigManager.Saved+=ObserveAutomaticSave;
+            try { updatesAutomatic.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); }
+            finally { ConfigManager.Saved-=ObserveAutomaticSave; }
+            Check(automaticSavedUnderGate,"automatic update preference is persisted under the mod synchronization gate");
             settings.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
             try
             {
@@ -94,17 +102,26 @@ static class SettingsLifecycleTests
             using(var stream=File.Create(skin)) encoder.Save(stream);
             var localConfig=Newtonsoft.Json.JsonConvert.DeserializeObject<LauncherConfig>(Newtonsoft.Json.JsonConvert.SerializeObject(originalConfig))!;
             localConfig.SkinType="local"; localConfig.SkinUser=skin; window.Config=localConfig;
+            const string synchronizedProfile="settings-synchronized-profile";
+            Task.Run(()=> { lock(syncGate) window.Config.LastSyncedVersion=synchronizedProfile; }).GetAwaiter().GetResult();
             user.Text=previous.User; memory.Text=previous.Ram.ToString();
             var targetLanguage=originalLanguage=="en"?"Turkce":"English";
             Control<ComboBox>(settings,"language").SelectedIndex=targetLanguage=="English"?1:0;
             FileStream? savedLock=null; int saveNotifications=0;
-            void LockAfterSave(LauncherConfig _) { saveNotifications++; savedLock=new FileStream(configPath,FileMode.Open,FileAccess.Read,FileShare.Read); }
+            bool settingsSavedUnderGate=false; string? notifiedSyncedProfile=null;
+            void LockAfterSave(LauncherConfig saved) {
+                saveNotifications++;
+                settingsSavedUnderGate=System.Threading.Monitor.IsEntered(syncGate);
+                notifiedSyncedProfile=saved.LastSyncedVersion;
+                savedLock=new FileStream(configPath,FileMode.Open,FileAccess.Read,FileShare.Read);
+            }
             ConfigManager.Saved+=LockAfterSave;
             try
             {
                 typeof(ModernSettingsPage).GetMethod("Save",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(settings,null);
                 var savedLanguage=ConfigManager.Load().Lang;
                 var feedback=Control<TextBlock>(settings,"result").Text;
+                Check(settingsSavedUnderGate && notifiedSyncedProfile==synchronizedProfile && window.Config.LastSyncedVersion==synchronizedProfile && ConfigManager.Load().LastSyncedVersion==synchronizedProfile,"settings snapshot and persistence retain completed mod synchronization under the shared gate");
                 Check(saveNotifications==1 && window.Config.Lang==targetLanguage && Localization.Language==(targetLanguage=="English"?"en":"tr") && savedLanguage==targetLanguage && feedback==Localization.T("saved"),$"successful settings language save updates the interface without a second write after reload (notifications={saveNotifications}, target={targetLanguage}, runtime={window.Config.Lang}, disk={savedLanguage}, UI={Localization.Language}, result={feedback})");
             }
             finally { ConfigManager.Saved-=LockAfterSave; savedLock?.Dispose(); }

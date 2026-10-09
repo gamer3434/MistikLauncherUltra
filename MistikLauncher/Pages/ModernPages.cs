@@ -193,11 +193,13 @@ public class ModernSettingsPage : Page, ILanguagePage
         updateContent.Children.Add(PageHelpers.Lbl(Localization.T("luTitle")+" · "+main.LauncherUpdates.CurrentVersion,18,"#EFF5FF",true));
         autoUpdate=new CheckBox { Content=Localization.T("luAutomatic"), IsChecked=main.Config.LauncherAutoUpdate, Foreground=Brushes.White, Margin=new Thickness(0,12,0,12) };
         autoUpdate.Click += (_,_)=> {
-            bool previous=main.Config.LauncherAutoUpdate;
-            try { main.Config.LauncherAutoUpdate=autoUpdate.IsChecked==true; ConfigManager.Save(main.Config); }
-            catch(Exception ex) {
-                main.Config.LauncherAutoUpdate=previous; autoUpdate.IsChecked=previous;
-                updateStatus.Text=Localization.T("error")+": "+ex.Message;
+            lock(main.ConfigurationGate) {
+                bool previous=main.Config.LauncherAutoUpdate;
+                try { main.Config.LauncherAutoUpdate=autoUpdate.IsChecked==true; ConfigManager.Save(main.Config); }
+                catch(Exception ex) {
+                    main.Config.LauncherAutoUpdate=previous; autoUpdate.IsChecked=previous;
+                    updateStatus.Text=Localization.T("error")+": "+ex.Message;
+                }
             }
         };
         updateContent.Children.Add(autoUpdate);
@@ -376,12 +378,15 @@ public class ModernSettingsPage : Page, ILanguagePage
         user.BorderBrush=PageHelpers.HexBrush(validUser?"#365574":"#FF4B4B"); ram.BorderBrush=PageHelpers.HexBrush(validMemory?"#365574":"#FF4B4B");
         if(!validUser || !validMemory) { result.Text=Localization.T("invalid"); var field=!validUser?user:ram; field.Focus(); field.BringIntoView(); return; }
         try {
-            var draft=Newtonsoft.Json.JsonConvert.DeserializeObject<LauncherConfig>(Newtonsoft.Json.JsonConvert.SerializeObject(main.Config))!;
-            draft.User=user.Text.Trim(); draft.Ram=memory;
-            draft.AuthType=provider.SelectedIndex==1?"elyby":"offline";
-            draft.AutoClose=close.IsChecked==true;
-            draft.Lang=language.SelectedIndex==1?"English":"Turkce";
-            ConfigManager.Save(draft); main.Config=draft; main.ReloadConfig();
+            lock(main.ConfigurationGate) {
+                var draft=Newtonsoft.Json.JsonConvert.DeserializeObject<LauncherConfig>(Newtonsoft.Json.JsonConvert.SerializeObject(main.Config))!;
+                draft.User=user.Text.Trim(); draft.Ram=memory;
+                draft.AuthType=provider.SelectedIndex==1?"elyby":"offline";
+                draft.AutoClose=close.IsChecked==true;
+                draft.Lang=language.SelectedIndex==1?"English":"Turkce";
+                ConfigManager.Save(draft); main.Config=draft;
+            }
+            main.ReloadConfig();
             if(Localization.Language!=(main.Config.Lang=="English"?"en":"tr")) Localization.SetLanguage(main.Config.Lang);
             result.Text=Localization.T("saved");
         } catch(Exception ex) { result.Text=Localization.T("error")+": "+ex.Message; }
