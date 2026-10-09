@@ -164,7 +164,7 @@ public class ModernSettingsPage : Page, ILanguagePage
     readonly bool updatesOnly;
     TextBox user = null!, ram = null!;
     ComboBox language = null!, provider = null!;
-    CheckBox close = null!;
+    CheckBox close = null!, autoUpdate = null!;
     TextBlock result = null!, updateStatus = null!, updateNotes = null!;
     Button updateButton = null!;
     ProgressBar updateProgress = null!;
@@ -173,7 +173,7 @@ public class ModernSettingsPage : Page, ILanguagePage
     {
         main=window;
         this.updatesOnly=updatesOnly;
-        Loaded += (_,_) => { main.LauncherUpdates.Changed += UpdateStatusAsync; UpdateStatus(); };
+        Loaded += (_,_) => { main.LauncherUpdates.Changed += UpdateStatusAsync; autoUpdate.IsChecked=main.Config.LauncherAutoUpdate; UpdateStatus(); };
         Unloaded += (_,_) => main.LauncherUpdates.Changed -= UpdateStatusAsync;
         Render();
     }
@@ -191,9 +191,16 @@ public class ModernSettingsPage : Page, ILanguagePage
         var updateCard=new Border { Background=PageHelpers.HexBrush("#192C46"), CornerRadius=new CornerRadius(14), Padding=new Thickness(20), Margin=new Thickness(0,0,0,12) };
         var updateContent=new StackPanel();
         updateContent.Children.Add(PageHelpers.Lbl(Localization.T("luTitle")+" · "+main.LauncherUpdates.CurrentVersion,18,"#EFF5FF",true));
-        var auto=new CheckBox { Content=Localization.T("luAutomatic"), IsChecked=main.Config.LauncherAutoUpdate, Foreground=Brushes.White, Margin=new Thickness(0,12,0,12) };
-        auto.Click += (_,_)=> { main.Config.LauncherAutoUpdate=auto.IsChecked==true; ConfigManager.Save(main.Config); };
-        updateContent.Children.Add(auto);
+        autoUpdate=new CheckBox { Content=Localization.T("luAutomatic"), IsChecked=main.Config.LauncherAutoUpdate, Foreground=Brushes.White, Margin=new Thickness(0,12,0,12) };
+        autoUpdate.Click += (_,_)=> {
+            bool previous=main.Config.LauncherAutoUpdate;
+            try { main.Config.LauncherAutoUpdate=autoUpdate.IsChecked==true; ConfigManager.Save(main.Config); }
+            catch(Exception ex) {
+                main.Config.LauncherAutoUpdate=previous; autoUpdate.IsChecked=previous;
+                updateStatus.Text=Localization.T("error")+": "+ex.Message;
+            }
+        };
+        updateContent.Children.Add(autoUpdate);
         updateButton=PageHelpers.MkBtn(Localization.T("luCheck"),"#226DA0"); updateButton.HorizontalAlignment=HorizontalAlignment.Left;
         updateButton.Click += async (_,_)=> await main.CheckLauncherUpdatesAsync(true); updateContent.Children.Add(updateButton);
         updateStatus=PageHelpers.Lbl("",13,"#ADBED6",pad:new Thickness(0,10,0,0),wrap:TextWrapping.Wrap); updateContent.Children.Add(updateStatus);
@@ -369,11 +376,13 @@ public class ModernSettingsPage : Page, ILanguagePage
         user.BorderBrush=PageHelpers.HexBrush(validUser?"#365574":"#FF4B4B"); ram.BorderBrush=PageHelpers.HexBrush(validMemory?"#365574":"#FF4B4B");
         if(!validUser || !validMemory) { result.Text=Localization.T("invalid"); var field=!validUser?user:ram; field.Focus(); field.BringIntoView(); return; }
         try {
-            main.Config.User=user.Text.Trim(); main.Config.Ram=memory;
-            main.Config.AuthType=provider.SelectedIndex==1?"elyby":"offline";
-            main.Config.AutoClose=close.IsChecked==true;
-            main.Config.Lang=language.SelectedIndex==1?"English":"Turkce";
-            ConfigManager.Save(main.Config); main.ReloadConfig(); main.SwitchLanguage(main.Config.Lang);
+            var draft=Newtonsoft.Json.JsonConvert.DeserializeObject<LauncherConfig>(Newtonsoft.Json.JsonConvert.SerializeObject(main.Config))!;
+            draft.User=user.Text.Trim(); draft.Ram=memory;
+            draft.AuthType=provider.SelectedIndex==1?"elyby":"offline";
+            draft.AutoClose=close.IsChecked==true;
+            draft.Lang=language.SelectedIndex==1?"English":"Turkce";
+            ConfigManager.Save(draft); main.Config=draft; main.ReloadConfig();
+            if(Localization.Language!=(main.Config.Lang=="English"?"en":"tr")) Localization.SetLanguage(main.Config.Lang);
             result.Text=Localization.T("saved");
         } catch(Exception ex) { result.Text=Localization.T("error")+": "+ex.Message; }
     }

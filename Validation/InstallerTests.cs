@@ -27,17 +27,33 @@ static class InstallerTests
         var marker=Path.Combine(root,InstallEngine.Marker); var valid=File.ReadAllText(marker);
         using(var locked=File.Open(marker,FileMode.Open,FileAccess.Read,FileShare.None)) Reject(()=>UpdateEngine.Apply(payload,root),"locked ownership record prevents partial update");
         check(File.ReadAllText(marker)==valid && File.ReadAllText(Path.Combine(root,names[0]))=="test "+names[0],"failed ownership update preserves installed bytes and record");
-        File.WriteAllText(marker,JsonSerializer.Serialize(new InstallState("MistikLauncher",root,"test",new[]{"../escape"})));
+        File.WriteAllText(marker,JsonSerializer.Serialize(new InstallState("MistikLauncher",root,"test",names.Append("../escape").ToArray())));
         Reject(()=>InstallEngine.Uninstall(root,false),"uninstaller rejects traversal before deleting any files");
         check(File.Exists(Path.Combine(root,names[0])),"malformed uninstall record leaves installation intact"); File.WriteAllText(marker,valid);
         File.WriteAllText(marker,JsonSerializer.Serialize(new InstallState("MistikLauncher",null!,"test",names)));
         bool nullRootRejected=false; try { InstallEngine.ReadState(root); } catch(IOException) { nullRootRejected=true; }
         check(nullRootRejected && File.Exists(Path.Combine(root,names[0])),"null installation root is rejected as a recoverable invalid record");
-        File.WriteAllText(marker,JsonSerializer.Serialize(new InstallState("MistikLauncher",root,"test",new[]{"INSTALL-STATE.JSON"})));
+        File.WriteAllText(marker,JsonSerializer.Serialize(new InstallState("MistikLauncher",root,"test",names.Append("INSTALL-STATE.JSON").ToArray())));
         Reject(()=>InstallEngine.ReadState(root),"ownership record rejects its marker regardless of Windows filename casing");
+        foreach(var incomplete in new[]{Array.Empty<string>(),new[]{"MistikLauncher.exe"}}) {
+            var incompleteRecord=JsonSerializer.Serialize(new InstallState("MistikLauncher",root,"test",incomplete)); File.WriteAllText(marker,incompleteRecord);
+            Reject(()=>InstallEngine.Uninstall(root,false),"empty or incomplete ownership record is rejected before uninstall");
+            check(names.Append(added).All(name=>File.Exists(Path.Combine(root,name))) && File.ReadAllText(marker)==incompleteRecord,"incomplete ownership record failure preserves the program and its record");
+        }
         File.WriteAllText(marker,valid);
         using(var locked=File.Open(Path.Combine(root,names[0]),FileMode.Open,FileAccess.Read,FileShare.None)) Reject(()=>InstallEngine.Uninstall(root,false),"uninstaller rejects running/locked app before deletion");
-        InstallEngine.Uninstall(root,false);
+        var readOnlyOwned=Path.Combine(root,added); var ownedAttributes=File.GetAttributes(readOnlyOwned);
+        File.SetAttributes(readOnlyOwned,ownedAttributes|FileAttributes.ReadOnly);
+        try {
+            Reject(()=>InstallEngine.Uninstall(root,false),"uninstaller rejects a later read-only owned file before deletion");
+            check(names.Append(added).All(name=>File.Exists(Path.Combine(root,name))) && File.ReadAllText(marker)==valid && File.ReadAllText(Path.Combine(root,"user-notes.txt"))=="keep","read-only uninstall failure preserves every owned file, ownership record and user data");
+        } finally { File.SetAttributes(readOnlyOwned,ownedAttributes); }
+        var userFile=Path.Combine(root,"user-notes.txt"); var userAttributes=File.GetAttributes(userFile);
+        File.SetAttributes(userFile,userAttributes|FileAttributes.ReadOnly);
+        try {
+            InstallEngine.Uninstall(root,false);
+            check(File.Exists(userFile) && (File.GetAttributes(userFile)&FileAttributes.ReadOnly)!=0,"read-only unowned user files do not block uninstall and keep their attributes");
+        } finally { File.SetAttributes(userFile,userAttributes); }
         check(!File.Exists(Path.Combine(root,names[0])) && File.ReadAllText(Path.Combine(root,"user-notes.txt"))=="keep","uninstaller removes owned files and preserves unknown user files");
         check(!File.Exists(Path.Combine(root,added)),"uninstall removes files introduced by updates");
         var cancelled=Path.Combine(temp,"cancelled","MistikLauncherUltra"); using var token=new CancellationTokenSource(); token.Cancel();

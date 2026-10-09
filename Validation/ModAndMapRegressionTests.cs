@@ -102,6 +102,25 @@ static class ModAndMapRegressionTests
         Check(!SameMigration("26.1", "forge") && !SameMigration("26.1.1", "fabric"),
             "migration still permits a different exact loader or Minecraft version");
 
+        var importSource = Path.Combine(root, "import-source"); Directory.CreateDirectory(importSource);
+        var importTarget = Path.Combine(root, "import-target"); Directory.CreateDirectory(importTarget);
+        var localJar = Path.Combine(importSource, "local.jar"); File.WriteAllText(localJar, "incoming local bytes");
+        var disabledLocal = Path.Combine(importTarget, "local.jar.disabled"); File.WriteAllText(disabledLocal, "disabled original bytes");
+        Check(!ModFiles.Import(importTarget, localJar) && File.ReadAllText(disabledLocal) == "disabled original bytes" &&
+            !File.Exists(Path.Combine(importTarget, "local.jar")), "local import preserves disabled state and never creates an active duplicate");
+        File.Delete(disabledLocal);
+        using (var locked = new FileStream(localJar, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            rejected = false; try { ModFiles.Import(importTarget, localJar); } catch (IOException) { rejected = true; }
+            Check(rejected && !File.Exists(Path.Combine(importTarget, "local.jar")) && !Directory.GetFiles(importTarget, "*.tmp").Any(),
+                "failed local mod copy never exposes a partial jar and cleans staging");
+        }
+        Check(ModFiles.Import(importTarget, localJar) && File.ReadAllText(Path.Combine(importTarget, "local.jar")) == "incoming local bytes",
+            "local import installs complete bytes from the source");
+        File.WriteAllText(localJar, "new incoming bytes");
+        Check(!ModFiles.Import(importTarget, localJar) && File.ReadAllText(Path.Combine(importTarget, "local.jar")) == "incoming local bytes",
+            "repeated local import preserves the existing active mod");
+
         var saves = Path.Combine(root, "saves");
         var existing = Path.Combine(saves, "SkyBlock"); Directory.CreateDirectory(existing);
         File.WriteAllText(Path.Combine(existing, "level.dat"), "player progress");
@@ -161,16 +180,81 @@ static class ModAndMapRegressionTests
                 ConfigManager.Load().LastSyncedVersion == nextVersion && File.ReadAllText(Path.Combine(previous, "sync-old.jar")) == "original active bytes" &&
                 File.ReadAllText(Path.Combine(App.ModsDir, "sync-new.jar.disabled")) == "target disabled bytes",
                 "retry after failed config save performs and persists the full transfer");
+            window.Config.Version = previousVersion;
+            string imported = window.WithSyncedMods(previousVersion, destination => {
+                Check(File.ReadAllText(Path.Combine(destination, "sync-old.jar")) == "original active bytes" &&
+                    !File.Exists(Path.Combine(destination, "sync-new.jar.disabled")), "mod writer first synchronizes the selected profile instead of writing into the previous active set");
+                string path = Path.Combine(destination, "sync-import.jar"); File.WriteAllText(path, "selected profile import"); return path;
+            });
+            Check(File.ReadAllText(imported) == "selected profile import" && window.Config.LastSyncedVersion == previousVersion,
+                "guarded mod write belongs to the synchronized selected profile");
+            bool wrote = false, rejected = false;
+            try { window.WithSyncedMods(nextVersion, _ => { wrote = true; return true; }); } catch (IOException) { rejected = true; }
+            Check(rejected && !wrote && File.ReadAllText(imported) == "selected profile import",
+                "stale mod operation cannot execute its write after profile selection changes");
+            checks += ProfileContext(window).GetAwaiter().GetResult();
             return checks;
         }
         finally
         {
             foreach (var folder in new[] { App.ModsDir, previous, next })
-                foreach (var name in new[] { "sync-old.jar", "sync-new.jar.disabled" })
+                foreach (var name in new[] { "sync-old.jar", "sync-new.jar.disabled", "sync-import.jar" })
                     File.Delete(Path.Combine(folder, name));
             ModFiles.SyncPools(App.ModsDir, next, holding);
             window.Config.Version = originalVersion; window.Config.LastSyncedVersion = originalSynced;
             ConfigManager.Save(window.Config);
         }
+    }
+
+    sealed class FixtureModHandler(MainWindow window) : System.Net.Http.HttpMessageHandler
+    {
+        public readonly List<string> Requests = new();
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken cancellation)
+        {
+            Requests.Add(request.RequestUri!.AbsolutePath);
+            if (Requests.Count != 1 || Requests[0] != "/v2/project/parent-mod/version")
+                throw new InvalidOperationException("A changed profile must prevent dependency metadata and mod file requests.");
+            window.Config.Version = "97.2-fabric";
+            var parent = new JObject {
+                ["id"] = "parent-a", ["project_id"] = "parent-mod", ["version_type"] = "release",
+                ["game_versions"] = new JArray("97.1"), ["loaders"] = new JArray("fabric"),
+                ["dependencies"] = new JArray(new JObject { ["dependency_type"] = "required", ["project_id"] = "required-library" }),
+                ["files"] = new JArray(new JObject { ["primary"] = true, ["filename"] = "parent-mod.jar",
+                    ["url"] = "https://cdn.modrinth.com/data/fixture/parent-mod.jar", ["hashes"] = new JObject { ["sha512"] = new string('0', 128) } })
+            };
+            return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) {
+                Content = new System.Net.Http.StringContent(new JArray(parent).ToString())
+            });
+        }
+    }
+
+    public static async Task<int> ProfileContext(MainWindow window)
+    {
+        var originalVersion = window.Config.Version;
+        var page = (ModManagerPage)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(ModManagerPage));
+        typeof(ModManagerPage).GetField("_main", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(page, window);
+        using var handler = new FixtureModHandler(window); using var client = new System.Net.Http.HttpClient(handler);
+        var installed = new List<string>(); var visited = new HashSet<string>();
+        var activeBefore = ModFiles.List(App.ModsDir).ToDictionary(path => path, File.ReadAllBytes);
+        try
+        {
+            window.Config.Version = "97.1-fabric";
+            var operation = (Task)typeof(ModManagerPage).GetMethod("DownloadModAndDependencies", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(page, new object?[] { "parent-mod", "parent-mod", installed, true, visited, null, null, null, null, client })!;
+            bool rejected = false; try { await operation; } catch (IOException) { rejected = true; }
+            if (!rejected || !handler.Requests.SequenceEqual(new[] { "/v2/project/parent-mod/version" }) || installed.Count != 0 || visited.Count != 0 ||
+                !ModFiles.List(App.ModsDir).Order().SequenceEqual(activeBefore.Keys.Order()) ||
+                activeBefore.Any(pair => !File.ReadAllBytes(pair.Key).SequenceEqual(pair.Value)))
+                throw new Exception("profile change during parent metadata download must prevent all required dependency requests and file writes");
+            Console.WriteLine("PASS profile change during parent metadata download rejects required dependency resolution and preserves active mod bytes");
+            var dependency=(Task)typeof(ModManagerPage).GetMethod("DownloadModAndDependencies",BindingFlags.Instance|BindingFlags.NonPublic)!
+                .Invoke(page,new object?[] { "required-library","required-library",installed,true,visited,null,null,null,"97.1-fabric",client })!;
+            rejected=false; try { await dependency; } catch(IOException) { rejected=true; }
+            if(!rejected || handler.Requests.Count!=1 || installed.Count!=0)
+                throw new Exception("A subsequent required dependency must retain the original profile before requesting metadata.");
+            Console.WriteLine("PASS subsequent dependency refuses the stale original profile before metadata or writes");
+            return 2;
+        }
+        finally { window.Config.Version = originalVersion; }
     }
 }

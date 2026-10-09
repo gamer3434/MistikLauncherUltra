@@ -73,15 +73,7 @@ public static class GameProfiles
         foreach(var token in array)
         {
             if(token.Type==JTokenType.String) { yield return token.ToString(); continue; }
-            bool allowed=false;
-            foreach(var rule in token["rules"] as JArray ?? new JArray())
-            {
-                if(rule["features"]!=null) continue;
-                if(rule["os"]!=null && rule["os"]?["name"]?.ToString()!="windows") continue;
-                if(rule["os"]?["arch"]!=null && rule["os"]?["arch"]?.ToString()!="x86_64") continue;
-                allowed=rule["action"]?.ToString()=="allow";
-            }
-            if(!allowed) continue;
+            if(token is not JObject argument || !GameRuntimeHealth.AppliesToWindows(argument)) continue;
             if(token["value"] is JArray values) { foreach(var value in values) yield return value.ToString(); }
             else if(token["value"]!=null) yield return token["value"]!.ToString();
         }

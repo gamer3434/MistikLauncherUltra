@@ -977,6 +977,16 @@ namespace MistikLauncher
             }
         }
 
+        public T WithSyncedMods<T>(string expectedVersion, Func<string,T> write)
+        {
+            lock (_modSyncGate)
+            {
+                if (!string.Equals(Config.Version,expectedVersion,StringComparison.Ordinal) || !SyncModsForCurrentVersion(expectedVersion))
+                    throw new IOException(Localization.T("modSyncFailed"));
+                return write(App.ModsDir);
+            }
+        }
+
         public bool SyncModsForCurrentVersion(string? requestedVersion=null)
         {
             lock (_modSyncGate)
@@ -1650,86 +1660,35 @@ namespace MistikLauncher
         string BuildClasspath(string version)
         {
             var libs = new List<string>();
-            AddLibrariesFromVersionJson(version, libs);
+            AddLibrariesFromVersionJson(version, libs, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
             return string.Join(";", libs);
         }
 
-        void AddLibrariesFromVersionJson(string version, List<string> libs)
+        void AddLibrariesFromVersionJson(string version, List<string> libs, HashSet<string> seen)
         {
-            try
+            if (!GameProfiles.SafeId(version) || seen.Count >= 16 || !seen.Add(version))
+                throw new InvalidDataException("Invalid or cyclic game profile.");
+            var json = GameProfiles.Read(App.GameDir, version) ?? throw new InvalidDataException("Invalid game profile: " + version);
+            var jar = Path.Combine(App.GameDir, "versions", version, version + ".jar");
+            if (File.Exists(jar) && !libs.Contains(jar)) libs.Add(jar);
+            var parent = json["inheritsFrom"]?.ToString();
+            if (!string.IsNullOrEmpty(parent)) AddLibrariesFromVersionJson(parent, libs, seen);
+            if (json["libraries"] is not JArray entries) return;
+            foreach (var library in entries.OfType<JObject>())
             {
-                var vDir = Path.Combine(App.GameDir, "versions", version);
-                var jar = Path.Combine(vDir, $"{version}.jar");
-                if (File.Exists(jar) && !libs.Contains(jar)) libs.Add(jar);
-
-                var jsonPath = Path.Combine(vDir, $"{version}.json");
-                if (!File.Exists(jsonPath)) return;
-
-                var json = JObject.Parse(File.ReadAllText(jsonPath));
-                
-                // Inherit libraries from parent if inheritsFrom is specified
-                var parent = json["inheritsFrom"]?.ToString();
-                if (!string.IsNullOrEmpty(parent))
-                {
-                    AddLibrariesFromVersionJson(parent, libs);
-                }
-
-                var libsArray = json["libraries"] as JArray;
-                if (libsArray != null)
-                {
-                    foreach (var lib in libsArray)
-                    {
-                        string? name = lib["name"]?.ToString();
-                        if (string.IsNullOrEmpty(name)) continue;
-
-                        string? relPath = null;
-                        var artifact = lib["downloads"]?["artifact"];
-                        if (artifact != null)
-                        {
-                            relPath = artifact["path"]?.ToString();
-                        }
-
-                        if (string.IsNullOrEmpty(relPath))
-                        {
-                            var parts = name.Split(':');
-                            if (parts.Length >= 3)
-                            {
-                                var group = parts[0].Replace('.', '/');
-                                var art = parts[1];
-                                var ver = parts[2];
-                                var classifier = parts.Length >= 4 ? $"-{parts[3]}" : "";
-                                relPath = $"{group}/{art}/{ver}/{art}-{ver}{classifier}.jar";
-                            }
-                        }
-
-                        if (string.IsNullOrEmpty(relPath)) continue;
-
-                        // 1. Check local libraries folder
-                        var localLib = Path.Combine(App.GameDir, "libraries", relPath);
-                        if (File.Exists(localLib))
-                        {
-                            if (!libs.Contains(localLib)) libs.Add(localLib);
-                            continue;
-                        }
-
-                        // 2. Check official .minecraft libraries folder
-                        var officialLib = Path.Combine(
-                            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                            ".minecraft", "libraries", relPath);
-                        if (File.Exists(officialLib))
-                        {
-                            if (!libs.Contains(officialLib)) libs.Add(officialLib);
-                            continue;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                App.Log($"AddLibrariesFromVersionJson error for {version}: {ex.Message}");
+                if (!GameRuntimeHealth.AppliesToWindows(library)) continue;
+                string name = library["name"]?.ToString() ?? "";
+                var artifact = library["downloads"]?["artifact"];
+                if (artifact == null && library["downloads"]?["classifiers"] is JObject) continue;
+                if (Regex.IsMatch(name, @":natives-windows(?:-[A-Za-z0-9_]+)?$")) continue;
+                string? relative = artifact?["path"]?.ToString();
+                if (string.IsNullOrWhiteSpace(relative) && !GameRuntimeHealth.TryMavenArtifact(name, out relative))
+                    throw new InvalidDataException("Invalid library coordinate: " + name);
+                if (!GameRuntimeHealth.TryChildPath(Path.Combine(App.GameDir, "libraries"), relative!, out var local))
+                    throw new InvalidDataException("Invalid library path: " + relative);
+                if (File.Exists(local) && !libs.Contains(local)) libs.Add(local);
             }
         }
-
         public async Task EnsureLibrariesInstalledAsync(string version, Action<double, string>? progress = null)
         {
             try

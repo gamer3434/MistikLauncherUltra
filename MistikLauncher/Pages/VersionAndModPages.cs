@@ -866,19 +866,22 @@ namespace MistikLauncher.Pages
                     return;
                 }
                 importBtn.IsEnabled = false; importBtn.Content = "Aktarılıyor...";
-                Directory.CreateDirectory(App.ModsDir);
-                int count = 0;
-                await Task.Run(() => {
-                    foreach (var jar in jars) {
-                        try {
-                            var dest = Path.Combine(App.ModsDir, Path.GetFileName(jar));
-                            if (!File.Exists(dest)) { File.Copy(jar, dest, true); count++; }
-                        } catch { }
-                    }
-                });
-                RenderInstalledMods();
-                importBtn.Content = Localization.T("modImport"); importBtn.IsEnabled = true;
-                MessageBox.Show($"{count} adet mod başarıyla .minecraft klasöründen Mistik Launcher'a aktarıldı!", "Aktarım Tamamlandı", MessageBoxButton.OK, MessageBoxImage.Information);
+                var importVersion = _main.Config.Version ?? "";
+                try
+                {
+                    int count = await Task.Run(() => _main.WithSyncedMods(importVersion, destination => {
+                        int copied = 0;
+                        foreach (var jar in jars) {
+                            try { if (ModFiles.Import(destination,jar)) copied++; }
+                            catch (Exception ex) { App.Log("Mod import failed: " + ex.Message); }
+                        }
+                        return copied;
+                    }));
+                    RenderInstalledMods();
+                    MessageBox.Show($"{count} adet mod başarıyla .minecraft klasöründen Mistik Launcher'a aktarıldı!", "Aktarım Tamamlandı", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex) { MessageBox.Show("Mod aktarımı başarısız: " + ex.Message, "Hata", MessageBoxButton.OK, MessageBoxImage.Error); }
+                finally { importBtn.Content = Localization.T("modImport"); importBtn.IsEnabled = true; }
             };
 
             Grid.SetColumn(searchBtn,1); Grid.SetColumn(folderBtn,2); Grid.SetColumn(importBtn,3);
@@ -1156,25 +1159,28 @@ namespace MistikLauncher.Pages
         }
 
         async Task DownloadModAndDependencies(string projectId, string name, List<string> installedList, bool isDependency = false,
-            HashSet<string>? visited = null, string? versionId = null, string? queueGame = null, string? queueLoader = null)
+            HashSet<string>? visited = null, string? versionId = null, string? queueGame = null, string? queueLoader = null,
+            string? expectedProfile = null, HttpClient? client = null)
         {
             visited ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var currentVer = _main.Config.Version ?? "";
+            var currentVer = expectedProfile ?? _main.Config.Version ?? "";
+            if (queueGame == null && _main.Config.Version != currentVer) throw new IOException("The selected Minecraft version changed during mod installation. Please retry.");
+            var http = client ?? Http;
             var mcVersion = queueGame ?? GameProfiles.MinecraftVersion(App.GameDir, currentVer);
             var loader = queueLoader ?? GameProfiles.Loader(App.GameDir, currentVer);
             JToken? targetVersion;
             JArray? versions = null;
             if (versionId != null)
             {
-                targetVersion = JObject.Parse(await Http.GetStringAsync($"https://api.modrinth.com/v2/version/{Uri.EscapeDataString(versionId)}"));
+                targetVersion = JObject.Parse(await http.GetStringAsync($"https://api.modrinth.com/v2/version/{Uri.EscapeDataString(versionId)}"));
                 projectId = targetVersion["project_id"]?.ToString() ?? throw new InvalidDataException("Missing dependency project ID.");
                 if (!CheckCompatibility(targetVersion, mcVersion, loader))
                     throw new IOException($"Required dependency {versionId} is incompatible with {mcVersion} {loader}.");
-                versions = JArray.Parse(await Http.GetStringAsync($"https://api.modrinth.com/v2/project/{Uri.EscapeDataString(projectId)}/version"));
+                versions = JArray.Parse(await http.GetStringAsync($"https://api.modrinth.com/v2/project/{Uri.EscapeDataString(projectId)}/version"));
             }
             else
             {
-                versions = JArray.Parse(await Http.GetStringAsync($"https://api.modrinth.com/v2/project/{Uri.EscapeDataString(projectId)}/version"));
+                versions = JArray.Parse(await http.GetStringAsync($"https://api.modrinth.com/v2/project/{Uri.EscapeDataString(projectId)}/version"));
                 targetVersion = FindCompatibleVersion(versions, mcVersion, loader);
             }
             if (targetVersion == null)
@@ -1187,10 +1193,10 @@ namespace MistikLauncher.Pages
                     ?? throw new IOException("No supported mod loader is available.");
                 var poolKey = GameProfiles.VersionPoolKey(targetGame, targetLoader);
                 await InstallRequiredDependencies(latest, (dependencyProject, dependencyVersion) =>
-                    DownloadModAndDependencies(dependencyProject, dependencyProject, new List<string>(), true, visited, dependencyVersion, targetGame, targetLoader));
+                    DownloadModAndDependencies(dependencyProject, dependencyProject, new List<string>(), true, visited, dependencyVersion, targetGame, targetLoader, currentVer, http));
                 var file = (latest["files"] as JArray)?.FirstOrDefault(value => value["primary"]?.Value<bool>() == true)
                     ?? latest["files"]?.FirstOrDefault() ?? throw new InvalidDataException("Missing mod file.");
-                var bytes = await Http.GetByteArrayAsync(ModFiles.DownloadUrl(file["url"]?.ToString() ?? ""));
+                var bytes = await http.GetByteArrayAsync(ModFiles.DownloadUrl(file["url"]?.ToString() ?? ""));
                 InstallDownloadedMod(Path.Combine(App.AppData, "mods_pool", poolKey), file, bytes, false);
                 MessageBox.Show($"'{name}' modu şu anki oyun sürümünüz ({mcVersion} {loader}) ile uyumsuz!\n\n'{targetGame} {targetLoader}' havuzuna indirildi. Bu sürüm ve yükleyici seçildiğinde otomatik olarak etkinleştirilecektir.", "Sürüm Beklemeye Alındı", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
@@ -1203,13 +1209,14 @@ namespace MistikLauncher.Pages
             {
                 // Resolve required files before installing the parent, so a failed dependency cannot look like success.
                 await InstallRequiredDependencies(targetVersion, (dependencyProject, dependencyVersion) =>
-                    DownloadModAndDependencies(dependencyProject, dependencyProject, installedList, true, visited, dependencyVersion, queueGame, queueLoader));
+                    DownloadModAndDependencies(dependencyProject, dependencyProject, installedList, true, visited, dependencyVersion, queueGame, queueLoader, currentVer, http));
                 var file = (targetVersion["files"] as JArray)?.FirstOrDefault(value => value["primary"]?.Value<bool>() == true)
                     ?? targetVersion["files"]?.FirstOrDefault() ?? throw new InvalidDataException("Missing mod file.");
-                var bytes = await Http.GetByteArrayAsync(ModFiles.DownloadUrl(file["url"]?.ToString() ?? ""));
+                var bytes = await http.GetByteArrayAsync(ModFiles.DownloadUrl(file["url"]?.ToString() ?? ""));
                 if (queueGame == null && _main.Config.Version != currentVer) throw new IOException("The selected Minecraft version changed during mod installation. Please retry.");
-                var destination = queueGame == null ? App.ModsDir : Path.Combine(App.AppData, "mods_pool", GameProfiles.VersionPoolKey(mcVersion, loader));
-                var installedPath = InstallDownloadedMod(destination, file, bytes, isDependency, versions);
+                var installedPath = queueGame == null
+                    ? _main.WithSyncedMods(currentVer, destination => InstallDownloadedMod(destination, file, bytes, isDependency, versions))
+                    : InstallDownloadedMod(Path.Combine(App.AppData, "mods_pool", GameProfiles.VersionPoolKey(mcVersion, loader)), file, bytes, isDependency, versions);
                 if (isDependency) name = Path.GetFileName(installedPath);
                 if (!installedList.Contains(name)) installedList.Add(name);
             }
@@ -1254,7 +1261,7 @@ namespace MistikLauncher.Pages
                     try
                     {
                         if (_main.Config.Version != currentVer) throw new IOException("The selected Minecraft version changed during mod installation.");
-                        await DownloadModAndDependencies(slug, name, allInstalled, true, globalVisited);
+                        await DownloadModAndDependencies(slug, name, allInstalled, true, globalVisited, expectedProfile: currentVer);
                         successCount++;
                     }
                     catch (Exception modEx)
@@ -1535,7 +1542,7 @@ namespace MistikLauncher.Pages
                     try
                     {
                         if (_main.Config.Version != matchedVerName) throw new IOException("The selected Minecraft version changed during mod migration.");
-                        await DownloadModAndDependencies(id, originalJarName, migrationInstalled, true, migrationVisited);
+                        await DownloadModAndDependencies(id, originalJarName, migrationInstalled, true, migrationVisited, expectedProfile: matchedVerName);
                         downloadedCount++;
                     }
                     catch (Exception ex)

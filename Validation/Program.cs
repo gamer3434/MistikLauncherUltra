@@ -130,11 +130,14 @@ class Program
             Check(turkish.Keys.Order().SequenceEqual(english.Keys.Order()), "locale keys match");
             Check(turkish.Values.All(v=>!string.IsNullOrWhiteSpace(v)) && english.Values.All(v=>!string.IsNullOrWhiteSpace(v)), "no empty translations");
             var application=new MistikLauncher.Application(); application.InitializeComponent();
+            // shortcut: WPF's setter rejects null; use a resource-only fixture if its private startup field changes.
+            typeof(System.Windows.Application).GetField("_startupUri",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!.SetValue(application,null);
             checks+=SecurityTests.Run();
             checks+=OptimizationTests.Run(Path.Combine(testRoot,"graphics-tests"));
             checks+=GameRuntimeHealthTests.Run(Path.Combine(testRoot,"runtime-health")).GetAwaiter().GetResult();
             checks+=LaunchReadinessTests.Run(Path.Combine(testRoot,"readiness-tests"));
             var window=new MainWindow { Width=1200, Height=820 };
+            checks+=ForgeTests.Classpath(window);
             checks+=ModAndMapRegressionTests.SyncFailure(window,Path.Combine(testRoot,"sync-commit"));
             var quiltJar=Path.Combine(testRoot,"quilt-metadata.jar");
             using(var archive=System.IO.Compression.ZipFile.Open(quiltJar,System.IO.Compression.ZipArchiveMode.Create))
@@ -148,6 +151,7 @@ class Program
             Check(quiltMetadata.loader==null,"multi-loader jar is not automatically misclassified as incompatible");
             checks+=VersionListTests.Run(window);
             checks+=SkinWorkflowTests.Run(window);
+            Check(application.Windows.Count==1,"isolated validation uses a single explicit launcher window");
             checks+=SettingsLifecycleTests.Run(window);
             checks+=FriendsPageTests.Run(window);
             Check(MainWindow.SkinTextureUrl("http://textures.minecraft.net/texture/test")=="https://textures.minecraft.net/texture/test" && MainWindow.SkinTextureUrl("https://ely.by.attacker.invalid/test")==null && MainWindow.SkinTextureUrl("file:///C:/Windows/test.png")==null,"skin texture URLs enforce trusted HTTPS hosts");

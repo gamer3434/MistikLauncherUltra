@@ -211,6 +211,13 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.3","2026-10-09","#00D4AA", new[]{
+                "Başarısız ayar kaydı aktif oyuncu ve RAM değerlerini değiştirmez",
+                "Mod bağımlılıkları indirme başladığı profile bağlı kalır",
+                "Mod aktarımı kapalı modları etkinleştirmez; profil havuzu korunur",
+                "Oyun kütüphaneleri ve JVM argümanları aynı Windows kurallarını kullanır",
+                "Eksik kurulum kaydı ve salt okunur dosyalar yarım kaldırmaya yol açmaz"
+            }),
             new("v6.2.2","2026-10-08","#00D4AA", new[]{
                 "Takılan online kurulum indirmeleri sonlanır; sağlıklı paket korunur",
                 "Mod havuzu geçişi ayar kaydı başarısız olduğunda geri alınır",

@@ -2,13 +2,13 @@
 
 Windows x64 için Türkçe / English Minecraft launcher. Oyuncu ayarları cihazında saklanır; sürüm, mod, skin ve yerel sunucu yönetimi içerir.
 
-[Yayımlanan sürümleri indir](https://github.com/gamer3434/MistikLauncherUltra/releases/latest) · [Web sitesi](https://mistiklauncherultra.web.app/) · [6.2.2 değişiklikleri](docs/RELEASE-6.2.2.md)
+[Yayımlanan sürümleri indir](https://github.com/gamer3434/MistikLauncherUltra/releases/latest) · [Web sitesi](https://mistiklauncherultra.web.app/) · [6.2.3 değişiklikleri](docs/RELEASE-6.2.3.md)
 
 ## Kurulum ve onarım
 
 Sürüm sayfasından online veya offline kurulum EXE'sini seçin. Taşınabilir kullanım için ZIP'in tüm dosyalarını aynı klasöre çıkartıp `MistikLauncher.exe` dosyasını açın. .NET çalışma zamanı pakete dahildir.
 
-Program bozulursa launcher'ı kapatın, aynı veya daha yeni sürümün `MistikRepair-6.2.2.exe` dosyasını açıp kurulum klasöründe **Onar** seçin. Onarıcı internet gerektirmez; program dosyalarını doğrular ve yeniler. Ayarlar, modlar ve dünyalar korunur.
+Program bozulursa launcher'ı kapatın, aynı veya daha yeni sürümün `MistikRepair-6.2.3.exe` dosyasını açıp kurulum klasöründe **Onar** seçin. Onarıcı internet gerektirmez; program dosyalarını doğrular ve yeniler. Ayarlar, modlar ve dünyalar korunur.
 
 Varsayılan kurulum: `%LOCALAPPDATA%\Programs\MistikLauncherUltra`. Oyuncu verileri: `%APPDATA%\.mistik_ultra`. Şifreli ayarlar aynı Windows kullanıcı hesabında açılır. Paket şu anda genel yayıncı sertifikasıyla imzalı değildir.
 

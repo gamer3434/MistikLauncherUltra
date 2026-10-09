@@ -85,6 +85,7 @@ public static class InstallEngine
         root=ValidateRoot(root);
         var state=JsonSerializer.Deserialize<InstallState>(File.ReadAllText(UpdateEngine.SafePath(root,Marker)))??throw new IOException("Missing installation record / Kurulum kaydı bulunamadı.");
         if(state.Product!="MistikLauncher" || string.IsNullOrWhiteSpace(state.Root) || !Path.GetFullPath(state.Root).Equals(root,StringComparison.OrdinalIgnoreCase) || state.Files is null || state.Files.Length>3000) throw new IOException("Invalid installation record / Geçersiz kurulum kaydı.");
+        if(!new[]{"MistikLauncher.exe","MistikLauncher.dll","MistikUpdater.exe"}.All(name=>state.Files.Contains(name,StringComparer.OrdinalIgnoreCase))) throw new IOException("Incomplete installation record / Kurulum dosyası kaydı eksik.");
         foreach(var file in state.Files) { UpdateEngine.SafePath(root,file); if(file.Equals(Marker,StringComparison.OrdinalIgnoreCase)) throw new IOException("Invalid installation record"); }
         return state;
     }
@@ -124,8 +125,12 @@ public static class InstallEngine
     {
         root=ValidateRoot(root); var state=ReadState(root);
         var files=state.Files.Select(f=>UpdateEngine.SafePath(root,f)).Append(Path.Combine(root,Marker)).ToArray();
-        // Preflight locks before removing anything; never kill the running launcher.
-        foreach(var file in files.Where(File.Exists)) using(File.Open(file,FileMode.Open,FileAccess.Read,FileShare.None)) { }
+        // Preflight owned files before removing anything; never kill the running launcher.
+        foreach(var file in files.Where(File.Exists)) {
+            if((File.GetAttributes(file)&FileAttributes.ReadOnly)!=0)
+                throw new IOException("A program file is read-only. Clear its read-only attribute and retry / Program dosyasının salt okunur özelliğini kaldırıp yeniden deneyin: "+Path.GetFileName(file));
+            using(File.Open(file,FileMode.Open,FileAccess.Read,FileShare.None)) { }
+        }
         foreach(var file in files) if(File.Exists(file)) File.Delete(file);
         foreach(var dir in state.Files.Select(f=>Path.GetDirectoryName(UpdateEngine.SafePath(root,f))!).Distinct().OrderByDescending(p=>p.Length)) if(Directory.Exists(dir) && !Directory.EnumerateFileSystemEntries(dir).Any()) Directory.Delete(dir,false);
         if(Directory.Exists(root) && !Directory.EnumerateFileSystemEntries(root).Any()) Directory.Delete(root,false);

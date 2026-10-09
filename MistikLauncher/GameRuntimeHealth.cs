@@ -364,7 +364,7 @@ public static class GameRuntimeHealth
     static bool IsSha1(string value) => Regex.IsMatch(value, "^[0-9a-fA-F]{40}$", RegexOptions.CultureInvariant);
     static string ProfilePath(string root, string id) => Path.Combine(root, "versions", id, id + ".json");
 
-    static bool TryChildPath(string root, string relativePath, out string fullPath)
+    internal static bool TryChildPath(string root, string relativePath, out string fullPath)
     {
         fullPath = "";
         if (string.IsNullOrWhiteSpace(relativePath) || Path.IsPathRooted(relativePath) || relativePath.Contains(':') ||
@@ -381,7 +381,7 @@ public static class GameRuntimeHealth
         catch { return false; }
     }
 
-    static bool TryMavenArtifact(string coordinate, out string path)
+    internal static bool TryMavenArtifact(string coordinate, out string path)
     {
         path = "";
         var parts = coordinate.Split(':');
@@ -401,7 +401,7 @@ public static class GameRuntimeHealth
         return true;
     }
 
-    static bool AppliesToWindows(JObject library)
+    internal static bool AppliesToWindows(JObject library)
     {
         if (library["rules"] is not JArray rules || rules.Count == 0) return true;
         bool allowed = false;
@@ -424,7 +424,7 @@ public static class GameRuntimeHealth
         string? version = os["version"]?.ToString();
         if (!string.IsNullOrWhiteSpace(version))
         {
-            try { if (!Regex.IsMatch(Environment.OSVersion.VersionString, version, RegexOptions.CultureInvariant)) return false; }
+            try { if (!Regex.IsMatch(Environment.OSVersion.Version.ToString(), version, RegexOptions.CultureInvariant)) return false; }
             catch (ArgumentException) { return false; }
         }
         return true;
