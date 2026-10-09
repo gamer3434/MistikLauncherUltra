@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.Json;
+using MistikLauncher.Updates;
 
 namespace MistikLauncher;
 
@@ -39,7 +40,7 @@ public sealed class AutoMcsUpdater
     {
         http=client ?? new HttpClient { Timeout=TimeSpan.FromMinutes(10) };
         if (!http.DefaultRequestHeaders.UserAgent.Any()) http.DefaultRequestHeaders.UserAgent.ParseAdd("MistikLauncher/6.0");
-        directory=dataDirectory ?? App.GameDir;
+        directory=Path.GetFullPath(dataDirectory ?? App.GameDir);
         isRunning=running ?? (() => {
             var processes=Process.GetProcessesByName("auto-mcs");
             try { return processes.Length>0; } finally { foreach(var process in processes) process.Dispose(); }
@@ -80,7 +81,12 @@ public sealed class AutoMcsUpdater
         string? staging=null;
         try
         {
-            Busy=true; Error=null; ResetTransfer(); Publish("mcsChecking");
+            Busy=true; Error=null; ResetTransfer();
+            string lockPath=UpdateEngine.SafePath(directory,".auto-mcs-install.lock");
+            Directory.CreateDirectory(directory);
+            // Keep executable, shared backup and receipt commits exclusive across launcher processes.
+            using var installLock=File.Open(lockPath,FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None);
+            Publish("mcsChecking");
             if(cached==null || force || DateTime.UtcNow-checkedAt>TimeSpan.FromMinutes(10))
             {
                 using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(20));
@@ -150,7 +156,8 @@ public sealed class AutoMcsUpdater
         finally
         {
             if(staging!=null) { try { foreach(var file in Directory.EnumerateFiles(staging)) File.Delete(file); Directory.Delete(staging); } catch { } }
-            Busy=false; Changed?.Invoke(); gate.Release();
+            Busy=false;
+            try { Changed?.Invoke(); } finally { gate.Release(); }
         }
     }
     void ResetTransfer()

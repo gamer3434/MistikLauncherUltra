@@ -11,6 +11,7 @@ public sealed class ServerManagerPage : Page, ILanguagePage
     TextBlock status=null!, installed=null!, latest=null!;
     Button launch=null!, update=null!;
     ProgressBar progress=null!;
+    bool launching;
     public ServerManagerPage(MainWindow window)
     {
         main=window; updater=window.AutoMcs;
@@ -75,7 +76,7 @@ public sealed class ServerManagerPage : Page, ILanguagePage
         status.Text=Localization.T(updater.StatusKey)+transfer+(updater.Error==null?"":"\n"+updater.Error);
         status.Foreground=PageHelpers.HexBrush(updater.Error==null?"#CCE1EF":"#F3BDA3");
         progress.Value=updater.Progress; progress.Visibility=updater.Busy?Visibility.Visible:Visibility.Collapsed;
-        launch.IsEnabled=!updater.Busy; update.IsEnabled=!updater.Busy;
+        launch.IsEnabled=!updater.Busy && !launching; update.IsEnabled=!updater.Busy && !launching;
         launch.Content=Localization.T(File.Exists(updater.ExecutablePath)?"mcsLaunch":"mcsInstallLaunch");
     }
     static string FormatBytes(long bytes)
@@ -92,17 +93,20 @@ public sealed class ServerManagerPage : Page, ILanguagePage
     }
     async Task Launch()
     {
+        if(launching) return;
         if(updater.IsRunning) { status.Text=Localization.T("mcsAlreadyRunning"); return; }
+        launching=true;
         launch.IsEnabled=false;
         try
         {
             if(!File.Exists(updater.ExecutablePath) || main.Config.AutoMcsAutoUpdate) await updater.CheckAsync(true);
+            if(updater.IsRunning) { status.Text=Localization.T("mcsAlreadyRunning"); return; }
             if(!File.Exists(updater.ExecutablePath)) { Refresh(); return; }
             Process.Start(new ProcessStartInfo(updater.ExecutablePath) { UseShellExecute=true, WorkingDirectory=Path.GetDirectoryName(updater.ExecutablePath)! });
             status.Text=Localization.T("mcsStarted");
         }
         catch(Exception ex) { status.Text=Localization.T("mcsError")+": "+ex.Message; }
-        finally { launch.IsEnabled=!updater.Busy; }
+        finally { launching=false; launch.IsEnabled=!updater.Busy; update.IsEnabled=!updater.Busy; }
     }
     void Open(string path) { try { Process.Start(new ProcessStartInfo(path) { UseShellExecute=true }); } catch(Exception ex) { status.Text=Localization.T("mcsError")+": "+ex.Message; } }
 }

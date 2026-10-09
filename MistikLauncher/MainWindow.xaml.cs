@@ -579,6 +579,7 @@ namespace MistikLauncher
         // ── Launch ────────────────────────────────────────────────────────────
         void HandleLaunch()
         {
+            if (launchPreparing || gameRunning) return;
             var ver = VerBox.SelectedItem?.ToString();
             if (string.IsNullOrEmpty(ver)) {
                 MessageBox.Show("Lutfen bir Minecraft surumu secin veya indirin.\n\nSurum Yoneticisi'nden bir surum indirin.",
@@ -594,9 +595,11 @@ namespace MistikLauncher
         }
 
         bool gameRunning;
+        bool launchPreparing;
         async Task LaunchMinecraftAsync(string version)
         {
-            if(gameRunning) return;
+            if(launchPreparing || gameRunning) return;
+            launchPreparing = true;
             var started=DateTime.UtcNow;
             var captured=new System.Text.StringBuilder();
             var outputGate=new object();
@@ -748,7 +751,7 @@ namespace MistikLauncher
                     WorkingDirectory=App.GameDir, UseShellExecute=false, CreateNoWindow=true,
                     RedirectStandardOutput=true, RedirectStandardError=true
                 };
-                var process=Process.Start(psi) ?? throw new InvalidOperationException("Java process could not start.");
+                var process=WithSyncedMods(version, _ => Process.Start(psi)) ?? throw new InvalidOperationException("Java process could not start.");
                 void Capture(object sender,DataReceivedEventArgs line) {
                     if(line.Data==null) return;
                     lock(outputGate) {
@@ -803,6 +806,7 @@ namespace MistikLauncher
             }
             finally
             {
+                launchPreparing = false;
                 BtnLaunch.IsEnabled = !gameRunning;
                 BtnLaunch.Content   = Localization.T("play");
                 SetProgress(0);
@@ -1793,9 +1797,9 @@ namespace MistikLauncher
             try
             {
                 var localJava25 = Path.Combine(App.AppData, "java", "jre25", "bin", "java.exe");
-                if (File.Exists(localJava25)) candidates.Add(Path.GetFullPath(localJava25));
+                if (JavaRuntimeInstaller.IsUsableRuntime(Path.GetDirectoryName(Path.GetDirectoryName(localJava25))!,25)) candidates.Add(Path.GetFullPath(localJava25));
                 var localJava = Path.Combine(App.AppData, "java", "jre21", "bin", "java.exe");
-                if (File.Exists(localJava)) candidates.Add(Path.GetFullPath(localJava));
+                if (JavaRuntimeInstaller.IsUsableRuntime(Path.GetDirectoryName(Path.GetDirectoryName(localJava))!,21)) candidates.Add(Path.GetFullPath(localJava));
             }
             catch { }
 
@@ -1850,8 +1854,18 @@ namespace MistikLauncher
                 });
                 if (p != null)
                 {
-                    var output = await p.StandardOutput.ReadToEndAsync();
-                    await p.WaitForExitAsync();
+                    using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    string output;
+                    try
+                    {
+                        output = await p.StandardOutput.ReadToEndAsync(deadline.Token);
+                        await p.WaitForExitAsync(deadline.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        try { if (!p.HasExited) p.Kill(); } catch { }
+                        throw;
+                    }
                     foreach (var rawLine in output.Split('\n'))
                     {
                         var line = rawLine.Trim();
@@ -1866,22 +1880,6 @@ namespace MistikLauncher
 
             if (candidates.Count == 0)
             {
-                // Fallback to system path "java"
-                try
-                {
-                    using var p = Process.Start(new ProcessStartInfo("java", "-version")
-                    {
-                        CreateNoWindow = true,
-                        UseShellExecute = false,
-                        RedirectStandardError = true
-                    });
-                    if (p != null)
-                    {
-                        await p.WaitForExitAsync();
-                        if (p.ExitCode == 0) return "java";
-                    }
-                }
-                catch { }
                 return null;
             }
 
@@ -1892,7 +1890,7 @@ namespace MistikLauncher
             foreach (var path in candidates)
             {
                 int ver = GetJavaMajorVersion(path);
-                if (ver > bestVersion)
+                if (ver > 0 && ver > bestVersion)
                 {
                     bestVersion = ver;
                     bestPath = path;
@@ -1930,111 +1928,7 @@ namespace MistikLauncher
             return 0;
         }
 
-        public async Task<string?> DownloadAndInstallJava21Async()
-        {
-            var javaDir = Path.Combine(App.AppData, "java");
-            var jreDir = Path.Combine(javaDir, "jre21");
-            var javaExe = Path.Combine(jreDir, "bin", "java.exe");
-
-            // Hem varligini hem de dosya boyutunu kontrol et (bozuk/yarim kalmis kurulumlari engeller)
-            if (File.Exists(javaExe) && new FileInfo(javaExe).Length > 50000)
-            {
-                return javaExe;
-            }
-
-            try
-            {
-                // Kurulum klasorunun kilitlenmesini onlemek icin varsa eski calisan java sureclerini sonlandir
-                try
-                {
-                    foreach (var proc in System.Diagnostics.Process.GetProcessesByName("java"))
-                    {
-                        try
-                        {
-                            if (proc.MainModule?.FileName.StartsWith(javaDir, StringComparison.OrdinalIgnoreCase) == true)
-                            {
-                                proc.Kill();
-                                proc.WaitForExit(3000);
-                            }
-                        }
-                        catch { }
-                    }
-                    foreach (var proc in System.Diagnostics.Process.GetProcessesByName("javaw"))
-                    {
-                        try
-                        {
-                            if (proc.MainModule?.FileName.StartsWith(javaDir, StringComparison.OrdinalIgnoreCase) == true)
-                            {
-                                proc.Kill();
-                                proc.WaitForExit(3000);
-                            }
-                        }
-                        catch { }
-                    }
-                }
-                catch { }
-
-                Directory.CreateDirectory(javaDir);
-                var zipPath = Path.Combine(javaDir, "jre21.zip");
-                var tempExtractDir = Path.Combine(javaDir, "jre21_temp");
-
-                if (Directory.Exists(tempExtractDir))
-                {
-                    try { Directory.Delete(tempExtractDir, true); } catch { }
-                }
-                Directory.CreateDirectory(tempExtractDir);
-
-                SetProgress(5, "Java 21 indiriliyor...");
-                var url = "https://api.adoptium.net/v3/binary/latest/21/ga/windows/x64/jre/hotspot/normal/eclipse";
-                
-                try
-                {
-                    await Pages.VersionManagerPage.DownloadFileWithProgressAsync(url, zipPath, (pct, status) => {
-                        SetProgress(5 + pct * 0.75, $"[Java 21] {status}");
-                    }, 0, 100);
-                }
-                catch (Exception apiEx)
-                {
-                    App.Log($"Adoptium API failed ({apiEx.Message}), trying stable GitHub fallback...");
-                    url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.3%2B9/OpenJDK21U-jre_x64_windows_hotspot_21.0.3_9.zip";
-                    await Pages.VersionManagerPage.DownloadFileWithProgressAsync(url, zipPath, (pct, status) => {
-                        SetProgress(5 + pct * 0.75, $"[Java 21 - Alternatif] {status}");
-                    }, 0, 100);
-                }
-
-                SetProgress(80, "Java 21 kuruluyor (Arşiv açılıyor)...");
-                await Task.Run(() => {
-                    System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, tempExtractDir);
-                });
-
-                var subDirs = Directory.GetDirectories(tempExtractDir);
-                if (subDirs.Length > 0)
-                {
-                    var sourceDir = subDirs[0];
-                    if (Directory.Exists(jreDir))
-                    {
-                        try { Directory.Delete(jreDir, true); } catch { }
-                    }
-                    Directory.Move(sourceDir, jreDir);
-                }
-
-                try { Directory.Delete(tempExtractDir, true); } catch { }
-                try { File.Delete(zipPath); } catch { }
-
-                if (File.Exists(javaExe) && new FileInfo(javaExe).Length > 50000)
-                {
-                    SetProgress(100, "Java 21 başarıyla kuruldu!");
-                    return javaExe;
-                }
-            }
-            catch (Exception ex)
-            {
-                App.Log($"Java auto-install failed: {ex.Message}");
-                MessageBox.Show($"Java otomatik kurulamadı:\n{ex.Message}\n\nLütfen tarayıcıdan indirip manuel kurun.", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-
-            return null;
-        }
+        public Task<string?> DownloadAndInstallJava21Async() => DownloadAndInstallJavaAsync(21);
 
         static bool IsModernVersion(string version)
         {
@@ -2060,110 +1954,21 @@ namespace MistikLauncher
             return !string.IsNullOrEmpty(version) && GameProfiles.RequiredJava(App.GameDir,version)>=25;
         }
 
-        public async Task<string?> DownloadAndInstallJava25Async()
+        public Task<string?> DownloadAndInstallJava25Async() => DownloadAndInstallJavaAsync(25);
+
+        async Task<string?> DownloadAndInstallJavaAsync(int major)
         {
-            var javaDir = Path.Combine(App.AppData, "java");
-            var jreDir = Path.Combine(javaDir, "jre25");
-            var javaExe = Path.Combine(jreDir, "bin", "java.exe");
-
-            // Hem varligini hem de dosya boyutunu kontrol et (bozuk/yarim kalmis kurulumlari engeller)
-            if (File.Exists(javaExe) && new FileInfo(javaExe).Length > 50000)
-            {
-                return javaExe;
-            }
-
             try
             {
-                // Kurulum klasorunun kilitlenmesini onlemek icin varsa eski calisan java sureclerini sonlandir
-                try
-                {
-                    foreach (var proc in System.Diagnostics.Process.GetProcessesByName("java"))
-                    {
-                        try
-                        {
-                            if (proc.MainModule?.FileName.StartsWith(javaDir, StringComparison.OrdinalIgnoreCase) == true)
-                            {
-                                proc.Kill();
-                                proc.WaitForExit(3000);
-                            }
-                        }
-                        catch { }
-                    }
-                    foreach (var proc in System.Diagnostics.Process.GetProcessesByName("javaw"))
-                    {
-                        try
-                        {
-                            if (proc.MainModule?.FileName.StartsWith(javaDir, StringComparison.OrdinalIgnoreCase) == true)
-                            {
-                                proc.Kill();
-                                proc.WaitForExit(3000);
-                            }
-                        }
-                        catch { }
-                    }
-                }
-                catch { }
-
-                Directory.CreateDirectory(javaDir);
-                var zipPath = Path.Combine(javaDir, "jre25.zip");
-                var tempExtractDir = Path.Combine(javaDir, "jre25_temp");
-
-                if (Directory.Exists(tempExtractDir))
-                {
-                    try { Directory.Delete(tempExtractDir, true); } catch { }
-                }
-                Directory.CreateDirectory(tempExtractDir);
-
-                SetProgress(5, "Java 25 indiriliyor...");
-                var url = "https://api.adoptium.net/v3/binary/latest/25/ga/windows/x64/jre/hotspot/normal/eclipse";
-                
-                try
-                {
-                    await Pages.VersionManagerPage.DownloadFileWithProgressAsync(url, zipPath, (pct, status) => {
-                        SetProgress(5 + pct * 0.75, $"[Java 25] {status}");
-                    }, 0, 100);
-                }
-                catch (Exception apiEx)
-                {
-                    App.Log($"Adoptium API failed ({apiEx.Message}), trying stable GitHub fallback...");
-                    url = "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.3%2B9/OpenJDK25U-jre_x64_windows_hotspot_25.0.3_9.zip";
-                    await Pages.VersionManagerPage.DownloadFileWithProgressAsync(url, zipPath, (pct, status) => {
-                        SetProgress(5 + pct * 0.75, $"[Java 25 - Alternatif] {status}");
-                    }, 0, 100);
-                }
-
-                SetProgress(80, "Java 25 kuruluyor (Arşiv açılıyor)...");
-                await Task.Run(() => {
-                    System.IO.Compression.ZipFile.ExtractToDirectory(zipPath, tempExtractDir);
-                });
-
-                var subDirs = Directory.GetDirectories(tempExtractDir);
-                if (subDirs.Length > 0)
-                {
-                    var sourceDir = subDirs[0];
-                    if (Directory.Exists(jreDir))
-                    {
-                        try { Directory.Delete(jreDir, true); } catch { }
-                    }
-                    Directory.Move(sourceDir, jreDir);
-                }
-
-                try { Directory.Delete(tempExtractDir, true); } catch { }
-                try { File.Delete(zipPath); } catch { }
-
-                if (File.Exists(javaExe) && new FileInfo(javaExe).Length > 50000)
-                {
-                    SetProgress(100, "Java 25 başarıyla kuruldu!");
-                    return javaExe;
-                }
+                return await JavaRuntimeInstaller.InstallAsync(Path.Combine(App.AppData, "java"), major,
+                    (percent, status) => SetProgress(percent, status));
             }
             catch (Exception ex)
             {
-                App.Log($"Java 25 auto-install failed: {ex.Message}");
-                MessageBox.Show($"Java 25 otomatik kurulamadı:\n{ex.Message}\n\nLütfen tarayıcıdan indirip manuel kurun.", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                App.Log($"Java {major} auto-install failed: {ex.Message}");
+                MessageBox.Show($"Java {major} otomatik kurulamadı:\n{ex.Message}\n\nLütfen tarayıcıdan indirip manuel kurun.", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                return null;
             }
-
-            return null;
         }
 
         void SetStatus(string s) => Dispatcher.Invoke(() => StatusLbl.Text = Localization.T(s));

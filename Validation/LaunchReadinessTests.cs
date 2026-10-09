@@ -1,5 +1,9 @@
 using System.IO;
+using System.Reflection;
+using System.Windows.Controls;
 using MistikLauncher;
+using MistikLauncher.Pages;
+using Localization = MistikLauncher.Localization;
 
 static class LaunchReadinessTests
 {
@@ -43,6 +47,63 @@ static class LaunchReadinessTests
         Check(suspects.Length==1 && Path.GetFileName(suspects[0])=="enabled.jar","safe recovery selects only enabled mods named by error evidence");
         var disabled=ModFiles.Toggle(mods,suspects[0]);
         Check(File.Exists(disabled) && !File.Exists(Path.Combine(mods,"enabled.jar")),"safe recovery disables a suspected mod without deleting its bytes");
+        return checks;
+    }
+
+    public static int RunHome(MainWindow window)
+    {
+        int checks=0;
+        void Check(bool value,string name) { if(!value) throw new Exception(name); Console.WriteLine("PASS "+name); checks++; }
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
+        T Field<T>(ModernHomePage page,string name)=>(T)typeof(ModernHomePage).GetField(name,flags)!.GetValue(page)!;
+        Task Refresh(ModernHomePage page,Func<string,int,Task<LaunchReadinessSnapshot>> evaluate)=>(Task)typeof(ModernHomePage).GetMethod("RefreshReadinessAsync",flags,null,new[]{evaluate.GetType()},null)!.Invoke(page,new object[]{evaluate})!;
+        Task Repair(ModernHomePage page,Func<string,Action<string>,Task<GameRuntimeHealthResult>> verify)=>(Task)typeof(ModernHomePage).GetMethod("VerifyAndRepairAsync",flags,null,new[]{verify.GetType()},null)!.Invoke(page,new object[]{verify})!;
+        LaunchReadinessSnapshot Ready(string version,int ram)=>new(version,true,21,"fixture-java",21,ram,16,10,0,0);
+        var previous=window.Config;
+        try
+        {
+            window.Config=Newtonsoft.Json.JsonConvert.DeserializeObject<LauncherConfig>(Newtonsoft.Json.JsonConvert.SerializeObject(previous))!;
+            window.Config.Ram=4;
+            foreach(bool success in new[]{false,true})
+            {
+                window.Config.Version="readiness-first";
+                var page=new ModernHomePage(window);
+                Refresh(page,(version,ram)=>Task.FromResult(Ready(version,ram))).GetAwaiter().GetResult();
+                var completion=new TaskCompletionSource<GameRuntimeHealthResult>();
+                Action<string>? progress=null; string? repairedVersion=null;
+                var pending=Repair(page,(version,report)=> { repairedVersion=version; progress=report; return completion.Task; });
+                Check(!pending.IsCompleted && repairedVersion=="readiness-first" && Field<LaunchReadinessSnapshot?>(page,"readiness")==null,"in-flight home repair captures its profile and invalidates the old readiness action");
+                window.Config.Version="readiness-second";
+                page.InvalidateReadiness();
+                Refresh(page,(version,ram)=>Task.FromResult(Ready(version,ram))).GetAwaiter().GetResult();
+                string state=Field<TextBlock>(page,"readinessState").Text;
+                string details=Field<TextBlock>(page,"readinessDetails").Text;
+                progress!("old profile progress");
+                Check(Field<TextBlock>(page,"readinessDetails").Text==details,"late repair progress cannot overwrite the newly selected profile");
+                completion.SetResult(new GameRuntimeHealthResult(success,0,"fixture",FailedPath:"old-profile.jar",FailureReason:"old profile failure"));
+                pending.GetAwaiter().GetResult();
+                Check(Field<TextBlock>(page,"readinessState").Text==state && Field<TextBlock>(page,"readinessDetails").Text==details && Field<LaunchReadinessSnapshot>(page,"readiness").Version=="readiness-second","late "+(success?"successful":"failed")+" repair cannot replace current profile readiness");
+            }
+
+            var retryPage=new ModernHomePage(window);
+            Action<string>? lateProgress=null;
+            Repair(retryPage,(_,report)=> { lateProgress=report; return Task.FromException<GameRuntimeHealthResult>(new IOException("fixture repair failure")); }).GetAwaiter().GetResult();
+            lateProgress!("queued progress after failure");
+            var retry=Field<Button>(retryPage,"readinessAction");
+            Check(retry.IsEnabled && Equals(retry.Content,Localization.T("readinessRefresh")) && System.Windows.Automation.AutomationProperties.GetName(retry)==Localization.T("readinessRefresh") && Field<LaunchReadinessSnapshot?>(retryPage,"readiness")==null && Field<TextBlock>(retryPage,"readinessDetails").Text=="fixture repair failure","repair exceptions restore an accessible check-again action without stale routing or queued progress");
+
+            var memoryPage=new ModernHomePage(window);
+            var oldCheck=new TaskCompletionSource<LaunchReadinessSnapshot>();
+            int capturedRam=0;
+            var checking=Refresh(memoryPage,(version,ram)=> { capturedRam=ram; return oldCheck.Task; });
+            window.Config.Ram=7;
+            memoryPage.InvalidateReadiness();
+            Refresh(memoryPage,(version,ram)=>Task.FromResult(Ready(version,ram))).GetAwaiter().GetResult();
+            oldCheck.SetResult(Ready(window.Config.Version,capturedRam));
+            checking.GetAwaiter().GetResult();
+            Check(capturedRam==4 && Field<LaunchReadinessSnapshot>(memoryPage,"readiness").AllocatedRamGb==7,"same-profile settings invalidation rejects a delayed readiness result even while the page is hidden");
+        }
+        finally { window.Config=previous; }
         return checks;
     }
 }

@@ -57,6 +57,17 @@ class Program
             if(args.Contains("--live-mod")) checks+=ModToggleTests.Live(Path.Combine(testRoot,"official-mod")).GetAwaiter().GetResult();
             checks += ForgeTests.Run(Path.Combine(testRoot,"forge-tests"));
             checks += AutoMcsTests.Run(testRoot).GetAwaiter().GetResult();
+            checks += AutoMcsConcurrencyTests.Run(testRoot).GetAwaiter().GetResult();
+            checks += JavaRuntimeInstallerTests.Run(testRoot).GetAwaiter().GetResult();
+            if(args.Contains("--live-java"))
+            {
+                foreach(int major in new[]{21,25})
+                {
+                    string java=JavaRuntimeInstaller.InstallAsync(Path.Combine(testRoot,"official-java"),major).GetAwaiter().GetResult();
+                    var detected=(int)typeof(MainWindow).GetMethod("GetJavaMajorVersion",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic)!.Invoke(null,new object[]{java})!;
+                    Check(JavaRuntimeInstaller.IsUsableRuntime(Path.GetDirectoryName(Path.GetDirectoryName(java))!,major) && detected==major,"official Java "+major+" archive installs with checksum and complete Windows runtime");
+                }
+            }
             checks += LauncherUpdateTests.Run(testRoot).GetAwaiter().GetResult();
             checks += ReleaseCacheTests.Run(testRoot).GetAwaiter().GetResult();
             int packageIndex=Array.IndexOf(args,"--verify-package");
@@ -137,6 +148,8 @@ class Program
             checks+=GameRuntimeHealthTests.Run(Path.Combine(testRoot,"runtime-health")).GetAwaiter().GetResult();
             checks+=LaunchReadinessTests.Run(Path.Combine(testRoot,"readiness-tests"));
             var window=new MainWindow { Width=1200, Height=820 };
+            checks+=LaunchLifecycleTests.Run(window);
+            checks+=LaunchReadinessTests.RunHome(window);
             checks+=ForgeTests.Classpath(window);
             checks+=ModAndMapRegressionTests.SyncFailure(window,Path.Combine(testRoot,"sync-commit"));
             var quiltJar=Path.Combine(testRoot,"quilt-metadata.jar");

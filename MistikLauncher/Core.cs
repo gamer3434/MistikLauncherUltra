@@ -211,6 +211,13 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.4","2026-10-09","#00D4AA", new[]{
+                "Java arşivi SHA-256 ve runtime yapısıyla doğrulanır; mevcut kurulum korunur",
+                "Java onarımı açık oyunları kapatmaz; kilitli kurulum güvenle ertelenir",
+                "Başlatma hazırlığında ikinci oyun ve sunucu yöneticisi açılışı engellenir",
+                "Eski profilin onarım sonucu güncel hazırlık kartını değiştirmez",
+                "Sunucu yöneticisi güncellemesi launcher örnekleri arasında korunur"
+            }),
             new("v6.2.3","2026-10-09","#00D4AA", new[]{
                 "Başarısız ayar kaydı aktif oyuncu ve RAM değerlerini değiştirmez",
                 "Mod bağımlılıkları indirme başladığı profile bağlı kalır",

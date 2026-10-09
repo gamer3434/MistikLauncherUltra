@@ -86,6 +86,7 @@ public class ModernHomePage : Page, ILanguagePage
         readinessAction.MinHeight=44; readinessAction.VerticalAlignment=VerticalAlignment.Center;
         System.Windows.Automation.AutomationProperties.SetName(readinessAction,Localization.T("readinessRefresh"));
         readinessAction.Click+=async (_,_)=> {
+            if(readiness==null) { await RefreshReadinessAsync(); return; }
             if(readiness?.RecommendedPage is { Length: >0 } page) { main.Navigate(page); return; }
             await VerifyAndRepairAsync();
         };
@@ -96,30 +97,38 @@ public class ModernHomePage : Page, ILanguagePage
 
     public void InvalidateReadiness()
     {
+        readinessGeneration++;
         readiness=null;
         if(IsLoaded) _=RefreshReadinessAsync();
     }
 
-    async Task RefreshReadinessAsync()
+    Task RefreshReadinessAsync() => RefreshReadinessAsync(async (version,ram) => {
+        string? java=await Task.Run(async ()=>await MainWindow.FindJavaAsync());
+        return await Task.Run(()=>LaunchReadiness.Evaluate(App.GameDir,version,ram,java,java==null?0:MainWindow.GetJavaMajorVersion(java),KernelOptimizer.GetTotalPhysicalMemory(),LaunchReadiness.FreeDiskBytes(App.GameDir)));
+    });
+
+    async Task RefreshReadinessAsync(Func<string,int,Task<LaunchReadinessSnapshot>> evaluate)
     {
         if(readinessState==null) return;
         int generation=++readinessGeneration;
         string version=main.Config.Version;
+        int ram=main.Config.Ram;
+        readiness=null;
         readinessAction.IsEnabled=false;
         readinessState.Text=Localization.T("readinessChecking"); readinessState.Foreground=PageHelpers.HexBrush("#F0CF84");
         readinessDetails.Text=Localization.T("readinessCheckingHelp");
         try
         {
-            string? java=await Task.Run(async ()=>await MainWindow.FindJavaAsync());
-            var snapshot=await Task.Run(()=>LaunchReadiness.Evaluate(App.GameDir,version,main.Config.Ram,java,java==null?0:MainWindow.GetJavaMajorVersion(java),KernelOptimizer.GetTotalPhysicalMemory(),LaunchReadiness.FreeDiskBytes(App.GameDir)));
-            if(generation!=readinessGeneration || version!=main.Config.Version) return;
+            var snapshot=await evaluate(version,ram);
+            if(generation!=readinessGeneration || version!=main.Config.Version || ram!=main.Config.Ram) return;
             readiness=snapshot; ShowReadiness(snapshot);
         }
         catch(Exception ex)
         {
-            if(generation!=readinessGeneration) return;
+            if(generation!=readinessGeneration || version!=main.Config.Version || ram!=main.Config.Ram) return;
             readinessState.Text=Localization.T("readinessError"); readinessState.Foreground=PageHelpers.HexBrush("#FF8F8F"); readinessDetails.Text=ex.Message;
             readinessAction.Content=Localization.T("readinessRefresh"); readinessAction.IsEnabled=true;
+            System.Windows.Automation.AutomationProperties.SetName(readinessAction,Localization.T("readinessRefresh"));
         }
     }
 
@@ -141,20 +150,41 @@ public class ModernHomePage : Page, ILanguagePage
         System.Windows.Automation.AutomationProperties.SetName(readinessAction,Localization.T(key));
     }
 
-    async Task VerifyAndRepairAsync()
+    Task VerifyAndRepairAsync() => VerifyAndRepairAsync((version,progress)=>main.VerifyAndRepairGameAsync(version,progress));
+
+    async Task VerifyAndRepairAsync(Func<string,Action<string>,Task<GameRuntimeHealthResult>> verify)
     {
+        int generation=++readinessGeneration;
+        string version=main.Config.Version;
+        bool Current()=>generation==readinessGeneration && version==main.Config.Version;
+        bool finished=false;
+        readiness=null;
         readinessAction.IsEnabled=false; readinessState.Text=Localization.T("readinessRepairing"); readinessDetails.Text=Localization.T("readinessRepairingHelp");
-        var result=await main.VerifyAndRepairGameAsync(main.Config.Version,status => readinessDetails.Text=status);
-        if(!result.CanLaunch)
+        try
         {
-            readinessState.Text=Localization.T("readinessRepairFailed"); readinessState.Foreground=PageHelpers.HexBrush("#FF8F8F");
-            readinessDetails.Text=result.FailedPath==null?Localization.T("readinessError"):$"{result.FailedPath}: {result.FailureReason}";
-            readinessAction.Content=Localization.T("readinessRefresh"); readinessAction.IsEnabled=true;
-            return;
+            var result=await verify(version,status => { if(!finished && Current()) readinessDetails.Text=status; });
+            finished=true;
+            if(!Current()) return;
+            if(!result.CanLaunch)
+            {
+                readinessState.Text=Localization.T("readinessRepairFailed"); readinessState.Foreground=PageHelpers.HexBrush("#FF8F8F");
+                readinessDetails.Text=result.FailedPath==null?Localization.T("readinessError"):$"{result.FailedPath}: {result.FailureReason}";
+                readinessAction.Content=Localization.T("readinessRefresh"); readinessAction.IsEnabled=true;
+                System.Windows.Automation.AutomationProperties.SetName(readinessAction,Localization.T("readinessRefresh"));
+                return;
+            }
+            readinessState.Text=result.RepairedCount>0?string.Format(Localization.T("readinessRepaired"),result.RepairedCount):Localization.T("readinessFilesHealthy");
+            readinessState.Foreground=PageHelpers.HexBrush("#78E6B1");
+            await RefreshReadinessAsync();
         }
-        readinessState.Text=result.RepairedCount>0?string.Format(Localization.T("readinessRepaired"),result.RepairedCount):Localization.T("readinessFilesHealthy");
-        readinessState.Foreground=PageHelpers.HexBrush("#78E6B1");
-        await RefreshReadinessAsync();
+        catch(Exception ex)
+        {
+            finished=true;
+            if(!Current()) return;
+            readinessState.Text=Localization.T("readinessRepairFailed"); readinessState.Foreground=PageHelpers.HexBrush("#FF8F8F"); readinessDetails.Text=ex.Message;
+            readinessAction.Content=Localization.T("readinessRefresh"); readinessAction.IsEnabled=true;
+            System.Windows.Automation.AutomationProperties.SetName(readinessAction,Localization.T("readinessRefresh"));
+        }
     }
 }
 
