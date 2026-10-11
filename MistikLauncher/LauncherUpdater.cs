@@ -12,6 +12,7 @@ public sealed record LauncherRelease(string Version,string Url,string Digest,lon
 public sealed class LauncherUpdater
 {
     public const string Endpoint="https://api.github.com/repos/gamer3434/MistikLauncherUltra/releases/latest";
+    const string LatestReleasePage="https://github.com/gamer3434/MistikLauncherUltra/releases/latest";
     readonly HttpClient http;
     readonly SemaphoreSlim gate=new(1,1);
     readonly Func<bool> idle;
@@ -49,6 +50,38 @@ public sealed class LauncherUpdater
         bool offeredPreview=a.Groups[2].Success, installedPreview=b.Groups[2].Success;
         if(offeredPreview!=installedPreview) return !offeredPreview;
         return offeredPreview && System.Numerics.BigInteger.Parse(a.Groups[2].Value)>System.Numerics.BigInteger.Parse(b.Groups[2].Value);
+    }
+    internal static string LatestTagFromPage(Uri page)
+    {
+        const string prefix="/gamer3434/MistikLauncherUltra/releases/tag/";
+        if(page.Scheme!="https"||page.Host!="github.com"||!page.IsDefaultPort||!page.AbsolutePath.StartsWith(prefix,StringComparison.Ordinal))
+            throw new InvalidDataException("Untrusted latest release page.");
+        var tag=Uri.UnescapeDataString(page.AbsolutePath[prefix.Length..]);
+        if(!Regex.IsMatch(tag,@"^v\d+\.\d+\.\d+$")) throw new InvalidDataException("Latest stable release tag is invalid.");
+        return tag;
+    }
+    internal static string PackageChecksum(string checksums,string fileName)
+    {
+        var match=Regex.Match(checksums,@"(?im)^([0-9a-f]{64})[\t ]+\*?"+Regex.Escape(fileName)+@"[\t ]*\r?$");
+        if(!match.Success) throw new InvalidDataException("Official update package checksum is missing.");
+        return match.Groups[1].Value;
+    }
+    static async Task<string> LatestReleaseFallbackAsync(HttpClient client,CancellationToken token)
+    {
+        using var latest=await client.GetAsync(LatestReleasePage,HttpCompletionOption.ResponseHeadersRead,token);
+        latest.EnsureSuccessStatusCode();
+        var tag=LatestTagFromPage(latest.RequestMessage?.RequestUri??throw new InvalidDataException("Latest release redirect is missing."));
+        var fileName=$"MistikLauncher-{tag[1..]}-win-x64.zip";
+        var baseUrl=$"https://github.com/gamer3434/MistikLauncherUltra/releases/download/{tag}/";
+        using var sumsResponse=await client.GetAsync(baseUrl+"SHA256SUMS.txt",token);
+        sumsResponse.EnsureSuccessStatusCode();
+        var digest=PackageChecksum(await sumsResponse.Content.ReadAsStringAsync(token),fileName);
+        using var head=new HttpRequestMessage(HttpMethod.Head,baseUrl+fileName);
+        using var package=await client.SendAsync(head,HttpCompletionOption.ResponseHeadersRead,token);
+        package.EnsureSuccessStatusCode();
+        var size=package.Content.Headers.ContentLength??throw new InvalidDataException("Update package size is missing.");
+        if(size<=0||size>512L*1024*1024) throw new InvalidDataException("Invalid update size.");
+        return JsonSerializer.Serialize(new { tag_name=tag,draft=false,prerelease=false,body="",assets=new[] { new { name=fileName,browser_download_url=baseUrl+fileName,digest="sha256:"+digest,size } } });
     }
     public string ReleaseNotes(string language)
     {
@@ -116,7 +149,11 @@ public sealed class LauncherUpdater
             LatestVersion="—"; latestReleaseBody="";
             using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(20));
             string json;
-            if(selectedVersion==null) json=await GitHubReleaseCache.GetAsync(http,Endpoint,Path.Combine(App.AppData,"launcher-release-cache.json"),timeout.Token);
+            if(selectedVersion==null)
+            {
+                try { json=await GitHubReleaseCache.GetAsync(http,Endpoint,Path.Combine(App.AppData,"launcher-release-cache.json"),timeout.Token,false); }
+                catch(HttpRequestException) when(!timeout.IsCancellationRequested) { json=await LatestReleaseFallbackAsync(http,timeout.Token); }
+            }
             else {
                 using var response=await http.GetAsync(Endpoint.Replace("/latest","/tags/"+Uri.EscapeDataString(selectedVersion)),timeout.Token);
                 response.EnsureSuccessStatusCode(); json=await response.Content.ReadAsStringAsync(timeout.Token);

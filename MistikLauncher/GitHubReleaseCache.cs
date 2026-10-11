@@ -15,7 +15,7 @@ public static class GitHubReleaseCache
     }
     static readonly TimeSpan StaleLimit = TimeSpan.FromDays(7);
 
-    public static async Task<string> GetAsync(HttpClient client, string endpoint, string cachePath, CancellationToken cancellationToken)
+    public static async Task<string> GetAsync(HttpClient client, string endpoint, string cachePath, CancellationToken cancellationToken, bool useStaleOnTransient = true)
     {
         var cached = Read(cachePath);
         using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
@@ -29,7 +29,7 @@ public static class GitHubReleaseCache
             if (response.StatusCode == HttpStatusCode.NotModified && cached is not null)
                 return cached.Json;
 
-            if (IsTransientLimit(response.StatusCode) && Usable(cached))
+            if (useStaleOnTransient && IsTransientLimit(response.StatusCode) && Usable(cached))
                 return cached!.Json;
 
             response.EnsureSuccessStatusCode();
@@ -41,7 +41,7 @@ public static class GitHubReleaseCache
         }
         catch (Exception ex) when (!cancellationToken.IsCancellationRequested && (ex is HttpRequestException or TaskCanceledException))
         {
-            if (Usable(cached)) return cached!.Json;
+            if (useStaleOnTransient && Usable(cached)) return cached!.Json;
             throw;
         }
     }

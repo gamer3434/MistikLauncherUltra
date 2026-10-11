@@ -214,6 +214,10 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.18","2026-10-12","#00D4AA", new[]{
+                "GitHub API sınırına takılırsa güncelleyici resmi son sürüm sayfasına ve SHA-256 listesine döner; eski önbellek yeni sürümü gizleyemez.",
+                "When GitHub's API is throttled, the updater checks the official latest release page and SHA-256 list instead of hiding newer versions behind stale cache."
+            }),
             new("v6.2.17","2026-10-12","#00D4AA", new[]{
                 "Mod galerisinde varsa tam çözünürlüklü görsel açılır; yüklenemezse önizleme kullanılır ve görsel oranı korunur.",
                 "Gallery images use the full-size source when available, fall back to the preview, and preserve their aspect ratio."

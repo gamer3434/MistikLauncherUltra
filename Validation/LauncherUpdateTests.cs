@@ -12,6 +12,13 @@ static class LauncherUpdateTests
     {
         int checks=0;
         void Check(bool ok,string name) { if(!ok) throw new Exception(name); Console.WriteLine("PASS "+name); checks++; }
+        string LatestTag(Uri page) => (string)typeof(LauncherUpdater).GetMethod("LatestTagFromPage",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic)!.Invoke(null,new object[]{page})!;
+        string PackageChecksum(string sums,string name) => (string)typeof(LauncherUpdater).GetMethod("PackageChecksum",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic)!.Invoke(null,new object[]{sums,name})!;
+        const string fallbackHash="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        bool rejectedLatest=false;
+        try { LatestTag(new Uri("https://evil.invalid/gamer3434/MistikLauncherUltra/releases/tag/v7.0.0")); } catch(System.Reflection.TargetInvocationException ex) when(ex.InnerException is InvalidDataException) { rejectedLatest=true; }
+        Check(LatestTag(new Uri("https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v7.0.0"))=="v7.0.0" && rejectedLatest && PackageChecksum(fallbackHash+"  MistikLauncher-7.0.0-win-x64.zip\r\n", "MistikLauncher-7.0.0-win-x64.zip")==fallbackHash,
+            "rate-limit fallback accepts only this repository's stable release and exact package checksum");
         Check(LauncherUpdater.IsNewer("v7.0.0","6.0.0-preview.1") && LauncherUpdater.IsNewer("v6.0.0","6.0.0-preview.1"),"stable upgrade and preview promotion");
         Check(!LauncherUpdater.IsNewer("v5.5.2","6.0.0-preview.1") && !LauncherUpdater.IsNewer("v6.0.0","6.0.0"),"no downgrade or same-version loop");
         Check(!LauncherUpdater.IsNewer("v7.0.0junk","6.0.0") && !LauncherUpdater.IsNewer("v7.0.0","6.0.0junk") && !LauncherUpdater.IsNewer("v999999999999.0.0","6.0.0"),"malformed release version rejected");
@@ -35,6 +42,12 @@ static class LauncherUpdateTests
             }}
         });
         string target=Path.Combine(root,"launcher-target"); Directory.CreateDirectory(target);
+        using(var fallbackClient=new HttpClient(new LatestReleaseFallback(metadata,zip)))
+        {
+            var fallback=new LauncherUpdater(()=>true,fallbackClient,target,"6.0.0-preview.1");
+            Check(!await fallback.CheckAsync(false) && fallback.LatestVersion=="v7.0.0" && fallback.StatusKey=="luAvailable",
+                "launcher discovers the stable update from the official release page when GitHub API is throttled");
+        }
         foreach(var name in names) File.WriteAllText(Path.Combine(target,name),"old "+name);
         var profileBytes=System.Text.Encoding.ASCII.GetBytes("MLUC1\n").Concat(WindowsSecret.Transform(System.Text.Encoding.UTF8.GetBytes("{\"user\":\"PersistedPlayer\",\"curseforge_api_key\":\"fake_update_fixture_key\"}"),true)).ToArray();
         File.WriteAllBytes(Path.Combine(target,"config.json"),profileBytes);
@@ -156,5 +169,28 @@ static class LauncherUpdateTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
             Content=request.RequestUri!.Host=="api.github.com"?new StringContent(metadata):stall?new StreamContent(new StalledStream()):new ByteArrayContent(bytes)
         });
+    }
+    sealed class LatestReleaseFallback(string metadata,byte[] bytes) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken token)
+        {
+            var uri=request.RequestUri!;
+            HttpResponseMessage response;
+            if(uri.Host=="api.github.com") response=new HttpResponseMessage(HttpStatusCode.Forbidden);
+            else if(request.Method==HttpMethod.Get && uri.AbsolutePath.EndsWith("/releases/latest",StringComparison.Ordinal))
+            {
+                response=new HttpResponseMessage(HttpStatusCode.OK);
+                response.RequestMessage=new HttpRequestMessage(HttpMethod.Get,"https://github.com/gamer3434/MistikLauncherUltra/releases/tag/v7.0.0");
+            }
+            else if(uri.AbsolutePath.EndsWith("/SHA256SUMS.txt",StringComparison.Ordinal))
+            {
+                using var document=JsonDocument.Parse(metadata);
+                var asset=document.RootElement.GetProperty("assets")[0];
+                response=new HttpResponseMessage(HttpStatusCode.OK) { Content=new StringContent(asset.GetProperty("digest").GetString()![7..]+"  "+asset.GetProperty("name").GetString()+"\n") };
+            }
+            else if(request.Method==HttpMethod.Head) { response=new HttpResponseMessage(HttpStatusCode.OK); response.Content=new ByteArrayContent(Array.Empty<byte>()); response.Content.Headers.ContentLength=bytes.Length; }
+            else response=new HttpResponseMessage(HttpStatusCode.NotFound);
+            return Task.FromResult(response);
+        }
     }
 }
