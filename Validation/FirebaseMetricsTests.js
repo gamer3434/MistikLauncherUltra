@@ -31,7 +31,7 @@ test('dashboard never injects metric strings into HTML and failures clear previo
   assert.match(source,/td\.textContent = String\(value\)/);
   assert.match(source,/data = undefined; clear\(\); status\('Veriler okunamadı/);
   assert.match(source,/browserSessionPersistence/);
-  assert.match(source,/signInWithPopup/);
+  assert.match(source,/signInWithRedirect/);
 });
 test('deployment defaults stay deny and admin CSP is scoped', () => {
   const rules=JSON.parse(read('analytics/database.rules.template.json')).rules;

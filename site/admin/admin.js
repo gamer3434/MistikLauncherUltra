@@ -34,14 +34,8 @@ try {
   $('login').disabled = false;
   $('login').onclick = async () => {
     $('login').disabled = true;
-    try { await authSdk.signInWithPopup(auth, new authSdk.GoogleAuthProvider()); }
-    catch (error) {
-      clear();
-      if (['auth/popup-blocked','auth/internal-error'].includes(error?.code)) {
-        try { await authSdk.signInWithRedirect(auth, new authSdk.GoogleAuthProvider()); }
-        catch { status('Google giriş sayfası açılamadı. Tarayıcı izinlerini kontrol edin.', true); }
-      } else status(error?.code === 'auth/unauthorized-domain' ? 'Bu site Firebase Authentication yetkili alan adlarına eklenmemiş.' : 'Giriş tamamlanamadı. Açılır pencere iznini ve Google hesabını kontrol edin. (' + (error?.code || 'bağlantı') + ')', true);
-    }
+    try { await authSdk.signInWithRedirect(auth, new authSdk.GoogleAuthProvider()); }
+    catch (error) { clear(); status(error?.code === 'auth/unauthorized-domain' ? 'Bu site Firebase Authentication yetkili alan adlarına eklenmemiş.' : 'Google giriş sayfası açılamadı. (' + (error?.code || 'bağlantı') + ')', true); }
     finally { $('login').disabled = false; }
   };
   $('logout').onclick = async () => { await authSdk.signOut(auth); };

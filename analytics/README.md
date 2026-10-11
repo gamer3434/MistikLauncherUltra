@@ -33,4 +33,4 @@ The emulator suite uses a demo namespace and a synthetic administrator email. It
 
 Official references: [Web SDK setup](https://firebase.google.com/docs/web/setup), [Google sign-in](https://firebase.google.com/docs/auth/web/google-signin), [Realtime Database rules](https://firebase.google.com/docs/database/security).
 
-For redirect fallback on browsers that block popups, set the runtime `authDomain` to the Firebase Hosting domain serving this panel and register `https://<domain>/__/auth/handler` in Google OAuth authorized redirect URIs. Keep that domain in Authentication authorized domains. [Firebase redirect guidance](https://firebase.google.com/docs/auth/web/redirect-best-practices).
+For redirect login without popup windows, set the runtime `authDomain` to the Firebase Hosting domain serving this panel and register `https://<domain>/__/auth/handler` in Google OAuth authorized redirect URIs. Keep that domain in Authentication authorized domains. [Firebase redirect guidance](https://firebase.google.com/docs/auth/web/redirect-best-practices).
