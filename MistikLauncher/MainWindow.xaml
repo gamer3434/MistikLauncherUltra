@@ -58,7 +58,7 @@
             <Setter Property="Background"                Value="Transparent"/>
             <Setter Property="Foreground"                Value="#D4DFE9"/>
             <Setter Property="BorderThickness"           Value="0"/>
-            <Setter Property="Height"                    Value="42"/>
+            <Setter Property="Height"                    Value="36"/>
             <Setter Property="FontSize"                  Value="13"/>
             <Setter Property="FontFamily"                Value="Segoe UI"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -133,13 +133,13 @@
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="5"/>
-            <RowDefinition Height="78"/>
+            <RowDefinition Height="4"/>
+            <RowDefinition Height="60"/>
         </Grid.RowDefinitions>
 
         <!-- ═══ CONTENT ═══════════════════════════════════════════════════════ -->
         <DockPanel Grid.Column="0" Grid.Row="0">
-            <Grid DockPanel.Dock="Top" Margin="24,8,24,4">
+            <Grid DockPanel.Dock="Top" Margin="24,4,24,2">
                 <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock x:Name="LogoText" Text="MISTIK" FontSize="22" FontWeight="Black" Foreground="{DynamicResource Theme00A3FF}" VerticalAlignment="Center"/>
@@ -149,15 +149,15 @@
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <ComboBox x:Name="LanguageBox" Width="110" Margin="0,0,14,0" AutomationProperties.Name="Türkçe / English"><ComboBoxItem Content="Türkçe"/><ComboBoxItem Content="English"/></ComboBox>
-                    <Button x:Name="ProfileButton" Style="{StaticResource NavBtn}" Padding="8,0" MinHeight="48" ToolTip="Profile">
+                    <Button x:Name="ProfileButton" Style="{StaticResource NavBtn}" Padding="8,0" MinHeight="40" ToolTip="Profile">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Border Width="36" Height="36" CornerRadius="8" Background="{DynamicResource Theme203853}" ClipToBounds="True" Margin="0,0,10,0"><Image x:Name="AvatarImg" RenderOptions.BitmapScalingMode="NearestNeighbor" Stretch="UniformToFill"/></Border>
+                            <Border Width="32" Height="32" CornerRadius="8" Background="{DynamicResource Theme203853}" ClipToBounds="True" Margin="0,0,8,0"><Image x:Name="AvatarImg" RenderOptions.BitmapScalingMode="NearestNeighbor" Stretch="UniformToFill"/></Border>
                             <TextBlock x:Name="UserNameLbl" Foreground="#EFF5FF" FontSize="14" FontWeight="SemiBold" MaxWidth="180" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                 </StackPanel>
             </Grid>
-            <Border x:Name="QuickBarHost" DockPanel.Dock="Top" Background="{DynamicResource Theme0D1727}" BorderBrush="{DynamicResource Theme365574}" BorderThickness="0,0,0,1" Padding="12,4">
+            <Border x:Name="QuickBarHost" DockPanel.Dock="Top" Background="{DynamicResource Theme0D1727}" BorderBrush="{DynamicResource Theme365574}" BorderThickness="0,0,0,1" Padding="8,1">
                 <WrapPanel x:Name="QuickBarPanel" HorizontalAlignment="Center"/>
             </Border>
         <Frame x:Name="MainFrame"
@@ -172,14 +172,14 @@
         <!-- ═══ CONTROL BAR ═══════════════════════════════════════════════════ -->
         <Border Grid.Column="0" Grid.Row="2" Background="{DynamicResource Theme152A43}"
                 BorderBrush="{DynamicResource Theme365574}" BorderThickness="0,1,0,0">
-            <Grid Margin="24,0">
+            <Grid Margin="20,0">
                 <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <TextBlock x:Name="StatusLbl" Foreground="#ADBED6" FontSize="12" VerticalAlignment="Center" Margin="0,0,24,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
 
                 <!-- Right: version + launch -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
                             HorizontalAlignment="Right">
-                    <ComboBox x:Name="VerBox" Width="200" Height="38" Margin="0,0,14,0"
+                    <ComboBox x:Name="VerBox" Width="180" Height="34" Margin="0,0,10,0"
                               Background="{DynamicResource Theme203853}" Foreground="#EFF5FF" FontWeight="Bold" BorderBrush="#36363C" BorderThickness="1">
                         <ComboBox.Resources>
                             <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#0D1727" />
@@ -189,8 +189,8 @@
                         </ComboBox.Resources>
                     </ComboBox>
                     <Button x:Name="BtnLaunch" Content="OYUNA GIR"
-                            Width="200" Height="48"
-                            FontSize="16" FontWeight="SemiBold"
+                            Width="180" Height="40"
+                            FontSize="14" FontWeight="SemiBold"
                             FontFamily="Segoe UI"
                             Style="{StaticResource AccentBtn}"/>
                 </StackPanel>

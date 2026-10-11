@@ -295,7 +295,7 @@ namespace MistikLauncher
                 var content=new StackPanel { Orientation=Orientation.Horizontal };
                 content.Children.Add(new TextBlock { Text=item.Item3,FontFamily=new FontFamily("Segoe MDL2 Assets"),FontSize=16,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,8,0) });
                 content.Children.Add(new TextBlock { Text=label,VerticalAlignment=VerticalAlignment.Center });
-                var button=new Button { Content=content,Style=(Style)FindResource("NavBtn"),Height=44,Padding=new Thickness(12,0,12,0),MinWidth=100 };
+                var button=new Button { Content=content,Style=(Style)FindResource("NavBtn"),Height=36,Padding=new Thickness(12,0,12,0),MinWidth=100 };
                 System.Windows.Automation.AutomationProperties.SetName(button,label);
                 button.Click+=(_,_)=>Navigate(item.Item1); quickButtons[item.Item1]=button; QuickBarPanel.Children.Add(button);
             }

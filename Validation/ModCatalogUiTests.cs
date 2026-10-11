@@ -12,11 +12,26 @@ static class ModCatalogUiTests
     public static int Run(MainWindow window, Action<string> capture)
     {
         var frame = (Frame)window.FindName("MainFrame"); var previous = frame.Content;
-        using var client = new HttpClient(new Fixture(window));
+        var fixture = new Fixture(window);
+        using var client = new HttpClient(fixture);
         var page = new ModManagerPage(window, client);
         try
         {
             frame.Content = page; Flush(window); capture("mod-catalog-cards");
+            if (fixture.SearchRequests.Count == 0 || fixture.SearchRequests[0].Query.Contains("query="))
+                throw new Exception("Opening the catalog should list compatible mods without requiring a search phrase.");
+            if (!Nodes(page).OfType<TextBlock>().Any(text => text.Text.Contains("41")))
+                throw new Exception("Catalog should show the total number of available compatible mods.");
+            var catalogCard = Nodes(page).OfType<Button>().Single(button => System.Windows.Automation.AutomationProperties.GetName(button).StartsWith("Example project ·", StringComparison.Ordinal));
+            catalogCard.ApplyTemplate();
+            if (catalogCard.Template.FindName("Surface", catalogCard) is not Border)
+                throw new Exception("Mod cards should use the theme-safe hover surface instead of the Windows blue button highlight.");
+            var nextPage = Nodes(page).OfType<Button>().Single(button => button.Content?.ToString() == "›");
+            if (!nextPage.IsEnabled) throw new Exception("More compatible mods should be reachable through pagination.");
+            nextPage.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
+            if (!fixture.SearchRequests.Any(uri => uri.Query.Contains("offset=20")))
+                throw new Exception("Next page should load the next group of matching mods.");
+            Console.WriteLine("PASS empty search browses all profile-compatible mods, shows totals and paginates");
             var open = Nodes(page).OfType<Button>().Single(button => System.Windows.Automation.AutomationProperties.GetName(button).StartsWith("Example project ·", StringComparison.Ordinal));
             open.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
             if (page.Content is not ModProjectView detail) throw new Exception("Card should open project inside its mod page.");
@@ -36,7 +51,7 @@ static class ModCatalogUiTests
             Nodes(detail).OfType<Button>().First().RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
             if (page.Content is ModProjectView) throw new Exception("Back should restore the original search and results.");
             Console.WriteLine("PASS gallery empty state and back navigation preserve original catalog");
-            return 3;
+            return 4;
         }
         finally { frame.Content = previous; }
     }
@@ -53,17 +68,23 @@ static class ModCatalogUiTests
     }
     sealed class Fixture(MainWindow window) : HttpMessageHandler
     {
+        public List<Uri> SearchRequests { get; } = new();
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var hit = new JObject { ["project_id"]="fixture", ["title"]="Example project", ["description"]="An illustrated catalog card opens description, versions and gallery.", ["downloads"]=12500, ["author"]="Example author", ["categories"]=new JArray("optimization", "fabric") };
             string game = GameProfiles.MinecraftVersion(App.GameDir, window.Config.Version);
             string loader = GameProfiles.Loader(App.GameDir, window.Config.Version);
             var project = new JObject { ["id"]="fixture", ["project_type"]="mod", ["title"]="Example project", ["description"]=hit["description"], ["body"]="# About this mod\n\n**Rich description** and version selection.", ["downloads"]=12500, ["followers"]=42, ["gallery"]=new JArray(), ["categories"]=new JArray("optimization", "fabric") };
-            JToken data = request.RequestUri!.AbsolutePath.EndsWith("/search") ? new JObject { ["hits"]=new JArray(hit), ["total_hits"]=1 }
+            JToken data = request.RequestUri!.AbsolutePath.EndsWith("/search") ? Search(request.RequestUri, hit)
                 : request.RequestUri.AbsolutePath.EndsWith("/version") ? new JArray(
                     new JObject { ["id"]="compatible", ["name"]="Stable compatible build", ["version_number"]="1.0", ["game_versions"]=new JArray(game), ["loaders"]=new JArray(loader) },
                     new JObject { ["id"]="wrong", ["name"]="Wrong build", ["game_versions"]=new JArray("0.0"), ["loaders"]=new JArray(loader) }) : project;
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(data.ToString()) });
+        }
+        JObject Search(Uri uri, JObject hit)
+        {
+            SearchRequests.Add(uri);
+            return new JObject { ["hits"] = new JArray(hit), ["total_hits"] = 41 };
         }
     }
 }

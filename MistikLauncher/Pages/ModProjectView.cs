@@ -41,7 +41,7 @@ public sealed class ModProjectView : Grid
                 <Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="Background" Value="#195D40"/></Trigger></Style.Triggers>
             </Style>
             """);
-        Margin = new Thickness(32, 24, 32, 24);
+        Margin = new Thickness(22, 16, 22, 16);
         RowDefinitions.Add(new() { Height = GridLength.Auto });
         RowDefinitions.Add(new() { Height = GridLength.Auto });
         RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) });

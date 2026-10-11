@@ -64,15 +64,18 @@ static class ModPagePerformanceTests
         Check(transport.Pending["slow"].Token.IsCancellationRequested,"new mod search cancels the superseded HTTP request");
         transport.Pending["fast"].Complete("new result"); Wait(latest);
         transport.Pending["slow"].Complete("old result"); Wait(old);
-        Check(Result("new result") && !Result("old result"),"late superseded search cannot replace the latest result cards");
+        Check(Result("new result") && !Result("old result"),"late superseded search cannot replace the latest result cards: " + string.Join(" | ",Nodes(results).OfType<TextBlock>().Select(text=>text.Text)));
         var failed=Search("late-failure"); var fresh=Search("fresh");
         transport.Pending["fresh"].Complete("fresh result"); Wait(fresh);
         transport.Pending["late-failure"].Response.SetException(new HttpRequestException("obsolete request failed")); Wait(failed);
         Check(Result("fresh result") && !Nodes(results).OfType<TextBlock>().Any(text=>text.Text.Contains("obsolete request failed",StringComparison.Ordinal)),
             "late superseded search failure cannot replace current results with an error");
-        var clearing=Search("clear-pending"); Wait(Search(""));
+        var clearing=Search("clear-pending"); var browseAll=Search(""); Wait(browseAll);
         transport.Pending["clear-pending"].Complete("obsolete cleared result"); Wait(clearing);
-        Check(results.Children.Count==0,"clearing a search cancels pending work and leaves no stale results or loading card");
+        Check(transport.Pending["clear-pending"].Token.IsCancellationRequested &&
+            Nodes(results).OfType<TextBlock>().Any(text=>text.Text.Contains("bulunamadı",StringComparison.OrdinalIgnoreCase)) &&
+            !Nodes(results).OfType<TextBlock>().Any(text=>text.Text.Contains("obsolete cleared result",StringComparison.Ordinal)),
+            "clearing a search browses the unfiltered catalog and ignores obsolete results");
         Check(!Nodes(page).OfType<ComboBox>().Any(box=>box.Name=="ModSource"),"single-source mod search needs no provider selector");
         var oldVersion=window.Config.Version;
         try {
@@ -173,9 +176,10 @@ static class ModPagePerformanceTests
             if(request.RequestUri!.AbsolutePath=="/v2/project/fixture-failed/version")
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
 
-            string query=Uri.UnescapeDataString(request.RequestUri!.Query.TrimStart('?').Split('&').Single(value=>value.StartsWith("query=",StringComparison.Ordinal))[6..]);
+            var queryValue=request.RequestUri!.Query.TrimStart('?').Split('&').FirstOrDefault(value=>value.StartsWith("query=",StringComparison.Ordinal));
+            string query=queryValue is null ? "" : Uri.UnescapeDataString(queryValue[6..]);
             SearchUris[query]=request.RequestUri;
-            if(query=="optimization") return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content=new StringContent("{\"hits\":[]}") });
+            if(query is "" or "optimization") return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content=new StringContent("{\"hits\":[],\"total_hits\":0}") });
             if(query.StartsWith("profile-",StringComparison.Ordinal) && Pending.ContainsKey(query))
             {
                 var refreshed=new PendingSearch(cancellationToken); refreshed.Complete("current profile result"); return refreshed.Response.Task;

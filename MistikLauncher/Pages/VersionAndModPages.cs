@@ -728,7 +728,7 @@ namespace MistikLauncher.Pages
             _client = client ?? Http;
 
             Background = Brushes.Transparent;
-            var sp = new StackPanel { Margin = new Thickness(40, 30, 40, 30) };
+            var sp = new StackPanel { Margin = new Thickness(32, 20, 32, 20) };
             sp.Children.Add(PageHelpers.Lbl("modCenterTitle", 28, "#FFFFFF", true));
             sp.Children.Add(PageHelpers.Lbl("modCenterIntro", 14, "#A0A0A0"));
 
@@ -874,7 +874,7 @@ namespace MistikLauncher.Pages
 
             optiCard.Child = optiSp;
 
-            var searchRow = new Grid { Margin = new Thickness(0, 16, 0, 12) };
+            var searchRow = new Grid { Margin = new Thickness(0, 12, 0, 10) };
             searchRow.ColumnDefinitions.Add(new ColumnDefinition());
             for(int column=0;column<3;column++) searchRow.ColumnDefinitions.Add(new ColumnDefinition { Width=GridLength.Auto });
             sp.Children.Add(PageHelpers.Lbl("modSearch",14,"#FFFFFF",true));
@@ -1092,7 +1092,7 @@ namespace MistikLauncher.Pages
             Content = new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
 
             // Load popular mods on open
-            _ = LoadPopular();
+            _ = LoadCatalog();
             RenderInstalledMods();
             Loaded += (_, _) => {
                 if (InstalledModsWriteTimeUtc() != _installedModsWriteTimeUtc) RenderInstalledMods();
@@ -1103,9 +1103,8 @@ namespace MistikLauncher.Pages
         static DateTime InstalledModsWriteTimeUtc(string? directory = null) => Directory.Exists(directory ?? App.ModsDir)
             ? Directory.GetLastWriteTimeUtc(directory ?? App.ModsDir) : DateTime.MinValue;
 
-        async Task LoadPopular()
+        async Task LoadCatalog()
         {
-            _searchBox.Text = "optimization";
             await SearchMods();
         }
 
@@ -1122,7 +1121,6 @@ namespace MistikLauncher.Pages
             if (_searchProfile != profile) _searchOffset = 0;
             _searchProfile = profile;
 
-            if (string.IsNullOrEmpty(q)) { _resultsPanel.Children.Clear(); return; }
             using var cancellation = new System.Threading.CancellationTokenSource();
             _searchCancellation = cancellation;
             _resultsPanel.Children.Clear();
@@ -1133,14 +1131,17 @@ namespace MistikLauncher.Pages
                 string loader = GameProfiles.Loader(App.GameDir, profile);
                 var facets = new JArray(new JArray("project_type:mod"), new JArray("versions:" + game));
                 if (loader is "fabric" or "forge" or "neoforge" or "quilt") facets.Add(new JArray("categories:" + loader));
-                var resp = await _client.GetStringAsync($"https://api.modrinth.com/v2/search?query={Uri.EscapeDataString(q)}&limit=20&offset={_searchOffset}&index={_sort}&facets={Uri.EscapeDataString(facets.ToString(Newtonsoft.Json.Formatting.None))}", cancellation.Token);
+                var searchUrl = $"https://api.modrinth.com/v2/search?limit=20&offset={_searchOffset}&index={_sort}&facets={Uri.EscapeDataString(facets.ToString(Newtonsoft.Json.Formatting.None))}";
+                if (q.Length > 0) searchUrl += "&query=" + Uri.EscapeDataString(q);
+                var resp = await _client.GetStringAsync(searchUrl, cancellation.Token);
                 var response = JObject.Parse(resp); var hits = response["hits"] as JArray;
                 if (generation != _searchGeneration) return;
                 if ((_main.Config.Version ?? "") != profile) { await SearchMods(); return; }
                 _resultsPanel.Children.Clear();
                 _previousPage.IsEnabled = _searchOffset > 0;
                 _nextPage.IsEnabled = _searchOffset + 20 < (response["total_hits"]?.Value<int>() ?? hits?.Count ?? 0);
-                _pageNumber.Text = (_searchOffset / 20 + 1).ToString();
+                var totalHits = response["total_hits"]?.Value<int>() ?? hits?.Count ?? 0;
+                _pageNumber.Text = $"{_searchOffset / 20 + 1} / {Math.Max(1, (totalHits + 19) / 20)}  ·  {totalHits:N0}";
                 if (hits == null || hits.Count == 0) { _resultsPanel.Children.Add(PageHelpers.Lbl("Mod bulunamadı.", 13, "#A0A0A0")); return; }
                 foreach (var hit in hits)
                 {
@@ -1163,7 +1164,19 @@ namespace MistikLauncher.Pages
                     var summary = new Grid(); summary.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); summary.ColumnDefinitions.Add(new ColumnDefinition());
                     summary.Children.Add(ModProjectView.Icon(hit["icon_url"]?.ToString(), 84)); Grid.SetColumn(info, 1); summary.Children.Add(info);
                     var details = new Button { Content = summary, Background = Brushes.Transparent, Foreground = Brushes.White, BorderThickness = new Thickness(0),
-                        HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(0), Cursor = System.Windows.Input.Cursors.Hand };
+                        HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(0), Cursor = System.Windows.Input.Cursors.Hand,
+                        Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse("""
+                            <ControlTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="Button">
+                              <Border x:Name="Surface" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="8">
+                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                              </Border>
+                              <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#30343A"/></Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#FFFFFF"/></Trigger>
+                                <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.75"/></Trigger>
+                              </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                            """) };
                     System.Windows.Automation.AutomationProperties.SetName(details, name + " · " + Localization.T("modDetails"));
                     details.Click += (_, _) => OpenProject(cId, mname);
                     Grid.SetColumn(details, 0); grid.Children.Add(details);
