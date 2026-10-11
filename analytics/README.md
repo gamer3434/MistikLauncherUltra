@@ -32,3 +32,5 @@ npx firebase-tools@15.33.0 emulators:exec --only database --project demo-mistik-
 The emulator suite uses a demo namespace and a synthetic administrator email. It exercises own-record writes/reads, stranger and guest denial, verified Google administrator reads, stale/future timestamps, immutable firstSeen, extra fields, unsupported versions/codes, atomic server increments, count bounds and opt-out deletion.
 
 Official references: [Web SDK setup](https://firebase.google.com/docs/web/setup), [Google sign-in](https://firebase.google.com/docs/auth/web/google-signin), [Realtime Database rules](https://firebase.google.com/docs/database/security).
+
+For redirect fallback on browsers that block popups, set the runtime `authDomain` to the Firebase Hosting domain serving this panel and register `https://<domain>/__/auth/handler` in Google OAuth authorized redirect URIs. Keep that domain in Authentication authorized domains. [Firebase redirect guidance](https://firebase.google.com/docs/auth/web/redirect-best-practices).
