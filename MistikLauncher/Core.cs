@@ -214,6 +214,12 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.16","2026-10-12","#00D4AA", new[]{
+                "Mod kataloğu artık arama boşken seçili profille uyumlu tüm modları listeler; toplam sonuç ve sayfa sayısı görünür.",
+                "Mod kartlarının hover rengi ve üst/alt gezinme çubukları daha dengeli hale getirildi.",
+                "Browse every mod compatible with the selected profile, with result totals and page counts.",
+                "Mod card highlights and launcher navigation bars use a cleaner, more compact layout."
+            }),
             new("v6.2.15","2026-10-11","#00D4AA", new[]{
                 "Ayarlara doğrulanmış eski launcher sürümüne dönme ve isteğe bağlı anonim kullanım/hata paylaşımı eklendi.",
                 "Firebase yönetim paneli aktif kurulumları, sürüm dağılımını ve hata kategorilerini gösterir."
