@@ -2,13 +2,13 @@
 
 Windows x64 için Türkçe / English Minecraft launcher. Oyuncu ayarları cihazında saklanır; sürüm, mod, skin ve yerel sunucu yönetimi içerir.
 
-[Yayımlanan sürümleri indir](https://github.com/gamer3434/MistikLauncherUltra/releases/latest) · [Web sitesi](https://mistiklauncherultra.web.app/) · [6.2.14 değişiklikleri](docs/RELEASE-6.2.14.md)
+[Yayımlanan sürümleri indir](https://github.com/gamer3434/MistikLauncherUltra/releases/latest) · [Web sitesi](https://mistiklauncherultra.web.app/) · [6.2.15 değişiklikleri](docs/RELEASE-6.2.15.md)
 
 ## Kurulum ve onarım
 
 Sürüm sayfasından online veya offline kurulum EXE'sini seçin. Taşınabilir kullanım için ZIP'in tüm dosyalarını aynı klasöre çıkartıp `MistikLauncher.exe` dosyasını açın. .NET çalışma zamanı pakete dahildir.
 
-Onarma seçeneği yalnızca kurucudadır: **Mevcut kurulumu onar**. Program bozulursa launcher'ı kapatın, aynı veya daha yeni sürümün `MistikRepair-6.2.14.exe` dosyasını açıp kurulum klasöründe **Onar** seçin. Onarıcı internet gerektirmez; program dosyalarını doğrular ve yeniler. Ayarlar, modlar ve dünyalar korunur.
+Onarma seçeneği yalnızca kurucudadır: **Mevcut kurulumu onar**. Program bozulursa launcher'ı kapatın, aynı veya daha yeni sürümün `MistikRepair-6.2.15.exe` dosyasını açıp kurulum klasöründe **Onar** seçin. Onarıcı internet gerektirmez; program dosyalarını doğrular ve yeniler. Ayarlar, modlar ve dünyalar korunur.
 
 Mod merkezinde resimli Modrinth kartları, sıralama ve sayfalama bulunur. Karta tıklayınca açıklama, uyumlu sürümler ve galeri açılır. Kurulum zorunlu bağımlılıkları da indirir. Yerel JAR dosyaları da içe aktarılabilir.
 
@@ -56,3 +56,7 @@ Eski Firebase hesapları, telemetri ve yönetici paneli kaldırılmıştır. İs
 ## English
 
 A bilingual Windows x64 Minecraft launcher with local player settings, version and mod management, skins and local server tools. Download the latest published installer or extract the complete portable ZIP. If an installation breaks, close the launcher and use the matching or newer repair EXE; settings, mods and worlds are preserved. Build and validation commands are above. Firebase account services and telemetry are retired; deployment mappings and credentials remain local.
+
+Sürüm düşürmek için **Ayarlar → Sürüm düşür → Eski sürümleri yükle** bölümünü açın. Hesap ve oyun dosyaları korunur; otomatik güncelleme kapatılır.
+
+Kullanım/hata paylaşımı varsayılan kapalıdır. İsteyen kullanıcı Ayarlar’dan açabilir. [Firebase yönetim paneli](https://mistiklauncherultra.web.app/admin/) yalnızca yetkili Google hesabına açıktır; anonim kurulum, aktiflik ve hata kategorilerini gösterir. Kurulum sayısı kişi sayısı değildir.

@@ -205,6 +205,28 @@ public class ModernSettingsPage : Page, ILanguagePage
         updateContent.Children.Add(autoUpdate);
         updateButton=PageHelpers.MkBtn(Localization.T("luCheck"),"#226DA0"); updateButton.HorizontalAlignment=HorizontalAlignment.Left;
         updateButton.Click += async (_,_)=> await main.CheckLauncherUpdatesAsync(true); updateContent.Children.Add(updateButton);
+        var downgrade=new Expander { Header=Localization.T("luDowngrade"), Foreground=Brushes.White, Margin=new Thickness(0,14,0,0) };
+        var downgradeContent=new StackPanel();
+        downgradeContent.Children.Add(PageHelpers.Lbl(Localization.T("luDowngradeHelp"),13,"#ADBED6",wrap:TextWrapping.Wrap));
+        var versions=new ComboBox { Name="LauncherDowngradeVersion", Margin=new Thickness(0,10,0,10), MinHeight=34 };
+        System.Windows.Automation.AutomationProperties.SetName(versions,Localization.T("luDowngrade"));
+        var load=PageHelpers.MkBtn(Localization.T("luOlderVersions"),"#226DA0");
+        load.Click+=async (_,_)=> {
+            load.IsEnabled=false;
+            try { versions.ItemsSource=await main.LauncherUpdates.OlderVersionsAsync(); versions.SelectedIndex=versions.Items.Count>0?0:-1; }
+            catch(Exception ex) { updateStatus.Text=Localization.T("luError")+"\n"+ex.Message; }
+            finally { load.IsEnabled=true; }
+        };
+        var installOlder=PageHelpers.MkBtn(Localization.T("luDowngrade"),"#226DA0");
+        installOlder.Click+=async (_,_)=> {
+            if(versions.SelectedItem is not string version || main.LauncherUpdates.Busy) return;
+            if(MessageBox.Show(string.Format(Localization.T("luDowngradeConfirm"),version),Localization.T("luDowngrade"),MessageBoxButton.YesNo,MessageBoxImage.Question)!=MessageBoxResult.Yes) return;
+            installOlder.IsEnabled=false;
+            try { await main.DowngradeLauncherAsync(version); }
+            finally { installOlder.IsEnabled=true; }
+        };
+        downgradeContent.Children.Add(load); downgradeContent.Children.Add(versions); downgradeContent.Children.Add(installOlder);
+        downgrade.Content=downgradeContent; updateContent.Children.Add(downgrade);
         updateStatus=PageHelpers.Lbl("",13,"#ADBED6",pad:new Thickness(0,10,0,0),wrap:TextWrapping.Wrap); updateContent.Children.Add(updateStatus);
         updateNotes=PageHelpers.Lbl("",13,"#D7E5F5",pad:new Thickness(0,10,0,0),wrap:TextWrapping.Wrap); updateContent.Children.Add(updateNotes);
         updateProgress=new ProgressBar { Height=8, Maximum=100, Margin=new Thickness(0,12,0,2), Background=ColorThemes.Brush("#263D56"), Foreground=ColorThemes.Brush("#00A3FF"), BorderThickness=new Thickness(0), Visibility=Visibility.Collapsed };
@@ -330,6 +352,17 @@ public class ModernSettingsPage : Page, ILanguagePage
         var save=PageHelpers.MkBtn(Localization.T("save"),"#226DA0"); save.Name="SaveSettingsButton"; save.HorizontalAlignment=HorizontalAlignment.Right;
         save.Click += (_,_) => Save();
         result=PageHelpers.Lbl("",13,"#F0CF84",wrap:TextWrapping.Wrap); result.Name="SettingsResult"; result.Margin=new Thickness(0,0,24,0);
+        var usageMetrics=new CheckBox { Name="UsageMetricsToggle", Content=Localization.T("usageMetricsToggle"), IsChecked=main.Config.UsageMetricsEnabled, Foreground=Brushes.White, Margin=new Thickness(0,8,0,8), MinHeight=32 };
+        System.Windows.Automation.AutomationProperties.SetName(usageMetrics,Localization.T("usageMetricsToggle"));
+        usageMetrics.Click+=async (_,_)=> {
+            usageMetrics.IsEnabled=false;
+            try { await main.SetUsageMetricsEnabled(usageMetrics.IsChecked==true); }
+            catch(Exception ex) { usageMetrics.IsChecked=main.Config.UsageMetricsEnabled; result.Text=Localization.T("error")+": "+ex.Message; }
+            finally { usageMetrics.IsEnabled=true; }
+        };
+        stack.Children.Add(usageMetrics);
+        stack.Children.Add(PageHelpers.Lbl(Localization.T("usageMetricsHelp"),12,"#BDCAD8",wrap:TextWrapping.Wrap));
+        if(!main.UsageMetricsAvailable) stack.Children.Add(PageHelpers.Lbl(Localization.T("usageMetricsUnavailable"),12,"#F0CF84",wrap:TextWrapping.Wrap));
         var privacy=PageHelpers.Lbl(Localization.T("privacyText"),13,"#BDCAD8",wrap:TextWrapping.Wrap);
         stack.Children.Add(new Expander { Header=Localization.T("privacy"),Foreground=Brushes.White,Content=privacy });
         var layout=new DockPanel();

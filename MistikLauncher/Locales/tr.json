@@ -50,7 +50,7 @@
   "saved": "Ayarlar kaydedildi.",
   "invalid": "Geçerli bir oyuncu adı ve 1–32 GB bellek gir.",
   "privacy": "Gizlilik ve güvenlik",
-  "privacyText": "Otomatik telemetri ve uzaktan yönetim kaldırıldı. Launcher güncellemeleri yalnızca resmî GitHub deposundan alınır ve paket bütünlüğü doğrulanır.",
+  "privacyText": "Kullanım ve hata paylaşımı varsayılan olarak kapalıdır. Açarsanız anonim kurulum kimliği, sürüm, aktiflik zamanı ve hata kodları Firebase’e gönderilir. İsim, IP ve ham günlük gönderilmez. Güncelleme paketleri resmî GitHub deposundan doğrulanır.",
   "updateDisabled": "İmzasız otomatik güncellemeler kapalıdır. GitHub sürüm sayfasını kullanın.",
   "error": "İşlem tamamlanamadı",
   "auth": "Cilt sağlayıcısı",
@@ -412,5 +412,12 @@
   "modDetails": "Detayları aç",
   "modTools": "Ek mod araçları",
   "modInstall": "↓ Kur",
-  "modProfileChanged": "Profil değişti. Mod detaylarını yeniden aç."
+  "modProfileChanged": "Profil değişti. Mod detaylarını yeniden aç.",
+  "luDowngrade": "Sürüm düşür",
+  "luOlderVersions": "Eski sürümleri listele",
+  "luDowngradeHelp": "Eski launcher sürümüne dön. Hesabın, ayarların ve oyun dosyaların korunur. Otomatik güncelleme kapatılır.",
+  "luDowngradeConfirm": "{0} sürümüne dönülsün mü? Otomatik güncelleme kapatılacak. Eski sürümler yeni ayarları desteklemeyebilir.",
+  "usageMetricsToggle": "Anonim kullanım ve hata istatistiklerini paylaş",
+  "usageMetricsHelp": "İsteğe bağlı: aktif kullanım, launcher sürümü ve hata kodları paylaşılır. Kullanıcı adı ve hesap bilgileri gönderilmez. Kapatınca paylaşım durur; internet bağlantısı varsa bu cihazın kayıtları silinir.",
+  "usageMetricsUnavailable": "İstatistik bağlantısı henüz hazır değil. Hazır olduğunda tercihin uygulanır."
 }

@@ -19,6 +19,7 @@ public sealed class LauncherUpdater
     public string CurrentVersion { get; }
     public string LatestVersion { get; private set; }="—";
     string latestReleaseBody="";
+    bool preparedDowngrade;
     public string StatusKey { get; private set; }="luIdle";
     public string? Error { get; private set; }
     public string? PreparedPayload { get; private set; }
@@ -66,12 +67,12 @@ public sealed class LauncherUpdater
         line=Regex.Replace(line,@"^\s*(?:[-*]|\d+\.)\s*","").Replace("**","").Replace("`","").Trim();
         return line.Length<=180?line:line[..179]+"…";
     }
-    public static LauncherRelease? ParseRelease(string json,string installed)
+    public static LauncherRelease? ParseRelease(string json,string installed,bool downgrade=false)
     {
         using var document=JsonDocument.Parse(json); var root=document.RootElement;
         if(root.GetProperty("draft").GetBoolean()||root.GetProperty("prerelease").GetBoolean()) return null;
         string version=root.GetProperty("tag_name").GetString()!;
-        if(!IsNewer(version,installed)) return null;
+        if(downgrade?!IsNewer(installed,version):!IsNewer(version,installed)) return null;
         var assets=root.GetProperty("assets").EnumerateArray().Where(item=> {
             string name=item.GetProperty("name").GetString()??"";
             return name.StartsWith("MistikLauncher-",StringComparison.Ordinal) && name.EndsWith("-win-x64.zip",StringComparison.Ordinal);
@@ -84,17 +85,42 @@ public sealed class LauncherUpdater
         long size=asset.GetProperty("size").GetInt64(); if(size<=0||size>512L*1024*1024) throw new InvalidDataException("Invalid update size.");
         return new(version,url,digest[7..],size);
     }
-    public async Task<bool> CheckAsync(bool prepare)
+    public async Task<string[]> OlderVersionsAsync()
+    {
+        using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        using var response=await http.GetAsync(Endpoint.Replace("/latest","?per_page=100"),timeout.Token);
+        response.EnsureSuccessStatusCode();
+        using var document=JsonDocument.Parse(await response.Content.ReadAsStringAsync(timeout.Token));
+        var versions=new List<string>();
+        foreach(var item in document.RootElement.EnumerateArray()) {
+            try { if(ParseRelease(item.GetRawText(),CurrentVersion,true) is { } release) versions.Add(release.Version); }
+            catch(InvalidDataException) { /* Releases without a verified portable package cannot be installed. */ }
+        }
+        return versions.ToArray();
+    }
+    public Task<bool> CheckAsync(bool prepare) => CheckAsync(prepare,null);
+    public Task<bool> PrepareDowngradeAsync(string version)
+    {
+        if(!IsNewer(CurrentVersion,version)) throw new InvalidDataException("Select an older launcher release.");
+        return CheckAsync(true,version);
+    }
+    async Task<bool> CheckAsync(bool prepare,string? selectedVersion)
     {
         if(!await gate.WaitAsync(0)) return false;
         string? stage=null;
         try
         {
             Busy=true; Error=null; ResetTransfer(); Publish("luChecking");
+            if((selectedVersion!=null || preparedDowngrade) && PreparedPayload!=null) { DeleteStage(Path.GetDirectoryName(PreparedPayload)); PreparedPayload=null; }
             if(PreparedPayload!=null) { bool ready=idle(); Publish(ready?"luReady":"luDeferred",100); return ready; }
             LatestVersion="—"; latestReleaseBody="";
             using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(20));
-            string json=await GitHubReleaseCache.GetAsync(http,Endpoint,Path.Combine(App.AppData,"launcher-release-cache.json"),timeout.Token);
+            string json;
+            if(selectedVersion==null) json=await GitHubReleaseCache.GetAsync(http,Endpoint,Path.Combine(App.AppData,"launcher-release-cache.json"),timeout.Token);
+            else {
+                using var response=await http.GetAsync(Endpoint.Replace("/latest","/tags/"+Uri.EscapeDataString(selectedVersion)),timeout.Token);
+                response.EnsureSuccessStatusCode(); json=await response.Content.ReadAsStringAsync(timeout.Token);
+            }
             using(var doc=JsonDocument.Parse(json))
             {
                 var root=doc.RootElement;
@@ -105,7 +131,8 @@ public sealed class LauncherUpdater
                     latestReleaseBody=notes.Length>8192?notes[..8192]:notes;
                 }
             }
-            var release=ParseRelease(json,CurrentVersion);
+            var release=ParseRelease(json,CurrentVersion,selectedVersion!=null);
+            if(selectedVersion!=null && release?.Version!=selectedVersion) throw new InvalidDataException("Selected release does not match server metadata.");
             if(release==null) { Publish("luCurrent"); return false; }
             if(!prepare) { Publish("luAvailable"); return false; }
             if(!idle()) { Publish("luDeferred"); return false; }
@@ -135,7 +162,7 @@ public sealed class LauncherUpdater
             string payload=Path.Combine(stage,"payload"); Directory.CreateDirectory(payload);
             var manifest=await Task.Run(()=> { UpdateEngine.Extract(zip,payload); return UpdateEngine.Verify(payload); });
             if(manifest.Version!=release.Version.TrimStart('v')) throw new InvalidDataException("Package version does not match release.");
-            PreparedPayload=payload; Publish(idle()?"luReady":"luDeferred",100); return idle();
+            PreparedPayload=payload; preparedDowngrade=selectedVersion!=null; Publish(idle()?"luReady":"luDeferred",100); return idle();
         }
         catch(Exception ex) { Error=ex.Message; Publish("luError"); App.Log("Launcher update: "+ex.Message); return false; }
         finally {
@@ -163,17 +190,24 @@ public sealed class LauncherUpdater
             if(PreparedPayload is not string payload||!idle()) { Publish("luDeferred"); return false; }
             Error=null;
             Busy=true; Publish("luVerifying",90);
-            string helper=UpdateEngine.SafePath(payload,"MistikUpdater.exe");
+            string helper=UpdateEngine.SafePath(preparedDowngrade?directory:payload,"MistikUpdater.exe");
             string stage=Path.GetDirectoryName(payload)!;
             string externalHelper=Path.Combine(stage,"MistikUpdater.exe");
             await Task.Run(()=> {
                 UpdateEngine.Verify(payload);
+                if(preparedDowngrade) {
+                    var installed=JsonSerializer.Deserialize<UpdateManifest>(File.ReadAllText(UpdateEngine.SafePath(directory,"update-manifest.json")))??throw new InvalidDataException("Installed helper manifest missing.");
+                    if(installed.Product!="MistikLauncher" || installed.Version!=CurrentVersion.TrimStart('v')) throw new InvalidDataException("Installed helper version mismatch.");
+                    var entry=installed.Files.Single(item=>item.Path=="MistikUpdater.exe");
+                    using var stream=File.OpenRead(helper);
+                    if(!Convert.ToHexString(SHA256.HashData(stream)).Equals(entry.Hash,StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Installed helper digest mismatch.");
+                }
                 File.Copy(helper,externalHelper,true);
             });
             if(!idle()) { Publish("luDeferred",100); return false; }
             using var current=Process.GetCurrentProcess();
             string plan=Path.Combine(stage,"plan.json");
-            File.WriteAllText(plan,JsonSerializer.Serialize(new UpdatePlan(directory,payload,current.Id,current.StartTime.ToUniversalTime().Ticks,Localization.Language,LatestVersion)));
+            File.WriteAllText(plan,JsonSerializer.Serialize(new UpdatePlan(directory,payload,current.Id,current.StartTime.ToUniversalTime().Ticks,Localization.Language,LatestVersion,preparedDowngrade)));
             var start=new ProcessStartInfo(externalHelper) { UseShellExecute=false, CreateNoWindow=true, WindowStyle=ProcessWindowStyle.Hidden };
             start.ArgumentList.Add(plan); child=Process.Start(start)??throw new IOException("Cannot start update helper.");
             for(int count=0;count<100;count++)

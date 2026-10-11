@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow"><title>Mistik — Yönetim</title>
+  <link rel="icon" href="/mistik_icon.png"><link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<main>
+  <header><div><a href="/">MISTIK LAUNCHER</a><h1>Kullanım ve hata görünümü</h1></div><div class="account"><button id="login" disabled>Google ile giriş</button><button id="logout" hidden>Çıkış</button></div></header>
+  <p id="status" role="status" aria-live="polite">Firebase bağlantısı hazırlanıyor…</p>
+  <section id="dashboard" hidden aria-label="Kullanım bilgileri">
+    <div class="cards"><article><h2>Katılan kurulumlar</h2><strong id="installations">—</strong><p>İstatistik paylaşan kurulum kimlikleri.</p></article><article><h2>Şimdi aktif</h2><strong id="active">—</strong><p>Son 5 dakikada bağlantı bildiren kurulumlar.</p></article><article><h2>Son 24 saatte aktif</h2><strong id="daily">—</strong><p>Son 24 saatte bağlantı bildiren kurulumlar.</p></article><article><h2>Son 24 saatte hata</h2><strong id="recentErrors">—</strong><p>Bu sürede son bildirimi alınan hata kategorileri.</p></article></div>
+    <div class="tables"><section><h2>Sürüm dağılımı</h2><table><thead><tr><th>Sürüm</th><th>Kurulum</th></tr></thead><tbody id="versions"></tbody></table></section><section><h2>Hata kategorileri</h2><table><thead><tr><th>Kategori</th><th>Bildirim</th></tr></thead><tbody id="categories"></tbody></table></section></div>
+    <section class="errors"><h2>Son hata bildirimleri</h2><table><thead><tr><th>Hata</th><th>Sürüm</th><th>Son bildirim</th><th>Toplam</th></tr></thead><tbody id="errors"></tbody></table></section>
+    <p class="note">Bunlar kullanıcı sayısı değildir. Yalnızca paylaşımı açık kurulumlar sayılır; aynı kişinin birden fazla kurulumu olabilir. Kullanıcı adı, e-posta, mod listesi ve ham hata günlüğü toplanmaz. Hata sayıları her kurulumun her kategori için son bildirimi ve toplamıdır. Yeniden kurulum yeni kimlik oluşturabilir; paylaşımı kapatınca kayıtların silinmesi denenir; çevrimdışı kapatılan kurulumların eski kayıtları kalabilir.</p>
+  </section>
+</main>
+<script type="module" src="admin.js"></script>
+</body>
+</html>

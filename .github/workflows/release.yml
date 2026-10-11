@@ -23,10 +23,12 @@ jobs:
           "MISTIK_RELEASE_TAG=v$version" >> $env:GITHUB_ENV
       - name: Validate ordinary build and website
         run: |
-          node --test Validation/WebsiteReleaseTests.js Validation/WebsitePrivacyTests.js
+          node --test Validation/WebsiteReleaseTests.js Validation/WebsitePrivacyTests.js Validation/FirebaseMetricsTests.js
           dotnet run --project Validation -c Release -- artifacts/screenshots-ordinary
       - name: Build regular package
         shell: pwsh
+        env:
+          MISTIK_METRICS_CONFIG: ${{ secrets.MISTIK_METRICS_CONFIG }}
         run: ./scripts/Build-Package.ps1
       - name: Build online and offline installers
         shell: pwsh

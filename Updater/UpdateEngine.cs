@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace MistikLauncher.Updates;
 public sealed record UpdateFile(string Path,string Hash);
 public sealed record UpdateManifest(string Product,string Version,UpdateFile[] Files);
-public sealed record UpdatePlan(string Target,string Payload,int ParentId,long ParentStarted,string Language,string? ExpectedVersion=null);
+public sealed record UpdatePlan(string Target,string Payload,int ParentId,long ParentStarted,string Language,string? ExpectedVersion=null,bool AllowDowngrade=false);
 public sealed record UpdateInstallState(string Product,string Root,string Version,string[] Files);
 public static class UpdateEngine
 {
@@ -63,9 +63,10 @@ public static class UpdateEngine
             if(!Convert.ToHexString(SHA256.HashData(stream)).Equals(file.Hash,StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Installed file digest mismatch.");
         }
     }
-    public static void Apply(string payload,string target,string? expectedVersion=null,bool repair=false)
+    public static void Apply(string payload,string target,string? expectedVersion=null,bool repair=false,bool allowDowngrade=false)
     {
         var manifest=Verify(payload);
+        if(allowDowngrade && string.IsNullOrWhiteSpace(expectedVersion)) throw new InvalidDataException("Explicit downgrade requires a selected release.");
         if(!string.IsNullOrWhiteSpace(expectedVersion) && !string.Equals(manifest.Version,expectedVersion.TrimStart('v'),StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Update package version does not match the selected release.");
         if(!repair && !File.Exists(SafePath(target,"MistikLauncher.exe"))) throw new InvalidDataException("Launcher installation not found.");
@@ -76,7 +77,7 @@ public static class UpdateEngine
             {
                 using var current=JsonDocument.Parse(File.ReadAllText(installedManifest));
                 string? currentVersion=current.RootElement.GetProperty("Version").GetString();
-                if(ReleaseNumber(manifest.Version) < ReleaseNumber(currentVersion))
+                if(!allowDowngrade && ReleaseNumber(manifest.Version) < ReleaseNumber(currentVersion))
                     throw new InvalidDataException("Downgrade blocked; the installed launcher is newer.");
             }
             catch(Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException) { if(!repair) throw new InvalidDataException("Installed update manifest is invalid."); }

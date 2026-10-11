@@ -73,3 +73,10 @@ credentials.json
 *.jks
 *.keystore
 /ClientHud/
+
+# Private metrics deployment material
+/site/admin/admin-config.json
+/analytics/database.rules.deployed.json
+/firebase.metrics.local.json
+
+/firebase/metrics-config.json

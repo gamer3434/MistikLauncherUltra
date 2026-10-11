@@ -3,6 +3,13 @@ using System.IO;
 namespace MistikLauncher;
 public partial class Application : System.Windows.Application
 {
+    internal LauncherMetrics? Metrics { get; set; }
+    protected override void OnExit(ExitEventArgs e)
+    {
+        // Flush only the online marker; crash/power loss is handled by dashboard heartbeat expiry.
+        Metrics?.StopAsync().GetAwaiter().GetResult();
+        base.OnExit(e);
+    }
     protected override void OnStartup(StartupEventArgs e)
     {
         foreach (var name in new[] { "account.refresh.dpapi", "account.refresh.dpapi.tmp" })
@@ -15,6 +22,7 @@ public partial class Application : System.Windows.Application
         DispatcherUnhandledException += (_, args) =>
         {
             App.Log(args.Exception.ToString());
+            if (Metrics != null) _ = Metrics.ReportErrorAsync("MLU-APP");
             MessageBox.Show(Localization.T("error") + "\n" + args.Exception.Message, "Mistik Launcher");
             args.Handled = true;
         };

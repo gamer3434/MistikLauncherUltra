@@ -1,0 +1,4 @@
+{
+  "apiKey": "PUBLIC_FIREBASE_WEB_API_KEY",
+  "databaseUrl": "https://mistiklauncher-9eb4b-default-rtdb.firebaseio.com/"
+}

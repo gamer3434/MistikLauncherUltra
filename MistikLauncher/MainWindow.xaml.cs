@@ -24,6 +24,8 @@ namespace MistikLauncher
         public LauncherConfig Config;
         public AutoMcsUpdater AutoMcs { get; } = new();
         public LauncherUpdater LauncherUpdates { get; }
+        public LauncherMetrics? UsageMetrics { get; }
+        public bool UsageMetricsAvailable => UsageMetrics != null;
         public MistikRelay?   Relay;
         readonly Dictionary<string, Page> _pageCache = new();
         readonly Dictionary<string, string> _pageLanguages = new();
@@ -47,6 +49,9 @@ namespace MistikLauncher
             Config = ConfigManager.Load();
             LauncherUpdates = new LauncherUpdater(() => BtnLaunch.IsEnabled && !AutoMcs.Busy && !(GlobalProgress.Value > 0 && GlobalProgress.Value < 100) && System.Windows.Input.Keyboard.FocusedElement is not (TextBox or PasswordBox));
             Title = "Mistik Launcher " + LauncherUpdates.CurrentVersion;
+            var metricsOptions = LauncherMetricsOptions.Load(Path.Combine(AppContext.BaseDirectory, "metrics-config.json"));
+            if (metricsOptions != null) UsageMetrics = new LauncherMetrics(metricsOptions, new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(6), MaxResponseContentBufferSize = 16384 }, App.AppData, LauncherUpdates.CurrentVersion);
+            if (System.Windows.Application.Current is Application application) application.Metrics = UsageMetrics;
             Config.OpenCount++;
             ConfigManager.Save(Config);
 
@@ -96,6 +101,7 @@ namespace MistikLauncher
             var updateTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
             updateTimer.Tick += async (_,_) => await CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate);
             Loaded += async (_,_) => {
+                if (UsageMetrics != null) await UsageMetrics.SetEnabledAsync(Config.UsageMetricsEnabled);
                 QueueBackgroundModSync();
                 updateTimer.Start();
                 await Task.WhenAll(CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate), AutoMcs.CheckAsync(Config.AutoMcsAutoUpdate && File.Exists(AutoMcs.ExecutablePath)));
@@ -113,6 +119,22 @@ namespace MistikLauncher
             };
         }
 
+        public async Task SetUsageMetricsEnabled(bool enabled)
+        {
+            bool previous = Config.UsageMetricsEnabled;
+            Config.UsageMetricsEnabled = enabled;
+            try { ConfigManager.Save(Config); }
+            catch { Config.UsageMetricsEnabled = previous; throw; }
+            if (UsageMetrics != null) await UsageMetrics.SetEnabledAsync(enabled);
+        }
+
+        void ShowCrashReport(string report)
+        {
+            var code = report.Split('\n')[0].Trim();
+            if (UsageMetrics != null) _ = UsageMetrics.ReportErrorAsync(code);
+            CrashDiagnostics.Show(this, report);
+        }
+
         public async Task CheckLauncherUpdatesAsync(bool apply)
         {
             try
@@ -121,6 +143,20 @@ namespace MistikLauncher
                     System.Windows.Application.Current.Shutdown();
             }
             catch(Exception ex) { App.Log("Update handoff: " + ex.Message); MessageBox.Show(Localization.T("luError")+"\n"+ex.Message,"Mistik Launcher"); }
+        }
+
+        public async Task DowngradeLauncherAsync(string version)
+        {
+            try {
+                if(!await LauncherUpdates.PrepareDowngradeAsync(version)) return;
+                bool previous=Config.LauncherAutoUpdate;
+                Config.LauncherAutoUpdate=false;
+                try {
+                    ConfigManager.Save(Config);
+                    if(await LauncherUpdates.StartInstallerAsync()) System.Windows.Application.Current.Shutdown();
+                    else { Config.LauncherAutoUpdate=previous; ConfigManager.Save(Config); }
+                } catch { Config.LauncherAutoUpdate=previous; ConfigManager.Save(Config); throw; }
+            } catch(Exception ex) { App.Log("Launcher downgrade: "+ex.Message); MessageBox.Show(Localization.T("luError")+"\n"+ex.Message,"Mistik Launcher"); }
         }
 
         public async Task<GameRuntimeHealthResult> VerifyAndRepairGameAsync(string version, Action<string>? status = null)
@@ -691,7 +727,7 @@ namespace MistikLauncher
                 if (!health.CanLaunch)
                 {
                     var detail = $"MLU-INTEGRITY: {health.FailedArtifact ?? "runtime"}\n{health.FailedPath}\n{health.FailureReason}";
-                    CrashDiagnostics.Show(this, CrashDiagnostics.Report(null, started, detail));
+                    ShowCrashReport(CrashDiagnostics.Report(null, started, detail));
                     return;
                 }
 
@@ -773,7 +809,7 @@ namespace MistikLauncher
                     process.WaitForExit();
                     int earlyExit=process.ExitCode; process.Dispose();
                     string output; lock(outputGate) output=captured.ToString();
-                    CrashDiagnostics.Show(this,CrashDiagnostics.Report(earlyExit,started,output));
+                    ShowCrashReport(CrashDiagnostics.Report(earlyExit,started,output));
                     return;
                 }
                 gameRunning=true;
@@ -787,7 +823,7 @@ namespace MistikLauncher
                         string output; lock(outputGate) output=captured.ToString();
                         string? report=exit==0?null:CrashDiagnostics.Report(exit,started,output);
                         await Dispatcher.InvokeAsync(()=> {
-                            if(report!=null) CrashDiagnostics.Show(this,report);
+                            if(report!=null) ShowCrashReport(report);
                             else if(Config.AutoClose) { Show(); WindowState=WindowState.Normal; Activate(); }
                         });
                     } catch(Exception monitorError) { App.Log("Game monitor: "+monitorError.Message); }
@@ -809,7 +845,7 @@ namespace MistikLauncher
             catch (Exception ex)
             {
                 App.Log($"Launch error: {ex.Message}");
-                CrashDiagnostics.Show(this,CrashDiagnostics.Report(null,started,ex.Message));
+                ShowCrashReport(CrashDiagnostics.Report(null,started,ex.Message));
             }
             finally
             {

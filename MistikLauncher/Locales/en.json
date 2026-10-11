@@ -50,7 +50,7 @@
   "saved": "Settings saved.",
   "invalid": "Enter a valid player name and 1–32 GB of memory.",
   "privacy": "Privacy and security",
-  "privacyText": "Automatic telemetry and remote administration have been removed. Launcher updates come only from the official GitHub repository and package integrity is verified.",
+  "privacyText": "Usage and error sharing is off by default. If enabled, an anonymous installation ID, version, activity timestamp and error categories go to Firebase. Names, IP addresses and raw logs are excluded. Update packages are verified from the official GitHub repository.",
   "updateDisabled": "Unsigned automatic updates are disabled. Use the GitHub release page.",
   "error": "Operation failed",
   "auth": "Skin provider",
@@ -412,5 +412,12 @@
   "modDetails": "Open details",
   "modTools": "Additional mod tools",
   "modInstall": "↓ Install",
-  "modProfileChanged": "Profile changed. Reopen project details."
+  "modProfileChanged": "Profile changed. Reopen project details.",
+  "luDowngrade": "Downgrade launcher",
+  "luOlderVersions": "List older releases",
+  "luDowngradeHelp": "Return to an older launcher release. Your account, settings and game files are preserved. Automatic updates will be turned off.",
+  "luDowngradeConfirm": "Return to {0}? Automatic updates will be turned off. Older releases may not support newer settings.",
+  "usageMetricsToggle": "Share anonymous usage and error statistics",
+  "usageMetricsHelp": "Optional: active usage, launcher version and error codes are shared. Usernames and account details are excluded. Turning this off stops reporting; when connected, this device’s records are deleted.",
+  "usageMetricsUnavailable": "The statistics connection is not ready yet. Your preference will apply when it becomes available."
 }

@@ -64,6 +64,12 @@ static class LauncherUpdateTests
         bool downgradeBlocked=false;
         try { UpdateEngine.Apply(payload,target); } catch(InvalidDataException ex) { downgradeBlocked=ex.Message.Contains("Downgrade blocked",StringComparison.Ordinal); }
         Check(downgradeBlocked,"older update package is blocked before file replacement");
+        Check(LauncherUpdater.ParseRelease(metadata,"8.0.0",true)?.Version=="v7.0.0" && LauncherUpdater.ParseRelease(metadata,"8.0.0")==null,"only explicit selection permits an older stable release");
+        bool missingSelection=false;
+        try { UpdateEngine.Apply(payload,target,allowDowngrade:true); } catch(InvalidDataException) { missingSelection=true; }
+        Check(missingSelection,"explicit downgrade requires an expected release version");
+        UpdateEngine.Apply(payload,target,"v7.0.0",allowDowngrade:true);
+        Check(JsonSerializer.Deserialize<UpdateManifest>(File.ReadAllText(Path.Combine(target,"update-manifest.json")))!.Version=="7.0.0" && File.ReadAllBytes(Path.Combine(target,"config.json")).SequenceEqual(profileBytes) && File.ReadAllText(Path.Combine(target,"game","world.dat"))=="world","explicit downgrade preserves account settings and worlds byte for byte");
         File.Delete(Path.Combine(target,"update-manifest.json"));
         UpdateEngine.Apply(payload,target);
         Check(names.All(name=>File.ReadAllText(Path.Combine(target,name))=="new "+name),"full package replacement");
@@ -119,6 +125,25 @@ static class LauncherUpdateTests
         var damagedPayload=service.PreparedPayload;
         Check(!await service.StartInstallerAsync() && service.PreparedPayload==null && !Directory.Exists(Path.GetDirectoryName(damagedPayload!)) && !service.Busy && service.StatusKey=="luError" && !string.IsNullOrWhiteSpace(service.Error),"failed update handoff removes unusable stage and releases busy state");
         Check(await service.CheckAsync(true) && service.PreparedPayload!=null && service.PreparedPayload!=damagedPayload && UpdateEngine.Verify(service.PreparedPayload).Version=="7.0.0" && !service.Busy,"update handoff failure permits downloading and verifying a fresh package on retry");
+        using var releasesClient=new HttpClient(new Stub("["+metadata+","+metadata.Replace("sha256:","invalid:")+"]",zip));
+        var releasesService=new LauncherUpdater(()=>true,releasesClient,target,"8.0.0");
+        Check((await releasesService.OlderVersionsAsync()).SequenceEqual(new[] {"v7.0.0"}),"older release selector excludes packages missing official digests");
+        using var downgradeClient=new HttpClient(new Stub(metadata,zip));
+        bool downgradeIdle=true;
+        var downgradeService=new LauncherUpdater(()=>downgradeIdle,downgradeClient,target,"8.0.0");
+        Check(await downgradeService.PrepareDowngradeAsync("v7.0.0") && UpdateEngine.Verify(downgradeService.PreparedPayload!).Version=="7.0.0","explicit downgrade downloads and verifies the selected older package");
+        File.WriteAllText(Path.Combine(target,"MistikUpdater.exe"),"current downgrade-capable helper");
+        var currentManifest=new UpdateManifest("MistikLauncher","8.0.0",names.Select(name=>new UpdateFile(name,Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(target,name)))))).ToArray());
+        File.WriteAllText(Path.Combine(target,"update-manifest.json"),JsonSerializer.Serialize(currentManifest));
+        void PauseDowngrade() { if(downgradeService.StatusKey=="luVerifying") downgradeIdle=false; }
+        downgradeService.Changed+=PauseDowngrade;
+        string downgradeStage=Path.GetDirectoryName(downgradeService.PreparedPayload!)!;
+        Check(!await downgradeService.StartInstallerAsync() && File.ReadAllText(Path.Combine(downgradeStage,"MistikUpdater.exe"))=="current downgrade-capable helper","downgrade handoff uses the verified current helper instead of an older incompatible helper");
+        downgradeService.Changed-=PauseDowngrade; downgradeIdle=true;
+        Check(!await downgradeService.CheckAsync(false) && downgradeService.PreparedPayload==null,"automatic release check cannot reuse a staged downgrade");
+        bool wrongSelection=false;
+        try { await downgradeService.PrepareDowngradeAsync("v9.0.0"); } catch(InvalidDataException) { wrongSelection=true; }
+        Check(wrongSelection,"downgrade selection rejects newer releases");
         return checks;
     }
     sealed class StalledStream : MemoryStream

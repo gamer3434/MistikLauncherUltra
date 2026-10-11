@@ -82,6 +82,7 @@ class Program
             }
             checks += LauncherUpdateTests.Run(testRoot).GetAwaiter().GetResult();
             checks += ReleaseCacheTests.Run(testRoot).GetAwaiter().GetResult();
+            checks += LauncherMetricsTests.Run(Path.Combine(testRoot,"metrics-tests")).GetAwaiter().GetResult();
             int packageIndex=Array.IndexOf(args,"--verify-package");
             if(packageIndex>=0) {
                 var packaged=MistikLauncher.Updates.UpdateEngine.Verify(Path.GetFullPath(args[packageIndex+1]));

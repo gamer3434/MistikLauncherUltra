@@ -17,6 +17,15 @@ try {
     & $Dotnet publish MistikLauncher/MistikLauncher.csproj -c Release --self-contained true -p:PublishSingleFile=false "-p:BaseOutputPath=$buildRoot/" -o $portableDir
     if ($LASTEXITCODE) { throw 'Build failed / Derleme başarısız' }
     $inputPath = (Resolve-Path $portableDir).Path
+    # Public Firebase identifiers come from a private release setting, never source history.
+    $metricsJson = $env:MISTIK_METRICS_CONFIG
+    $localMetrics = Join-Path $repo 'firebase/metrics-config.json'
+    if (!$metricsJson -and (Test-Path -LiteralPath $localMetrics)) { $metricsJson = Get-Content -LiteralPath $localMetrics -Raw }
+    if ($metricsJson) {
+        $metrics = $metricsJson | ConvertFrom-Json
+        if ($metrics.apiKey -notmatch '^[A-Za-z0-9_-]{20,100}$' -or $metrics.databaseUrl -notmatch '^https://mistiklauncher-9eb4b-default-rtdb(?:\.firebaseio\.com|\.[a-z0-9-]+\.firebasedatabase\.app)/?$') { throw 'Invalid metrics release configuration' }
+        @{ apiKey=$metrics.apiKey; databaseUrl=$metrics.databaseUrl } | ConvertTo-Json -Compress | Set-Content (Join-Path $inputPath 'metrics-config.json') -Encoding utf8
+    }
     if ($Obfuscate) {
     & $Dotnet tool restore
     if ($LASTEXITCODE) { throw 'Tool restore failed / Araç yüklenemedi' }

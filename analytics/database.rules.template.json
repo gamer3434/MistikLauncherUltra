@@ -1,0 +1,78 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "activeSessions": {
+      ".read": false,
+      ".write": false
+    },
+    "launcherProfiles": {
+      ".read": false,
+      ".write": false
+    },
+    "launcherMetrics": {
+      ".read": "auth != null && auth.token.email_verified == true && auth.token.email == 'ADMIN_EMAIL' && auth.token.firebase.sign_in_provider == 'google.com'",
+      "installations": {
+        "$uid": {
+          ".write": "auth != null && auth.uid == $uid && auth.token.firebase.sign_in_provider == 'anonymous'",
+          ".validate": "newData.hasChildren(['firstSeen', 'lastSeen', 'version'])",
+          "firstSeen": {
+            ".validate": "newData.isNumber() && ((!data.exists() && newData.val() <= now + 60000 && newData.val() >= now - 300000) || (data.exists() && newData.val() == data.val()))"
+          },
+          "lastSeen": {
+            ".validate": "newData.isNumber() && newData.val() <= now + 60000 && newData.val() >= now - 300000"
+          },
+          "version": {
+            ".validate": "newData.isString() && newData.val().matches(/^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$/)"
+          },
+          "$other": {
+            ".validate": false
+          },
+          ".read": "auth != null && auth.uid == $uid && auth.token.firebase.sign_in_provider == 'anonymous'"
+        }
+      },
+      "sessions": {
+        ".indexOn": [
+          "lastSeen"
+        ],
+        "$uid": {
+          ".write": "auth != null && auth.uid == $uid && auth.token.firebase.sign_in_provider == 'anonymous'",
+          ".validate": "newData.hasChildren(['lastSeen', 'version'])",
+          "lastSeen": {
+            ".validate": "newData.isNumber() && newData.val() <= now + 60000 && newData.val() >= now - 300000"
+          },
+          "version": {
+            ".validate": "newData.isString() && newData.val().matches(/^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$/)"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "errors": {
+        "$uid": {
+          ".write": "auth != null && auth.uid == $uid && auth.token.firebase.sign_in_provider == 'anonymous' && !newData.exists()",
+          "$code": {
+            ".write": "auth != null && auth.uid == $uid && auth.token.firebase.sign_in_provider == 'anonymous' && ($code == 'MLU-INTEGRITY' || $code == 'MLU-MEMORY' || $code == 'MLU-JAVA' || $code == 'MLU-MOD-DEPENDENCY' || $code == 'MLU-MOD-MIXIN' || $code == 'MLU-CLASSPATH' || $code == 'MLU-FILE' || $code == 'MLU-EXIT' || $code == 'MLU-LAUNCH' || $code == 'MLU-APP')",
+            ".validate": "newData.hasChildren(['lastSeen', 'version', 'code', 'count'])",
+            "lastSeen": {
+              ".validate": "newData.isNumber() && newData.val() <= now + 60000 && newData.val() >= now - 300000"
+            },
+            "version": {
+              ".validate": "newData.isString() && newData.val().matches(/^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$/)"
+            },
+            "code": {
+              ".validate": "newData.isString() && newData.val() == $code"
+            },
+            "count": {
+              ".validate": "newData.isNumber() && newData.val() % 1 == 0 && newData.val() >= 1 && newData.val() <= 1000000000 && ((!data.exists() && newData.val() == 1) || (data.exists() && newData.val() == data.val() + 1))"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      }
+    }
+  }
+}

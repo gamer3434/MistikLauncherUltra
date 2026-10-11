@@ -23,6 +23,7 @@ namespace MistikLauncher
         [JsonProperty("close_rgb")] public string CloseRgb { get; set; } = "#FFB000";
         [JsonProperty("launcher_auto_update")] public bool LauncherAutoUpdate { get; set; } = true;
         [JsonProperty("auto_mcs_update")] public bool AutoMcsAutoUpdate { get; set; } = true;
+        [JsonProperty("usage_metrics_enabled")] public bool UsageMetricsEnabled { get; set; } = false;
 
         [JsonProperty("user")]       public string User       { get; set; } = "Oyuncu";
         [JsonProperty("version")]    public string Version    { get; set; } = "1.21";
@@ -213,6 +214,10 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.15","2026-10-11","#00D4AA", new[]{
+                "Ayarlara doğrulanmış eski launcher sürümüne dönme ve isteğe bağlı anonim kullanım/hata paylaşımı eklendi.",
+                "Firebase yönetim paneli aktif kurulumları, sürüm dağılımını ve hata kategorilerini gösterir."
+            }),
             new("v6.2.14","2026-10-11","#00D4AA", new[]{
                 "Onarma seçeneği yalnızca kurucuda bulunur; launcher ana sayfası sadece hazırlık durumunu kontrol eder.",
                 "Repair remains available in the installer; the client readiness action only refreshes status."
