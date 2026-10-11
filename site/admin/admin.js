@@ -28,6 +28,8 @@ try {
   ]);
   const app = initializeApp(config), auth = authSdk.getAuth(app), database = dbSdk.getDatabase(app);
   await authSdk.setPersistence(auth, authSdk.browserSessionPersistence);
+  let redirectError;
+  try { await authSdk.getRedirectResult(auth); } catch (error) { redirectError = error?.code || "bağlantı"; }
   let unsubscribe = () => {}, connectedStop = () => {}, offsetStop = () => {}, timer, data, connected = false, offset = 0;
   $('login').disabled = false;
   $('login').onclick = async () => {
@@ -46,7 +48,7 @@ try {
   authSdk.onAuthStateChanged(auth, user => {
     unsubscribe(); connectedStop(); offsetStop(); clearInterval(timer); data = undefined; connected = false; clear();
     $('login').hidden = !!user; $('logout').hidden = !user;
-    if (!user) { status('Bu panel yalnızca yetkili Google hesabına açıktır.'); return; }
+    if (!user) { status(redirectError ? 'Google girişi tamamlanamadı. (' + redirectError + ')' : 'Bu panel yalnızca yetkili Google hesabına açıktır.', !!redirectError); return; }
     status('Yetki ve Firebase verileri kontrol ediliyor…');
     const update = () => { if (connected && data !== undefined) { render(data, Date.now() + offset); status('Bağlı · Canlı veriler; aktiflik her 30 saniyede yenilenir.'); } };
     connectedStop = dbSdk.onValue(dbSdk.ref(database, '.info/connected'), snapshot => {
