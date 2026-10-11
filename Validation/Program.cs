@@ -61,6 +61,7 @@ class Program
             checks += ShaderTests.Run(Path.Combine(testRoot,"shaders"));
             checks += HudPresetTests.Run(Path.Combine(testRoot,"hud-preset"));
             checks += HudSettingsTests.Run(Path.Combine(testRoot,"hud-settings"));
+            checks += BundledHudTests.Run(Path.Combine(testRoot,"bundled-hud"));
             checks += MistikMenuTests.Run(Path.Combine(testRoot,"mistik-menu"));
             checks += ModAndMapRegressionTests.Run(Path.Combine(testRoot,"mod-map-regressions")).GetAwaiter().GetResult();
             checks += TunnelLifecycleTests.Run(testRoot).GetAwaiter().GetResult();

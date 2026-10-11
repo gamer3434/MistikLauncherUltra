@@ -12,25 +12,36 @@ public static class HudSettings
     const string Profile = "==Section:TopLeft==\n&bMISTIK &7| &f{fps} FPS\n&7XYZ &f{bx} {by} {bz}\n&7Ping &f{ping} ms\n";
     static readonly string[] ModIds = ["custom_hud", "keystrokesxvelo", "ukus-armor-hud"];
 
-    static string[] Mods(string gameDirectory)
+    internal static string? ModId(string path)
+    {
+        if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new IOException("HUD mod cannot be a link.");
+        try
+        {
+            using var zip = ZipFile.OpenRead(path);
+            var entry = zip.GetEntry("fabric.mod.json");
+            if (entry == null || entry.Length > 64 * 1024) return null;
+            using var reader = new StreamReader(entry.Open());
+            return JObject.Parse(reader.ReadToEnd(), new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error })["id"]?.ToString();
+        }
+        catch (InvalidDataException) { return null; }
+        catch (JsonException) { return null; }
+    }
+
+    internal static string[] LegacyMods(string gameDirectory) => AllMods(gameDirectory).Where(path => ModIds.Contains(ModId(path))).ToArray();
+
+    static string[] AllMods(string gameDirectory)
     {
         var root = Path.Combine(gameDirectory, "mods");
         if (!Directory.Exists(root)) return [];
         ModFiles.EnsureRoot(root);
-        return ModFiles.List(root).Where(path =>
-        {
-            if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new IOException("HUD mod cannot be a link.");
-            try
-            {
-                using var zip = ZipFile.OpenRead(path);
-                var entry = zip.GetEntry("fabric.mod.json");
-                if (entry == null || entry.Length > 64 * 1024) return false;
-                using var reader = new StreamReader(entry.Open());
-                return ModIds.Contains(JObject.Parse(reader.ReadToEnd())["id"]?.ToString());
-            }
-            catch (InvalidDataException) { return false; }
-            catch (JsonException) { return false; }
-        }).ToArray();
+        return ModFiles.List(root).ToArray();
+    }
+
+    static string[] Mods(string gameDirectory)
+    {
+        var all = AllMods(gameDirectory);
+        var own = all.Where(path => ModId(path) == "mistik_hud").ToArray();
+        return own.Length > 0 ? own : all.Where(path => ModIds.Contains(ModId(path))).ToArray();
     }
 
     static string ConfigPath(string gameDirectory) => Path.Combine(gameDirectory, "config", "custom-hud", "config.json");
@@ -39,6 +50,11 @@ public static class HudSettings
     {
         var mods = Mods(gameDirectory);
         if (mods.Length == 0 || mods.Any(path => !ModFiles.Enabled(path))) return false;
+        if (mods.Any(path => ModId(path) == "mistik_hud"))
+        {
+            var ownConfig = Path.Combine(gameDirectory, "config", "mistik-hud.json");
+            return !File.Exists(ownConfig) || ReadConfig(ownConfig)["enabled"]?.Value<bool>() != false;
+        }
         var config = ConfigPath(gameDirectory);
         if (File.Exists(config) && ReadConfig(config)["enabled"]?.Value<bool>() == false) return false;
         var armor = Path.Combine(gameDirectory, "config", "ukus-armor-hud.toml");
@@ -56,6 +72,11 @@ public static class HudSettings
     {
         var mods = Mods(gameDirectory);
         if (mods.Length == 0) throw new IOException("Install the HUD pack first.");
+        if (mods.Any(path => ModId(path) == "mistik_hud"))
+        {
+            SetOwnEnabled(gameDirectory, mods, enabled);
+            return;
+        }
         var moved = new List<string>();
         var originals = new Dictionary<string, string?>();
         void Change(string path, string text)
@@ -92,6 +113,29 @@ public static class HudSettings
             foreach (var item in originals.Reverse())
                 if (item.Value == null) { if (File.Exists(item.Key)) File.Delete(item.Key); }
                 else Write(item.Key, item.Value);
+            throw;
+        }
+    }
+
+    static void SetOwnEnabled(string gameDirectory, string[] mods, bool enabled)
+    {
+        var path = Path.Combine(gameDirectory, "config", "mistik-hud.json");
+        var original = File.Exists(path) ? Read(path) : null;
+        var config = original == null ? new JObject() : JObject.Parse(original,
+            new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+        config["enabled"] = enabled;
+        var moved = new List<string>();
+        try
+        {
+            Write(path, config.ToString());
+            foreach (var mod in mods)
+                if (ModFiles.Enabled(mod) != enabled) moved.Add(ModFiles.Toggle(Path.Combine(gameDirectory, "mods"), mod));
+        }
+        catch
+        {
+            foreach (var mod in moved.AsEnumerable().Reverse()) ModFiles.Toggle(Path.Combine(gameDirectory, "mods"), mod);
+            if (original == null) { if (File.Exists(path)) File.Delete(path); }
+            else Write(path, original);
             throw;
         }
     }

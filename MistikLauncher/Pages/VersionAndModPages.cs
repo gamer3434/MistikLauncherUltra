@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -740,9 +740,9 @@ namespace MistikLauncher.Pages
             var hudButton = PageHelpers.MkBtn("clientInstallHud", "#226DA0");
             hudButton.Margin = new Thickness(0, 12, 0, 8);
             hudButton.Click += async (_, _) => await InstallModpack(
-                new[] { "customhud", "advanced-keystrokes", "ukus-armor-hud", "modmenu" },
-                new[] { "CustomHUD", "Advanced Keystrokes", "uku's Armor HUD", "Mod Menu" },
-                hudButton, Localization.T("clientPresetTitle"), "fabric", () => CreateHudProfile(App.GameDir));
+                new[] { "fabric-api", "modmenu" },
+                new[] { "Fabric API", "Mod Menu" },
+                hudButton, Localization.T("clientPresetTitle"), "fabric", () => BundledHud.Install(App.GameDir));
             clientPanel.Children.Add(hudButton);
             var interfaceButton = PageHelpers.MkBtn("clientInstallInterface", "#203853");
             interfaceButton.Click += async (_, _) => await InstallModpack(

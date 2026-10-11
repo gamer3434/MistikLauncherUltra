@@ -213,6 +213,10 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.10","2026-10-11","#00D4AA", new[]{
+                "Lunar tarzı ayrı HUD kutuları ve sağ Shift ile açılan sürükle/boyutlandır düzenleyicisi eklendi.",
+                "Native Fabric HUD displays FPS, CPS, ping, coordinates, keystrokes and armor in one configurable overlay."
+            }),
             new("v6.2.9","2026-10-11","#00D4AA", new[]{
                 "Ayarlar bölümüne oyun içi HUD aç/kapat seçeneği eklendi.",
                 "Shader center, Fabric HUD presets and Mistik menu appearance added; CurseForge integration removed."

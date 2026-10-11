@@ -21,8 +21,8 @@
   "shaderDisable": "Disable",
   "shaderEmpty": "No shader packs installed yet.",
   "clientPresetTitle": "In-game appearance",
-  "clientPresetHelp": "Fabric 1.21.1: install FPS, coordinates, ping, WASD/CPS and armor displays. Personal HUD settings are preserved.",
-  "clientInstallHud": "Install HUD pack",
+  "clientPresetHelp": "Fabric 1.21.1: separate FPS, CPS, ping, coordinates, WASD and armor widgets. Open the editor with Right Shift to drag and scale.",
+  "clientInstallHud": "Install Mistik HUD",
   "clientInstallInterface": "Install modern interface",
   "clientInterfaceTitle": "Modern game interface",
   "clientInterfaceHelp": "Modern UI adds blurred menu backdrops, smooth scrolling, fonts and improved tooltips.",
@@ -434,5 +434,5 @@
   "clientInstallMenu": "Apply Mistik menu",
   "clientMenuInstalled": "Menu applied — restart the game or reload resources with F3+T",
   "hudEnabled": "Enable in-game HUD",
-  "hudRestart": "HUD appears in a world, not on the main menu. Restart after changes. Install HUD mods from the mod center."
+  "hudRestart": "Right Shift in a world opens the HUD editor. Move, scale and toggle individual widgets. Restart after changing the launcher setting."
 }
