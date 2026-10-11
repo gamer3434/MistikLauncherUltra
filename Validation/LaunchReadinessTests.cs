@@ -58,40 +58,17 @@ static class LaunchReadinessTests
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
         T Field<T>(ModernHomePage page,string name)=>(T)typeof(ModernHomePage).GetField(name,flags)!.GetValue(page)!;
         Task Refresh(ModernHomePage page,Func<string,int,Task<LaunchReadinessSnapshot>> evaluate)=>(Task)typeof(ModernHomePage).GetMethod("RefreshReadinessAsync",flags,null,new[]{evaluate.GetType()},null)!.Invoke(page,new object[]{evaluate})!;
-        Task Repair(ModernHomePage page,Func<string,Action<string>,Task<GameRuntimeHealthResult>> verify)=>(Task)typeof(ModernHomePage).GetMethod("VerifyAndRepairAsync",flags,null,new[]{verify.GetType()},null)!.Invoke(page,new object[]{verify})!;
         LaunchReadinessSnapshot Ready(string version,int ram)=>new(version,true,21,"fixture-java",21,ram,16,10,0,0);
         var previous=window.Config;
         try
         {
             window.Config=Newtonsoft.Json.JsonConvert.DeserializeObject<LauncherConfig>(Newtonsoft.Json.JsonConvert.SerializeObject(previous))!;
             window.Config.Ram=4;
-            foreach(bool success in new[]{false,true})
-            {
-                window.Config.Version="readiness-first";
-                var page=new ModernHomePage(window);
-                Refresh(page,(version,ram)=>Task.FromResult(Ready(version,ram))).GetAwaiter().GetResult();
-                var completion=new TaskCompletionSource<GameRuntimeHealthResult>();
-                Action<string>? progress=null; string? repairedVersion=null;
-                var pending=Repair(page,(version,report)=> { repairedVersion=version; progress=report; return completion.Task; });
-                Check(!pending.IsCompleted && repairedVersion=="readiness-first" && Field<LaunchReadinessSnapshot?>(page,"readiness")==null,"in-flight home repair captures its profile and invalidates the old readiness action");
-                window.Config.Version="readiness-second";
-                page.InvalidateReadiness();
-                Refresh(page,(version,ram)=>Task.FromResult(Ready(version,ram))).GetAwaiter().GetResult();
-                string state=Field<TextBlock>(page,"readinessState").Text;
-                string details=Field<TextBlock>(page,"readinessDetails").Text;
-                progress!("old profile progress");
-                Check(Field<TextBlock>(page,"readinessDetails").Text==details,"late repair progress cannot overwrite the newly selected profile");
-                completion.SetResult(new GameRuntimeHealthResult(success,0,"fixture",FailedPath:"old-profile.jar",FailureReason:"old profile failure"));
-                pending.GetAwaiter().GetResult();
-                Check(Field<TextBlock>(page,"readinessState").Text==state && Field<TextBlock>(page,"readinessDetails").Text==details && Field<LaunchReadinessSnapshot>(page,"readiness").Version=="readiness-second","late "+(success?"successful":"failed")+" repair cannot replace current profile readiness");
-            }
-
-            var retryPage=new ModernHomePage(window);
-            Action<string>? lateProgress=null;
-            Repair(retryPage,(_,report)=> { lateProgress=report; return Task.FromException<GameRuntimeHealthResult>(new IOException("fixture repair failure")); }).GetAwaiter().GetResult();
-            lateProgress!("queued progress after failure");
-            var retry=Field<Button>(retryPage,"readinessAction");
-            Check(retry.IsEnabled && Equals(retry.Content,Localization.T("readinessRefresh")) && System.Windows.Automation.AutomationProperties.GetName(retry)==Localization.T("readinessRefresh") && Field<LaunchReadinessSnapshot?>(retryPage,"readiness")==null && Field<TextBlock>(retryPage,"readinessDetails").Text=="fixture repair failure","repair exceptions restore an accessible check-again action without stale routing or queued progress");
+            var healthyPage=new ModernHomePage(window);
+            Refresh(healthyPage,(version,ram)=>Task.FromResult(Ready(version,ram))).GetAwaiter().GetResult();
+            var refresh=Field<Button>(healthyPage,"readinessAction");
+            Check(refresh.IsEnabled && Equals(refresh.Content,Localization.T("readinessRefresh")) && System.Windows.Automation.AutomationProperties.GetName(refresh)==Localization.T("readinessRefresh"),"healthy home exposes an accessible read-only readiness refresh");
+            Check(!typeof(ModernHomePage).GetMethods(flags).Any(method=>method.Name=="VerifyAndRepairAsync"),"manual repair is absent from the client home page");
 
             var memoryPage=new ModernHomePage(window);
             var oldCheck=new TaskCompletionSource<LaunchReadinessSnapshot>();

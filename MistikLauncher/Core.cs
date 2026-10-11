@@ -213,6 +213,10 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.14","2026-10-11","#00D4AA", new[]{
+                "Onarma seçeneği yalnızca kurucuda bulunur; launcher ana sayfası sadece hazırlık durumunu kontrol eder.",
+                "Repair remains available in the installer; the client readiness action only refreshes status."
+            }),
             new("v6.2.13","2026-10-11","#00D4AA", new[]{
                 "Mod merkezine resimli kartlar, açıklama/sürümler/galeri detayları, sıralama ve sayfalama eklendi.",
                 "Mistik HUD ve shader menüsü kaldırıldı. Oyuncu modları ve shader dosyaları korunur."

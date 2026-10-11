@@ -81,7 +81,7 @@ public static class CrashDiagnostics
         var suspects=SuspectedMods(text);
         var code=Category(text); if(exitCode==null && code=="MLU-EXIT") code="MLU-LAUNCH";
         string advice=code switch {
-            "MLU-INTEGRITY"=>en?"A required game file failed integrity verification. Use Launch readiness to repair it before retrying.":"Gerekli bir oyun dosyası bütünlük doğrulamasını geçemedi. Yeniden denemeden önce Başlatma hazırlığı ile onarın.",
+            "MLU-INTEGRITY"=>en?"A required game file failed integrity verification. Try launching again to verify game files; if verification still fails, check the selected version.":"Gerekli bir oyun dosyası bütünlük doğrulamasını geçemedi. Dosyaların doğrulanması için oyunu yeniden başlatmayı deneyin; doğrulama yine başarısız olursa seçili sürümü kontrol edin.",
             "MLU-MEMORY"=>en?"Check free memory and reduce RAM allocation or heavy mods.":"Boş belleği kontrol edin; RAM tahsisini veya ağır modları azaltın.",
             "MLU-JAVA"=>en?"Select the Java version required by this Minecraft profile.":"Bu Minecraft profilinin gerektirdiği Java sürümünü kullanın.",
             "MLU-CLASSPATH"=>en?"A required class could not be loaded. Check the profile main class, game JAR and library/mod compatibility.":"Gerekli bir sınıf yüklenemedi. Profil ana sınıfını, oyun JAR dosyasını ve kütüphane/mod uyumunu kontrol edin.",

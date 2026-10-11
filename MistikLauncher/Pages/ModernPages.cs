@@ -89,7 +89,7 @@ public class ModernHomePage : Page, ILanguagePage
         readinessAction.Click+=async (_,_)=> {
             if(readiness==null) { await RefreshReadinessAsync(); return; }
             if(readiness?.RecommendedPage is { Length: >0 } page) { main.Navigate(page); return; }
-            await VerifyAndRepairAsync();
+            await RefreshReadinessAsync();
         };
         Grid.SetColumn(readinessAction,1); grid.Children.Add(readinessAction); card.Child=grid;
         if(readiness!=null) ShowReadiness(readiness);
@@ -146,47 +146,12 @@ public class ModernHomePage : Page, ILanguagePage
             $"{Mark(value.JavaReady)} {Localization.T("readinessJava")}: {java}\n"+
             $"{Mark(value.MemoryReady)} {Localization.T("readinessMemory")}: {value.AllocatedRamGb} / {(value.TotalRamGb>0?value.TotalRamGb.ToString():"—")} GB\n"+
             $"{Mark(value.DiskReady)} {Localization.T("readinessDisk")}: {disk} · {Localization.T("readinessMods")}: {value.EnabledMods} / {value.DisabledMods}";
-        var key=value.RecommendedPage switch { "Vers"=>"readinessOpenVersions","Settings"=>"readinessOpenSettings",_=>"readinessVerifyRepair" };
+        var key=value.RecommendedPage switch { "Vers"=>"readinessOpenVersions","Settings"=>"readinessOpenSettings",_=>"readinessRefresh" };
         readinessAction.Content=Localization.T(key); readinessAction.IsEnabled=true;
         System.Windows.Automation.AutomationProperties.SetName(readinessAction,Localization.T(key));
     }
 
-    Task VerifyAndRepairAsync() => VerifyAndRepairAsync((version,progress)=>main.VerifyAndRepairGameAsync(version,progress));
 
-    async Task VerifyAndRepairAsync(Func<string,Action<string>,Task<GameRuntimeHealthResult>> verify)
-    {
-        int generation=++readinessGeneration;
-        string version=main.Config.Version;
-        bool Current()=>generation==readinessGeneration && version==main.Config.Version;
-        bool finished=false;
-        readiness=null;
-        readinessAction.IsEnabled=false; readinessState.Text=Localization.T("readinessRepairing"); readinessDetails.Text=Localization.T("readinessRepairingHelp");
-        try
-        {
-            var result=await verify(version,status => { if(!finished && Current()) readinessDetails.Text=status; });
-            finished=true;
-            if(!Current()) return;
-            if(!result.CanLaunch)
-            {
-                readinessState.Text=Localization.T("readinessRepairFailed"); readinessState.Foreground=PageHelpers.HexBrush("#FF8F8F");
-                readinessDetails.Text=result.FailedPath==null?Localization.T("readinessError"):$"{result.FailedPath}: {result.FailureReason}";
-                readinessAction.Content=Localization.T("readinessRefresh"); readinessAction.IsEnabled=true;
-                System.Windows.Automation.AutomationProperties.SetName(readinessAction,Localization.T("readinessRefresh"));
-                return;
-            }
-            readinessState.Text=result.RepairedCount>0?string.Format(Localization.T("readinessRepaired"),result.RepairedCount):Localization.T("readinessFilesHealthy");
-            readinessState.Foreground=PageHelpers.HexBrush("#78E6B1");
-            await RefreshReadinessAsync();
-        }
-        catch(Exception ex)
-        {
-            finished=true;
-            if(!Current()) return;
-            readinessState.Text=Localization.T("readinessRepairFailed"); readinessState.Foreground=PageHelpers.HexBrush("#FF8F8F"); readinessDetails.Text=ex.Message;
-            readinessAction.Content=Localization.T("readinessRefresh"); readinessAction.IsEnabled=true;
-            System.Windows.Automation.AutomationProperties.SetName(readinessAction,Localization.T("readinessRefresh"));
-        }
-    }
 }
 
 public class ModernSettingsPage : Page, ILanguagePage

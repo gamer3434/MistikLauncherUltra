@@ -317,7 +317,7 @@ class Program
                 var homeVersion=window.Config.Version; window.SetVersion("1.21"); window.SetVersion(homeVersion); Flush(window);
                 Check(Texts(window.Content as DependencyObject).Contains(homeVersion),"home version follows shared profile selection: "+code);
                 Check(Texts(window.Content as DependencyObject).Contains(Localization.T("readinessTitle")),"home launch readiness card language " + code);
-                var readinessNames=new[]{Localization.T("readinessRefresh"),Localization.T("readinessVerifyRepair"),Localization.T("readinessOpenVersions"),Localization.T("readinessOpenSettings")};
+                var readinessNames=new[]{Localization.T("readinessRefresh"),Localization.T("readinessOpenVersions"),Localization.T("readinessOpenSettings")};
                 Check(Nodes((DependencyObject)window.Content).OfType<Button>().Any(button=>button.MinHeight>=44 && readinessNames.Contains(System.Windows.Automation.AutomationProperties.GetName(button))),"home readiness action remains keyboard-sized " + code);
                 window.Navigate("Settings"); Capture(window,Path.Combine(output,"settings-"+code+".png"));
                 Check(Texts(window.Content as DependencyObject).Contains(Localization.T("luTitle")+" · "+window.LauncherUpdates.CurrentVersion),"cached settings language " + code);
