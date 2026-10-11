@@ -214,6 +214,10 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.17","2026-10-12","#00D4AA", new[]{
+                "Mod galerisinde varsa tam çözünürlüklü görsel açılır; yüklenemezse önizleme kullanılır ve görsel oranı korunur.",
+                "Gallery images use the full-size source when available, fall back to the preview, and preserve their aspect ratio."
+            }),
             new("v6.2.16","2026-10-12","#00D4AA", new[]{
                 "Mod kataloğu artık arama boşken seçili profille uyumlu tüm modları listeler; toplam sonuç ve sayfa sayısı görünür.",
                 "Mod kartlarının hover rengi ve üst/alt gezinme çubukları daha dengeli hale getirildi.",

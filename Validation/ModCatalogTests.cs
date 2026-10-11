@@ -37,6 +37,10 @@ static class ModCatalogTests
             new[] { "file:///C:/Windows/test.png", "http://cdn.modrinth.com/x", "https://cdn.modrinth.com.attacker.invalid/x", "https://user@cdn.modrinth.com/x", "https://127.0.0.1/x" }
                 .All(url => ImageUrl(url) == null),
             "Catalog images accept only official HTTPS CDN URLs");
+        Uri? GalleryImageUrl(string? raw, string? preview) => (Uri?)typeof(ModProjectView).GetMethod("GalleryImageUrl", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!.Invoke(null, new object?[] { raw, preview });
+        Check(GalleryImageUrl("https://cdn.modrinth.com/data/original.png", "https://cdn.modrinth.com/data/preview.webp")?.AbsolutePath.EndsWith("original.png") == true &&
+            GalleryImageUrl("https://attacker.invalid/original.png", "https://cdn.modrinth.com/data/preview.webp")?.AbsolutePath.EndsWith("preview.webp") == true,
+            "Gallery prefers the verified full-size source and falls back to its verified preview");
         Check(typeof(App).Assembly.GetManifestResourceNames().All(name => !name.EndsWith("mistik-hud.jar")), "Launcher no longer distributes the retired HUD");
         using var picture = new SkiaSharp.SKBitmap(12, 6);
         picture.Erase(SkiaSharp.SKColors.Green);

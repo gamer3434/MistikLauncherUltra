@@ -66,6 +66,8 @@ public sealed class ModProjectView : Grid
         url.Scheme == "https" && url.IsDefaultPort && url.UserInfo.Length == 0 &&
         url.Host is "cdn.modrinth.com" or "cdn-raw.modrinth.com" ? url : null;
 
+    internal static Uri? GalleryImageUrl(string? raw, string? preview) => ImageUrl(raw) ?? ImageUrl(preview);
+
     internal static FrameworkElement Icon(string? raw, int size)
     {
         var border = new Border { Width = size, Height = size, CornerRadius = new CornerRadius(12),
@@ -137,13 +139,17 @@ public sealed class ModProjectView : Grid
             var gallery = new StackPanel { Margin = new Thickness(16) };
             foreach (var item in (project["gallery"] as JArray ?? new()).Take(30))
             {
-                if (ImageUrl(item["url"]?.ToString()) is not Uri url) continue;
+                var previewUrl = ImageUrl(item["url"]?.ToString());
+                if (GalleryImageUrl(item["raw_url"]?.ToString(), previewUrl?.AbsoluteUri) is not Uri url) continue;
                 gallery.Children.Add(PageHelpers.Lbl(item["title"]?.ToString() ?? "", 18, "#FFFFFF", true));
-                var image = new Image { MaxHeight = 520, Stretch = Stretch.Uniform, Margin = new Thickness(0, 10, 0, 12) };
+                var image = new Image { MaxHeight = 520, MaxWidth = 1200, HorizontalAlignment = HorizontalAlignment.Center,
+                    Stretch = Stretch.Uniform, Margin = new Thickness(0, 10, 0, 12) };
                 gallery.Children.Add(image);
                 async Task LoadGalleryImage()
                 {
                     var picture = await ModCatalogImages.LoadAsync(url, 1200, token);
+                    if (picture is null && previewUrl is not null && previewUrl != url)
+                        picture = await ModCatalogImages.LoadAsync(previewUrl, 1200, token);
                     if (!token.IsCancellationRequested) image.Source = picture;
                 }
                 _ = LoadGalleryImage();
