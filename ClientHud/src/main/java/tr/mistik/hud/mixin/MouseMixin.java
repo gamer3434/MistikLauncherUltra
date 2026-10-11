@@ -1,4 +1,6 @@
-package tr.mistik.hud;
+package tr.mistik.hud.mixin;
+
+import tr.mistik.hud.MistikHud;
 
 import net.minecraft.client.Mouse;
 import org.spongepowered.asm.mixin.Mixin;

@@ -53,10 +53,10 @@ public static class CrashDiagnostics
     public static string Category(string text) => text.Contains("MLU-INTEGRITY",StringComparison.OrdinalIgnoreCase) || text.Contains("integrity check",StringComparison.OrdinalIgnoreCase) ? "MLU-INTEGRITY" :
         text.Contains("OutOfMemoryError",StringComparison.OrdinalIgnoreCase) || text.Contains("Could not reserve",StringComparison.OrdinalIgnoreCase) ? "MLU-MEMORY" :
         text.Contains("UnsupportedClassVersionError",StringComparison.OrdinalIgnoreCase) ? "MLU-JAVA" :
-        text.Contains("ClassNotFoundException",StringComparison.OrdinalIgnoreCase) || text.Contains("Could not find or load main class",StringComparison.OrdinalIgnoreCase) ? "MLU-CLASSPATH" :
         text.Contains("Incompatible mods",StringComparison.OrdinalIgnoreCase) || text.Contains("requires",StringComparison.OrdinalIgnoreCase) && text.Contains("mod",StringComparison.OrdinalIgnoreCase) ||
         Regex.IsMatch(text, @"NoSuchMethodError|NoSuchFieldError|AbstractMethodError|IncompatibleClassChangeError", RegexOptions.IgnoreCase) ? "MLU-MOD-DEPENDENCY" :
-        Regex.IsMatch(text, @"(?im)Mixin(?:ApplyError|TransformerError)|Invalid(?:Mixin|Injection)Exception|InjectionError|(?:error|exception|failed)[^\r\n]*mixin|mixin[^\r\n]*(?:error|exception|failed)") ? "MLU-MOD-MIXIN" :
+        Regex.IsMatch(text, @"(?im)Mixin(?:ApplyError|TransformerError)|Invalid(?:Mixin|Injection)Exception|InjectionError|org\.spongepowered\.asm\.mixin\.transformer\.throwables\.IllegalClassLoadError|(?:error|exception|failed)[^\r\n]*mixin|mixin[^\r\n]*(?:error|exception|failed)") ? "MLU-MOD-MIXIN" :
+        text.Contains("ClassNotFoundException",StringComparison.OrdinalIgnoreCase) || text.Contains("Could not find or load main class",StringComparison.OrdinalIgnoreCase) ? "MLU-CLASSPATH" :
         text.Contains("ZipException",StringComparison.OrdinalIgnoreCase) || text.Contains("NoSuchFileException",StringComparison.OrdinalIgnoreCase) ? "MLU-FILE" : "MLU-EXIT";
     public static string Tail(string path)
     {

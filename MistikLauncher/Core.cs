@@ -213,6 +213,10 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.12","2026-10-11","#00D4AA", new[]{
+                "HUD modunun oyun açılışında oluşan Mixin sınıf yükleme hatası düzeltildi.",
+                "Fixed native HUD startup crash and classification of fatal Mixin errors."
+            }),
             new("v6.2.11","2026-10-11","#00D4AA", new[]{
                 "Lunar tarzı ayrı HUD kutuları ve sağ Shift ile açılan sürükle/boyutlandır düzenleyicisi eklendi.",
                 "Native Fabric HUD displays FPS, CPS, ping, coordinates, keystrokes and armor in one configurable overlay."

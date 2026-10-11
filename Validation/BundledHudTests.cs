@@ -33,6 +33,19 @@ public static class BundledHudTests
             var metadata = JObject.Parse(reader.ReadToEnd());
             Check(metadata["id"]?.ToString() == "mistik_hud" && metadata["depends"]?["minecraft"]?.ToString() == "1.21.1",
                 "Bundled HUD contains the own Fabric 1.21.1 mod");
+            using var mixinReader = new StreamReader(zip.GetEntry("mistik-hud.mixins.json")!.Open());
+            var mixins = JObject.Parse(mixinReader.ReadToEnd());
+            var package = mixins["package"]!.ToString();
+            var entrypoint = metadata["entrypoints"]!["client"]![0]!.ToString();
+            Check(!entrypoint.StartsWith(package + ".", StringComparison.Ordinal),
+                "HUD entrypoint is outside the Mixin-only package");
+            var mixinClasses = mixins["client"]!.Select(value => (package + "." + value).Replace('.', '/') + ".class").ToHashSet();
+            Check(mixinClasses.All(name => zip.GetEntry(name) != null) &&
+                zip.Entries.Where(entry => entry.FullName.StartsWith(package.Replace('.', '/') + "/", StringComparison.Ordinal) && entry.FullName.EndsWith(".class"))
+                    .All(entry => mixinClasses.Contains(entry.FullName)),
+                "Packaged Mixin namespace contains only declared Mixins");
+            Check(zip.GetEntry("tr/mistik/hud/MouseMixin.class") == null,
+                "Packaged HUD has no stale Mixin in its application namespace");
         }
         Check(new[] { "custom", "keys", "armor" }.All(name => File.Exists(Path.Combine(game, "mods", name + ".jar.disabled"))) && File.Exists(Path.Combine(game, "mods", "other.jar")),
             "Own HUD disables legacy components reversibly and preserves unrelated mods");

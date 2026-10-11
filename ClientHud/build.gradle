@@ -1,5 +1,5 @@
 plugins { id 'fabric-loom' version '1.8.13' }
-version = '1.0.0'
+version = '1.0.1'
 group = 'tr.mistik'
 base { archivesName = 'mistik-hud' }
 repositories { mavenCentral() }

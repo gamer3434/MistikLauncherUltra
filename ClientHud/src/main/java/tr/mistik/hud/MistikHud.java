@@ -43,7 +43,7 @@ public final class MistikHud implements ClientModInitializer {
             if (config.enabled) render(context, false);
         });
     }
-    static void recordClick(long window, int button, int action) {
+    public static void recordClick(long window, int button, int action) {
         var client = MinecraftClient.getInstance();
         if (instance != null && action == GLFW.GLFW_PRESS && button >= 0 && button < 2
             && window == client.getWindow().getHandle() && client.player != null && client.currentScreen == null)

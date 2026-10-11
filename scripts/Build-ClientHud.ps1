@@ -44,5 +44,5 @@ if($LASTEXITCODE) { throw 'HUD mod build failed' }
 if($project -ne (Join-Path $repo 'ClientHud')) {
     $output=Join-Path $repo 'ClientHud/build/libs'
     New-Item -ItemType Directory -Path $output -Force | Out-Null
-    Copy-Item -LiteralPath (Join-Path $project 'build/libs/mistik-hud-1.0.0.jar') -Destination $output -Force
+    Copy-Item -LiteralPath (Join-Path $project 'build/libs/mistik-hud-1.0.1.jar') -Destination $output -Force
 }

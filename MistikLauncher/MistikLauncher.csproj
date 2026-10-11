@@ -14,7 +14,7 @@
     <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>6.2.11</Version>
+    <Version>6.2.12</Version>
     <AssemblyVersion>6.0.0.0</AssemblyVersion>
     <FileVersion>$(Version)</FileVersion>
     <Authors>Mustafa</Authors>
@@ -35,11 +35,11 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Locales/*.json" />
-    <EmbeddedResource Include="../ClientHud/build/libs/mistik-hud-1.0.0.jar" LogicalName="MistikLauncher.mistik-hud.jar" />
+    <EmbeddedResource Include="../ClientHud/build/libs/mistik-hud-1.0.1.jar" LogicalName="MistikLauncher.mistik-hud.jar" />
     <ClientHudSource Include="../ClientHud/src/**/*;../ClientHud/build.gradle;../ClientHud/settings.gradle;../ClientHud/gradle.properties;../scripts/Build-ClientHud.ps1" />
     <Compile Include="../Updater/UpdateEngine.cs" Link="Updates/UpdateEngine.cs" />
   </ItemGroup>
-  <Target Name="BuildClientHud" BeforeTargets="PrepareForBuild" Inputs="@(ClientHudSource)" Outputs="../ClientHud/build/libs/mistik-hud-1.0.0.jar">
+  <Target Name="BuildClientHud" BeforeTargets="PrepareForBuild" Inputs="@(ClientHudSource)" Outputs="../ClientHud/build/libs/mistik-hud-1.0.1.jar">
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)/../scripts/Build-ClientHud.ps1&quot;" />
   </Target>
 </Project>

@@ -51,6 +51,9 @@ class Program
             Check(CrashDiagnostics.Category(linkage)=="MLU-MOD-DEPENDENCY","missing HUD method takes priority over incidental mixin stack frames");
             Check(CrashDiagnostics.Category("Loading mod mixinextras 0.5.5\nexit code 1")=="MLU-EXIT","loaded mixin library alone does not imply a mixin crash");
             Check(CrashDiagnostics.Category("Mixin apply failed example.mixins.json")=="MLU-MOD-MIXIN","actual mixin application failure retains its category");
+            var hudMixinFailure="[main/WARN]: Error loading class: com/electronwill/nightconfig/core/io/IoUtils (java.lang.ClassNotFoundException: com/electronwill/nightconfig/core/io/IoUtils)\nCaused by: org.spongepowered.asm.mixin.transformer.throwables.IllegalClassLoadError: tr.mistik.hud.MistikHud is in a defined mixin package tr.mistik.hud.* owned by mistik-hud.mixins.json and cannot be referenced directly";
+            Check(CrashDiagnostics.Category(hudMixinFailure)=="MLU-MOD-MIXIN","fatal HUD mixin package failure takes priority over an optional missing-class warning");
+            Check(CrashDiagnostics.Category("Could not find or load main class net.minecraft.client.main.Main")=="MLU-CLASSPATH","missing profile main class retains its classpath diagnosis");
             Directory.CreateDirectory(Path.Combine(App.GameDir,"logs"));
             var stale=Path.Combine(App.GameDir,"logs","latest.log"); File.WriteAllText(stale,"STALE_CRASH_MARKER"); File.SetLastWriteTimeUtc(stale,DateTime.UtcNow.AddHours(-1));
             Check(!CrashDiagnostics.Report(1,DateTime.UtcNow,"new failure").Contains("STALE_CRASH_MARKER"),"previous run logs are excluded from new crash analysis");

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "mistik_hud",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": "Mistik HUD",
   "description": "Movable FPS, CPS, ping, coordinates, keystrokes and armor HUD. Right Shift opens the editor.",
   "authors": ["musti_tr"],
