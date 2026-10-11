@@ -14,7 +14,16 @@ public static class CrashDiagnostics
         {
             modsRoot??=App.ModsDir;
             if (!Directory.Exists(modsRoot)) return Array.Empty<string>();
-            var evidence = string.Join("\n", text.Split('\n').Where(line => Regex.IsMatch(line, @"(?i)error|exception|caused by|mod file:|failed|requires|mixin")));
+            var evidenceLines = new List<string>();
+            bool inFailure = false;
+            foreach (var line in text.Split('\n'))
+            {
+                bool failure = Regex.IsMatch(line, @"(?i)error|exception|caused by|mod file:|failed|requires|mixin");
+                bool frame = Regex.IsMatch(line, @"^\s*(?:at\s+|\.\.\. \d+ more\b)");
+                if (failure || inFailure && frame) evidenceLines.Add(line);
+                inFailure = failure || inFailure && frame;
+            }
+            var evidence = string.Join("\n", evidenceLines);
             return ModFiles.List(modsRoot)
                 .Where(ModFiles.Enabled)
                 .Where(file => evidence.Contains(Path.GetFileName(file), StringComparison.OrdinalIgnoreCase))
@@ -45,8 +54,9 @@ public static class CrashDiagnostics
         text.Contains("OutOfMemoryError",StringComparison.OrdinalIgnoreCase) || text.Contains("Could not reserve",StringComparison.OrdinalIgnoreCase) ? "MLU-MEMORY" :
         text.Contains("UnsupportedClassVersionError",StringComparison.OrdinalIgnoreCase) ? "MLU-JAVA" :
         text.Contains("ClassNotFoundException",StringComparison.OrdinalIgnoreCase) || text.Contains("Could not find or load main class",StringComparison.OrdinalIgnoreCase) ? "MLU-CLASSPATH" :
-        text.Contains("Mixin",StringComparison.OrdinalIgnoreCase) ? "MLU-MOD-MIXIN" :
-        text.Contains("Incompatible mods",StringComparison.OrdinalIgnoreCase) || text.Contains("requires",StringComparison.OrdinalIgnoreCase) && text.Contains("mod",StringComparison.OrdinalIgnoreCase) ? "MLU-MOD-DEPENDENCY" :
+        text.Contains("Incompatible mods",StringComparison.OrdinalIgnoreCase) || text.Contains("requires",StringComparison.OrdinalIgnoreCase) && text.Contains("mod",StringComparison.OrdinalIgnoreCase) ||
+        Regex.IsMatch(text, @"NoSuchMethodError|NoSuchFieldError|AbstractMethodError|IncompatibleClassChangeError", RegexOptions.IgnoreCase) ? "MLU-MOD-DEPENDENCY" :
+        Regex.IsMatch(text, @"(?im)Mixin(?:ApplyError|TransformerError)|Invalid(?:Mixin|Injection)Exception|InjectionError|(?:error|exception|failed)[^\r\n]*mixin|mixin[^\r\n]*(?:error|exception|failed)") ? "MLU-MOD-MIXIN" :
         text.Contains("ZipException",StringComparison.OrdinalIgnoreCase) || text.Contains("NoSuchFileException",StringComparison.OrdinalIgnoreCase) ? "MLU-FILE" : "MLU-EXIT";
     public static string Tail(string path)
     {
@@ -67,7 +77,7 @@ public static class CrashDiagnostics
         foreach(var file in candidates) try {
             if(File.Exists(file) && File.GetLastWriteTimeUtc(file)>=started) { text+="\n"+Tail(file); files.Add(file); }
         } catch(IOException) { } catch(UnauthorizedAccessException) { }
-        // Only explicit error lines implicate a mod; the loaded-mod list is not evidence of blame.
+        // Failure lines and their stack frames implicate a mod; the loaded-mod list does not.
         var suspects=SuspectedMods(text);
         var code=Category(text); if(exitCode==null && code=="MLU-EXIT") code="MLU-LAUNCH";
         string advice=code switch {

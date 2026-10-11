@@ -19,7 +19,7 @@ static class SettingsLifecycleTests
         var updater=window.LauncherUpdates;
         var originalConfig=window.Config;
         var originalAutoUpdate=originalConfig.LauncherAutoUpdate;
-        var originalCurseForgeKey=originalConfig.CurseForgeApiKey;
+
         var originalLanguage=Localization.Language;
         var syncGate=typeof(MainWindow).GetField("_modSyncGate",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
         var configurationGate=typeof(MainWindow).GetProperty("ConfigurationGate",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
@@ -34,9 +34,9 @@ static class SettingsLifecycleTests
         T Control<T>(ModernSettingsPage page,string name)=>(T)typeof(ModernSettingsPage).GetField(name,BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(page)!;
         try
         {
-            const string savedFixtureKey="$2a$10$settings_saved_fixture_key_0123456789012345678901234567";
-            const string pendingFixtureKey="$2a$10$settings_pending_fixture_key_01234567890123456789012345";
-            window.Config.CurseForgeApiKey=savedFixtureKey;
+
+
+
             ConfigManager.Save(window.Config);
             Check(ReferenceEquals(configurationGate,syncGate),"settings persistence shares the existing mod synchronization gate");
             foreach(var updatesOnly in new[]{false,true})
@@ -60,8 +60,9 @@ static class SettingsLifecycleTests
             var updates=new ModernSettingsPage(window,updatesOnly:true);
             var user=Control<TextBox>(settings,"user"); var memory=Control<TextBox>(settings,"ram");
             user.Text="PendingName"; memory.Text="7";
-            Control<PasswordBox>(settings,"curseForgeKey").Password=pendingFixtureKey;
-            Check(!Control<Expander>(settings,"integrations").IsExpanded && Control<PasswordBox>(updates,"curseForgeKey")==null,"CurseForge key remains masked inside optional settings integration and is absent from updates-only page");
+
+
+            Check(typeof(ModernSettingsPage).GetField("curseForgeKey",BindingFlags.Instance|BindingFlags.NonPublic)==null,"retired integration has no API key control");
             var cachedContent=settings.Content;
             var updatesAutomatic=Control<CheckBox>(updates,"autoUpdate");
             updatesAutomatic.IsChecked=!originalAutoUpdate;
@@ -104,20 +105,12 @@ static class SettingsLifecycleTests
             }
             Check(ReferenceEquals(window.Config,originalConfig) && (window.Config.User,window.Config.Ram,window.Config.AuthType,window.Config.AutoClose,window.Config.Lang)==previous && File.ReadAllBytes(configPath).SequenceEqual(savedBytes),"failed settings persistence preserves the active player profile and saved preferences");
             Check(user.Text=="PendingName" && memory.Text=="7" && Control<TextBlock>(settings,"result").Text.StartsWith(Localization.T("error")),"failed settings save retains the draft and displays an error for retry");
-            Check(window.Config.CurseForgeApiKey==savedFixtureKey && ConfigManager.Load().CurseForgeApiKey==savedFixtureKey && Control<PasswordBox>(settings,"curseForgeKey").Password==pendingFixtureKey,"locked settings save preserves the current CurseForge key and the pending masked draft");
-            Control<Expander>(settings,"integrations").IsExpanded=true;
+
+
             settings.RefreshLanguage();
             user=Control<TextBox>(settings,"user"); memory=Control<TextBox>(settings,"ram");
-            Check(Control<PasswordBox>(settings,"curseForgeKey").Password==pendingFixtureKey && Control<Expander>(settings,"integrations").IsExpanded,"settings language refresh preserves the pending CurseForge key and integration expansion");
-            user.Text=previous.User; memory.Text=previous.Ram.ToString();
-            foreach(var invalidKey in new[]{"fixture\r\nheader", "fixture\u0131key"})
-            {
-                Control<PasswordBox>(settings,"curseForgeKey").Password=invalidKey;
-                typeof(ModernSettingsPage).GetMethod("Save",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(settings,null);
-                Check(window.Config.CurseForgeApiKey==savedFixtureKey && File.ReadAllBytes(configPath).SequenceEqual(savedBytes) && Control<TextBlock>(settings,"result").Text==Localization.T("curseForgeKeyInvalid"),"invalid CurseForge API key is rejected visibly without altering saved settings");
-            }
-            Control<PasswordBox>(settings,"curseForgeKey").Password=" "+pendingFixtureKey+" ";
 
+            user.Text=previous.User; memory.Text=previous.Ram.ToString();
             var skin=Path.Combine(App.AppData,"settings-avatar-fixture.png");
             var bitmap=BitmapSource.Create(64,64,96,96,PixelFormats.Bgra32,null,new byte[64*64*4],64*4);
             var encoder=new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
@@ -143,61 +136,20 @@ static class SettingsLifecycleTests
                 typeof(ModernSettingsPage).GetMethod("Save",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(settings,null);
                 var savedLanguage=ConfigManager.Load().Lang;
                 var feedback=Control<TextBlock>(settings,"result").Text;
-                Check(window.Config.CurseForgeApiKey==pendingFixtureKey && ConfigManager.Load().CurseForgeApiKey==pendingFixtureKey,"masked CurseForge API key trims and round-trips through settings persistence");
-                bool ContainsFixtureSecret(string path)=>new[]{savedFixtureKey,pendingFixtureKey}.Any(key=>File.ReadAllBytes(path).AsSpan().IndexOf(System.Text.Encoding.UTF8.GetBytes(key))>=0);
-                Check(!ContainsFixtureSecret(configPath) && !ContainsFixtureSecret(configPath+".bak"),"primary and backup settings contain no plaintext CurseForge API key");
+
+
+
                 Check(settingsSavedUnderGate && notifiedSyncedProfile==synchronizedProfile && window.Config.LastSyncedVersion==synchronizedProfile && ConfigManager.Load().LastSyncedVersion==synchronizedProfile,"settings snapshot and persistence retain completed mod synchronization under the shared gate");
                 Check(saveNotifications==1 && window.Config.Lang==targetLanguage && Localization.Language==(targetLanguage=="English"?"en":"tr") && savedLanguage==targetLanguage && feedback==Localization.T("saved"),$"successful settings language save updates the interface without a second write after reload (notifications={saveNotifications}, target={targetLanguage}, runtime={window.Config.Lang}, disk={savedLanguage}, UI={Localization.Language}, result={feedback})");
             }
             finally { ConfigManager.Saved-=LockAfterSave; savedLock?.Dispose(); }
 
-            void Flush()
-            {
-                var frame=new DispatcherFrame();
-                window.Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle,new Action(()=>frame.Continue=false));
-                Dispatcher.PushFrame(frame);
-            }
-            window.NavigateToCurseForgeSettings(); Flush();
-            var navigation=(Frame)window.FindName("MainFrame");
-            var setup=(ModernSettingsPage)navigation.Content;
-            var setupContent=setup.Content;
-            Control<TextBox>(setup,"user").Text="SetupDraft";
-            Control<PasswordBox>(setup,"curseForgeKey").Password="unsaved_setup_fixture";
-            Control<Expander>(setup,"integrations").IsExpanded=false;
-            var beforeSetup=File.ReadAllBytes(configPath);
-            window.Navigate("Dash"); Flush();
-            window.NavigateToCurseForgeSettings(); Flush();
-            bool samePage=ReferenceEquals(navigation.Content,setup), sameContent=ReferenceEquals(setup.Content,setupContent);
-            bool expanded=Control<Expander>(setup,"integrations").IsExpanded, userDraft=Control<TextBox>(setup,"user").Text=="SetupDraft";
-            bool keyDraft=Control<PasswordBox>(setup,"curseForgeKey").Password=="unsaved_setup_fixture", unchangedDisk=File.ReadAllBytes(configPath).SequenceEqual(beforeSetup);
-            Check(samePage && sameContent && expanded && userDraft && keyDraft && unchangedDisk,$"CurseForge setup navigation opens the cached integration without rewriting unsaved drafts or saving configuration (page={samePage}, content={sameContent}, expanded={expanded}, userDraft={userDraft}, keyDraft={keyDraft}, disk={unchangedDisk})");
-            Control<PasswordBox>(setup,"curseForgeKey").Password="";
-            window.Navigate("Dash"); Flush();
-            window.NavigateToCurseForgeSettings(); Flush();
-            Check(Control<PasswordBox>(setup,"curseForgeKey").Password.Length==0 && File.ReadAllBytes(configPath).SequenceEqual(beforeSetup),"intentionally cleared CurseForge key stays empty on cached settings navigation without restoring a saved key or writing configuration");
-            var integrationContent=(StackPanel)Control<Expander>(setup,"integrations").Content;
-            var links=integrationContent.Children.OfType<WrapPanel>().Single().Children.OfType<Button>().ToArray();
-            Check(links.Any(button=>button.Name=="CurseForgeApplyKey" && Equals(button.Content,Localization.T("cfApplyKey")) && Equals(button.Tag,"https://support.curseforge.com/support/solutions/articles/9000208346-about-the-curseforge-api-and-how-to-apply-for-a-key")) && links.Any(button=>button.Name=="CurseForgeManageKey" && Equals(button.Content,Localization.T("cfManageKey")) && Equals(button.Tag,"https://console.curseforge.com/")),"CurseForge integration exposes the official application guide and console links");
-            window.Navigate("Dash"); Flush();
-            var key=Control<PasswordBox>(setup,"curseForgeKey");
-            bool broughtIntoView=false;
-            key.RequestBringIntoView+=(_,_)=>broughtIntoView=true;
-            var host=new Window { Content=setup,Width=960,Height=440,Left=-10000,Top=-10000,WindowStyle=WindowStyle.None,ShowActivated=false,ShowInTaskbar=false };
-            try
-            {
-                typeof(ModernSettingsPage).GetMethod("FocusCurseForgeIntegration",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(setup,null);
-                host.Show(); Flush(); host.UpdateLayout();
-                var setupScroll=((DockPanel)setup.Content).Children.OfType<ScrollViewer>().Single();
-                double keyTop=key.TranslatePoint(new Point(0,0),setupScroll).Y;
-                Check(broughtIntoView && ReferenceEquals(FocusManager.GetFocusedElement(host),key) && setupScroll.VerticalOffset>0 && keyTop>=0 && keyTop+key.ActualHeight<=setupScroll.ViewportHeight,"loaded CurseForge setup scrolls the exact masked key field into view and gives it focus");
-            }
-            finally { host.Content=null; host.Close(); }
         }
         finally
         {
             window.Config=originalConfig;
             window.Config.LauncherAutoUpdate=originalAutoUpdate;
-            window.Config.CurseForgeApiKey=originalCurseForgeKey;
+
             ConfigManager.Save(window.Config);
             Localization.SetLanguage(originalLanguage);
             var temporaryConfig=Path.Combine(App.AppData,"config.json.tmp");

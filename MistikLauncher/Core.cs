@@ -23,7 +23,7 @@ namespace MistikLauncher
         [JsonProperty("close_rgb")] public string CloseRgb { get; set; } = "#FFB000";
         [JsonProperty("launcher_auto_update")] public bool LauncherAutoUpdate { get; set; } = true;
         [JsonProperty("auto_mcs_update")] public bool AutoMcsAutoUpdate { get; set; } = true;
-        [JsonProperty("curseforge_api_key")] public string CurseForgeApiKey { get; set; } = "";
+
         [JsonProperty("user")]       public string User       { get; set; } = "Oyuncu";
         [JsonProperty("version")]    public string Version    { get; set; } = "1.21";
         [JsonProperty("ram")]        public int    Ram        { get; set; } = 4;
@@ -67,7 +67,7 @@ namespace MistikLauncher
             cfg.Lang = cfg.Lang == "English" || cfg.Lang == "en" ? "English" : "Turkce";
             cfg.Ram = Math.Clamp(cfg.Ram, 1, 32);
             cfg.TunnelPort = Math.Clamp(cfg.TunnelPort, 1, 65535);
-            cfg.CurseForgeApiKey = cfg.CurseForgeApiKey is { Length: <=512 } key && key.All(c=>c is >= ' ' and <= '~') ? key.Trim() : "";
+
               cfg.User = Regex.IsMatch(cfg.User ?? "", @"^[A-Za-z0-9_]{3,16}$") ? cfg.User! : "Player";
               cfg.Version ??= "";
               cfg.Version = GameProfiles.SafeId(cfg.Version) && cfg.Version.Length<=120 ? cfg.Version : "1.21";
@@ -213,6 +213,10 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.9","2026-10-11","#00D4AA", new[]{
+                "Ayarlar bölümüne oyun içi HUD aç/kapat seçeneği eklendi.",
+                "Shader center, Fabric HUD presets and Mistik menu appearance added; CurseForge integration removed."
+            }),
             new("v6.2.8","2026-10-10","#00D4AA", new[]{
                 "Güncelleme menüsü kaldırıldı; güncellemeler Ayarlar bölümünde yönetilir.",
                 "Encrypted player profile and API key remain local across launcher upgrades."

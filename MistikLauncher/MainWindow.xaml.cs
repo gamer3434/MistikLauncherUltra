@@ -86,7 +86,7 @@ namespace MistikLauncher
             LanguageBox.SelectionChanged += (_,_) => SwitchLanguage(LanguageBox.SelectedIndex == 1 ? "English" : "Turkce");
             Localization.Changed += RefreshLanguage;
             MainFrame.LoadCompleted += (_, e) => {
-                (e.Content as Pages.ModernSettingsPage)?.RestoreCurseForgeDraft();
+
                 if (ReferenceEquals(_pendingPage, e.Content)) _pendingPage = null;
                 if (e.Content is Page loaded && _pendingTranslations.Remove(loaded))
                     Localization.TranslateTree(loaded);
@@ -294,6 +294,7 @@ namespace MistikLauncher
                     "Dash"      => new Pages.ModernHomePage(this),
                     "Vers"      => new Pages.VersionManagerPage(this),
                     "Mods"      => new Pages.ModManagerPage(this),
+                    "Shader"    => new Pages.ShaderManagerPage(this),
                     "Skin"      => new Pages.SkinPage(this),
                     "Elyby"     => new Pages.ElybyPage(this),
                     "Friends"   => new Pages.FriendsPage(this),
@@ -320,23 +321,7 @@ namespace MistikLauncher
             _pageLanguages[key] = Localization.Language;
             if (languageChanged) _pendingTranslations.Add(page);
             _pendingPage = page;
-            var previousSettings = MainFrame.Content as Pages.ModernSettingsPage;
-            previousSettings?.PreserveCurseForgeDraft();
-            try
-            {
-                if (!MainFrame.Navigate(page)) previousSettings?.RestoreCurseForgeDraft();
-            }
-            catch
-            {
-                previousSettings?.RestoreCurseForgeDraft();
-                throw;
-            }
-        }
-
-        public void NavigateToCurseForgeSettings()
-        {
-            Navigate("Settings");
-            if (_pageCache.TryGetValue("Settings", out var page) && page is Pages.ModernSettingsPage settings) settings.FocusCurseForgeIntegration();
+            MainFrame.Navigate(page);
         }
 
         // Belirli bir sayfanın cache'ini temizler (yeniden oluşturmak için)

@@ -45,6 +45,12 @@ class Program
             File.WriteAllText(Path.Combine(App.ModsDir,"innocent.jar"),"fixture");
             var report=CrashDiagnostics.Report(1,DateTime.UtcNow,"ERROR failed mod file: suspect.jar\nLoaded mods: innocent.jar");
             Check(report.Contains(Path.Combine(App.ModsDir,"suspect.jar")) && !report.Contains(Path.Combine(App.ModsDir,"innocent.jar")),"only explicit failure evidence identifies a suspect mod path");
+            var linkage="java.lang.NoSuchMethodError: missing HUD method\n\tat knot/net.marvex.client.TotemHUDOverlay.onHudRender(Overlay.java:99) ~[suspect.jar:?]\n\tat net.fabricmc.mixin.Callback.invoke(Callback.java:1)\nLoaded mods: innocent.jar\n\tat example.Unrelated.run(Unrelated.java:1) ~[innocent.jar:?]";
+            var linkageSuspects=CrashDiagnostics.SuspectedMods(linkage);
+            Check(linkageSuspects.Length==1 && Path.GetFileName(linkageSuspects[0])=="suspect.jar","failure stack frames identify the culprit without blaming unrelated frames or loaded mods");
+            Check(CrashDiagnostics.Category(linkage)=="MLU-MOD-DEPENDENCY","missing HUD method takes priority over incidental mixin stack frames");
+            Check(CrashDiagnostics.Category("Loading mod mixinextras 0.5.5\nexit code 1")=="MLU-EXIT","loaded mixin library alone does not imply a mixin crash");
+            Check(CrashDiagnostics.Category("Mixin apply failed example.mixins.json")=="MLU-MOD-MIXIN","actual mixin application failure retains its category");
             Directory.CreateDirectory(Path.Combine(App.GameDir,"logs"));
             var stale=Path.Combine(App.GameDir,"logs","latest.log"); File.WriteAllText(stale,"STALE_CRASH_MARKER"); File.SetLastWriteTimeUtc(stale,DateTime.UtcNow.AddHours(-1));
             Check(!CrashDiagnostics.Report(1,DateTime.UtcNow,"new failure").Contains("STALE_CRASH_MARKER"),"previous run logs are excluded from new crash analysis");
@@ -52,13 +58,17 @@ class Program
             var invalidLighting=ConfigManager.Normalize(new LauncherConfig { CloseLighting="bad",CloseRgb="invalid" });
             Check(invalidLighting.CloseLighting=="Theme" && invalidLighting.CloseRgb=="#FFB000","close lighting settings validation");
             checks += ModToggleTests.Run(Path.Combine(testRoot,"mod-toggle"));
+            checks += ShaderTests.Run(Path.Combine(testRoot,"shaders"));
+            checks += HudPresetTests.Run(Path.Combine(testRoot,"hud-preset"));
+            checks += HudSettingsTests.Run(Path.Combine(testRoot,"hud-settings"));
+            checks += MistikMenuTests.Run(Path.Combine(testRoot,"mistik-menu"));
             checks += ModAndMapRegressionTests.Run(Path.Combine(testRoot,"mod-map-regressions")).GetAwaiter().GetResult();
             checks += TunnelLifecycleTests.Run(testRoot).GetAwaiter().GetResult();
             if(args.Contains("--live-mod")) checks+=ModToggleTests.Live(Path.Combine(testRoot,"official-mod")).GetAwaiter().GetResult();
             checks += ForgeTests.Run(Path.Combine(testRoot,"forge-tests"));
             checks += AutoMcsTests.Run(testRoot).GetAwaiter().GetResult();
             checks += AutoMcsConcurrencyTests.Run(testRoot).GetAwaiter().GetResult();
-            checks += CurseForgeTests.Run(testRoot).GetAwaiter().GetResult();
+
             checks += JavaRuntimeInstallerTests.Run(testRoot).GetAwaiter().GetResult();
             if(args.Contains("--live-java"))
             {
@@ -119,13 +129,17 @@ class Program
             ConfigManager.Save(ConfigManager.Load());
             Check(ConfigManager.Load().User=="LegacyUser" && !File.ReadAllText(Path.Combine(testRoot,"config.json")).Contains("LegacyUser") && !File.ReadAllText(Path.Combine(testRoot,"config.json.bak")).Contains("LegacyUser"), "legacy settings and backup migrate to encrypted files");
             var previousProfile=ConfigManager.Load();
-            var migrationProfile=new LauncherConfig { User="LegacyUser",VersionCode="v1.0.0",Ram=8,Lang="English",AuthType="elyby",SkinType="username",SkinUser="LegacySkin",CurseForgeApiKey="fake_migration_fixture_key" };
-            var migrationBytes=System.Text.Encoding.ASCII.GetBytes("MLUC1\n").Concat(WindowsSecret.Transform(System.Text.Encoding.UTF8.GetBytes(Newtonsoft.Json.JsonConvert.SerializeObject(migrationProfile)),true)).ToArray();
+            var migrationProfile=new LauncherConfig { User="LegacyUser",VersionCode="v1.0.0",Ram=8,Lang="English",AuthType="elyby",SkinType="username",SkinUser="LegacySkin" };
+            var legacyProfile=Newtonsoft.Json.Linq.JObject.FromObject(migrationProfile);
+            legacyProfile["curseforge_api_key"]="retired_fixture_secret";
+            var migrationBytes=System.Text.Encoding.ASCII.GetBytes("MLUC1\n").Concat(WindowsSecret.Transform(System.Text.Encoding.UTF8.GetBytes(legacyProfile.ToString()),true)).ToArray();
             File.WriteAllBytes(Path.Combine(testRoot,"config.json"),migrationBytes);
             var migratedProfile=ConfigManager.Load();
-            Check(migratedProfile.User==migrationProfile.User && migratedProfile.Ram==8 && migratedProfile.Lang=="English" && migratedProfile.AuthType=="elyby" && migratedProfile.SkinUser=="LegacySkin" && migratedProfile.CurseForgeApiKey==migrationProfile.CurseForgeApiKey && migratedProfile.VersionCode==App.LocalVersion && File.ReadAllBytes(Path.Combine(testRoot,"config.json")).SequenceEqual(migrationBytes),"new launcher version preserves encrypted player profile and API key without rewriting settings on load");
+            Check(migratedProfile.User==migrationProfile.User && migratedProfile.Ram==8 && migratedProfile.Lang=="English" && migratedProfile.AuthType=="elyby" && migratedProfile.SkinUser=="LegacySkin" && migratedProfile.VersionCode==App.LocalVersion && File.ReadAllBytes(Path.Combine(testRoot,"config.json")).SequenceEqual(migrationBytes),"new launcher version preserves encrypted player profile and preferences without rewriting settings on load");
             ConfigManager.Save(migratedProfile);
-            Check(ConfigManager.Load().User=="LegacyUser" && ConfigManager.Load().CurseForgeApiKey==migrationProfile.CurseForgeApiKey && !File.ReadAllText(Path.Combine(testRoot,"config.json")).Contains(migrationProfile.CurseForgeApiKey),"migrated profile and API key survive an encrypted save and reload");
+            var savedProfile=System.Text.Encoding.UTF8.GetString(WindowsSecret.Transform(File.ReadAllBytes(Path.Combine(testRoot,"config.json"))[6..],false));
+            Check(!savedProfile.Contains("curseforge_api_key") && !savedProfile.Contains("retired_fixture_secret") && ConfigManager.Load().User=="LegacyUser","retired provider credential is dropped on save without resetting the player profile");
+            Check(ConfigManager.Load().User=="LegacyUser" && !File.ReadAllText(Path.Combine(testRoot,"config.json")).Contains("LegacyUser"),"migrated player profile survive an encrypted save and reload");
             ConfigManager.Save(previousProfile);
             bool notificationRan=false;
             Action<LauncherConfig> failedNotification=_=> { notificationRan=true; throw new IOException("test subscriber failure"); };
@@ -161,6 +175,8 @@ class Program
             checks+=LaunchLifecycleTests.Run(window);
             checks+=LaunchReadinessTests.RunHome(window);
             checks+=ModPagePerformanceTests.Run(window,Path.Combine(testRoot,"mod-page-performance"));
+            checks+=HudSettingsUiTests.Run(window);
+            checks+=ShaderTests.RunPage(window);
             checks+=ForgeTests.Classpath(window);
             checks+=ModAndMapRegressionTests.SyncFailure(window,Path.Combine(testRoot,"sync-commit"));
             var quiltJar=Path.Combine(testRoot,"quilt-metadata.jar");
@@ -331,7 +347,7 @@ class Program
                 appearance=Nodes(settingsPage).OfType<Expander>().Single(expander=>expander.Name=="AppearanceExpander"); appearance.IsExpanded=true; Flush(window);
                 var lighting=Nodes(settingsPage).OfType<ComboBox>().Single(box=>box.Name=="CloseLightingBox");
                 Check(Nodes(appearance).OfType<Button>().Count(button=>ColorThemes.Names.Any(name=>System.Windows.Automation.AutomationProperties.GetName(button)==Localization.T("theme"+name)))==ColorThemes.Names.Length,"all themes remain available in appearance options: "+code);
-                Check(!Texts(settingsPage).Contains(Localization.T("cloudTitle")) && Nodes(settingsPage).OfType<PasswordBox>().All(box=>box.Name=="CurseForgeKeyBox"),"cloud account UI removed: "+code);
+                Check(!Texts(settingsPage).Contains(Localization.T("cloudTitle")) && !Nodes(settingsPage).OfType<PasswordBox>().Any(),"cloud account UI removed: "+code);
                 Check(lighting.Items.Count==3 && !lighting.Items.Cast<string>().Any(item=>item.Contains("Rainbow") || item.Contains("Gökkuşağı")),"single RGB mode replaces Rainbow: "+code);
                 lighting.SelectedIndex=2; Flush(window); Localization.TranslateTree(settingsPage);
                 lighting.SelectedIndex=1; Flush(window); Localization.TranslateTree(settingsPage); Flush(window);
@@ -373,9 +389,8 @@ class Program
                 window.Navigate("Mods"); Capture(window,Path.Combine(output,"mods-"+code+".png"),960,640);
                 var currentModPage=(DependencyObject)((Frame)window.FindName("MainFrame")).Content;
                 var modScroll=Nodes(currentModPage).OfType<ScrollViewer>().First();
-                var modSource=Nodes(currentModPage).OfType<ComboBox>().Single(box=>box.Name=="ModSource");
                 var modSearch=Nodes(currentModPage).OfType<TextBox>().Single(box=>System.Windows.Automation.AutomationProperties.GetName(box)==Localization.T("modSearch"));
-                Check(modSource.TranslatePoint(new Point(0,modSource.ActualHeight),modScroll).Y<=modScroll.ViewportHeight && modSearch.TranslatePoint(new Point(0,modSearch.ActualHeight),modScroll).Y<=modScroll.ViewportHeight,"mod source and search are visible at compact size: "+code);
+                Check(!Nodes(currentModPage).OfType<ComboBox>().Any(box=>box.Name=="ModSource") && modSearch.TranslatePoint(new Point(0,modSearch.ActualHeight),modScroll).Y<=modScroll.ViewportHeight,"Modrinth search is visible at compact size without a source selector: "+code);
                 Check(Texts(currentModPage).Contains(Localization.T("modCenterTitle")),"mod center opens in selected language: "+code);
                 window.SwitchLanguage(code=="tr"?"en":"tr"); Flush(window);
                 Check(Texts(currentModPage).Contains(Localization.T("modCenterTitle")),"cached mod center headings follow language switch: "+code);

@@ -33,22 +33,6 @@ static class ModPagePerformanceTests
             jar=memory.ToArray();
         }
         for(int i=0;i<95;i++) File.WriteAllBytes(Path.Combine(root,$"mod-{i:0000}.jar"),jar);
-        var bundleRoot=Path.Combine(root,"curseforge-bundle"); Directory.CreateDirectory(bundleRoot);
-        var bundle=new[] {
-            new CurseForgeModFile("dependency-new.jar",jar) { CompatibleFilenames=new[]{"dependency-new.jar","dependency-old.jar"} },
-            new CurseForgeModFile("main-new.jar",jar) { CompatibleFilenames=new[]{"main-new.jar","main-old.jar"} }
-        };
-        var installBundle=typeof(ModManagerPage).GetMethod("InstallCurseForgeBundle",BindingFlags.Static|BindingFlags.NonPublic)!;
-        foreach(var conflict in new[]{"main-old.jar","dependency-old.jar","dependency-old.jar.disabled"})
-        {
-            string existing=Path.Combine(bundleRoot,conflict); File.WriteAllBytes(existing,jar); bool rejected=false;
-            try { installBundle.Invoke(null,new object[]{bundleRoot,bundle}); } catch(TargetInvocationException error) when(error.InnerException is IOException) { rejected=true; }
-            Check(rejected && Directory.GetFiles(bundleRoot).Length==1 && File.ReadAllBytes(existing).SequenceEqual(jar),
-                "CurseForge rejects existing alternate mod version before any bundle write: "+conflict);
-            File.Delete(existing);
-        }
-        installBundle.Invoke(null,new object[]{bundleRoot,bundle});
-        Check(bundle.All(file=>File.ReadAllBytes(Path.Combine(bundleRoot,file.Filename)).SequenceEqual(jar)),"CurseForge installs the verified bundle after conflict preflight succeeds");
         using var transport=new SearchTransport(); using var client=new HttpClient(transport);
         var page=new ModManagerPage(window,client);
         var fields=typeof(ModManagerPage);
@@ -89,39 +73,10 @@ static class ModPagePerformanceTests
         var clearing=Search("clear-pending"); Wait(Search(""));
         transport.Pending["clear-pending"].Complete("obsolete cleared result"); Wait(clearing);
         Check(results.Children.Count==0,"clearing a search cancels pending work and leaves no stale results or loading card");
-        var source=(ComboBox)fields.GetField("_sourceBox",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(page)!;
-        Check(source.Items.Cast<string>().SequenceEqual(new[]{"Modrinth","CurseForge"}) && source.SelectedIndex==0,
-            "mod search defaults to Modrinth and offers the explicit CurseForge source");
-        var oldKey=window.Config.CurseForgeApiKey; var oldVersion=window.Config.Version;
-        try
-        {
-            window.Config.CurseForgeApiKey="";
-            var switching=Search("source-switch-pending"); int before=transport.Requests;
-            source.SelectedIndex=1;
-            Check(transport.Requests==before && transport.CurseForgeRequests==0 && transport.Pending["source-switch-pending"].Token.IsCancellationRequested &&
-                Nodes(results).OfType<TextBlock>().Any(text=>text.Name=="CurseForgeKeyRequired") &&
-                Nodes(results).OfType<Button>().Any(button=>button.Name=="CurseForgeSettings") && Nodes(results).OfType<Button>().Any(button=>button.Name=="CurseForgeOfficialSearch"),
-                "CurseForge without a key cancels the previous source and shows settings and official website help without an HTTP request");
-            transport.Pending["source-switch-pending"].Complete("obsolete Modrinth result"); Wait(switching);
-            Check(!Result("obsolete Modrinth result") && Nodes(results).OfType<TextBlock>().Any(text=>text.Name=="CurseForgeKeyRequired"),
-                "late Modrinth result cannot replace the selected CurseForge key help");
-            Wait(Search(""));
-            Check(transport.CurseForgeRequests==0 && Nodes(results).OfType<TextBlock>().Any(text=>text.Name=="CurseForgeKeyRequired"),
-                "missing CurseForge key retains helpful actions even with an empty search");
-            window.Config.CurseForgeApiKey="fixture-api-key"; window.Config.Version="98.1-fabric";
-            Wait(Search("cf-current"));
-            Check(Result("CurseForge fixture") && transport.CurseForgeRequests==1 &&
-                Nodes(results).OfType<TextBlock>().Any(text=>text.Text=="CurseForge") &&
-                Nodes(results).OfType<Button>().Any(button=>Equals(button.Content,Localization.T("cfOpenWebsite"))),
-                "authenticated CurseForge search displays normalized metadata source caption and official website action");
-            foreach(var status in new[]{HttpStatusCode.Unauthorized,HttpStatusCode.Forbidden}) {
-                transport.CurseForgeFailure=status; Wait(Search("cf-rejected"));
-                Check(Nodes(results).OfType<TextBlock>().Any(text=>text.Text==Localization.T("cfKeyRejected")) && Nodes(results).OfType<Button>().Any(button=>button.Name=="CurseForgeSettings") && Nodes(results).OfType<Button>().Any(button=>button.Name=="CurseForgeOfficialSearch") && window.Config.CurseForgeApiKey=="fixture-api-key","rejected CurseForge key shows actionable settings help without erasing the stored key: "+status);
-            }
-            transport.CurseForgeFailure=null;
-            Wait(Search("")); source.SelectedIndex=0;
-            Check(results.Children.Count==0 && source.SelectedIndex==0,"switching back to Modrinth invalidates CurseForge results");
-
+        Check(!Nodes(page).OfType<ComboBox>().Any(box=>box.Name=="ModSource"),"single-source mod search needs no provider selector");
+        var oldVersion=window.Config.Version;
+        try {
+            window.Config.Version="98.1-fabric";
             var filtered=Search("filtered");
             var facets=JArray.Parse(Uri.UnescapeDataString(transport.SearchUris["filtered"].Query.TrimStart('?').Split('&')
                 .Single(value=>value.StartsWith("facets=",StringComparison.Ordinal))[7..]));
@@ -179,7 +134,7 @@ static class ModPagePerformanceTests
             Wait(RunButton(()=>Task.FromResult(true)));
             Check(installButton.IsEnabled && Equals(installButton.Content,"OK"),"successful mod operation alone produces the installation success label");
         }
-        finally { window.Config.CurseForgeApiKey=oldKey; window.Config.Version=oldVersion; }
+        finally { window.Config.Version=oldVersion; }
         return checks;
     }
     static void Wait(Task task)
@@ -210,22 +165,14 @@ static class ModPagePerformanceTests
     {
         public readonly Dictionary<string,PendingSearch> Pending=new();
         public readonly Dictionary<string,Uri> SearchUris=new();
-        public int Requests,CurseForgeRequests;
-        public HttpStatusCode? CurseForgeFailure;
+        public int Requests;
+
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken cancellationToken)
         {
             Requests++;
             if(request.RequestUri!.AbsolutePath=="/v2/project/fixture-failed/version")
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
-            if(request.RequestUri!.Host=="api.curseforge.com")
-            {
-                CurseForgeRequests++;
-                if(!request.Headers.TryGetValues("x-api-key",out var keys) || keys.Single()!="fixture-api-key") throw new Exception("Missing fixture API header.");
-                if(CurseForgeFailure is HttpStatusCode failure) return Task.FromResult(new HttpResponseMessage(failure));
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content=new StringContent(new JObject {
-                    ["data"]=new JArray(new JObject { ["id"]=123,["gameId"]=432,["classId"]=6,["name"]="CurseForge fixture",["summary"]="fixture",
-                        ["downloadCount"]=2,["slug"]="fixture-mod" }) }.ToString()) });
-            }
+
             string query=Uri.UnescapeDataString(request.RequestUri!.Query.TrimStart('?').Split('&').Single(value=>value.StartsWith("query=",StringComparison.Ordinal))[6..]);
             SearchUris[query]=request.RequestUri;
             if(query=="optimization") return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content=new StringContent("{\"hits\":[]}") });

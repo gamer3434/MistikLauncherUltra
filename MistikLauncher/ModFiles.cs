@@ -2,7 +2,7 @@ using System.IO;
 namespace MistikLauncher;
 public static class ModFiles
 {
-    static void EnsureRoot(string root)
+    internal static void EnsureRoot(string root)
     {
         Directory.CreateDirectory(root);
         for(string? current=Path.GetFullPath(root);current!=null;current=Path.GetDirectoryName(current))
