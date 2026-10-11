@@ -42,7 +42,7 @@ public class ModernHomePage : Page, ILanguagePage
         stack.Children.Add(BuildReadinessCard());
         stack.Children.Add(PageHelpers.Lbl(Localization.T("quick"),16,"#FFFFFF",true));
         var actions = new WrapPanel { Name="HomeActions", Margin = new Thickness(0,6,0,4) };
-        foreach (var item in new[] { ("versions","Vers"),("mods","Mods"),("shaders","Shader"),("server","Server"),("settings","Settings") })
+        foreach (var item in new[] { ("versions","Vers"),("mods","Mods"),("server","Server"),("settings","Settings") })
         {
             var button = PageHelpers.MkBtn(Localization.T(item.Item1),"#28445E");
             button.MinHeight=44; button.Margin = new Thickness(0,0,10,8); button.Click += (_,_) => main.Navigate(item.Item2); actions.Children.Add(button);
@@ -360,15 +360,6 @@ public class ModernSettingsPage : Page, ILanguagePage
         provider=new ComboBox { ItemsSource=new[] { Localization.T("offline"), "Ely.by" }, SelectedIndex=draftProvider, MinHeight=40 }; Field("auth",provider,1,1); stack.Children.Add(fields);
         System.Windows.Automation.AutomationProperties.SetName(provider,Localization.T("auth"));
         close=new CheckBox { Content=Localization.T("close"), IsChecked=draftClose, Foreground=Brushes.White, MinHeight=32, VerticalContentAlignment=VerticalAlignment.Center, Margin=new Thickness(0,0,0,12) }; stack.Children.Add(close);
-        var hud = new CheckBox { Name="HudEnabledBox", Content=Localization.T("hudEnabled"), Foreground=Brushes.White, MinHeight=32, Margin=new Thickness(0,0,0,6) };
-        var hudStatus=PageHelpers.Lbl("hudRestart",12,"#BDCAD8",wrap:TextWrapping.Wrap,pad:new Thickness(0,0,0,12));
-        try { hud.IsChecked=HudSettings.IsEnabled(App.GameDir); hud.IsEnabled=HudSettings.IsInstalled(App.GameDir); }
-        catch(Exception ex) { hud.IsEnabled=false; hudStatus.Text=Localization.T("error")+": "+ex.Message; }
-        hud.Click+=(_,_)=> {
-            try { lock(main.ConfigurationGate) HudSettings.SetEnabled(App.GameDir,hud.IsChecked==true); hudStatus.Text=Localization.T("hudRestart"); }
-            catch(Exception ex) { hud.IsChecked=!(hud.IsChecked==true); hudStatus.Text=Localization.T("error")+": "+ex.Message; }
-        };
-        stack.Children.Add(hud); stack.Children.Add(hudStatus);
         appearance=new Expander { Name="AppearanceExpander", Header=Localization.T("appearanceTitle"),Foreground=Brushes.White,FontSize=16,IsExpanded=appearanceExpanded,Content=appearanceContent,Margin=new Thickness(0,0,0,16) }; stack.Children.Add(appearance);
         stack.Children.Add(updateCard);
         var save=PageHelpers.MkBtn(Localization.T("save"),"#226DA0"); save.Name="SaveSettingsButton"; save.HorizontalAlignment=HorizontalAlignment.Right;

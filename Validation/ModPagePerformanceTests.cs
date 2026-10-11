@@ -117,7 +117,7 @@ static class ModPagePerformanceTests
             var install=fields.GetMethod("InstallMod",BindingFlags.Instance|BindingFlags.NonPublic)!;
             var runButton=fields.GetMethod("RunInstallButton",BindingFlags.Static|BindingFlags.NonPublic)!;
             var installButton=new Button { Content="KUR" }; int failures=0;
-            Func<Task<bool>> realFailure=()=>(Task<bool>)install.Invoke(page,new object[]{"fixture-failed","Fixture"})!;
+            Func<Task<bool>> realFailure=()=>(Task<bool>)install.Invoke(page,new object?[]{"fixture-failed","Fixture",null})!;
             Task RunButton(Func<Task<bool>> operation)=>(Task)runButton.Invoke(null,new object[]{installButton,operation,
                 (Action<Exception>)(error=>{ if(error is not HttpRequestException) throw error; failures++; }),"OK"})!;
             for(int attempt=0;attempt<2;attempt++)

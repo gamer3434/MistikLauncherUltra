@@ -72,3 +72,4 @@ credentials.json
 *.bundle
 *.jks
 *.keystore
+/ClientHud/

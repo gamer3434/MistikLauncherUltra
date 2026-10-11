@@ -2,6 +2,29 @@ using System.IO;
 namespace MistikLauncher;
 public static class ModFiles
 {
+    public static void RetireMistikHud(string root)
+    {
+        if (!Directory.Exists(root)) return;
+        EnsureRoot(root);
+        foreach (var path in List(root))
+        {
+            if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new IOException("Invalid mod path.");
+            bool retired;
+            try
+            {
+                using var zip = System.IO.Compression.ZipFile.OpenRead(path);
+                var entry = zip.GetEntry("fabric.mod.json");
+                if (entry == null || entry.Length > 65536) continue;
+                using var reader = new StreamReader(entry.Open());
+                retired = Newtonsoft.Json.Linq.JObject.Parse(reader.ReadToEnd())["id"]?.ToString() == "mistik_hud";
+            }
+            catch (InvalidDataException) { continue; }
+            catch (Newtonsoft.Json.JsonException) { continue; }
+            if (!retired) continue;
+            var backup = Path.Combine(root, ".retired"); EnsureRoot(backup);
+            File.Move(path, Path.Combine(backup, Guid.NewGuid().ToString("N") + "-" + Path.GetFileName(path)));
+        }
+    }
     internal static void EnsureRoot(string root)
     {
         Directory.CreateDirectory(root);

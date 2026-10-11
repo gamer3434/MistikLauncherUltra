@@ -280,7 +280,7 @@ namespace MistikLauncher
 
         public void Navigate(string key)
         {
-            if (key is "Admin" or "Updates") key = "Settings";
+            if (key is "Admin" or "Updates" or "Shader") key = "Settings";
             _currentNav = key;
             SelectNav(key);
 
@@ -294,7 +294,6 @@ namespace MistikLauncher
                     "Dash"      => new Pages.ModernHomePage(this),
                     "Vers"      => new Pages.VersionManagerPage(this),
                     "Mods"      => new Pages.ModManagerPage(this),
-                    "Shader"    => new Pages.ShaderManagerPage(this),
                     "Skin"      => new Pages.SkinPage(this),
                     "Elyby"     => new Pages.ElybyPage(this),
                     "Friends"   => new Pages.FriendsPage(this),
@@ -1013,7 +1012,7 @@ namespace MistikLauncher
                     var lastSynced = previousSynced;
 
                     // If nothing has changed, do not do anything
-                    if (lastSynced == currentVer) return true;
+                    if (lastSynced == currentVer) { ModFiles.RetireMistikHud(App.ModsDir); return true; }
 
                     string currentLoader = GameProfiles.Loader(App.GameDir,currentVer);
                     string mcVersion = GameProfiles.MinecraftVersion(App.GameDir,currentVer);
@@ -1040,6 +1039,7 @@ namespace MistikLauncher
                     });
 
                     // Uyumsuz modları otomatik askıya al
+                    ModFiles.RetireMistikHud(App.ModsDir);
                     SuspendIncompatibleMods(mcVersion, currentLoader);
 
                     App.Log($"Mods synchronized successfully for version: {currentVer} ({currentLoader})");

@@ -678,6 +678,8 @@ namespace MistikLauncher.Pages
                 ("Mistik Launcher Ultra", "2026 Mistik Team. Tum haklari saklidir.", "#00A3FF"),
                 ("MQTTnet",              "MIT License - dotnet/MQTTnet", "#2EB82E"),
                 ("Newtonsoft.Json",       "MIT License - James Newton-King", "#FFB100"),
+                ("Markdig",               "BSD-2-Clause - Alexandre Mutel", "#888888"),
+                ("SkiaSharp",             "MIT License - Microsoft / Skia contributors", "#888888"),
                 (".NET 8 / WPF",          "MIT License - Microsoft Corporation", "#A349A4"),
                 ("Modrinth API",          "Fair-use - modrinth.com", "#888888"),
             };

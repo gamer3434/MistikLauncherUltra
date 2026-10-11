@@ -2,19 +2,17 @@
 
 Windows x64 için Türkçe / English Minecraft launcher. Oyuncu ayarları cihazında saklanır; sürüm, mod, skin ve yerel sunucu yönetimi içerir.
 
-[Yayımlanan sürümleri indir](https://github.com/gamer3434/MistikLauncherUltra/releases/latest) · [Web sitesi](https://mistiklauncherultra.web.app/) · [6.2.12 değişiklikleri](docs/RELEASE-6.2.12.md)
+[Yayımlanan sürümleri indir](https://github.com/gamer3434/MistikLauncherUltra/releases/latest) · [Web sitesi](https://mistiklauncherultra.web.app/) · [6.2.13 değişiklikleri](docs/RELEASE-6.2.13.md)
 
 ## Kurulum ve onarım
 
 Sürüm sayfasından online veya offline kurulum EXE'sini seçin. Taşınabilir kullanım için ZIP'in tüm dosyalarını aynı klasöre çıkartıp `MistikLauncher.exe` dosyasını açın. .NET çalışma zamanı pakete dahildir.
 
-Kurucuda **Mevcut kurulumu onar** seçeneği de vardır. Program bozulursa launcher'ı kapatın, aynı veya daha yeni sürümün `MistikRepair-6.2.12.exe` dosyasını açıp kurulum klasöründe **Onar** seçin. Onarıcı internet gerektirmez; program dosyalarını doğrular ve yeniler. Ayarlar, modlar ve dünyalar korunur.
+Kurucuda **Mevcut kurulumu onar** seçeneği de vardır. Program bozulursa launcher'ı kapatın, aynı veya daha yeni sürümün `MistikRepair-6.2.13.exe` dosyasını açıp kurulum klasöründe **Onar** seçin. Onarıcı internet gerektirmez; program dosyalarını doğrular ve yeniler. Ayarlar, modlar ve dünyalar korunur.
 
-Mod merkezinde Modrinth üzerinden arama, kurulum ve zorunlu bağımlılık indirme yapılır. Yerel JAR dosyaları da içe aktarılabilir.
+Mod merkezinde resimli Modrinth kartları, sıralama ve sayfalama bulunur. Karta tıklayınca açıklama, uyumlu sürümler ve galeri açılır. Kurulum zorunlu bağımlılıkları da indirir. Yerel JAR dosyaları da içe aktarılabilir.
 
-Ana sayfadaki **Shader** düğmesi shader merkezini açar. Fabric profilinde **Iris ve Sodium kur** ile desteği hazırlayın; uyumlu shader ZIP'ini kurduktan sonra oyundaki Video Ayarları → Shader Packs bölümünden seçin. Kurulu paketler dosyaları silmeden kapatılabilir. Shader klasörü sürümler arasında ortaktır.
 
-Mod merkezindeki **Oyun içi görünüm** bölümünde Fabric 1.21.1 için HUD ve Modern UI kurulabilir. Mistik HUD; ayrı FPS, CPS, ping, koordinat, WASD ve zırh kutuları içerir. Oyunda sağ Shift ile düzenleyiciyi açın; göstergeleri sürükleyin, ölçekleyin ve ayrı ayrı açıp kapatın. Önceki HUD modları silinmeden kapatılır; kişisel profilleri korunur. **Mistik menüsünü uygula**, Minecraft 1.21/1.21.1 ana menüsüne MISTIK logosu, koyu/cyan düğmeler ve mavi arka plan ekler. Menü düzeni korunur; mevcut kaynak paketleri ve oyun seçenekleri saklanır. Ayarlar bölümündeki **Oyun içi HUD açık** seçeneği HUD bileşenlerini birlikte açıp kapatır. HUD bir dünyaya girince görünür; ana menüde ve F3 ekranı açıkken görünmez. Değişikliklerden sonra oyunu yeniden açın.
 
 Varsayılan kurulum: `%LOCALAPPDATA%\Programs\MistikLauncherUltra`. Oyuncu verileri: `%APPDATA%\.mistik_ultra`. Şifreli ayarlar aynı Windows kullanıcı hesabında açılır. Paket şu anda genel yayıncı sertifikasıyla imzalı değildir.
 
@@ -31,7 +29,6 @@ Minecraft ve mod lisanslarına uyun. Microsoft hesabı kimlik doğrulaması bu l
 
 ## Kaynaktan derleme
 
-Windows, .NET 8 SDK ve Java 21 gerekir. İlk derleme doğrulanmış Gradle dağıtımını indirir ve gömülü Fabric HUD modunu derler:
 
 ```powershell
 dotnet build MistikLauncher/MistikLauncher.csproj -c Release

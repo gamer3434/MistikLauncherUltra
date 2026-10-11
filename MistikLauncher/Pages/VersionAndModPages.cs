@@ -713,8 +713,12 @@ namespace MistikLauncher.Pages
         string? _searchProfile;
         System.Threading.CancellationTokenSource? _searchCancellation;
         readonly HttpClient _client;
+        int _searchOffset;
+        string _sort = "relevance", _lastQuery = "";
+        Button _previousPage = null!, _nextPage = null!;
+        TextBlock _pageNumber = null!;
 
-        public void RefreshLanguage() { installedHelp.Text=Localization.T("modToggleHelp"); System.Windows.Automation.AutomationProperties.SetName(_searchBox,Localization.T("modSearch")); RenderInstalledMods(); Localization.TranslateTree(this); }
+        public void RefreshLanguage() { installedHelp.Text=Localization.T("modToggleHelp"); System.Windows.Automation.AutomationProperties.SetName(_searchBox,Localization.T("modSearch")); RenderInstalledMods(); Localization.TranslateTree(this); if (Content is ModProjectView detail) detail.RefreshLanguage(); }
         static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30),MaxResponseContentBufferSize=128*1024*1024 };
         static ModManagerPage() => Http.DefaultRequestHeaders.UserAgent.ParseAdd("MistikLauncher/6.2 (gamer3434/MistikLauncherUltra)");
 
@@ -727,23 +731,12 @@ namespace MistikLauncher.Pages
             var sp = new StackPanel { Margin = new Thickness(40, 30, 40, 30) };
             sp.Children.Add(PageHelpers.Lbl("modCenterTitle", 28, "#FFFFFF", true));
             sp.Children.Add(PageHelpers.Lbl("modCenterIntro", 14, "#A0A0A0"));
-            var shaderButton = PageHelpers.MkBtn("shaders", "#226DA0", 200);
-            shaderButton.Margin = new Thickness(0, 12, 0, 0);
-            shaderButton.Click += (_, _) => _main.Navigate("Shader");
-            sp.Children.Add(shaderButton);
 
             var clientCard = PageHelpers.Card("#192C46", 14, "#365574");
             clientCard.Margin = new Thickness(0, 14, 0, 10);
             var clientPanel = new StackPanel { Margin = new Thickness(16) };
             clientPanel.Children.Add(PageHelpers.Lbl("clientPresetTitle", 18, "#FFFFFF", true));
             clientPanel.Children.Add(PageHelpers.Lbl("clientPresetHelp", 13, "#ADBED6", wrap: TextWrapping.Wrap));
-            var hudButton = PageHelpers.MkBtn("clientInstallHud", "#226DA0");
-            hudButton.Margin = new Thickness(0, 12, 0, 8);
-            hudButton.Click += async (_, _) => await InstallModpack(
-                new[] { "fabric-api", "modmenu" },
-                new[] { "Fabric API", "Mod Menu" },
-                hudButton, Localization.T("clientPresetTitle"), "fabric", () => BundledHud.Install(App.GameDir));
-            clientPanel.Children.Add(hudButton);
             var interfaceButton = PageHelpers.MkBtn("clientInstallInterface", "#203853");
             interfaceButton.Click += async (_, _) => await InstallModpack(
                 new[] { "fabric-api", "modern-ui" }, new[] { "Fabric API", "Modern UI" }, interfaceButton,
@@ -929,11 +922,26 @@ namespace MistikLauncher.Pages
             searchRow.Children.Add(_searchBox); searchRow.Children.Add(searchBtn); searchRow.Children.Add(folderBtn); searchRow.Children.Add(importBtn);
             sp.Children.Add(searchRow);
 
+            var catalogControls = new DockPanel { Margin = new Thickness(0, 0, 0, 12) };
+            var sorting = new ComboBox { Name = "ModSort", Width = 200, MinHeight = 36 };
+            foreach (var item in new[] { ("modSortRelevance", "relevance"), ("modSortDownloads", "downloads"), ("modSortUpdated", "updated"), ("modSortNewest", "newest") })
+                sorting.Items.Add(new ComboBoxItem { Content = Localization.T(item.Item1), Tag = item.Item2 });
+            sorting.SelectedIndex = 0;
+            sorting.SelectionChanged += async (_, _) => { _sort = ((ComboBoxItem)sorting.SelectedItem).Tag.ToString()!; _searchOffset = 0; await SearchMods(); };
+            catalogControls.Children.Add(sorting);
+            var pagination = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            _previousPage = PageHelpers.MkBtn("‹", "#28445E", 44); _previousPage.IsEnabled = false;
+            _nextPage = PageHelpers.MkBtn("›", "#28445E", 44); _nextPage.IsEnabled = false;
+            _pageNumber = PageHelpers.Lbl("1", 16, "#FFFFFF", true, pad: new Thickness(12, 6, 12, 0));
+            _previousPage.Click += async (_, _) => { _searchOffset = Math.Max(0, _searchOffset - 20); await SearchMods(); };
+            _nextPage.Click += async (_, _) => { _searchOffset += 20; await SearchMods(); };
+            pagination.Children.Add(_previousPage); pagination.Children.Add(_pageNumber); pagination.Children.Add(_nextPage);
+            catalogControls.Children.Add(pagination); sp.Children.Add(catalogControls);
+
             _resultsPanel = new StackPanel();
             sp.Children.Add(_resultsPanel);
-            sp.Children.Add(clientCard);
-            sp.Children.Add(packsCard);
-            sp.Children.Add(optiCard);
+            var extraTools = new StackPanel();
+            extraTools.Children.Add(clientCard); extraTools.Children.Add(packsCard); extraTools.Children.Add(optiCard);
 
             // ── Toplu Mod Sürüm Taşıyıcı (Migrator) Kartı ──
             var migCard = PageHelpers.Card("#192C46", 14, "#365574");
@@ -1034,7 +1042,8 @@ namespace MistikLauncher.Pages
 
             migSp.Children.Add(migControls);
             migCard.Child = migSp;
-            sp.Children.Add(migCard);
+            extraTools.Children.Add(migCard);
+            sp.Children.Add(new Expander { Header = Localization.T("modTools"), Content = extraTools, Foreground = Brushes.White, Margin = new Thickness(0, 16, 0, 12) });
 
             // ── Kurulu Modlar Bölümü ─────────────────────────────────────────
             sp.Children.Add(new Separator { Background = PageHelpers.HexBrush("#282828"), Margin = new Thickness(0, 24, 0, 10) });
@@ -1105,9 +1114,12 @@ namespace MistikLauncher.Pages
             int generation = ++_searchGeneration;
             _searchCancellation?.Cancel();
             var q = _searchBox.Text.Trim();
+            if (q != _lastQuery) { _searchOffset = 0; _lastQuery = q; }
+            _previousPage.IsEnabled = false; _nextPage.IsEnabled = false;
 
 
             string profile = _main.Config.Version ?? "";
+            if (_searchProfile != profile) _searchOffset = 0;
             _searchProfile = profile;
 
             if (string.IsNullOrEmpty(q)) { _resultsPanel.Children.Clear(); return; }
@@ -1121,11 +1133,14 @@ namespace MistikLauncher.Pages
                 string loader = GameProfiles.Loader(App.GameDir, profile);
                 var facets = new JArray(new JArray("project_type:mod"), new JArray("versions:" + game));
                 if (loader is "fabric" or "forge" or "neoforge" or "quilt") facets.Add(new JArray("categories:" + loader));
-                var resp = await _client.GetStringAsync($"https://api.modrinth.com/v2/search?query={Uri.EscapeDataString(q)}&limit=20&facets={Uri.EscapeDataString(facets.ToString(Newtonsoft.Json.Formatting.None))}", cancellation.Token);
-                var hits = JObject.Parse(resp)["hits"] as JArray;
+                var resp = await _client.GetStringAsync($"https://api.modrinth.com/v2/search?query={Uri.EscapeDataString(q)}&limit=20&offset={_searchOffset}&index={_sort}&facets={Uri.EscapeDataString(facets.ToString(Newtonsoft.Json.Formatting.None))}", cancellation.Token);
+                var response = JObject.Parse(resp); var hits = response["hits"] as JArray;
                 if (generation != _searchGeneration) return;
                 if ((_main.Config.Version ?? "") != profile) { await SearchMods(); return; }
                 _resultsPanel.Children.Clear();
+                _previousPage.IsEnabled = _searchOffset > 0;
+                _nextPage.IsEnabled = _searchOffset + 20 < (response["total_hits"]?.Value<int>() ?? hits?.Count ?? 0);
+                _pageNumber.Text = (_searchOffset / 20 + 1).ToString();
                 if (hits == null || hits.Count == 0) { _resultsPanel.Children.Add(PageHelpers.Lbl("Mod bulunamadı.", 13, "#A0A0A0")); return; }
                 foreach (var hit in hits)
                 {
@@ -1135,19 +1150,25 @@ namespace MistikLauncher.Pages
                     var dl    = hit["downloads"]?.Value<long>() ?? 0;
                     var mname = name; var cId = modId;
 
-                    var card = PageHelpers.Card("#181818", 10, margin: new Thickness(0, 5, 0, 5));
+                    var card = PageHelpers.Card("#25282E", 16, "#3A3F46", margin: new Thickness(0, 7, 0, 7));
                     var grid = new Grid { Margin = new Thickness(16, 12, 16, 12) };
                     grid.ColumnDefinitions.Add(new ColumnDefinition());
                     grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
                     var info = new StackPanel();
-                    info.Children.Add(PageHelpers.Lbl(name, 14, "#FFFFFF", true));
-                    info.Children.Add(PageHelpers.Lbl(desc.Length > 120 ? desc[..120] + "..." : desc, 11, "#A0A0A0", wrap: TextWrapping.Wrap));
-                    info.Children.Add(PageHelpers.Lbl($"⬇ {dl:N0} indirme", 10, "#555"));
-                    info.Children.Add(PageHelpers.Lbl("Modrinth", 10, "#ADBED6"));
-                    Grid.SetColumn(info, 0); grid.Children.Add(info);
+                    info.Children.Add(PageHelpers.Lbl(name, 20, "#FFFFFF", true, wrap: TextWrapping.Wrap));
+                    info.Children.Add(PageHelpers.Lbl(desc, 14, "#ADBED6", wrap: TextWrapping.Wrap));
+                    info.Children.Add(PageHelpers.Lbl($"↓ {dl:N0}   ·   {hit["author"]}   ·   Modrinth", 12, "#ADBED6"));
+                    info.Children.Add(PageHelpers.Lbl(string.Join("  ·  ", (hit["categories"] as JArray ?? new()).Take(6).Select(value => value.ToString())), 12, "#ADBED6", wrap: TextWrapping.Wrap));
+                    var summary = new Grid(); summary.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); summary.ColumnDefinitions.Add(new ColumnDefinition());
+                    summary.Children.Add(ModProjectView.Icon(hit["icon_url"]?.ToString(), 84)); Grid.SetColumn(info, 1); summary.Children.Add(info);
+                    var details = new Button { Content = summary, Background = Brushes.Transparent, Foreground = Brushes.White, BorderThickness = new Thickness(0),
+                        HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(0), Cursor = System.Windows.Input.Cursors.Hand };
+                    System.Windows.Automation.AutomationProperties.SetName(details, name + " · " + Localization.T("modDetails"));
+                    details.Click += (_, _) => OpenProject(cId, mname);
+                    Grid.SetColumn(details, 0); grid.Children.Add(details);
 
-                    var installBtn = PageHelpers.MkBtn("KUR", "#00A3FF", 70); installBtn.VerticalAlignment = VerticalAlignment.Center;
+                    var installBtn = PageHelpers.MkBtn(Localization.T("modInstall"), "#159D59", 100); installBtn.VerticalAlignment = VerticalAlignment.Center;
                     installBtn.Click += async (_, _) => {
                         await RunInstallButton(installBtn, async () => {
                             return await InstallMod(cId, mname);
@@ -1172,6 +1193,16 @@ namespace MistikLauncher.Pages
             finally { if (ReferenceEquals(_searchCancellation, cancellation)) _searchCancellation = null; }
         }
 
+        void OpenProject(string id, string name)
+        {
+            var previous = Content;
+            var profile = _main.Config.Version ?? "";
+            Content = new ModProjectView(_main, _client, id, () => Content = previous, async version => {
+                if (_main.Config.Version != profile) throw new IOException(Localization.T("modProfileChanged"));
+                return await InstallMod(id, name, version);
+            });
+        }
+
         internal static async Task RunInstallButton(Button button, Func<Task<bool>> install, Action<Exception> failure, string success = "OK")
         {
             var original = button.Content;
@@ -1184,11 +1215,11 @@ namespace MistikLauncher.Pages
             finally { button.IsEnabled = true; }
         }
 
-        async Task<bool> InstallMod(string projectId, string name)
+        async Task<bool> InstallMod(string projectId, string name, string? versionId = null)
         {
             var installedList = new List<string>();
             var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            await DownloadModAndDependencies(projectId, name, installedList, false, visited);
+            await DownloadModAndDependencies(projectId, name, installedList, false, visited, versionId);
             RenderInstalledMods();
             if (installedList.Count > 1)
             {
@@ -1202,14 +1233,6 @@ namespace MistikLauncher.Pages
             return installedList.Count > 0;
         }
 
-        internal Task<bool> InstallShaderSupportAsync()
-        {
-            if (GameProfiles.Loader(App.GameDir, _main.Config.Version ?? "") != "fabric")
-                throw new IOException(Localization.T("clientFabricRequired"));
-            return InstallMod("iris", "Iris Shaders");
-        }
-
-        internal static void CreateHudProfile(string gameDirectory) => HudSettings.EnsureProfile(gameDirectory);
 
         internal static JToken? FindInstalledCompatibleVersion(JArray versions, string root, string game, string loader)
             => versions.FirstOrDefault(version => CheckCompatibility(version, game, loader) &&

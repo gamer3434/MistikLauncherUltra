@@ -61,10 +61,7 @@ class Program
             var invalidLighting=ConfigManager.Normalize(new LauncherConfig { CloseLighting="bad",CloseRgb="invalid" });
             Check(invalidLighting.CloseLighting=="Theme" && invalidLighting.CloseRgb=="#FFB000","close lighting settings validation");
             checks += ModToggleTests.Run(Path.Combine(testRoot,"mod-toggle"));
-            checks += ShaderTests.Run(Path.Combine(testRoot,"shaders"));
-            checks += HudPresetTests.Run(Path.Combine(testRoot,"hud-preset"));
-            checks += HudSettingsTests.Run(Path.Combine(testRoot,"hud-settings"));
-            checks += BundledHudTests.Run(Path.Combine(testRoot,"bundled-hud"));
+            checks += ModCatalogTests.Run(Path.Combine(testRoot,"mod-catalog"));
             checks += MistikMenuTests.Run(Path.Combine(testRoot,"mistik-menu"));
             checks += ModAndMapRegressionTests.Run(Path.Combine(testRoot,"mod-map-regressions")).GetAwaiter().GetResult();
             checks += TunnelLifecycleTests.Run(testRoot).GetAwaiter().GetResult();
@@ -179,8 +176,6 @@ class Program
             checks+=LaunchLifecycleTests.Run(window);
             checks+=LaunchReadinessTests.RunHome(window);
             checks+=ModPagePerformanceTests.Run(window,Path.Combine(testRoot,"mod-page-performance"));
-            checks+=HudSettingsUiTests.Run(window);
-            checks+=ShaderTests.RunPage(window);
             checks+=ForgeTests.Classpath(window);
             checks+=ModAndMapRegressionTests.SyncFailure(window,Path.Combine(testRoot,"sync-commit"));
             var quiltJar=Path.Combine(testRoot,"quilt-metadata.jar");
@@ -404,6 +399,7 @@ class Program
                 window.Navigate("Opt"); Capture(window,Path.Combine(output,"performance-"+code+".png"),960,640);
                 Check(Texts((DependencyObject)((Frame)window.FindName("MainFrame")).Content).Contains(Localization.T("optTitle")),"optimization page opens in selected language: "+code);
             }
+            checks += ModCatalogUiTests.Run(window, name => Capture(window, Path.Combine(output,name+".png")));
             var horizontal=new System.Windows.Controls.Primitives.ScrollBar { Orientation=Orientation.Horizontal,Style=(Style)application.FindResource(typeof(System.Windows.Controls.Primitives.ScrollBar)) };
             horizontal.ApplyTemplate();
             var track=(System.Windows.Controls.Primitives.Track)horizontal.Template.FindName("PART_Track",horizontal);
