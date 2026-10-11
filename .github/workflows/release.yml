@@ -25,6 +25,9 @@ jobs:
           $version = [string]$project.SelectSingleNode("/Project/PropertyGroup/Version").InnerText
           if ($env:RELEASE_TAG -ne "v$version") { throw 'Tag must match project version' }
           "MISTIK_RELEASE_TAG=v$version" >> $env:GITHUB_ENV
+      - name: Build and test Fabric HUD
+        shell: pwsh
+        run: ./scripts/Build-ClientHud.ps1
       - name: Validate ordinary build and website
         run: |
           node --test Validation/WebsiteReleaseTests.js Validation/WebsitePrivacyTests.js

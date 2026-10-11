@@ -1,5 +1,6 @@
 param()
 $ErrorActionPreference='Stop'
+$ProgressPreference='SilentlyContinue'
 $repo=Split-Path $PSScriptRoot -Parent
 $version='8.10.2'
 $cache=Join-Path $env:LOCALAPPDATA "MistikLauncherBuildTools/gradle-$version"
@@ -15,7 +16,7 @@ if (!(Test-Path -LiteralPath $gradle)) {
     $url="https://services.gradle.org/distributions/gradle-$version-bin.zip"
     $expected=(Invoke-RestMethod -Uri "$url.sha256").Trim()
     if($expected -notmatch '^[a-fA-F0-9]{64}$') { throw 'Invalid Gradle checksum metadata' }
-    Invoke-WebRequest -Uri $url -OutFile $zip
+    Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing -TimeoutSec 180
     if((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash -ne $expected) { throw 'Gradle checksum mismatch' }
     Expand-Archive -LiteralPath $zip -DestinationPath $cache -Force
 }
@@ -36,7 +37,7 @@ if($project -cmatch '[^\x00-\x7F]') {
         Remove-Item -LiteralPath $source -Recurse -Force
     }
     Copy-Item -LiteralPath (Join-Path $repo 'ClientHud/src') -Destination $project -Recurse -Force
-    Copy-Item -LiteralPath (Join-Path $repo 'ClientHud/build.gradle'),(Join-Path $repo 'ClientHud/settings.gradle') -Destination $project -Force
+    Copy-Item -LiteralPath (Join-Path $repo 'ClientHud/build.gradle'),(Join-Path $repo 'ClientHud/settings.gradle'),(Join-Path $repo 'ClientHud/gradle.properties') -Destination $project -Force
 }
 & $gradle -p $project --no-daemon build
 if($LASTEXITCODE) { throw 'HUD mod build failed' }

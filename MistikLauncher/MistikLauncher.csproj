@@ -36,7 +36,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Locales/*.json" />
     <EmbeddedResource Include="../ClientHud/build/libs/mistik-hud-1.0.0.jar" LogicalName="MistikLauncher.mistik-hud.jar" />
-    <ClientHudSource Include="../ClientHud/src/**/*;../ClientHud/build.gradle;../ClientHud/settings.gradle;../scripts/Build-ClientHud.ps1" />
+    <ClientHudSource Include="../ClientHud/src/**/*;../ClientHud/build.gradle;../ClientHud/settings.gradle;../ClientHud/gradle.properties;../scripts/Build-ClientHud.ps1" />
     <Compile Include="../Updater/UpdateEngine.cs" Link="Updates/UpdateEngine.cs" />
   </ItemGroup>
   <Target Name="BuildClientHud" BeforeTargets="PrepareForBuild" Inputs="@(ClientHudSource)" Outputs="../ClientHud/build/libs/mistik-hud-1.0.0.jar">
