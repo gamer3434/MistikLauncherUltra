@@ -701,8 +701,14 @@ namespace MistikLauncher.Pages
     // Mod Manager
     public class ModManagerPage : Page, ILanguagePage
     {
+        internal sealed record MigrationTarget(string ProfileId, string GameVersion, string Loader)
+        {
+            public override string ToString() => $"{GameVersion} · {Loader} — {ProfileId}";
+        }
+
         readonly MainWindow _main;
         TextBox _searchBox = null!;
+        ComboBox _migrationTargetCombo = null!;
 
         StackPanel _resultsPanel = null!;
         StackPanel _installedPanel = null!;
@@ -718,7 +724,7 @@ namespace MistikLauncher.Pages
         Button _previousPage = null!, _nextPage = null!;
         TextBlock _pageNumber = null!;
 
-        public void RefreshLanguage() { installedHelp.Text=Localization.T("modToggleHelp"); System.Windows.Automation.AutomationProperties.SetName(_searchBox,Localization.T("modSearch")); RenderInstalledMods(); Localization.TranslateTree(this); if (Content is ModProjectView detail) detail.RefreshLanguage(); }
+        public void RefreshLanguage() { installedHelp.Text=Localization.T("modToggleHelp"); System.Windows.Automation.AutomationProperties.SetName(_searchBox,Localization.T("modSearch")); System.Windows.Automation.AutomationProperties.SetName(_migrationTargetCombo,Localization.T("modTargetProfile")); RenderInstalledMods(); Localization.TranslateTree(this); if (Content is ModProjectView detail) detail.RefreshLanguage(); }
         static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30),MaxResponseContentBufferSize=128*1024*1024 };
         static ModManagerPage() => Http.DefaultRequestHeaders.UserAgent.ParseAdd("MistikLauncher/6.2 (gamer3434/MistikLauncherUltra)");
 
@@ -953,91 +959,34 @@ namespace MistikLauncher.Pages
 
             var migControls = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
 
-            migControls.Children.Add(PageHelpers.Lbl("modTargetVersion", 13, "#FFFFFF"));
+            migControls.Children.Add(PageHelpers.Lbl("modTargetProfile", 13, "#FFFFFF"));
 
-            var targetVerCombo = new ComboBox {
-                Width = 120, MinHeight = 40, Margin = new Thickness(6, 0, 16, 8),
+            _migrationTargetCombo = new ComboBox {
+                Width = 350, MinHeight = 40, Margin = new Thickness(6, 0, 8, 8),
                 Background = PageHelpers.HexBrush("#203853"), Foreground = Brushes.White, FontWeight = FontWeights.SemiBold
             };
-
-            var uniqueMcVersions = new HashSet<string>();
-            foreach (var item in _main.VerBox.Items)
-            {
-                var itemStr = item?.ToString() ?? "";
-                var gameVersion = GameProfiles.MinecraftVersion(App.GameDir, itemStr);
-                if (GameProfiles.SafeId(gameVersion))
-                {
-                    uniqueMcVersions.Add(gameVersion);
-                }
-            }
-
-            // Sort versions nicely (latest at the top)
-            var sortedMcVersions = uniqueMcVersions.ToList();
-            sortedMcVersions.Sort((a, b) => {
-                var partsA = new List<int>();
-                foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(a, @"\d+"))
-                    if (int.TryParse(m.Value, out var n)) partsA.Add(n);
-                var partsB = new List<int>();
-                foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(b, @"\d+"))
-                    if (int.TryParse(m.Value, out var n)) partsB.Add(n);
-                for (int i = 0; i < Math.Max(partsA.Count, partsB.Count); i++)
-                {
-                    int numA = i < partsA.Count ? partsA[i] : 0;
-                    int numB = i < partsB.Count ? partsB[i] : 0;
-                    if (numA != numB) return numB.CompareTo(numA);
-                }
-                return string.Compare(b, a, StringComparison.OrdinalIgnoreCase);
-            });
-
-            foreach (var v in sortedMcVersions)
-            {
-                targetVerCombo.Items.Add(v);
-            }
-
-            if (targetVerCombo.Items.Count > 0)
-            {
-                targetVerCombo.SelectedIndex = 0;
-
-                var activeVer = _main.Config.Version ?? "";
-                var activeGameVersion = GameProfiles.MinecraftVersion(App.GameDir, activeVer);
-                if (targetVerCombo.Items.Contains(activeGameVersion))
-                {
-                    targetVerCombo.SelectedItem = activeGameVersion;
-                }
-            }
-            else
-            {
-                var migVersions = new[] { "1.21.1", "1.20.1", "1.19.2", "1.18.2", "1.16.5", "1.12.2" };
-                foreach (var v in migVersions) targetVerCombo.Items.Add(v);
-                targetVerCombo.SelectedIndex = 0;
-
-                var activeVer = _main.Config.Version ?? "";
-                var activeGameVersion = GameProfiles.MinecraftVersion(App.GameDir, activeVer);
-                if (targetVerCombo.Items.Contains(activeGameVersion))
-                {
-                    targetVerCombo.SelectedItem = activeGameVersion;
-                }
-            }
-            migControls.Children.Add(targetVerCombo);
-
-            migControls.Children.Add(PageHelpers.Lbl("Mod Yükleyici:", 11, "#FFFFFF"));
-
-            var targetLoaderCombo = new ComboBox {
-                Width = 120, MinHeight = 40, Margin = new Thickness(6, 0, 16, 8),
-                Background = PageHelpers.HexBrush("#203853"), Foreground = Brushes.White, FontWeight = FontWeights.SemiBold
-            };
-            targetLoaderCombo.Items.Add("Fabric");
-            targetLoaderCombo.Items.Add("Forge");
-            targetLoaderCombo.SelectedIndex = 0;
-            migControls.Children.Add(targetLoaderCombo);
-
+            var refreshTargetsBtn = PageHelpers.MkBtn("modMigrationRefresh", "#28445E", 110);
+            refreshTargetsBtn.Margin = new Thickness(0, 0, 8, 8);
             var migBtn = PageHelpers.MkBtn("modMigrate", "#226DA0", 240);
             migBtn.Click += async (_, _) => {
-                var targetVer = targetVerCombo.SelectedItem?.ToString();
-                var targetLoader = targetLoaderCombo.SelectedItem?.ToString();
-                if (string.IsNullOrEmpty(targetVer) || string.IsNullOrEmpty(targetLoader)) return;
-                await MigrateAndDownloadMods(targetVer, targetLoader, migBtn);
+                if (_migrationTargetCombo.SelectedItem is MigrationTarget target)
+                    await MigrateAndDownloadMods(target.ProfileId, migBtn);
             };
+            void RefreshMigrationTargets()
+            {
+                var preferred = (_migrationTargetCombo.SelectedItem as MigrationTarget)?.ProfileId ?? _main.Config.Version;
+                _migrationTargetCombo.Items.Clear();
+                foreach (var target in GetMigrationTargets(App.GameDir, GameProfiles.InstalledIds(App.GameDir)))
+                    _migrationTargetCombo.Items.Add(target);
+                _migrationTargetCombo.SelectedItem = _migrationTargetCombo.Items.OfType<MigrationTarget>()
+                    .FirstOrDefault(target => target.ProfileId.Equals(preferred, StringComparison.OrdinalIgnoreCase))
+                    ?? _migrationTargetCombo.Items.OfType<MigrationTarget>().FirstOrDefault();
+                migBtn.IsEnabled = _migrationTargetCombo.Items.Count > 0;
+            }
+            refreshTargetsBtn.Click += (_, _) => RefreshMigrationTargets();
+            RefreshMigrationTargets();
+            migControls.Children.Add(_migrationTargetCombo);
+            migControls.Children.Add(refreshTargetsBtn);
             migControls.Children.Add(migBtn);
 
             migSp.Children.Add(migControls);
@@ -1057,6 +1006,51 @@ namespace MistikLauncher.Pages
             instHeader.Children.Add(instTitle);
 
             var cleanBtn = PageHelpers.MkBtn("modClearFolder", "#CC2222", 140);
+            var backupBtn = PageHelpers.MkBtn("modBackupCreate", "#226DA0", 130);
+            backupBtn.Margin = new Thickness(0, 0, 8, 0);
+            var restoreBtn = PageHelpers.MkBtn("modBackupRestore", "#28445E", 150);
+            restoreBtn.Margin = new Thickness(0, 0, 8, 0);
+            backupBtn.Click += async (_, _) => {
+                string profile = _main.Config.Version ?? "";
+                var dialog = new Microsoft.Win32.SaveFileDialog {
+                    Title = Localization.T("modBackupCreate"),
+                    Filter = Localization.T("modBackupFilter") + "|*.zip",
+                    FileName = $"{Localization.T("modBackupFileName")}-{DateTime.Now:yyyyMMdd-HHmm}.zip",
+                    DefaultExt = ".zip",
+                    AddExtension = true,
+                    OverwritePrompt = true
+                };
+                if (dialog.ShowDialog() != true) return;
+                string archivePath = dialog.FileName;
+                backupBtn.IsEnabled = restoreBtn.IsEnabled = cleanBtn.IsEnabled = false;
+                backupBtn.Content = Localization.T("modBackupWorking");
+                try {
+                    await Task.Run(() => _main.WithSyncedMods(profile, modsDirectory => { ModBackup.Create(modsDirectory, archivePath); return true; }));
+                    MessageBox.Show(Localization.T("modBackupCreated") + "\n" + archivePath, "Mistik Launcher", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex) { MessageBox.Show(Localization.T("modBackupFailed") + "\n" + ex.Message, "Mistik Launcher", MessageBoxButton.OK, MessageBoxImage.Error); }
+                finally { backupBtn.Content = Localization.T("modBackupCreate"); backupBtn.IsEnabled = restoreBtn.IsEnabled = cleanBtn.IsEnabled = true; }
+            };
+            restoreBtn.Click += async (_, _) => {
+                string profile = _main.Config.Version ?? "";
+                var dialog = new Microsoft.Win32.OpenFileDialog {
+                    Title = Localization.T("modBackupRestore"),
+                    Filter = Localization.T("modBackupFilter") + "|*.zip",
+                    CheckFileExists = true
+                };
+                if (dialog.ShowDialog() != true) return;
+                string archivePath = dialog.FileName;
+                if (MessageBox.Show(Localization.T("modBackupRestoreConfirm") + "\n\n" + profile, "Mistik Launcher", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+                backupBtn.IsEnabled = restoreBtn.IsEnabled = cleanBtn.IsEnabled = false;
+                restoreBtn.Content = Localization.T("modBackupWorking");
+                try {
+                    var result = await Task.Run(() => _main.WithSyncedMods(profile, modsDirectory => ModBackup.Restore(modsDirectory, archivePath)));
+                    if (_main.Config.Version == profile) RenderInstalledMods();
+                    MessageBox.Show(string.Format(Localization.T("modBackupRestored"), result.Restored, result.Skipped), "Mistik Launcher", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex) { MessageBox.Show(Localization.T("modBackupFailed") + "\n" + ex.Message, "Mistik Launcher", MessageBoxButton.OK, MessageBoxImage.Error); }
+                finally { restoreBtn.Content = Localization.T("modBackupRestore"); backupBtn.IsEnabled = restoreBtn.IsEnabled = cleanBtn.IsEnabled = true; }
+            };
             cleanBtn.Click += (_, _) => {
                 var confirm = MessageBox.Show(
                     "Aktif mod klasöründeki tüm modları silmek istediğinizden emin misiniz?\n\nBu işlem eski/uyumsuz kalıntı modları temizlemek için önerilir.",
@@ -1081,10 +1075,15 @@ namespace MistikLauncher.Pages
                     }
                 }
             };
-            Grid.SetColumn(cleanBtn, 1);
-            instHeader.Children.Add(cleanBtn);
+            var modActions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+            modActions.Children.Add(backupBtn);
+            modActions.Children.Add(restoreBtn);
+            modActions.Children.Add(cleanBtn);
+            Grid.SetColumn(modActions, 1);
+            instHeader.Children.Add(modActions);
             sp.Children.Add(instHeader);
 
+            sp.Children.Add(PageHelpers.Lbl("modBackupHelp", 12, "#9FB4CA", wrap: TextWrapping.Wrap));
             installedHelp=PageHelpers.Lbl(Localization.T("modToggleHelp"), 13, "#ADBED6", wrap: TextWrapping.Wrap); sp.Children.Add(installedHelp);
             _installedPanel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
             sp.Children.Add(_installedPanel);
@@ -1581,14 +1580,29 @@ namespace MistikLauncher.Pages
             => GameProfiles.VersionPoolKey(GameProfiles.MinecraftVersion(root, sourceProfile), GameProfiles.Loader(root, sourceProfile))
                 .Equals(GameProfiles.VersionPoolKey(targetVer, loader), StringComparison.OrdinalIgnoreCase);
 
-        private async Task MigrateAndDownloadMods(string targetVer, string loader, Button btn)
+        internal static IReadOnlyList<MigrationTarget> GetMigrationTargets(string root, IEnumerable<string> profiles)
+        {
+            var supportedLoaders = new HashSet<string>(new[] { "fabric", "forge", "neoforge", "quilt" }, StringComparer.OrdinalIgnoreCase);
+            return profiles.Distinct(StringComparer.OrdinalIgnoreCase)
+                .Where(profile => GameProfiles.SafeId(profile) && GameProfiles.IsInstalled(root, profile))
+                .Select(profile => new MigrationTarget(profile, GameProfiles.MinecraftVersion(root, profile), GameProfiles.Loader(root, profile)))
+                .Where(target => GameProfiles.SafeId(target.GameVersion) && supportedLoaders.Contains(target.Loader))
+                .ToArray();
+        }
+
+        private async Task MigrateAndDownloadMods(string targetProfile, Button btn)
         {
             try
             {
                 var sourceVersion = _main.Config.Version ?? "";
+                var targetVer = GameProfiles.MinecraftVersion(App.GameDir, targetProfile);
+                var loader = GameProfiles.Loader(App.GameDir, targetProfile);
+                if (!GameProfiles.SafeId(targetProfile) || !GameProfiles.IsInstalled(App.GameDir, targetProfile) ||
+                    !new[] { "fabric", "forge", "neoforge", "quilt" }.Contains(loader, StringComparer.OrdinalIgnoreCase))
+                    throw new IOException(Localization.T("modMigrationTargetInvalid"));
                 if (IsSameMigrationPool(App.GameDir, sourceVersion, targetVer, loader))
                 {
-                    MessageBox.Show("Seçilen sürüm ve mod yükleyici zaten aktif. Modlarınız mevcut klasörde korunmuştur.", "Mod Sürüm Taşıma", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show("Seçilen profil zaten aktif. Modlarınız mevcut klasörde korunmuştur.", "Mod Sürüm Taşıma", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
                 if (!Directory.Exists(App.ModsDir))
@@ -1605,7 +1619,7 @@ namespace MistikLauncher.Pages
                 }
 
                 var confirm = MessageBox.Show(
-                    $"Mevcut aktif mod klasörünüzdeki {jars.Length} mod taranacak, '{targetVer} - {loader}' uyumlu sürümleri Modrinth'ten aranıp sıfırdan indirilecektir.\n\n" +
+                    $"Mevcut aktif mod klasörünüzdeki {jars.Length} mod taranacak, '{targetProfile}' profiline uygun sürümleri Modrinth'ten aranıp indirilecektir.\n\n" +
                     $"Mevcut aktif modlarınız otomatik olarak '{_main.Config.Version}' sürüm havuzuna güvenle yedeklenecektir (askıya alınacaktır).\n\n" +
                     "Devam etmek istiyor musunuz?",
                     "Mod Sürüm Taşıma", MessageBoxButton.YesNo, MessageBoxImage.Question);
@@ -1644,23 +1658,12 @@ namespace MistikLauncher.Pages
                 if(!_main.SyncModsForCurrentVersion()) throw new IOException(Localization.T("modSyncFailed"));
 
                 // 3. Launcher ana sürümünü hedef sürüme geçir (VerBox listesinde arayarak)
-                string matchedVerName = "";
+                string matchedVerName = targetProfile;
                 _main.Dispatcher.Invoke(() => {
-                    foreach (var item in _main.VerBox.Items)
-                    {
-                        var itemStr = item.ToString() ?? "";
-                        if (GameProfiles.MinecraftVersion(App.GameDir, itemStr) == targetVer &&
-                            GameProfiles.Loader(App.GameDir, itemStr).Equals(loader, StringComparison.OrdinalIgnoreCase))
-                        {
-                            matchedVerName = itemStr;
-                            break;
-                        }
-                    }
-                    if (string.IsNullOrEmpty(matchedVerName)) throw new IOException(Localization.T("modSyncFailed"));
-
+                    if (!_main.VerBox.Items.Contains(matchedVerName)) _main.VerBox.Items.Add(matchedVerName);
                     _main.VerBox.SelectedItem = matchedVerName;
                     var profile=GameProfiles.Read(App.GameDir,matchedVerName);
-                    if(profile==null || GameProfiles.Kind(profile)!=loader) throw new IOException(Localization.T("modSyncFailed"));
+                    if(profile==null || !GameProfiles.Loader(App.GameDir, matchedVerName).Equals(loader, StringComparison.OrdinalIgnoreCase)) throw new IOException(Localization.T("modMigrationTargetInvalid"));
                     _main.SetVersion(matchedVerName);
                     if(!_main.SyncModsForCurrentVersion()) throw new IOException(Localization.T("modSyncFailed"));
                     _main.StatusLbl.Text = $"Surum: {matchedVerName}";
