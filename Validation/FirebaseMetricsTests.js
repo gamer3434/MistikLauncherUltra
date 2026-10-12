@@ -36,6 +36,10 @@ test('dashboard never injects metric strings into HTML and failures clear previo
   assert.match(source,/browserSessionPersistence/);
   assert.match(source,/signInWithRedirect/);
 });
+test('admin panel headings stack at mobile widths to prevent caption overflow', () => {
+  const css=read('site/admin/admin.css');
+  assert.match(css,/@media\(max-width:620px\)\{[\s\S]*?\.panel-heading\{align-items:flex-start;flex-direction:column;gap:5px\}[\s\S]*?\.panel-caption\{text-align:left\}/);
+});
 test('deployment defaults stay deny and admin CSP is scoped', () => {
   const rules=JSON.parse(read('analytics/database.rules.template.json')).rules;
   assert.equal(rules['.read'],false); assert.equal(rules['.write'],false);
