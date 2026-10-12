@@ -38,6 +38,8 @@ static class ModCatalogUiTests
             detail.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent)); Flush(window); capture("mod-catalog-description");
             var tabs = detail.Children.OfType<TabControl>().Single();
             if (tabs.Items.Count != 3) throw new Exception("Description, versions and gallery must all load. " + string.Join(" | ", Nodes(detail).OfType<TextBlock>().Select(text => text.Text)));
+            if (tabs.Items.Cast<TabItem>().Any(tab => tab.Width != 120)) throw new Exception("Project detail tabs should have consistent widths.");
+            if (tabs.ItemsPanel.LoadContent() is not StackPanel { Orientation: Orientation.Horizontal, Margin.Left: -2 } ) throw new Exception("Project detail tabs should share a flush, fixed horizontal strip.");
             Console.WriteLine("PASS catalog card opens all three project detail tabs inside the launcher");
             tabs.SelectedIndex = 1; capture("mod-catalog-versions");
             var versions = (DependencyObject)((TabItem)tabs.Items[1]).Content;

@@ -29,6 +29,9 @@ test('dashboard never injects metric strings into HTML and failures clear previo
   const source=read('site/admin/admin.js');
   assert.doesNotMatch(source,/innerHTML|insertAdjacentHTML/);
   assert.match(source,/td\.textContent = String\(value\)/);
+  assert.match(source,/api\.github\.com\/repos\/gamer3434\/MistikLauncherUltra\/releases\/latest/);
+  assert.match(source,/api\.modrinth\.com\/v2\/search/);
+  assert.match(source,/target = '_blank'; link\.rel = 'noopener noreferrer'/);
   assert.match(source,/data = undefined; clear\(\); status\('Veriler okunamadı/);
   assert.match(source,/browserSessionPersistence/);
   assert.match(source,/signInWithRedirect/);
@@ -46,5 +49,7 @@ test('deployment defaults stay deny and admin CSP is scoped', () => {
   assert.doesNotMatch(general.headers.find(item=>item.key==='Content-Security-Policy').value,/gstatic/);
   const admin=config.hosting.headers.find(item=>item.source==='/admin/**');
   assert.match(admin.headers.find(item=>item.key==='Content-Security-Policy').value,/gstatic/);
+  assert.match(admin.headers.find(item=>item.key==='Content-Security-Policy').value,/https:\/\/api\.modrinth\.com/);
+  assert.match(admin.headers.find(item=>item.key==='Content-Security-Policy').value,/https:\/\/api\.github\.com/);
   assert.match(read('.gitignore'),/\/site\/admin\/admin-config\.json/);
 });

@@ -27,11 +27,16 @@ public sealed class ModProjectView : Grid
     {
         this.main = main; this.client = client; this.id = id; this.install = install;
         tabs.BorderBrush = PageHelpers.HexBrush("#3A3F46"); tabs.Padding = new Thickness(12);
+        tabs.ItemsPanel = (ItemsPanelTemplate)System.Windows.Markup.XamlReader.Parse("""
+            <ItemsPanelTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+              <StackPanel Orientation="Horizontal" Margin="-2,0,0,0"/>
+            </ItemsPanelTemplate>
+            """);
         tabs.ItemContainerStyle = (Style)System.Windows.Markup.XamlReader.Parse("""
             <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="TabItem">
               <Setter Property="Foreground" Value="#C6CBD2"/><Setter Property="Background" Value="#30343A"/>
               <Setter Property="FontSize" Value="15"/><Setter Property="FontWeight" Value="SemiBold"/>
-              <Setter Property="Margin" Value="0,0,8,10"/><Setter Property="MinHeight" Value="44"/>
+              <Setter Property="Width" Value="120"/><Setter Property="Margin" Value="0,0,8,10"/><Setter Property="MinHeight" Value="44"/>
               <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabItem">
                 <Border Background="{TemplateBinding Background}" CornerRadius="18" Padding="20,10">
                   <ContentPresenter ContentSource="Header" HorizontalAlignment="Center"/>

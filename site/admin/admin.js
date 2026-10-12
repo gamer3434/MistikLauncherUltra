@@ -7,6 +7,47 @@ function table(id, rows, columns) {
   if (!rows.length) rows = [Array.from({length:columns}, (_,i) => i ? '—' : 'Henüz veri yok')];
   for (const row of rows) { const tr = document.createElement('tr'); for (const value of row) { const td = document.createElement('td'); td.textContent = String(value); tr.append(td); } body.append(tr); }
 }
+function externalLink(url, label) {
+  const link = document.createElement('a'); link.href = url; link.textContent = label;
+  link.target = '_blank'; link.rel = 'noopener noreferrer'; return link;
+}
+async function loadLauncherDetails() {
+  const panel = $('releaseDetails');
+  try {
+    const response = await fetch('https://api.github.com/repos/gamer3434/MistikLauncherUltra/releases/latest', {headers:{Accept:'application/vnd.github+json'}, cache:'no-store'});
+    if (!response.ok) throw new Error('release');
+    const release = await response.json();
+    const published = Date.parse(release.published_at);
+    const downloads = Array.isArray(release.assets) ? release.assets.reduce((sum, asset) => sum + (Number.isSafeInteger(asset.download_count) ? asset.download_count : 0), 0) : 0;
+    const version = typeof release.tag_name === 'string' && /^v?\d+\.\d+\.\d+$/.test(release.tag_name) ? release.tag_name.replace(/^v/, '') : 'Bilinmiyor';
+    panel.replaceChildren();
+    const versionLine = document.createElement('strong'); versionLine.className = 'release-version'; versionLine.textContent = 'v' + version; panel.append(versionLine);
+    const facts = document.createElement('div'); facts.className = 'release-facts';
+    for (const value of [Number.isFinite(published) ? new Date(published).toLocaleDateString('tr-TR') : 'Tarih yok', new Intl.NumberFormat('tr-TR').format(downloads) + ' indirme']) {
+      const item = document.createElement('span'); item.textContent = value; facts.append(item);
+    }
+    panel.append(facts);
+    if (typeof release.html_url === 'string' && new URL(release.html_url).origin === 'https://github.com') panel.append(externalLink(release.html_url, 'Sürüm notlarını aç ↗'));
+  } catch { panel.replaceChildren(Object.assign(document.createElement('p'), {className:'empty-state', textContent:'Sürüm bilgisi şu anda alınamadı.'})); }
+}
+async function loadCatalogMods() {
+  const panel = $('catalogMods');
+  try {
+    const params = new URLSearchParams({limit:'6', index:'downloads', facets:JSON.stringify([['project_type:mod']])});
+    const response = await fetch('https://api.modrinth.com/v2/search?' + params, {headers:{Accept:'application/json'}, cache:'no-store'});
+    if (!response.ok) throw new Error('catalog');
+    const result = await response.json(); panel.replaceChildren();
+    for (const mod of (Array.isArray(result.hits) ? result.hits : []).slice(0, 6)) {
+      if (typeof mod.slug !== 'string' || !/^[\w-]{1,100}$/.test(mod.slug)) continue;
+      const item = document.createElement('article'); item.className = 'mod-item';
+      const title = externalLink('https://modrinth.com/mod/' + encodeURIComponent(mod.slug), typeof mod.title === 'string' ? mod.title : 'Mod'); title.className = 'mod-title';
+      const description = document.createElement('p'); description.textContent = typeof mod.description === 'string' ? mod.description : '';
+      const meta = document.createElement('span'); meta.className = 'mod-downloads'; meta.textContent = '↓ ' + new Intl.NumberFormat('tr-TR').format(Number.isSafeInteger(mod.downloads) ? mod.downloads : 0);
+      item.append(title, description, meta); panel.append(item);
+    }
+    if (!panel.childElementCount) throw new Error('empty catalog');
+  } catch { panel.replaceChildren(Object.assign(document.createElement('p'), {className:'empty-state', textContent:'Mod kataloğu şu anda alınamadı.'})); }
+}
 function render(data, now) {
   const result = summarize(data, now);
   for (const id of ['installations','active','daily','recentErrors']) $(id).textContent = new Intl.NumberFormat('tr-TR').format(result[id]);
@@ -44,6 +85,7 @@ try {
     $('login').hidden = !!user; $('logout').hidden = !user;
     if (!user) { status(redirectError ? 'Google girişi tamamlanamadı. (' + redirectError + ')' : 'Bu panel yalnızca yetkili Google hesabına açıktır.', !!redirectError); return; }
     status('Yetki ve Firebase verileri kontrol ediliyor…');
+    void loadLauncherDetails(); void loadCatalogMods();
     const update = () => { if (connected && data !== undefined) { render(data, Date.now() + offset); status('Bağlı · Canlı veriler; aktiflik her 30 saniyede yenilenir.'); } };
     connectedStop = dbSdk.onValue(dbSdk.ref(database, '.info/connected'), snapshot => {
       connected = snapshot.val() === true;

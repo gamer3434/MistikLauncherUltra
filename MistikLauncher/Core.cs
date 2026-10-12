@@ -214,6 +214,12 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.21","2026-10-12","#00D4AA", new[]{
+                "Mod ayrıntılarındaki Açıklama, Sürümler ve Galeri sekmeleri eşit genişlikte ve hizalı gösterilir.",
+                "Yönetim paneli güncel launcher sürümünü, indirme sayısını ve öne çıkan Modrinth modlarını gösterir.",
+                "Description, Versions, and Gallery tabs in mod details now share consistent sizing and alignment.",
+                "The admin panel shows the latest launcher version, download count, and featured Modrinth mods."
+            }),
             new("v6.2.20","2026-10-12","#00D4AA", new[]{
                 "Başlatıcı güncellemesi artık AutoMCS denetiminden önce çalışır; eşzamanlı güncelleme yarışında yeni sürüm ertelenmez.",
                 "Launcher updates now run before AutoMCS checks, avoiding a race that deferred new launcher releases."
