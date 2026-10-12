@@ -424,6 +424,7 @@
   "modDetails": "Detayları aç",
   "modTools": "Ek mod araçları",
   "modInstall": "↓ Kur",
+  "modIncompatible": "Profil uyumsuz",
   "modProfileChanged": "Profil değişti. Mod detaylarını yeniden aç.",
   "luDowngrade": "Sürüm düşür",
   "luOlderVersions": "Eski sürümleri listele",

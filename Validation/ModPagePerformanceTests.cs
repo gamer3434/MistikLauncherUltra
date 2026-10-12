@@ -83,9 +83,11 @@ static class ModPagePerformanceTests
             var filtered=Search("filtered");
             var facets=JArray.Parse(Uri.UnescapeDataString(transport.SearchUris["filtered"].Query.TrimStart('?').Split('&')
                 .Single(value=>value.StartsWith("facets=",StringComparison.Ordinal))[7..]));
-            Check(facets.Count==3 && facets.All(value=>value is JArray group && group.Count==1) &&
-                facets.Select(value=>value[0]!.ToString()).ToHashSet().SetEquals(new[]{"project_type:mod","versions:98.1","categories:fabric"}),
-                "Modrinth search AND-filters the exact Minecraft version and loader instead of returning unrelated profiles");
+            var modFacet=facets.OfType<JArray>().SingleOrDefault();
+            Check(facets.Count==1 && modFacet?.Count==1 && modFacet[0]!.ToString()=="project_type:mod" &&
+                !Uri.UnescapeDataString(transport.SearchUris["filtered"].Query).Contains("versions:",StringComparison.Ordinal) &&
+                !Uri.UnescapeDataString(transport.SearchUris["filtered"].Query).Contains("categories:",StringComparison.Ordinal),
+                "Modrinth catalog searches mods across all game versions and loaders: " + facets.ToString(Newtonsoft.Json.Formatting.None));
             transport.Pending["filtered"].Complete("filtered result"); Wait(filtered);
             foreach(bool error in new[]{false,true})
             {
@@ -98,9 +100,9 @@ static class ModPagePerformanceTests
                 Wait(stale);
                 Check(Result("current profile result") && !Result("obsolete profile result") &&
                     !Nodes(results).OfType<TextBlock>().Any(text=>text.Text.Contains("obsolete profile failed",StringComparison.Ordinal)) &&
-                    Uri.UnescapeDataString(transport.SearchUris[query].Query).Contains("categories:neoforge",StringComparison.Ordinal) &&
-                    Uri.UnescapeDataString(transport.SearchUris[query].Query).Contains("versions:98.2",StringComparison.Ordinal),
-                    "profile change refreshes current compatibility instead of publishing the old "+(error ? "error" : "results"));
+                    !Uri.UnescapeDataString(transport.SearchUris[query].Query).Contains("categories:",StringComparison.Ordinal) &&
+                    !Uri.UnescapeDataString(transport.SearchUris[query].Query).Contains("versions:",StringComparison.Ordinal),
+                    "profile change refreshes broad catalog results without narrowing away other supported builds or publishing stale "+(error ? "errors" : "results"));
             }
             window.Config.Version="98.1-fabric";
             var loaded=Search("profile-loaded"); transport.Pending["profile-loaded"].Complete("old cached profile result"); Wait(loaded);
@@ -113,8 +115,9 @@ static class ModPagePerformanceTests
             var vanilla=Search("filtered-vanilla");
             var vanillaFacets=JArray.Parse(Uri.UnescapeDataString(transport.SearchUris["filtered-vanilla"].Query.TrimStart('?').Split('&')
                 .Single(value=>value.StartsWith("facets=",StringComparison.Ordinal))[7..]));
-            Check(vanillaFacets.Count==2 && vanillaFacets.Select(value=>value[0]!.ToString()).ToHashSet().SetEquals(new[]{"project_type:mod","versions:98.3"}),
-                "vanilla search filters the game version without inventing an unsupported vanilla loader facet");
+            var vanillaModFacet=vanillaFacets.OfType<JArray>().SingleOrDefault();
+            Check(vanillaFacets.Count==1 && vanillaModFacet?.Count==1 && vanillaModFacet[0]!.ToString()=="project_type:mod",
+                "vanilla profile can browse mods for every Minecraft version and loader");
             transport.Pending["filtered-vanilla"].Complete("vanilla result"); Wait(vanilla);
 
             var install=fields.GetMethod("InstallMod",BindingFlags.Instance|BindingFlags.NonPublic)!;

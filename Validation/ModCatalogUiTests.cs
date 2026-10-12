@@ -6,6 +6,7 @@ using System.Windows.Threading;
 using MistikLauncher;
 using MistikLauncher.Pages;
 using Newtonsoft.Json.Linq;
+using Localization = MistikLauncher.Localization;
 
 static class ModCatalogUiTests
 {
@@ -18,10 +19,15 @@ static class ModCatalogUiTests
         try
         {
             frame.Content = page; Flush(window); capture("mod-catalog-cards");
-            if (fixture.SearchRequests.Count == 0 || fixture.SearchRequests[0].Query.Contains("query="))
-                throw new Exception("Opening the catalog should list compatible mods without requiring a search phrase.");
+            if (fixture.SearchRequests.Count == 0 || fixture.SearchRequests[0].Query.Contains("query=") ||
+                Uri.UnescapeDataString(fixture.SearchRequests[0].Query).Contains("versions:") ||
+                Uri.UnescapeDataString(fixture.SearchRequests[0].Query).Contains("categories:"))
+                throw new Exception("Opening the catalog should list mods across game versions and loaders without requiring a search phrase.");
             if (!Nodes(page).OfType<TextBlock>().Any(text => text.Text.Contains("41")))
-                throw new Exception("Catalog should show the total number of available compatible mods.");
+                throw new Exception("Catalog should show the total number of available mods.");
+            var unsupported = Nodes(page).OfType<Button>().FirstOrDefault(button => System.Windows.Automation.AutomationProperties.GetName(button).StartsWith("Double $1 Every Minute ·", StringComparison.Ordinal));
+            var unavailableInstall = Nodes(page).OfType<Button>().Single(button => Equals(button.Content, Localization.T("modIncompatible")));
+            if (unsupported is null || unavailableInstall.IsEnabled) throw new Exception("Incompatible mods should stay visible but cannot be installed into this profile.");
             var catalogCard = Nodes(page).OfType<Button>().Single(button => System.Windows.Automation.AutomationProperties.GetName(button).StartsWith("Example project ·", StringComparison.Ordinal));
             catalogCard.ApplyTemplate();
             if (catalogCard.Template.FindName("Surface", catalogCard) is not Border)
@@ -31,7 +37,7 @@ static class ModCatalogUiTests
             nextPage.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
             if (!fixture.SearchRequests.Any(uri => uri.Query.Contains("offset=20")))
                 throw new Exception("Next page should load the next group of matching mods.");
-            Console.WriteLine("PASS empty search browses all profile-compatible mods, shows totals and paginates");
+            Console.WriteLine("PASS empty search browses mods across versions and loaders, labels incompatible projects, and paginates");
             var open = Nodes(page).OfType<Button>().Single(button => System.Windows.Automation.AutomationProperties.GetName(button).StartsWith("Example project ·", StringComparison.Ordinal));
             open.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
             if (page.Content is not ModProjectView detail) throw new Exception("Card should open project inside its mod page.");
@@ -52,6 +58,14 @@ static class ModCatalogUiTests
                 throw new Exception("Empty gallery should explain that no pictures were supplied.");
             Nodes(detail).OfType<Button>().First().RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
             if (page.Content is ModProjectView) throw new Exception("Back should restore the original search and results.");
+            var search = Nodes(page).OfType<TextBox>().Single();
+            search.Text = "Double $1 Every Minute";
+            var searchTask = (Task)typeof(ModManagerPage).GetMethod("SearchMods", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(page, null)!;
+            searchTask.GetAwaiter().GetResult(); Flush(window);
+            if (!fixture.SearchRequests.Last().Query.Contains("Double%20%241%20Every%20Minute", StringComparison.OrdinalIgnoreCase) ||
+                !Nodes(page).OfType<TextBlock>().Any(text => text.Text == "Double $1 Every Minute"))
+                throw new Exception("A project with a dollar sign in its name should be searchable across all versions.");
+            Console.WriteLine("PASS exact search finds Double $1 Every Minute despite selected profile mismatch");
             Console.WriteLine("PASS gallery empty state and back navigation preserve original catalog");
             return 4;
         }
@@ -73,9 +87,10 @@ static class ModCatalogUiTests
         public List<Uri> SearchRequests { get; } = new();
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            var hit = new JObject { ["project_id"]="fixture", ["title"]="Example project", ["description"]="An illustrated catalog card opens description, versions and gallery.", ["downloads"]=12500, ["author"]="Example author", ["categories"]=new JArray("optimization", "fabric") };
+            var hit = new JObject { ["project_id"]="fixture", ["title"]="Example project", ["description"]="An illustrated catalog card opens description, versions and gallery.", ["downloads"]=12500, ["author"]="Example author", ["categories"]=new JArray("optimization", "fabric", "forge", "neoforge", "quilt"), ["versions"]=new JArray("1.20.1") };
             string game = GameProfiles.MinecraftVersion(App.GameDir, window.Config.Version);
             string loader = GameProfiles.Loader(App.GameDir, window.Config.Version);
+            hit["versions"] = new JArray(game);
             var project = new JObject { ["id"]="fixture", ["project_type"]="mod", ["title"]="Example project", ["description"]=hit["description"], ["body"]="# About this mod\n\n**Rich description** and version selection.", ["downloads"]=12500, ["followers"]=42, ["gallery"]=new JArray(), ["categories"]=new JArray("optimization", "fabric") };
             JToken data = request.RequestUri!.AbsolutePath.EndsWith("/search") ? Search(request.RequestUri, hit)
                 : request.RequestUri.AbsolutePath.EndsWith("/version") ? new JArray(
@@ -86,7 +101,9 @@ static class ModCatalogUiTests
         JObject Search(Uri uri, JObject hit)
         {
             SearchRequests.Add(uri);
-            return new JObject { ["hits"] = new JArray(hit), ["total_hits"] = 41 };
+            bool exact = Uri.UnescapeDataString(uri.Query).Contains("Double $1 Every Minute", StringComparison.OrdinalIgnoreCase);
+            var sample = new JObject { ["project_id"]="double-every-minute", ["title"]="Double $1 Every Minute", ["description"]="How long can you double a dollar every minute?", ["downloads"]=1400, ["author"]="Example author", ["categories"]=new JArray("fabric"), ["versions"]=new JArray(hit["versions"]![0]!.ToString()+"-future") };
+            return new JObject { ["hits"] = exact ? new JArray(sample) : new JArray(hit, sample), ["total_hits"] = exact ? 1 : 41 };
         }
     }
 }

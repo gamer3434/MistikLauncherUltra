@@ -424,6 +424,7 @@
   "modDetails": "Open details",
   "modTools": "Additional mod tools",
   "modInstall": "↓ Install",
+  "modIncompatible": "Profile mismatch",
   "modProfileChanged": "Profile changed. Reopen project details.",
   "luDowngrade": "Downgrade launcher",
   "luOlderVersions": "List older releases",

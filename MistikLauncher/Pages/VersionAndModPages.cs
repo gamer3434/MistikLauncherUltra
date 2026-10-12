@@ -1107,6 +1107,11 @@ namespace MistikLauncher.Pages
             await SearchMods();
         }
 
+        internal static bool SearchResultSupportsProfile(JToken hit, string game, string loader) =>
+            (loader is "fabric" or "forge" or "neoforge" or "quilt") &&
+            hit["versions"] is JArray versions && versions.Any(value => value.ToString().Equals(game, StringComparison.OrdinalIgnoreCase)) &&
+            hit["categories"] is JArray categories && categories.Any(value => value.ToString().Equals(loader, StringComparison.OrdinalIgnoreCase));
+
         async Task SearchMods()
         {
             int generation = ++_searchGeneration;
@@ -1128,8 +1133,7 @@ namespace MistikLauncher.Pages
             {
                 string game = GameProfiles.MinecraftVersion(App.GameDir, profile);
                 string loader = GameProfiles.Loader(App.GameDir, profile);
-                var facets = new JArray(new JArray("project_type:mod"), new JArray("versions:" + game));
-                if (loader is "fabric" or "forge" or "neoforge" or "quilt") facets.Add(new JArray("categories:" + loader));
+                var facets = new JArray { new JArray { "project_type:mod" } };
                 var searchUrl = $"https://api.modrinth.com/v2/search?limit=20&offset={_searchOffset}&index={_sort}&facets={Uri.EscapeDataString(facets.ToString(Newtonsoft.Json.Formatting.None))}";
                 if (q.Length > 0) searchUrl += "&query=" + Uri.EscapeDataString(q);
                 var resp = await _client.GetStringAsync(searchUrl, cancellation.Token);
@@ -1149,6 +1153,7 @@ namespace MistikLauncher.Pages
                     var desc  = hit["description"]?.ToString() ?? "";
                     var dl    = hit["downloads"]?.Value<long>() ?? 0;
                     var mname = name; var cId = modId;
+                    var canInstall = SearchResultSupportsProfile(hit, game, loader);
 
                     var card = PageHelpers.Card("#25282E", 16, "#3A3F46", margin: new Thickness(0, 7, 0, 7));
                     var grid = new Grid { Margin = new Thickness(16, 12, 16, 12) };
@@ -1180,7 +1185,8 @@ namespace MistikLauncher.Pages
                     details.Click += (_, _) => OpenProject(cId, mname);
                     Grid.SetColumn(details, 0); grid.Children.Add(details);
 
-                    var installBtn = PageHelpers.MkBtn(Localization.T("modInstall"), "#159D59", 100); installBtn.VerticalAlignment = VerticalAlignment.Center;
+                    var installBtn = PageHelpers.MkBtn(Localization.T(canInstall ? "modInstall" : "modIncompatible"), canInstall ? "#159D59" : "#333333", 136);
+                    installBtn.IsEnabled = canInstall; installBtn.VerticalAlignment = VerticalAlignment.Center;
                     installBtn.Click += async (_, _) => {
                         await RunInstallButton(installBtn, async () => {
                             return await InstallMod(cId, mname);

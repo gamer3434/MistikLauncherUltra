@@ -214,6 +214,10 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.22","2026-10-12","#00D4AA", new[]{
+                "Mod kataloğu artık Double $1 Every Minute dahil tüm Modrinth modlarını Minecraft sürümünden bağımsız arar; uyumsuz olanları kurulumdan önce açıkça işaretler.",
+                "The mod catalog now searches all Modrinth mods across Minecraft versions, including Double $1 Every Minute, and clearly marks incompatible projects before installation."
+            }),
             new("v6.2.21","2026-10-12","#00D4AA", new[]{
                 "Mod ayrıntılarındaki Açıklama, Sürümler ve Galeri sekmeleri eşit genişlikte ve hizalı gösterilir.",
                 "Yönetim paneli güncel launcher sürümünü, indirme sayısını ve öne çıkan Modrinth modlarını gösterir.",

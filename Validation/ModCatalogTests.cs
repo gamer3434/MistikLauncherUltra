@@ -2,6 +2,7 @@ using System.IO;
 using System.IO.Compression;
 using MistikLauncher;
 using MistikLauncher.Pages;
+using Newtonsoft.Json.Linq;
 
 static class ModCatalogTests
 {
@@ -42,6 +43,10 @@ static class ModCatalogTests
             GalleryImageUrl("https://attacker.invalid/original.png", "https://cdn.modrinth.com/data/preview.webp")?.AbsolutePath.EndsWith("preview.webp") == true,
             "Gallery prefers the verified full-size source and falls back to its verified preview");
         Check(typeof(App).Assembly.GetManifestResourceNames().All(name => !name.EndsWith("mistik-hud.jar")), "Launcher no longer distributes the retired HUD");
+        bool Supports(JObject hit, string game, string loader) => (bool)typeof(ModManagerPage).GetMethod("SearchResultSupportsProfile", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!.Invoke(null, new object[] { hit, game, loader })!;
+        var minuteMod = new JObject { ["versions"] = new JArray("1.21.11"), ["categories"] = new JArray("fabric") };
+        Check(Supports(minuteMod, "1.21.11", "fabric") && !Supports(minuteMod, "1.21.1", "fabric") && !Supports(minuteMod, "1.21.11", "forge"),
+            "all-version catalog keeps search broad while install compatibility stays exact to Minecraft and loader");
         using var picture = new SkiaSharp.SKBitmap(12, 6);
         picture.Erase(SkiaSharp.SKColors.Green);
         using var encodedPicture = SkiaSharp.SKImage.FromBitmap(picture);
