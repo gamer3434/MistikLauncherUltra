@@ -104,7 +104,9 @@ namespace MistikLauncher
                 if (UsageMetrics != null) await UsageMetrics.SetEnabledAsync(Config.UsageMetricsEnabled);
                 QueueBackgroundModSync();
                 updateTimer.Start();
-                await Task.WhenAll(CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate), AutoMcs.CheckAsync(Config.AutoMcsAutoUpdate && File.Exists(AutoMcs.ExecutablePath)));
+                await CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate);
+                if (!Dispatcher.HasShutdownStarted)
+                    await AutoMcs.CheckAsync(Config.AutoMcsAutoUpdate && File.Exists(AutoMcs.ExecutablePath));
             };
             Closed += (_,_) => updateTimer.Stop();
             Navigate("Dash");

@@ -214,6 +214,10 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.20","2026-10-12","#00D4AA", new[]{
+                "Başlatıcı güncellemesi artık AutoMCS denetiminden önce çalışır; eşzamanlı güncelleme yarışında yeni sürüm ertelenmez.",
+                "Launcher updates now run before AutoMCS checks, avoiding a race that deferred new launcher releases."
+            }),
             new("v6.2.19","2026-10-12","#00D4AA", new[]{
                 "Modlar seçili Minecraft profiline göre yedeklenip güvenle geri yüklenebilir; mevcut dosyalar ezilmez. Mod taşıma artık kurulu Fabric, Forge, NeoForge ve Quilt profillerini gösterir.",
                 "Back up and safely restore mods for the selected Minecraft profile without overwriting existing files. Mod migration now lists installed Fabric, Forge, NeoForge, and Quilt profiles."
