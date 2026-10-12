@@ -929,7 +929,10 @@ namespace MistikLauncher.Pages
             sp.Children.Add(searchRow);
 
             var catalogControls = new DockPanel { Margin = new Thickness(0, 0, 0, 12) };
-            var sorting = new ComboBox { Name = "ModSort", Width = 200, MinHeight = 36 };
+            var sorting = new ComboBox { Name = "ModSort", Width = 200, MinHeight = 36,
+                Style = (Style)_main.FindResource(typeof(ComboBox)), ItemContainerStyle = (Style)_main.FindResource(typeof(ComboBoxItem)),
+                Background = PageHelpers.HexBrush("#203853"), Foreground = PageHelpers.HexBrush("#EFF5FF"),
+                BorderBrush = PageHelpers.HexBrush("#36363C"), BorderThickness = new Thickness(1) };
             foreach (var item in new[] { ("modSortRelevance", "relevance"), ("modSortDownloads", "downloads"), ("modSortUpdated", "updated"), ("modSortNewest", "newest") })
                 sorting.Items.Add(new ComboBoxItem { Content = Localization.T(item.Item1), Tag = item.Item2 });
             sorting.SelectedIndex = 0;

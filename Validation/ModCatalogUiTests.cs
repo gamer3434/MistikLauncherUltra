@@ -19,6 +19,11 @@ static class ModCatalogUiTests
         try
         {
             frame.Content = page; Flush(window); capture("mod-catalog-cards");
+            var sortBox = Nodes(page).OfType<ComboBox>().Single(box => box.Name == "ModSort");
+            sortBox.ApplyTemplate();
+            if (sortBox.Template.FindName("DropDownToggle", sortBox) is null || sortBox.ItemContainerStyle is null ||
+                sortBox.Background is not System.Windows.Media.SolidColorBrush sortBackground || sortBackground.Color == System.Windows.Media.Colors.White)
+                throw new Exception("The catalog sort selector should use the launcher's dark combo box template.");
             if (fixture.SearchRequests.Count == 0 || fixture.SearchRequests[0].Query.Contains("query=") ||
                 Uri.UnescapeDataString(fixture.SearchRequests[0].Query).Contains("versions:") ||
                 Uri.UnescapeDataString(fixture.SearchRequests[0].Query).Contains("categories:"))
