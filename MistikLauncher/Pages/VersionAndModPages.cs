@@ -748,16 +748,6 @@ namespace MistikLauncher.Pages
                 new[] { "fabric-api", "modern-ui" }, new[] { "Fabric API", "Modern UI" }, interfaceButton,
                 Localization.T("clientInterfaceTitle"), "fabric");
             clientPanel.Children.Add(interfaceButton);
-            var menuButton = PageHelpers.MkBtn("clientInstallMenu", "#203853");
-            menuButton.Margin = new Thickness(0, 8, 0, 0);
-            menuButton.Click += async (_, _) => await RunInstallButton(menuButton, () =>
-            {
-                var profile = _main.Config.Version ?? "";
-                MistikMenuPack.Install(App.GameDir, GameProfiles.MinecraftVersion(App.GameDir, profile));
-                return Task.FromResult(true);
-            }, error => MessageBox.Show(error.Message, Localization.T("clientPresetTitle"),
-                MessageBoxButton.OK, MessageBoxImage.Warning), Localization.T("clientMenuInstalled"));
-            clientPanel.Children.Add(menuButton);
             clientPanel.Children.Add(PageHelpers.Lbl("clientInterfaceHelp", 12, "#ADBED6", wrap: TextWrapping.Wrap,
                 pad: new Thickness(0, 8, 0, 0)));
             clientCard.Child = clientPanel;
@@ -1307,7 +1297,11 @@ namespace MistikLauncher.Pages
             if (versionId != null)
             {
                 targetVersion = JObject.Parse(await http.GetStringAsync($"https://api.modrinth.com/v2/version/{Uri.EscapeDataString(versionId)}"));
-                projectId = targetVersion["project_id"]?.ToString() ?? throw new InvalidDataException("Missing dependency project ID.");
+                var resolvedProject = targetVersion["project_id"]?.ToString();
+                if (targetVersion["id"]?.ToString() != versionId || string.IsNullOrWhiteSpace(resolvedProject) ||
+                    (!string.IsNullOrWhiteSpace(projectId) && resolvedProject != projectId))
+                    throw new InvalidDataException("Mod version metadata does not match the requested project or version.");
+                projectId = resolvedProject;
                 if (!CheckCompatibility(targetVersion, mcVersion, loader))
                     throw new IOException($"Required dependency {versionId} is incompatible with {mcVersion} {loader}.");
                 versions = JArray.Parse(await http.GetStringAsync($"https://api.modrinth.com/v2/project/{Uri.EscapeDataString(projectId)}/version"));

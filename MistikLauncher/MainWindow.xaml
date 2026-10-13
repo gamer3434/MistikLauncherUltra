@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Mistik Launcher" Height="820" Width="1200"
         WindowStartupLocation="CenterScreen" Background="{DynamicResource Theme0D1727}"
-        FontFamily="Segoe UI" UseLayoutRounding="True"
+        FontFamily="Segoe UI" UseLayoutRounding="True" SnapsToDevicePixels="True"
         MinHeight="640" MinWidth="960">
     <Window.Resources>
         <Style TargetType="ComboBoxItem">
@@ -134,12 +134,12 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="4"/>
-            <RowDefinition Height="60"/>
+            <RowDefinition x:Name="ControlBarRow" Height="60"/>
         </Grid.RowDefinitions>
 
         <!-- ═══ CONTENT ═══════════════════════════════════════════════════════ -->
         <DockPanel Grid.Column="0" Grid.Row="0">
-            <Grid DockPanel.Dock="Top" Margin="24,4,24,2">
+            <Grid x:Name="ShellHeader" DockPanel.Dock="Top" Margin="24,4,24,2">
                 <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock x:Name="LogoText" Text="MISTIK" FontSize="22" FontWeight="Black" Foreground="{DynamicResource Theme00A3FF}" VerticalAlignment="Center"/>

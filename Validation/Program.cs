@@ -402,7 +402,8 @@ class Program
                 window.Navigate("Opt"); Capture(window,Path.Combine(output,"performance-"+code+".png"),960,640);
                 Check(Texts((DependencyObject)((Frame)window.FindName("MainFrame")).Content).Contains(Localization.T("optTitle")),"optimization page opens in selected language: "+code);
             }
-            checks += ModCatalogUiTests.Run(window, name => Capture(window, Path.Combine(output,name+".png")));
+            checks += ModCatalogUiTests.Run(window, name => Capture(window, Path.Combine(output,name+".png"), name == "mod-catalog-long-heading" ? 960 : 1200, name == "mod-catalog-long-heading" ? 640 : 820));
+            checks += WindowScalingUiTests.Run(window);
             var horizontal=new System.Windows.Controls.Primitives.ScrollBar { Orientation=Orientation.Horizontal,Style=(Style)application.FindResource(typeof(System.Windows.Controls.Primitives.ScrollBar)) };
             horizontal.ApplyTemplate();
             var track=(System.Windows.Controls.Primitives.Track)horizontal.Template.FindName("PART_Track",horizontal);

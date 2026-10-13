@@ -46,7 +46,11 @@ namespace MistikLauncher
         {
 
             InitializeComponent();
+            WindowSurface.SizeChanged += (_, _) => UpdateCompactShell();
+            DpiChanged += (_, _) => Dispatcher.BeginInvoke(new Action(FitMonitorWorkArea));
             Config = ConfigManager.Load();
+            try { MistikMenuPack.Retire(App.GameDir); }
+            catch (Exception ex) { App.Log("Mistik menu retirement failed: " + ex.Message); }
             LauncherUpdates = new LauncherUpdater(() => BtnLaunch.IsEnabled && !AutoMcs.Busy && !(GlobalProgress.Value > 0 && GlobalProgress.Value < 100) && System.Windows.Input.Keyboard.FocusedElement is not (TextBox or PasswordBox));
             Title = "Mistik Launcher " + LauncherUpdates.CurrentVersion;
             var metricsOptions = LauncherMetricsOptions.Load(Path.Combine(AppContext.BaseDirectory, "metrics-config.json"));
@@ -68,7 +72,10 @@ namespace MistikLauncher
             LoadAvatar();
             ProfileButton.Click+=(_,_)=>Navigate("Settings");
             StateChanged+=(_,_)=>ApplyWindowAppearance();
-            SourceInitialized+=(_,_)=>System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle)?.AddHook(ConstrainMaximizedWindow);
+            SourceInitialized+=(_,_)=> {
+                System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle)?.AddHook(ConstrainMaximizedWindow);
+                FitMonitorWorkArea();
+            };
 
             VerBox.SelectionChanged += (s, e) => {
                 if (_isPopulatingVersionBox) return;
@@ -284,6 +291,50 @@ namespace MistikLauncher
         public static SolidColorBrush HexBrush(string hex) => ColorThemes.IsThemed(hex)?ColorThemes.Brush(hex):new(HexColor(hex));
 
         // ── Nav ───────────────────────────────────────────────────────────────
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        static extern bool GetWindowRect(IntPtr window, out NativeRect bounds);
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, uint flags);
+
+        void FitMonitorWorkArea()
+        {
+            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            var info = new MonitorInfo { Size = System.Runtime.InteropServices.Marshal.SizeOf<MonitorInfo>() };
+            if (handle == IntPtr.Zero || !GetMonitorInfo(MonitorFromWindow(handle, 2), ref info)) return;
+            var dpi = VisualTreeHelper.GetDpi(this);
+            var available = new Size((info.Work.Right - info.Work.Left) / dpi.DpiScaleX,
+                                     (info.Work.Bottom - info.Work.Top) / dpi.DpiScaleY);
+            MinWidth = Math.Min(960, available.Width);
+            MinHeight = Math.Min(640, available.Height);
+            if (WindowState == WindowState.Normal)
+            {
+                Width = Math.Min(Width, available.Width);
+                Height = Math.Min(Height, available.Height);
+                // Monitor bounds and window position stay in native pixels on mixed-DPI displays.
+                if (GetWindowRect(handle, out var bounds))
+                {
+                    int left = Math.Clamp(bounds.Left, info.Work.Left, Math.Max(info.Work.Left, info.Work.Right - (bounds.Right - bounds.Left)));
+                    int top = Math.Clamp(bounds.Top, info.Work.Top, Math.Max(info.Work.Top, info.Work.Bottom - (bounds.Bottom - bounds.Top)));
+                    if (left != bounds.Left || top != bounds.Top) SetWindowPos(handle, IntPtr.Zero, left, top, 0, 0, 0x0015);
+                }
+            }
+        }
+
+        void UpdateCompactShell()
+        {
+            bool compact = WindowSurface.ActualWidth > 0 && WindowSurface.ActualWidth < 1050;
+            ShellHeader.Margin = compact ? new Thickness(16, 4, 16, 2) : new Thickness(24, 4, 24, 2);
+            UserNameLbl.MaxWidth = compact ? 120 : 180;
+            BtnDiscord.Padding = BtnYoutube.Padding = new Thickness(compact ? 10 : 18, 0, compact ? 10 : 18, 0);
+            BtnDiscord.Visibility = BtnYoutube.Visibility = WindowSurface.ActualWidth > 0 && WindowSurface.ActualWidth < 800 ? Visibility.Collapsed : Visibility.Visible;
+            ControlBarRow.Height = new GridLength(WindowSurface.ActualHeight > 0 && WindowSurface.ActualHeight < 720 ? 52 : 60);
+            foreach (var button in quickButtons.Values)
+            {
+                button.Padding = new Thickness(compact ? 8 : 12, 0, compact ? 8 : 12, 0);
+                button.MinWidth = compact ? 80 : 100;
+            }
+        }
+
         void BuildNav() => BuildQuickBar();
 
         readonly Dictionary<string,Button> quickButtons=new();
@@ -302,6 +353,7 @@ namespace MistikLauncher
                 button.Click+=(_,_)=>Navigate(item.Item1); quickButtons[item.Item1]=button; QuickBarPanel.Children.Add(button);
             }
             QuickBarHost.Visibility=quickButtons.Count==0?Visibility.Collapsed:Visibility.Visible;
+            UpdateCompactShell();
             SelectNav(_currentNav);
         }
 

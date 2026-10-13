@@ -49,8 +49,26 @@ static class ModCatalogUiTests
             detail.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent)); Flush(window); capture("mod-catalog-description");
             var tabs = detail.Children.OfType<TabControl>().Single();
             if (tabs.Items.Count != 3) throw new Exception("Description, versions and gallery must all load. " + string.Join(" | ", Nodes(detail).OfType<TextBlock>().Select(text => text.Text)));
-            if (tabs.Items.Cast<TabItem>().Any(tab => tab.Width != 120)) throw new Exception("Project detail tabs should have consistent widths.");
-            if (tabs.ItemsPanel.LoadContent() is not StackPanel { Orientation: Orientation.Horizontal, Margin.Left: -2 } ) throw new Exception("Project detail tabs should share a flush, fixed horizontal strip.");
+            if (tabs.Items.Cast<TabItem>().Any(tab => tab.MinWidth != 120)) throw new Exception("Project detail tabs should have consistent minimum widths without clipping translated labels.");
+            if (tabs.ItemsPanel.LoadContent() is not StackPanel { Orientation: Orientation.Horizontal, Margin.Left: 0 } ) throw new Exception("Project detail tabs should share a flush horizontal strip without negative insets.");
+            foreach (var width in new[] { 620d, 960d })
+            {
+                detail.Measure(new Size(width, 480)); detail.Arrange(new Rect(0, 0, width, 480)); detail.UpdateLayout();
+                tabs.ApplyTemplate();
+                var contentHost = (FrameworkElement)tabs.Template.FindName("PART_SelectedContentHost", tabs);
+                var items = tabs.Items.Cast<TabItem>().ToArray();
+                var top = items[0].TranslatePoint(new Point(), detail).Y;
+                foreach (var item in items)
+                {
+                    item.ApplyTemplate();
+                    var border = (Border)System.Windows.Media.VisualTreeHelper.GetChild(item, 0);
+                    if (Math.Abs(item.TranslatePoint(new Point(), detail).Y - top) > 0.5 ||
+                        border.ActualWidth < item.MinWidth - 1 || border.ActualHeight < 44 ||
+                        item.TranslatePoint(new Point(item.ActualWidth, item.ActualHeight), detail).Y >= contentHost.TranslatePoint(new Point(), detail).Y)
+                        throw new Exception("Rounded detail tabs must remain whole, aligned and separate from their content at compact widths.");
+                }
+            }
+            Flush(window);
             Console.WriteLine("PASS catalog card opens all three project detail tabs inside the launcher");
             tabs.SelectedIndex = 1; capture("mod-catalog-versions");
             var versions = (DependencyObject)((TabItem)tabs.Items[1]).Content;
@@ -61,6 +79,56 @@ static class ModCatalogUiTests
             var gallery = (DependencyObject)((TabItem)tabs.Items[2]).Content;
             if (!Nodes(gallery).OfType<TextBlock>().Any(text => text.Text.Contains("gallery", StringComparison.OrdinalIgnoreCase) || text.Text.Contains("galeri")))
                 throw new Exception("Empty gallery should explain that no pictures were supplied.");
+            var pending = new TaskCompletionSource<HttpResponseMessage>();
+            fixture.PendingProject = pending;
+            var obsoleteLoad = (Task)typeof(ModProjectView).GetMethod("Load", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(detail, null)!;
+            fixture.PendingProject = null;
+            detail.RefreshLanguage(); Flush(window);
+            pending.SetException(new HttpRequestException("Obsolete request failed")); Flush(window);
+            if (!obsoleteLoad.IsCompleted || Nodes(detail).OfType<TextBlock>().Any(text => text.Text.Contains("Obsolete request failed")))
+                throw new Exception("An obsolete failed request must not overwrite the successfully refreshed project.");
+            Console.WriteLine("PASS cancelled detail load cannot overwrite refreshed content with an obsolete error");
+            fixture.ProjectTitle = string.Join(" ", Enumerable.Repeat("Uzun mod başlığı / Long project title", 10));
+            fixture.ProjectDescription = string.Join(" ", Enumerable.Repeat("Uzun açıklama compact profile description", 24));
+            fixture.ProjectCategories = new JArray(Enumerable.Repeat("long-category-name", 16));
+            detail.RefreshLanguage(); Flush(window);
+            detail.Measure(new Size(620, 480)); detail.Arrange(new Rect(0, 0, 620, 480)); detail.UpdateLayout();
+            tabs.ApplyTemplate();
+            var compactContent = (FrameworkElement)tabs.Template.FindName("PART_SelectedContentHost", tabs);
+            var projectInstall = Nodes(detail).OfType<Button>().Single(button => button.Name == "ProjectInstallButton");
+            var summary = Nodes(detail).OfType<FrameworkElement>().Single(element => element.Name == "ProjectSummary");
+            var installStart = projectInstall.TranslatePoint(new Point(), detail);
+            var installEnd = projectInstall.TranslatePoint(new Point(projectInstall.ActualWidth, projectInstall.ActualHeight), detail);
+            if (compactContent.ActualHeight < 120 || installStart.X < 0 || installEnd.X > detail.ActualWidth + 0.5 ||
+                summary.ActualHeight <= 0 || summary.TranslatePoint(new Point(0, summary.ActualHeight), detail).Y > tabs.TranslatePoint(new Point(), detail).Y)
+                throw new Exception("Long project headings must keep installation in bounds and preserve a usable detail viewport at compact size.");
+            capture("mod-catalog-long-heading");
+            Console.WriteLine("PASS long project heading preserves compact install controls and content viewport");
+            var successfulPending = new TaskCompletionSource<HttpResponseMessage>();
+            fixture.PendingProject = successfulPending;
+            var obsoleteSuccess = (Task)typeof(ModProjectView).GetMethod("Load", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(detail, null)!;
+            fixture.PendingProject = null;
+            fixture.ProjectTitle = "Refreshed project"; fixture.ProjectDescription = "Refreshed description";
+            fixture.ProjectCategories = new JArray("fabric", "optimization");
+            detail.RefreshLanguage(); Flush(window);
+            successfulPending.SetResult(Fixture.ProjectResponse("Obsolete successful project")); Flush(window);
+            if (!obsoleteSuccess.IsCompleted || tabs.Items.Count != 3 ||
+                !Nodes(detail).OfType<TextBlock>().Any(text => text.Text == "Refreshed project") ||
+                Nodes(detail).OfType<TextBlock>().Any(text => text.Text == "Obsolete successful project"))
+                throw new Exception("An obsolete successful request must not overwrite refreshed project metadata or tabs.");
+            Console.WriteLine("PASS obsolete successful detail response cannot replace refreshed content");
+            var unloadedPending = new TaskCompletionSource<HttpResponseMessage>();
+            fixture.PendingProject = unloadedPending;
+            var unloadedLoad = (Task)typeof(ModProjectView).GetMethod("Load", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(detail, null)!;
+            detail.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+            var unloadedText = Nodes(detail).OfType<TextBlock>().Select(text => text.Text).ToArray();
+            var unloadedTabCount = tabs.Items.Count;
+            unloadedPending.SetResult(Fixture.ProjectResponse("Late unloaded project")); Flush(window);
+            fixture.PendingProject = null;
+            if (!unloadedLoad.IsCompleted || tabs.Items.Count != unloadedTabCount ||
+                !Nodes(detail).OfType<TextBlock>().Select(text => text.Text).SequenceEqual(unloadedText))
+                throw new Exception("Completing a pending request after unload must not mutate detail content or status.");
+            Console.WriteLine("PASS unloaded detail ignores late metadata response");
             Nodes(detail).OfType<Button>().First().RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
             if (page.Content is ModProjectView) throw new Exception("Back should restore the original search and results.");
             var search = Nodes(page).OfType<TextBox>().Single();
@@ -72,7 +140,7 @@ static class ModCatalogUiTests
                 throw new Exception("A project with a dollar sign in its name should be searchable across all versions.");
             Console.WriteLine("PASS exact search finds Double $1 Every Minute despite selected profile mismatch");
             Console.WriteLine("PASS gallery empty state and back navigation preserve original catalog");
-            return 4;
+            return 8;
         }
         finally { frame.Content = previous; }
     }
@@ -90,13 +158,22 @@ static class ModCatalogUiTests
     sealed class Fixture(MainWindow window) : HttpMessageHandler
     {
         public List<Uri> SearchRequests { get; } = new();
+        public TaskCompletionSource<HttpResponseMessage>? PendingProject { get; set; }
+        public string ProjectTitle { get; set; } = "Example project";
+        public string ProjectDescription { get; set; } = "An illustrated catalog card opens description, versions and gallery.";
+        public JArray ProjectCategories { get; set; } = new("optimization", "fabric");
+        public static HttpResponseMessage ProjectResponse(string title) => new(HttpStatusCode.OK) {
+            Content = new StringContent(new JObject { ["id"]="fixture", ["project_type"]="mod", ["title"]=title,
+                ["description"]="Late response", ["body"]="Late description", ["gallery"]=new JArray(), ["categories"]=new JArray("fabric") }.ToString())
+        };
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (PendingProject is not null && request.RequestUri!.AbsolutePath.EndsWith("/project/fixture")) return PendingProject.Task;
             var hit = new JObject { ["project_id"]="fixture", ["title"]="Example project", ["description"]="An illustrated catalog card opens description, versions and gallery.", ["downloads"]=12500, ["author"]="Example author", ["categories"]=new JArray("optimization", "fabric", "forge", "neoforge", "quilt"), ["versions"]=new JArray("1.20.1") };
             string game = GameProfiles.MinecraftVersion(App.GameDir, window.Config.Version);
             string loader = GameProfiles.Loader(App.GameDir, window.Config.Version);
             hit["versions"] = new JArray(game);
-            var project = new JObject { ["id"]="fixture", ["project_type"]="mod", ["title"]="Example project", ["description"]=hit["description"], ["body"]="# About this mod\n\n**Rich description** and version selection.", ["downloads"]=12500, ["followers"]=42, ["gallery"]=new JArray(), ["categories"]=new JArray("optimization", "fabric") };
+            var project = new JObject { ["id"]="fixture", ["project_type"]="mod", ["title"]=ProjectTitle, ["description"]=ProjectDescription, ["body"]="# About this mod\n\n**Rich description** and version selection.", ["downloads"]=12500, ["followers"]=42, ["gallery"]=new JArray(), ["categories"]=ProjectCategories.DeepClone() };
             JToken data = request.RequestUri!.AbsolutePath.EndsWith("/search") ? Search(request.RequestUri, hit)
                 : request.RequestUri.AbsolutePath.EndsWith("/version") ? new JArray(
                     new JObject { ["id"]="compatible", ["name"]="Stable compatible build", ["version_number"]="1.0", ["game_versions"]=new JArray(game), ["loaders"]=new JArray(loader) },

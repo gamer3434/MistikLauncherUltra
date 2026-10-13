@@ -214,6 +214,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.24","2026-10-13","#00D4AA", new[]{
+                "Mod ayrıntıları hizalı sekmeler, okunaklı sürüm kartları ve net galeri yükleme durumlarıyla yenilendi; eski yükleme sonuçlarının sayfayı bozması düzeltildi.",
+                "Client küçük pencerelere ve yüksek DPI ekranlarına daha iyi sığar. Oyuna kurulabilen Mıstık menüsü kaldırıldı; mevcut Mıstık paketi güvenli yedeğe taşınır.",
+                "Sabit mod sürümü kurulurken proje ve sürüm kimliği doğrulanır.",
+                "Mod details now feature aligned tabs, readable version cards and clear gallery loading states; obsolete requests can no longer overwrite refreshed pages.",
+                "The client fits compact windows and high-DPI screens. The game-installable Mistik menu was removed and existing owned packs are safely backed up.",
+                "Pinned mod installs now verify both project and version identity."
+            }),
             new("v6.2.23","2026-10-12","#00D4AA", new[]{
                 "Mod merkezindeki sıralama menüsü artık launcher'ın koyu teması ve Türkçe/İngilizce arayüzüyle uyumlu görünür.",
                 "The mod center's sort menu now matches the launcher's dark theme and localized interface."

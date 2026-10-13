@@ -67,6 +67,26 @@ static class ModAndMapRegressionTests
         catch (InvalidDataException) { rejected = true; }
         Check(rejected, "required dependency without identity cannot be reported as installed");
 
+        foreach (var sample in new[] {
+            (project: "library", returnedId: "another-version", returnedProject: "library", valid: false),
+            (project: "library", returnedId: "pinned", returnedProject: "another-project", valid: false),
+            (project: "library", returnedId: "pinned", returnedProject: "", valid: false),
+            (project: "library", returnedId: "pinned", returnedProject: "library", valid: true),
+            (project: "", returnedId: "pinned", returnedProject: "library", valid: true) })
+        {
+            var response = Version(sample.returnedId, "1.21.1", "fabric"); response["project_id"] = sample.returnedProject;
+            using var handler = new PinnedMetadataHandler(response);
+            using var client = new System.Net.Http.HttpClient(handler);
+            var page = (ModManagerPage)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(ModManagerPage));
+            var operation = (Task)typeof(ModManagerPage).GetMethod("DownloadModAndDependencies", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(page, new object?[] { sample.project, "fixture", new List<string>(), true, new HashSet<string>(), "pinned", "1.21.1", "fabric", "fixture-profile", client })!;
+            rejected = false;
+            try { await operation; } catch (InvalidDataException) { rejected = true; } catch (IOException) when (sample.valid) { }
+            Check(sample.valid ? !rejected && handler.Requests.SequenceEqual(new[] { "/v2/version/pinned", "/v2/project/library/version" }) :
+                rejected && handler.Requests.SequenceEqual(new[] { "/v2/version/pinned" }),
+                $"pinned mod metadata binds requested version/project ({sample.project}, {sample.returnedId}, {sample.returnedProject})");
+        }
+
         byte[] modBytes = System.Text.Encoding.UTF8.GetBytes("verified mod fixture");
         var modFile = new JObject { ["filename"] = "library.jar", ["hashes"] = new JObject { ["sha512"] = Convert.ToHexString(SHA512.HashData(modBytes)) } };
         var mods = Path.Combine(root, "mods"); Directory.CreateDirectory(mods);
@@ -203,6 +223,19 @@ static class ModAndMapRegressionTests
             ModFiles.SyncPools(App.ModsDir, next, holding);
             window.Config.Version = originalVersion; window.Config.LastSyncedVersion = originalSynced;
             ConfigManager.Save(window.Config);
+        }
+    }
+
+    sealed class PinnedMetadataHandler(JObject version) : System.Net.Http.HttpMessageHandler
+    {
+        public readonly List<string> Requests = new();
+        protected override Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, CancellationToken cancellation)
+        {
+            Requests.Add(request.RequestUri!.AbsolutePath);
+            if (Requests.Count > 1) throw new IOException("Stop fixture before downloads or writes.");
+            return Task.FromResult(new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK) {
+                Content = new System.Net.Http.StringContent(version.ToString())
+            });
         }
     }
 
