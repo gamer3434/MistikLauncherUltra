@@ -266,8 +266,10 @@ public class ModernSettingsPage : Page, ILanguagePage
             choice.Template=(ControlTemplate)System.Windows.Markup.XamlReader.Parse("<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border Name='focus' BorderThickness='1' BorderBrush='Transparent' CornerRadius='14'><ContentPresenter Content='{TemplateBinding Content}' HorizontalAlignment='Stretch' VerticalAlignment='Stretch'/></Border><ControlTemplate.Triggers><Trigger Property='IsKeyboardFocused' Value='True'><Setter TargetName='focus' Property='BorderBrush' Value='White'/></Trigger><Trigger Property='IsMouseOver' Value='True'><Setter TargetName='focus' Property='Opacity' Value='0.85'/></Trigger></ControlTemplate.Triggers></ControlTemplate>");
             System.Windows.Automation.AutomationProperties.SetName(choice,Localization.T("theme"+name));
             choice.Click+=(_,_)=> {
-                main.SetColorTheme(name); UpdateSelection();
-                result.Text=Localization.T("themeApplied")+" · "+Localization.T("theme"+name);
+                try {
+                    main.SetColorTheme(name); UpdateSelection();
+                    result.Text=Localization.T("themeApplied")+" · "+Localization.T("theme"+name);
+                } catch(Exception ex) { result.Text=Localization.T("error")+": "+ex.Message; }
             };
             tiles.Add((name,tile,mark)); swatches.Children.Add(choice);
         }
@@ -279,11 +281,19 @@ public class ModernSettingsPage : Page, ILanguagePage
         var options=new WrapPanel();
         foreach(var item in new[]{("Dash","home"),("Vers","versions"),("Mods","mods"),("Skin","skin"),("Server","server"),("Settings","settings")})
         {
-            var option=new CheckBox { Content=Localization.T(item.Item2),IsChecked=main.Config.QuickLinks.Contains(item.Item1),Foreground=PageHelpers.HexBrush("#EFF5FF"),MinHeight=44,MinWidth=140,VerticalContentAlignment=VerticalAlignment.Center };
+            var option=new CheckBox { Name="QuickLink"+item.Item1,Content=Localization.T(item.Item2),IsChecked=main.Config.QuickLinks.Contains(item.Item1),Foreground=PageHelpers.HexBrush("#EFF5FF"),MinHeight=44,MinWidth=140,VerticalContentAlignment=VerticalAlignment.Center };
             option.Click+=(_,_)=> {
-                if(option.IsChecked==true && !main.Config.QuickLinks.Contains(item.Item1)) main.Config.QuickLinks.Add(item.Item1);
-                else if(option.IsChecked!=true) main.Config.QuickLinks.Remove(item.Item1);
-                ConfigManager.Save(main.Config); main.BuildQuickBar();
+                lock(main.ConfigurationGate) {
+                    var previous=main.Config.QuickLinks.ToList();
+                    try {
+                        if(option.IsChecked==true && !main.Config.QuickLinks.Contains(item.Item1)) main.Config.QuickLinks.Add(item.Item1);
+                        else if(option.IsChecked!=true) main.Config.QuickLinks.Remove(item.Item1);
+                        ConfigManager.Save(main.Config); main.BuildQuickBar();
+                    } catch(Exception ex) {
+                        main.Config.QuickLinks=previous; option.IsChecked=previous.Contains(item.Item1);
+                        result.Text=Localization.T("error")+": "+ex.Message;
+                    }
+                }
             };
             options.Children.Add(option);
         }
@@ -317,7 +327,7 @@ public class ModernSettingsPage : Page, ILanguagePage
             var tile=new Border { Child=grid,CornerRadius=new CornerRadius(14),MinHeight=164 };
             var button=PageHelpers.MkBtn("","#0D1727"); button.Content=tile; button.Padding=new Thickness(0); button.Template=((Button)swatches.Children[0]).Template; button.Margin=new Thickness(0,0,10,10);
             System.Windows.Automation.AutomationProperties.SetName(button,Localization.T("style"+style));
-            button.Click+=(_,_)=> { main.SetWindowButtons(style); UpdateWindowSelection(); };
+            button.Click+=(_,_)=> { try { main.SetWindowButtons(style); UpdateWindowSelection(); } catch(Exception ex) { result.Text=Localization.T("error")+": "+ex.Message; } };
             styleTiles.Add((style,tile,tick)); styleGrid.Children.Add(button);
         }
         UpdateWindowSelection(); windowContent.Children.Add(styleGrid); windowCard.Child=windowContent; appearanceContent.Children.Add(windowCard); appearanceContent.Children.Add(barCard);
@@ -326,9 +336,20 @@ public class ModernSettingsPage : Page, ILanguagePage
         var modes=new[]{"Theme","RGB","Off"};
         var lighting=new ComboBox { Name="CloseLightingBox",ItemsSource=Localization.Language=="en"?new[]{"Theme","RGB · color cycle","Off"}:new[]{"Tema","RGB · renk geçişi","Kapalı"},SelectedIndex=Array.IndexOf(modes,main.Config.CloseLighting),Width=190,MinHeight=36 };
         System.Windows.Automation.AutomationProperties.SetName(lighting,Localization.T("closeLightingTitle"));
+        bool changingLighting=false;
         lighting.SelectionChanged+=(_,_)=> {
-            if(lighting.SelectedIndex<0) return;
-            main.Config.CloseLighting=modes[lighting.SelectedIndex]; ConfigManager.Save(main.Config); main.ApplyWindowAppearance();
+            if(changingLighting || lighting.SelectedIndex<0) return;
+            changingLighting=true;
+            try {
+                lock(main.ConfigurationGate) {
+                    var previous=main.Config.CloseLighting;
+                    try { main.Config.CloseLighting=modes[lighting.SelectedIndex]; ConfigManager.Save(main.Config); main.ApplyWindowAppearance(); }
+                    catch(Exception ex) {
+                        main.Config.CloseLighting=previous; lighting.SelectedIndex=Array.IndexOf(modes,previous);
+                        result.Text=Localization.T("error")+": "+ex.Message;
+                    }
+                }
+            } finally { changingLighting=false; }
         };
         lightRow.Children.Add(lighting); windowContent.Children.Add(lightRow);
         windowContent.Children.Add(PageHelpers.Lbl("closeLightingHelp",12,"#ADBED6",wrap:TextWrapping.Wrap));

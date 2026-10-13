@@ -17,6 +17,10 @@ static class ReleaseCacheTests
         Check(await MistikLauncher.GitHubReleaseCache.GetAsync(notModified,"https://example.invalid/releases/latest",path,CancellationToken.None)==metadata,"release metadata cache handles ETag response");
         using var limited=new HttpClient(new Response(HttpStatusCode.Forbidden,"rate limit",null));
         Check(await MistikLauncher.GitHubReleaseCache.GetAsync(limited,"https://example.invalid/releases/latest",path,CancellationToken.None)==metadata,"release metadata cache survives API rate limits");
+        await File.WriteAllTextAsync(path,$"{DateTimeOffset.UtcNow.AddDays(-8).UtcTicks}\n\"cache-1\"\n{metadata}");
+        Check(await MistikLauncher.GitHubReleaseCache.GetAsync(notModified,"https://example.invalid/releases/latest",path,CancellationToken.None)==metadata &&
+            await MistikLauncher.GitHubReleaseCache.GetAsync(limited,"https://example.invalid/releases/latest",path,CancellationToken.None)==metadata,
+            "ETag validation renews old metadata for fallback during a subsequent API outage");
         bool surfaced=false;
         try { await MistikLauncher.GitHubReleaseCache.GetAsync(limited,"https://example.invalid/releases/latest",path,CancellationToken.None,false); }
         catch(HttpRequestException) { surfaced=true; }

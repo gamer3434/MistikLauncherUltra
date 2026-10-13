@@ -39,7 +39,13 @@ public sealed class LauncherUpdater
         directory=target??AppContext.BaseDirectory;
         CurrentVersion=currentVersion??(typeof(LauncherUpdater).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]??"6.0.0-preview.1");
     }
-    void Publish(string key,double progress=0) { StatusKey=key; Progress=progress; Changed?.Invoke(); }
+    void NotifyChanged()
+    {
+        foreach(var observer in Changed?.GetInvocationList() ?? Array.Empty<Delegate>())
+            try { ((Action)observer)(); }
+            catch(Exception ex) { App.Log("Launcher update notification failed: "+ex.Message); }
+    }
+    void Publish(string key,double progress=0) { StatusKey=key; Progress=progress; NotifyChanged(); }
     public static bool IsNewer(string offered,string installed)
     {
         var a=Regex.Match(offered,@"^v?(\d+\.\d+\.\d+)(?:-preview\.(\d+))?\z");
@@ -203,8 +209,8 @@ public sealed class LauncherUpdater
         }
         catch(Exception ex) { Error=ex.Message; Publish("luError"); App.Log("Launcher update: "+ex.Message); return false; }
         finally {
-            if(stage!=null && PreparedPayload!=Path.Combine(stage,"payload")) DeleteStage(stage);
-            Busy=false; Changed?.Invoke(); gate.Release();
+            try { if(stage!=null && PreparedPayload!=Path.Combine(stage,"payload")) DeleteStage(stage); }
+            finally { Busy=false; try { NotifyChanged(); } finally { gate.Release(); } }
         }
     }
     void ResetTransfer()
@@ -259,16 +265,19 @@ public sealed class LauncherUpdater
         }
         catch(Exception ex) { abandon=true; Error=ex.Message; Publish("luError"); App.Log("Launcher update handoff: "+ex.Message); return false; }
         finally {
-            if(abandon) {
-                bool stopped=child==null;
-                if(child!=null) try {
-                    if(!child.HasExited) { child.Kill(true); child.WaitForExit(5000); }
-                    stopped=child.HasExited;
-                } catch(Exception ex) { App.Log("Update helper cleanup: "+ex.Message); }
-                // An active helper still needs its plan and payload.
-                if(stopped) { var payload=PreparedPayload; PreparedPayload=null; if(payload!=null) DeleteStage(Path.GetDirectoryName(payload)); }
+            try {
+                if(abandon) {
+                    bool stopped=child==null;
+                    if(child!=null) try {
+                        if(!child.HasExited) { child.Kill(true); child.WaitForExit(5000); }
+                        stopped=child.HasExited;
+                    } catch(Exception ex) { App.Log("Update helper cleanup: "+ex.Message); }
+                    // An active helper still needs its plan and payload.
+                    if(stopped) { var payload=PreparedPayload; PreparedPayload=null; if(payload!=null) DeleteStage(Path.GetDirectoryName(payload)); }
+                }
+                child?.Dispose();
             }
-            child?.Dispose(); Busy=false; Changed?.Invoke(); gate.Release();
+            finally { Busy=false; try { NotifyChanged(); } finally { gate.Release(); } }
         }
     }
 

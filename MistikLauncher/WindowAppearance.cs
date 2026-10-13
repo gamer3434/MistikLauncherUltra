@@ -30,8 +30,13 @@ public partial class MainWindow
     public static readonly string[] WindowButtonStyles={"MacOS","Windows","Minimal","Neon","Retro","Glass","Terminal","Pill","Cyberpunk","Balloon","Aurora","Diamond","NeonOutline","FrostedGlass","Samurai","Hologram"};
     public void SetWindowButtons(string style)
     {
-        Config.WindowButtons=WindowButtonStyles.Contains(style)?style:"MacOS";
-        ConfigManager.Save(Config); ApplyWindowAppearance();
+        lock(ConfigurationGate)
+        {
+            var previous=Config.WindowButtons;
+            try { Config.WindowButtons=WindowButtonStyles.Contains(style)?style:"MacOS"; ConfigManager.Save(Config); }
+            catch { Config.WindowButtons=previous; throw; }
+            ApplyWindowAppearance();
+        }
     }
     public void ApplyWindowAppearance()
     {

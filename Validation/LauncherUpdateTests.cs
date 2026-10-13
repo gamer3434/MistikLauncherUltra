@@ -53,6 +53,24 @@ static class LauncherUpdateTests
         File.WriteAllBytes(Path.Combine(target,"config.json"),profileBytes);
         Directory.CreateDirectory(Path.Combine(target,"game")); File.WriteAllText(Path.Combine(target,"game","world.dat"),"world");
         using var client=new HttpClient(new Stub(metadata,zip));
+        var notified=new LauncherUpdater(()=>true,client,target,"6.0.0");
+        int successfulNotifications=0;
+        void BrokenNotification() => throw new InvalidOperationException("Notification fixture failure");
+        void SuccessfulNotification() => successfulNotifications++;
+        notified.Changed+=BrokenNotification; notified.Changed+=SuccessfulNotification;
+        Check(!await notified.CheckAsync(false) && notified.StatusKey=="luAvailable" && !notified.Busy && successfulNotifications>0,
+            "failed update notification does not interrupt work or prevent other observers");
+        notified.Changed-=BrokenNotification;
+        int beforeRetry=successfulNotifications;
+        Check(!await notified.CheckAsync(false) && notified.StatusKey=="luAvailable" && !notified.Busy && successfulNotifications>beforeRetry,
+            "update check releases its gate after a failed notification and allows retry");
+        notified.Changed+=BrokenNotification;
+        Check(!await notified.StartInstallerAsync() && notified.StatusKey=="luDeferred" && !notified.Busy,
+            "installer notification failure cannot strand its busy state or gate");
+        notified.Changed-=BrokenNotification;
+        beforeRetry=successfulNotifications;
+        Check(!await notified.CheckAsync(false) && notified.StatusKey=="luAvailable" && successfulNotifications>beforeRetry,
+            "update check remains usable after installer notification failure");
         bool canUpdate=true;
         var service=new LauncherUpdater(()=>canUpdate,client,target,"6.0.0-preview.1");
         Check(!await service.CheckAsync(false) && service.StatusKey=="luAvailable" && service.PreparedPayload==null,"launcher check-only avoids download");

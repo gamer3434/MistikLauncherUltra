@@ -93,6 +93,23 @@ static class SettingsLifecycleTests
             Control<ComboBox>(settings,"language").SelectedIndex=previous.Lang=="English"?0:1;
             using(var locked=new FileStream(configPath,FileMode.Open,FileAccess.Read,FileShare.Read))
             {
+                var appearance=(window.Config.Accent,window.Config.WindowButtons,window.Config.CloseLighting);
+                var links=window.Config.QuickLinks.ToArray();
+                var accent=ColorThemes.Accent;
+                var themeName=ColorThemes.Names.First(name=>name!=appearance.Accent);
+                var themeButton=Nodes(settings).OfType<Button>().Single(button=>System.Windows.Automation.AutomationProperties.GetName(button)==Localization.T("theme"+themeName));
+                themeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Check(window.Config.Accent==appearance.Accent && ColorThemes.Accent==accent && Control<TextBlock>(settings,"result").Text.StartsWith(Localization.T("error")),"failed theme save keeps the current config and appearance with a visible error");
+                var styleName=MainWindow.WindowButtonStyles.First(style=>style!=appearance.WindowButtons);
+                var styleButton=Nodes(settings).OfType<Button>().Single(button=>System.Windows.Automation.AutomationProperties.GetName(button)==Localization.T("style"+styleName));
+                styleButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Check(window.Config.WindowButtons==appearance.WindowButtons,"failed caption style save rolls back the active appearance preference");
+                var quickLink=Nodes(settings).OfType<CheckBox>().Single(box=>box.Name=="QuickLinkMods");
+                quickLink.IsChecked=!links.Contains("Mods"); quickLink.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Check(window.Config.QuickLinks.SequenceEqual(links) && quickLink.IsChecked==links.Contains("Mods"),"failed navigation save restores both the link list and checkbox");
+                var lighting=Nodes(settings).OfType<ComboBox>().Single(box=>box.Name=="CloseLightingBox");
+                var previousLight=lighting.SelectedIndex; lighting.SelectedIndex=previousLight==2?0:2;
+                Check(window.Config.CloseLighting==appearance.CloseLighting && lighting.SelectedIndex==previousLight && File.ReadAllBytes(configPath).SequenceEqual(savedBytes),"failed lighting save restores config and selection without overwriting saved preferences");
                 foreach(var page in new[]{settings,updates})
                 {
                     var automatic=Control<CheckBox>(page,"autoUpdate");
@@ -159,5 +176,11 @@ static class SettingsLifecycleTests
             typeof(LauncherUpdater).GetProperty(nameof(LauncherUpdater.Error))!.SetValue(updater,error);
         }
         return checks;
+    }
+    static IEnumerable<DependencyObject> Nodes(DependencyObject node)
+    {
+        yield return node;
+        foreach(var child in LogicalTreeHelper.GetChildren(node).OfType<DependencyObject>())
+            foreach(var descendant in Nodes(child)) yield return descendant;
     }
 }

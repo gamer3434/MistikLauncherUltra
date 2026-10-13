@@ -17,7 +17,7 @@ static class ModAndMapRegressionTests
     public static async Task<int> Run(string root)
     {
         Directory.CreateDirectory(root);
-        int checks = 0;
+        int checks = await ModInstallSystemTests.Run(Path.Combine(root, "install-systems"));
         void Check(bool condition, string name)
         {
             if (!condition) throw new Exception(name);

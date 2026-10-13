@@ -27,7 +27,11 @@ public static class GitHubReleaseCache
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (response.StatusCode == HttpStatusCode.NotModified && cached is not null)
+            {
+                cached.SavedAt = DateTimeOffset.UtcNow;
+                Write(cachePath, cached);
                 return cached.Json;
+            }
 
             if (useStaleOnTransient && IsTransientLimit(response.StatusCode) && Usable(cached))
                 return cached!.Json;

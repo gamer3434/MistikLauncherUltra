@@ -214,6 +214,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.25","2026-10-13","#00D4AA", new[]{
+                "Mod taşıma dosya hash'iyle doğru projeyi tanır, hedef modları korur ve doğrulanmış kurulu bağımlılıkları tekrar indirmez.",
+                "Oyun açıkken mod klasörü değiştirilmez; gerekli Java sürümü bir kez kurulur ve başlatmadan önce yeni eklenen uyumsuz modlar kontrol edilir.",
+                "Güncelleme bildirim hataları sistemi kilitlemez; doğrulanan önbellek yenilenir ve kaydedilemeyen görünüm tercihleri geri alınır.",
+                "Mod migration identifies projects by file hash, preserves target mods and reuses verified installed dependencies.",
+                "Active game mod files stay unchanged; the required Java runtime is installed once and newly added incompatible mods are checked before launch.",
+                "Update observer errors cannot lock the updater; validated cache ages refresh and failed appearance saves roll back."
+            }),
             new("v6.2.24","2026-10-13","#00D4AA", new[]{
                 "Mod ayrıntıları hizalı sekmeler, okunaklı sürüm kartları ve net galeri yükleme durumlarıyla yenilendi; eski yükleme sonuçlarının sayfayı bozması düzeltildi.",
                 "Client küçük pencerelere ve yüksek DPI ekranlarına daha iyi sığar. Oyuna kurulabilen Mıstık menüsü kaldırıldı; mevcut Mıstık paketi güvenli yedeğe taşınır.",

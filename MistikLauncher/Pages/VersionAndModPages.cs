@@ -1269,6 +1269,12 @@ namespace MistikLauncher.Pages
 
         internal static string InstallDownloadedMod(string root, JToken file, byte[] bytes, bool required, JArray? projectVersions = null)
         {
+            CheckModInstallConflicts(root, file, required, projectVersions);
+            return ModFiles.Install(root, file["filename"]!.ToString(), bytes, file["hashes"]?["sha512"]?.ToString());
+        }
+
+        static void CheckModInstallConflicts(string root, JToken file, bool required, JArray? projectVersions)
+        {
             string filename = file["filename"]?.ToString() ?? throw new InvalidDataException("Missing mod filename.");
             if (required && File.Exists(Path.Combine(root, filename + ".disabled")))
                 throw new IOException("Required mod is disabled: " + filename);
@@ -1279,7 +1285,29 @@ namespace MistikLauncher.Pages
                     (File.Exists(Path.Combine(root, other)) || File.Exists(Path.Combine(root, other + ".disabled"))))
                     throw new IOException("Another version of this mod is installed. Remove it before installing a different version: " + other);
             }
-            return ModFiles.Install(root, filename, bytes, file["hashes"]?["sha512"]?.ToString());
+        }
+
+        internal static string? FindVerifiedInstalledMod(string root, JToken file, bool required, JArray? projectVersions = null)
+        {
+            var filename = file["filename"]?.ToString() ?? "";
+            var hash = file["hashes"]?["sha512"]?.ToString() ?? "";
+            if (string.IsNullOrWhiteSpace(filename) || filename != Path.GetFileName(filename) ||
+                filename.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || !filename.EndsWith(".jar", StringComparison.OrdinalIgnoreCase) ||
+                !System.Text.RegularExpressions.Regex.IsMatch(hash, @"^[a-fA-F0-9]{128}$"))
+                throw new InvalidDataException("Invalid mod file metadata.");
+            ModFiles.EnsureRoot(root);
+            CheckModInstallConflicts(root, file, required, projectVersions);
+            var path = Path.Combine(root, filename);
+            if (File.Exists(path + ".disabled"))
+            {
+                if (required || File.Exists(path)) throw new IOException("Required mod is disabled or has conflicting copies: " + filename);
+                path += ".disabled";
+            }
+            if (!File.Exists(path)) return null;
+            if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) throw new IOException("Invalid mod path.");
+            using var stream = File.OpenRead(path);
+            if (stream.Length is <= 0 or > 128L * 1024 * 1024) return null;
+            return Convert.ToHexString(System.Security.Cryptography.SHA512.HashData(stream)).Equals(hash, StringComparison.OrdinalIgnoreCase) ? path : null;
         }
 
         async Task DownloadModAndDependencies(string projectId, string name, List<string> installedList, bool isDependency = false,
@@ -1344,6 +1372,15 @@ namespace MistikLauncher.Pages
                     DownloadModAndDependencies(dependencyProject, dependencyProject, installedList, true, visited, dependencyVersion, queueGame, queueLoader, currentVer, http));
                 var file = (targetVersion["files"] as JArray)?.FirstOrDefault(value => value["primary"]?.Value<bool>() == true)
                     ?? targetVersion["files"]?.FirstOrDefault() ?? throw new InvalidDataException("Missing mod file.");
+                var reused = await Task.Run(() => queueGame == null
+                    ? _main.WithSyncedMods(currentVer, destination => FindVerifiedInstalledMod(destination, file, isDependency, versions))
+                    : FindVerifiedInstalledMod(Path.Combine(App.AppData, "mods_pool", GameProfiles.VersionPoolKey(mcVersion, loader)), file, isDependency, versions));
+                if (reused != null)
+                {
+                    if (isDependency) name = Path.GetFileName(reused);
+                    if (!installedList.Contains(name)) installedList.Add(name);
+                    return;
+                }
                 var bytes = await http.GetByteArrayAsync(ModFiles.DownloadUrl(file["url"]?.ToString() ?? ""));
                 if (queueGame == null && _main.Config.Version != currentVer) throw new IOException("The selected Minecraft version changed during mod installation. Please retry.");
                 var installedPath = queueGame == null
@@ -1633,24 +1670,33 @@ namespace MistikLauncher.Pages
                 var origText = btn.Content.ToString();
                 btn.Content = "Yedekleniyor & Sürüm değiştiriliyor...";
 
-                // 1. Modların kimliklerini (Mod ID / Clean Name) asenkron olarak oku
+                // Runtime mod IDs are not Modrinth project IDs; identify the exact local file before switching profiles.
                 var modIds = new List<string>();
                 var jarFileNames = new List<string>();
-                await Task.Run(() => {
-                    foreach (var jar in jars)
+                var failedMods = new List<string>();
+                foreach (var jar in jars)
+                {
+                    btn.Content = $"Mod tanımlanıyor: {Path.GetFileName(jar)}…";
+                    try
                     {
-                        var id = GetModIdFromJar(jar);
-                        if (!string.IsNullOrEmpty(id))
+                        var id = await ResolveModrinthProject(_client, jar);
+                        if (id != null)
                         {
                             modIds.Add(id);
                             jarFileNames.Add(Path.GetFileName(jar));
                         }
+                        else failedMods.Add(Path.GetFileName(jar) + " (Modrinth'te bulunamadı; kaynak profilde korundu)");
                     }
-                });
+                    catch (Exception error)
+                    {
+                        failedMods.Add(Path.GetFileName(jar) + " (tanımlanamadı; kaynak profilde korundu)");
+                        App.Log($"Mod migration identification failed: {Path.GetFileName(jar)}: {error.Message}");
+                    }
+                }
 
                 if (modIds.Count == 0)
                 {
-                    MessageBox.Show("Mod dosyaları okunamadı veya geçerli mod bulunamadı!", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show("Modrinth'te tanımlanabilen mod bulunamadı. Profil değiştirilmedi; mevcut modlar korundu.\n\n" + string.Join("\n", failedMods.Take(8)), "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
                     btn.IsEnabled = true;
                     btn.Content = origText;
                     return;
@@ -1672,14 +1718,8 @@ namespace MistikLauncher.Pages
                     _main.StatusLbl.Text = $"Surum: {matchedVerName}";
                 });
 
-                // Preserve the target version's existing set before downloading replacements.
-                var migrationBackup=Path.Combine(App.AppData,"mods_pool","migration-backup-"+Guid.NewGuid().ToString("N"));
-                ModFiles.SyncPools(App.ModsDir,migrationBackup,null);
-                App.Log("Mod migration backup: "+migrationBackup);
-
-                // 5. Her bir mod için Modrinth'ten uyumlu sürümü bul ve indir
+                // Merge into the target set; failed downloads must not remove its existing mods.
                 int downloadedCount = 0;
-                var failedMods = new List<string>();
 
                 var migrationVisited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var migrationInstalled = new List<string>();
@@ -1712,7 +1752,7 @@ namespace MistikLauncher.Pages
 
                 if (failedMods.Count > 0)
                 {
-                    msg += $"❌ Uyumlu Sürümü Bulunamayan ({failedMods.Count}):\n" + string.Join("\n", failedMods.Take(8));
+                    msg += $"❌ Atlanan / Kurulamayan ({failedMods.Count}; mevcut dosyalar korundu):\n" + string.Join("\n", failedMods.Take(8));
                     if (failedMods.Count > 8) msg += $"\n...ve {failedMods.Count - 8} mod daha.";
                 }
 
@@ -1729,52 +1769,24 @@ namespace MistikLauncher.Pages
             }
         }
 
-        private static string? GetModIdFromJar(string jarPath)
+        internal static async Task<string?> ResolveModrinthProject(HttpClient client, string jarPath)
         {
-            try
+            if ((File.GetAttributes(jarPath) & FileAttributes.ReparsePoint) != 0) throw new IOException("Invalid mod path.");
+            string hash;
+            using (var file = File.OpenRead(jarPath))
             {
-                using var archive = System.IO.Compression.ZipFile.OpenRead(jarPath);
-
-                // Try Fabric first
-                var fabricEntry = archive.GetEntry("fabric.mod.json");
-                if (fabricEntry != null)
-                {
-                    using var reader = new StreamReader(fabricEntry.Open());
-                    var jsonStr = reader.ReadToEnd();
-                    var jObj = JObject.Parse(jsonStr);
-                    return jObj["id"]?.ToString() ?? jObj["name"]?.ToString();
-                }
-
-                // Try Forge mods.toml
-                var tomlEntry = archive.GetEntry("META-INF/mods.toml");
-                if (tomlEntry != null)
-                {
-                    using var reader = new StreamReader(tomlEntry.Open());
-                    var content = reader.ReadToEnd();
-                    var match = System.Text.RegularExpressions.Regex.Match(content, @"modId\s*=\s*""([^""]+)""");
-                    if (match.Success) return match.Groups[1].Value;
-                }
-
-                // Try older Forge mcmod.info
-                var infoEntry = archive.GetEntry("mcmod.info");
-                if (infoEntry != null)
-                {
-                    using var reader = new StreamReader(infoEntry.Open());
-                    var content = reader.ReadToEnd();
-                    var match = System.Text.RegularExpressions.Regex.Match(content, @"""modid""\s*:\s*""([^""]+)""");
-                    if (match.Success) return match.Groups[1].Value;
-                }
+                if (file.Length is <= 0 or > 128L * 1024 * 1024) throw new IOException("Invalid mod file size.");
+                hash = Convert.ToHexString(await System.Security.Cryptography.SHA512.HashDataAsync(file)).ToLowerInvariant();
             }
-            catch (Exception ex)
-            {
-                App.Log($"Error reading jar {Path.GetFileName(jarPath)}: {ex.Message}");
-            }
-
-            // Fallback: Use filename cleaned
-            var name = Path.GetFileNameWithoutExtension(jarPath);
-            name = System.Text.RegularExpressions.Regex.Replace(name, @"[-_]\d+.*", ""); // Strip version like -1.20.1-0.5.0
-            name = System.Text.RegularExpressions.Regex.Replace(name, @"(?i)(fabric|forge|neoforge|loader)", ""); // Strip loaders
-            return name.Trim('-', '_');
+            using var response = await client.GetAsync("https://api.modrinth.com/v2/version_file/" + hash + "?algorithm=sha512");
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+            response.EnsureSuccessStatusCode();
+            var version = JObject.Parse(await response.Content.ReadAsStringAsync());
+            var project = version["project_id"]?.ToString();
+            if (string.IsNullOrWhiteSpace(project) ||
+                !(version["files"] as JArray ?? new JArray()).Any(file => hash.Equals(file["hashes"]?["sha512"]?.ToString(), StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidDataException("Modrinth project metadata does not match the local mod file.");
+            return project;
         }
     }
 }

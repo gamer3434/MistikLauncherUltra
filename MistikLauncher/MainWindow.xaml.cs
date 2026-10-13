@@ -276,7 +276,14 @@ namespace MistikLauncher
 
         public void SetColorTheme(string name)
         {
-            Config.Accent=name; ConfigManager.Save(Config); ApplyAccent(name);
+            lock (ConfigurationGate)
+            {
+                var previousAccent = Config.Accent;
+                Config.Accent = name;
+                try { ConfigManager.Save(Config); }
+                catch { Config.Accent = previousAccent; throw; }
+            }
+            ApplyAccent(name);
             SelectNav(_currentNav);
         }
 
@@ -516,7 +523,7 @@ namespace MistikLauncher
                 if (!Dispatcher.HasShutdownStarted) Dispatcher.BeginInvoke(new Action(QueueBackgroundModSync));
                 return;
             }
-            if (!IsLoaded || string.IsNullOrWhiteSpace(Config.Version) || Interlocked.Exchange(ref _backgroundModSync,1)!=0) return;
+            if (!IsLoaded || launchPreparing || gameRunning || string.IsNullOrWhiteSpace(Config.Version) || Interlocked.Exchange(ref _backgroundModSync,1)!=0) return;
             var requestedVersion=Config.Version;
             _ = Task.Run(() => {
                 try { SyncModsForCurrentVersion(requestedVersion); }
@@ -701,7 +708,7 @@ namespace MistikLauncher
 
             try
             {
-                if(!await Task.Run(() => SyncModsForCurrentVersion(version)))
+                if(!await Task.Run(() => SyncModsForCurrentVersion(version, verifyCompatibility: true)))
                 {
                     MessageBox.Show(Localization.T("modSyncFailed"),"Mistik Launcher",MessageBoxButton.OK,MessageBoxImage.Warning);
                     return;
@@ -709,70 +716,17 @@ namespace MistikLauncher
                 // 1. Java bul
                 SetStatus("Java aranıyor...");
                 var javaPath = await FindJavaAsync();
-                if (javaPath == null)
+                int requiredJava = GameProfiles.RequiredJava(App.GameDir, version);
+                int javaVer = javaPath == null ? 0 : GetJavaMajorVersion(javaPath);
+                javaPath = await EnsureLaunchJavaAsync(javaPath, requiredJava, async installJava =>
                 {
                     var res = MessageBox.Show(
-                        "Java bulunamadı!\n\nModern Minecraft ve modları açabilmek için Java 21 gereklidir.\n\nJava 21 otomatik olarak indirilip kurulsun mu?",
-                        "Java Yok", MessageBoxButton.YesNo, MessageBoxImage.Question);
-                    if (res == MessageBoxResult.Yes)
-                    {
-                        javaPath = await DownloadAndInstallJava21Async();
-                        if (javaPath == null) return;
-                    }
-                    else
-                    {
-                        return;
-                    }
-                }
-                if (javaPath != null)
-                {
-                    int javaVer = GetJavaMajorVersion(javaPath);
-                    bool req25 = RequiresJava25(version);
-                    if (req25 && javaVer < 25)
-                    {
-                        var res = MessageBox.Show(
-                            $"Seçtiğiniz sürüm ({version}) için en az Java 25 gereklidir. Ancak bilgisayarınızda sadece Java {javaVer} bulundu.\n\nJava 25 otomatik olarak indirilip kurulsun mu?",
-                            "Uyumsuz Java Sürümü", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                        if (res == MessageBoxResult.Yes)
-                        {
-                            var autoJava = await DownloadAndInstallJava25Async();
-                            if (autoJava != null)
-                            {
-                                javaPath = autoJava;
-                            }
-                            else
-                            {
-                                return;
-                            }
-                        }
-                        else
-                        {
-                            return;
-                        }
-                    }
-                    else if (javaVer < GameProfiles.RequiredJava(App.GameDir,version))
-                    {
-                        var res = MessageBox.Show(
-                            $"Seçtiğiniz sürüm ({version}) için en az Java {GameProfiles.RequiredJava(App.GameDir,version)} gereklidir. Ancak bilgisayarınızda sadece Java {javaVer} bulundu.\n\nJava 21 otomatik olarak indirilip kurulsun mu?",
-                            "Uyumsuz Java Sürümü", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                        if (res == MessageBoxResult.Yes)
-                        {
-                            var autoJava = await DownloadAndInstallJava21Async();
-                            if (autoJava != null)
-                            {
-                                javaPath = autoJava;
-                            }
-                            else
-                            {
-                                return;
-                            }
-                        }
-                        else
-                        {
-                            return;
-                        }
-                    }
-                }
+                        javaPath == null
+                            ? $"Java bulunamadı!\n\nSeçtiğiniz sürüm ({version}) için Java {requiredJava} gereklidir.\n\nJava {installJava} otomatik olarak indirilip kurulsun mu?"
+                            : $"Seçtiğiniz sürüm ({version}) için en az Java {requiredJava} gereklidir. Ancak bilgisayarınızda sadece Java {javaVer} bulundu.\n\nJava {installJava} otomatik olarak indirilip kurulsun mu?",
+                        javaPath == null ? "Java Yok" : "Uyumsuz Java Sürümü", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                    return res == MessageBoxResult.Yes ? await DownloadAndInstallJavaAsync(installJava) : null;
+                });
 
                 if(javaPath==null) return;
                 SetProgress(40);
@@ -886,6 +840,7 @@ namespace MistikLauncher
                         if(!Dispatcher.HasShutdownStarted) await Dispatcher.InvokeAsync(()=> {
                             gameRunning=false;
                             BtnLaunch.IsEnabled=true;
+                            QueueBackgroundModSync();
                             if(Config.AutoClose && !IsVisible) { Show(); WindowState=WindowState.Normal; Activate(); }
                         });
                     }
@@ -904,6 +859,7 @@ namespace MistikLauncher
             finally
             {
                 launchPreparing = false;
+                if (!gameRunning) QueueBackgroundModSync();
                 BtnLaunch.IsEnabled = !gameRunning;
                 BtnLaunch.Content   = Localization.T("play");
                 SetProgress(0);
@@ -1089,20 +1045,26 @@ namespace MistikLauncher
             }
         }
 
-        public bool SyncModsForCurrentVersion(string? requestedVersion=null)
+        public bool SyncModsForCurrentVersion(string? requestedVersion=null, bool verifyCompatibility = false)
         {
             lock (_modSyncGate)
             {
                 try
                 {
                     var currentVer = requestedVersion ?? Config.Version ?? "";
+                    if (gameRunning) return false;
                     if (string.IsNullOrEmpty(currentVer) || !string.Equals(Config.Version,currentVer,StringComparison.Ordinal)) return false;
 
                     var previousSynced = Config.LastSyncedVersion ?? "";
                     var lastSynced = previousSynced;
 
                     // If nothing has changed, do not do anything
-                    if (lastSynced == currentVer) { ModFiles.RetireMistikHud(App.ModsDir); return true; }
+                    if (lastSynced == currentVer)
+                    {
+                        ModFiles.RetireMistikHud(App.ModsDir);
+                        if (verifyCompatibility) SuspendIncompatibleMods(GameProfiles.MinecraftVersion(App.GameDir, currentVer), GameProfiles.Loader(App.GameDir, currentVer));
+                        return true;
+                    }
 
                     string currentLoader = GameProfiles.Loader(App.GameDir,currentVer);
                     string mcVersion = GameProfiles.MinecraftVersion(App.GameDir,currentVer);
@@ -1888,6 +1850,12 @@ namespace MistikLauncher
         }
 
         internal static Task<string?> FindJavaAsync() => Task.Run(FindJavaCoreAsync);
+
+        static async Task<string?> EnsureLaunchJavaAsync(string? javaPath, int requiredJava, Func<int, Task<string?>> install)
+        {
+            if (javaPath != null && GetJavaMajorVersion(javaPath) >= requiredJava) return javaPath;
+            return await install(requiredJava >= 25 ? 25 : 21);
+        }
 
         static async Task<string?> FindJavaCoreAsync()
         {
