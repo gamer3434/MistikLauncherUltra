@@ -133,10 +133,15 @@ public static class UpdateEngine
             if(key?.GetValue("InstallLocation") is string location && System.IO.Path.GetFullPath(location).Equals(System.IO.Path.GetFullPath(target),StringComparison.OrdinalIgnoreCase)) key.SetValue("DisplayVersion",manifest.Version);
             cleanBackup=true;
         }
-        catch
+        catch(Exception error)
         {
+            var rollbackErrors=new List<Exception>();
             foreach(var item in completed.AsEnumerable().Reverse())
-                if(item.Backup!=null) File.Copy(item.Backup,item.Destination,true); else File.Delete(item.Destination);
+                try { if(item.Backup!=null) File.Copy(item.Backup,item.Destination,true); else File.Delete(item.Destination); }
+                catch(Exception rollbackError) { rollbackErrors.Add(rollbackError); }
+            if(rollbackErrors.Count>0)
+                throw new AggregateException("Update rollback incomplete; recovery files preserved in "+backup,
+                    new[] { error }.Concat(rollbackErrors));
             cleanBackup=true;
             throw;
         }

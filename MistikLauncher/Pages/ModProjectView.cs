@@ -21,6 +21,13 @@ public sealed class ModProjectView : Grid
     readonly TextBlock status = PageHelpers.Lbl("", 13, "#ADBED6", wrap: TextWrapping.Wrap);
     CancellationTokenSource? cancellation;
     WebView2? browser;
+    JArray? projectVersions;
+    Button? projectInstall;
+    readonly List<Button> installButtons = new();
+    bool installing;
+    Border? projectSummary;
+    FrameworkElement? projectIcon;
+    TextBlock? projectTitle, projectDescription, projectCategories;
     string T(string tr, string en) => Localization.Language == "en" ? en : tr;
 
     public ModProjectView(MainWindow main, HttpClient client, string id, Action back, Func<string?, Task<bool>> install)
@@ -73,6 +80,7 @@ public sealed class ModProjectView : Grid
         heading.Children.Add(status); Children.Add(heading);
         SetRow(tabs, 1); Children.Add(tabs);
         Loaded += async (_, _) => await Load();
+        SizeChanged += (_, _) => UpdateCompactLayout();
         Unloaded += (_, _) => { cancellation?.Cancel(); browser?.Dispose(); browser = null; };
     }
 
@@ -110,10 +118,52 @@ public sealed class ModProjectView : Grid
 
     public void RefreshLanguage() => _ = Load();
 
+    public void RefreshProfile()
+    {
+        if (projectVersions == null || projectInstall == null || tabs.Items.Count < 2) return;
+        var versionPanel = new StackPanel { Margin = new Thickness(16) };
+        var profile = main.Config.Version ?? "";
+        var game = GameProfiles.MinecraftVersion(App.GameDir, profile);
+        var loader = GameProfiles.Loader(App.GameDir, profile);
+        var compatible = projectVersions.Where(version => ModManagerPage.CheckCompatibility(version, game, loader)).Take(100).ToArray();
+        installButtons.Clear(); installButtons.Add(projectInstall);
+        projectInstall.IsEnabled = !installing && compatible.Length > 0;
+        projectInstall.ToolTip = compatible.Length == 0 ? T("Bu Minecraft sürümü ve yükleyici için uyumlu dosya yok.", "No compatible file for this Minecraft version and loader.") : T("Seçili profile en güncel uyumlu sürümü kur.", "Install the latest compatible version into the selected profile.");
+        System.Windows.Controls.ToolTipService.SetShowOnDisabled(projectInstall, true);
+        versionPanel.Children.Add(PageHelpers.Lbl(T("Seçili profil: ", "Selected profile: ") + game + " / " + loader, 14, "#ADBED6"));
+        if (compatible.Length == 0) versionPanel.Children.Add(PageHelpers.Lbl(T("Bu profil için uyumlu sürüm yok.", "No compatible version for this profile."), 15, "#F0CF84"));
+        foreach (var version in compatible)
+        {
+            var row = new DockPanel { Margin = new Thickness(14) };
+            var button = InstallButton(version["id"]?.ToString()); DockPanel.SetDock(button, Dock.Right); row.Children.Add(button);
+            var details = new StackPanel();
+            details.Children.Add(PageHelpers.Lbl(version["name"]?.ToString() ?? "", 16, "#FFFFFF", true));
+            details.Children.Add(PageHelpers.Lbl(string.Join("  ·  ", new[] { version["version_number"]?.ToString(), version["version_type"]?.ToString(), game, loader }.Where(value => !string.IsNullOrWhiteSpace(value))), 13, "#ADBED6"));
+            row.Children.Add(details);
+            var card = PageHelpers.Card("#202731", 10, "#303A45"); card.Child = row; versionPanel.Children.Add(card);
+        }
+        ((TabItem)tabs.Items[1]).Content = new ScrollViewer { Content = versionPanel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+    }
+
+    void UpdateCompactLayout()
+    {
+        bool compact = ActualHeight > 0 && ActualHeight + Margin.Top + Margin.Bottom < 432;
+        Margin = compact ? new Thickness(16, 10, 16, 10) : new Thickness(22, 16, 22, 16);
+        tabs.Padding = new Thickness(compact ? 8 : 12);
+        if (projectSummary == null || projectIcon == null || projectTitle == null || projectDescription == null || projectCategories == null) return;
+        projectSummary.Padding = new Thickness(compact ? 8 : 16);
+        projectSummary.Margin = compact ? new Thickness(0, 6, 0, 6) : new Thickness(0, 12, 0, 14);
+        projectIcon.Width = projectIcon.Height = compact ? 48 : 92;
+        projectIcon.Margin = new Thickness(0, 0, compact ? 12 : 18, 0);
+        projectTitle.MaxHeight = compact ? 28 : 56;
+        projectDescription.Visibility = projectCategories.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+    }
+
     async Task Load()
     {
         cancellation?.Cancel(); cancellation?.Dispose(); cancellation = new(); var token = cancellation.Token;
         browser?.Dispose(); browser = null;
+        projectVersions = null; projectInstall = null;
         tabs.Items.Clear();
         while (heading.Children.Count > 2) heading.Children.RemoveAt(2);
         ((Button)heading.Children[0]).Content = T("← Modlara dön", "← Back to mods");
@@ -133,47 +183,34 @@ public sealed class ModProjectView : Grid
             var header = new Grid();
             header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
             header.ColumnDefinitions.Add(new()); header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-            header.Children.Add(Icon(project["icon_url"]?.ToString(), 92));
+            projectIcon = Icon(project["icon_url"]?.ToString(), 92); header.Children.Add(projectIcon);
             var copy = new StackPanel { VerticalAlignment = VerticalAlignment.Top }; SetColumn(copy, 1); header.Children.Add(copy);
             var title = PageHelpers.Lbl(project["title"]?.ToString() ?? id, 22, "#FFFFFF", true);
             title.MaxHeight = 56; title.LineHeight = 28; title.TextTrimming = TextTrimming.CharacterEllipsis; title.ToolTip = title.Text;
+            projectTitle = title;
             copy.Children.Add(title);
             var summary = PageHelpers.Lbl(project["description"]?.ToString() ?? "", 14, "#ADBED6");
             summary.MaxHeight = 42; summary.LineHeight = 21; summary.TextTrimming = TextTrimming.CharacterEllipsis; summary.ToolTip = summary.Text;
+            projectDescription = summary;
+            title.ToolTip = title.Text + "\n\n" + summary.Text;
             copy.Children.Add(summary);
             copy.Children.Add(PageHelpers.Lbl($"↓ {project["downloads"]?.Value<long>() ?? 0:N0}   ♡ {project["followers"]?.Value<long>() ?? 0:N0}", 13, "#ADBED6"));
             var categories = PageHelpers.Lbl(string.Join("  ·  ", (project["categories"] as JArray ?? new()).Select(value => value.ToString())), 12, "#ADBED6", wrap: TextWrapping.NoWrap);
             categories.TextTrimming = TextTrimming.CharacterEllipsis; categories.ToolTip = categories.Text; copy.Children.Add(categories);
+            projectCategories = categories;
             var latest = InstallButton(null); latest.Name = "ProjectInstallButton"; SetColumn(latest, 2); header.Children.Add(latest);
-            heading.Children.Add(new Border { Name = "ProjectSummary", Child = header, Padding = new Thickness(16),
+            projectSummary = new Border { Name = "ProjectSummary", Child = header, Padding = new Thickness(16),
                 CornerRadius = new CornerRadius(14), BorderThickness = new Thickness(1), BorderBrush = PageHelpers.HexBrush("#303A45"),
-                Background = PageHelpers.HexBrush("#171B22"), Margin = new Thickness(0, 12, 0, 14) });
+                Background = PageHelpers.HexBrush("#171B22"), Margin = new Thickness(0, 12, 0, 14) };
+            heading.Children.Add(projectSummary); UpdateCompactLayout();
             status.Text = ""; status.Visibility = Visibility.Collapsed; tabs.Items.Clear();
             var description = new Grid();
             browser = new WebView2 { DefaultBackgroundColor = System.Drawing.Color.FromArgb(255, 23, 27, 34) };
             description.Children.Add(browser);
             tabs.Items.Add(new TabItem { Header = T("Açıklama", "Description"), Content = description });
-            var versionPanel = new StackPanel { Margin = new Thickness(16) };
-            var profile = main.Config.Version ?? "";
-            var game = GameProfiles.MinecraftVersion(App.GameDir, profile);
-            var loader = GameProfiles.Loader(App.GameDir, profile);
-            var compatible = versions.Where(version => ModManagerPage.CheckCompatibility(version, game, loader)).Take(100).ToArray();
-            latest.IsEnabled = compatible.Length > 0;
-            latest.ToolTip = compatible.Length == 0 ? T("Bu Minecraft sürümü ve yükleyici için uyumlu dosya yok.", "No compatible file for this Minecraft version and loader.") : T("Seçili profile en güncel uyumlu sürümü kur.", "Install the latest compatible version into the selected profile.");
-            System.Windows.Controls.ToolTipService.SetShowOnDisabled(latest, true);
-            versionPanel.Children.Add(PageHelpers.Lbl(T("Seçili profil: ", "Selected profile: ") + game + " / " + loader, 14, "#ADBED6"));
-            if (compatible.Length == 0) versionPanel.Children.Add(PageHelpers.Lbl(T("Bu profil için uyumlu sürüm yok.", "No compatible version for this profile."), 15, "#F0CF84"));
-            foreach (var version in compatible)
-            {
-                var row = new DockPanel { Margin = new Thickness(14) };
-                var button = InstallButton(version["id"]?.ToString()); DockPanel.SetDock(button, Dock.Right); row.Children.Add(button);
-                var details = new StackPanel();
-                details.Children.Add(PageHelpers.Lbl(version["name"]?.ToString() ?? "", 16, "#FFFFFF", true));
-                details.Children.Add(PageHelpers.Lbl(string.Join("  ·  ", new[] { version["version_number"]?.ToString(), version["version_type"]?.ToString(), game, loader }.Where(value => !string.IsNullOrWhiteSpace(value))), 13, "#ADBED6"));
-                row.Children.Add(details);
-                var card = PageHelpers.Card("#202731", 10, "#303A45"); card.Child = row; versionPanel.Children.Add(card);
-            }
-            tabs.Items.Add(new TabItem { Header = T("Sürümler", "Versions"), Content = new ScrollViewer { Content = versionPanel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
+            projectVersions = versions; projectInstall = latest;
+            tabs.Items.Add(new TabItem { Header = T("Sürümler", "Versions") });
+            RefreshProfile();
             var gallery = new StackPanel { Margin = new Thickness(16) };
             foreach (var item in (project["gallery"] as JArray ?? new()).Take(30))
             {
@@ -244,7 +281,17 @@ public sealed class ModProjectView : Grid
     {
         var button = PageHelpers.MkBtn(T("↓ Kur", "↓ Install"), "#159D59", 118);
         button.VerticalAlignment = VerticalAlignment.Top; button.Margin = new Thickness(12, 0, 0, 0);
-        button.Click += async (_, _) => await ModManagerPage.RunInstallButton(button, () => install(version), error => { status.Visibility = Visibility.Visible; status.Text = error.Message; }, T("Kuruldu", "Installed"));
+        button.IsEnabled = !installing; installButtons.Add(button);
+        button.Click += async (_, _) => {
+            if (installing) return;
+            installing = true;
+            foreach (var pendingButton in installButtons) pendingButton.IsEnabled = false;
+            try
+            {
+                await ModManagerPage.RunInstallButton(button, () => install(version), error => { status.Visibility = Visibility.Visible; status.Text = error.Message; }, T("Kuruldu", "Installed"));
+            }
+            finally { installing = false; RefreshProfile(); }
+        };
         return button;
     }
 }

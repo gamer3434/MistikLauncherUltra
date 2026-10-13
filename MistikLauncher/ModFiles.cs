@@ -86,12 +86,32 @@ public static class ModFiles
             throw;
         }
     }
-    public static string Toggle(string root,string path)
+    static string ValidateExistingMod(string root,string path)
     {
         root=Path.GetFullPath(root); path=Path.GetFullPath(path);
         if(!string.Equals(Path.GetDirectoryName(path),root,StringComparison.OrdinalIgnoreCase) || !List(root).Contains(path,StringComparer.OrdinalIgnoreCase)) throw new IOException(Localization.T("modToggleInvalid"));
         for(string? current=path;current!=null;current=Path.GetDirectoryName(current))
             if((File.GetAttributes(current)&FileAttributes.ReparsePoint)!=0) throw new IOException(Localization.T("modToggleInvalid"));
+        return path;
+    }
+    public static string Remove(string root,string path)
+    {
+        path=ValidateExistingMod(root,path);
+        string backup=Path.Combine(root,".backups"); EnsureRoot(backup);
+        string destination=Path.Combine(backup,Guid.NewGuid().ToString("N")+"-"+Path.GetFileName(path));
+        File.Move(path,destination);
+        return destination;
+    }
+    public static string Clear(string root)
+    {
+        EnsureRoot(root);
+        string backup=Path.Combine(root,".backups","clear-"+Guid.NewGuid().ToString("N"));
+        SyncPools(root,backup,null);
+        return backup;
+    }
+    public static string Toggle(string root,string path)
+    {
+        path=ValidateExistingMod(root,path);
         string target=Enabled(path)?path+".disabled":path[..^9];
         if(File.Exists(target)) throw new IOException(Localization.T("modToggleConflict"));
         File.Move(path,target); return target;

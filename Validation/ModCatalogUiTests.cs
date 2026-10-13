@@ -1,4 +1,5 @@
 using System.Net;
+using System.IO;
 using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
@@ -10,7 +11,7 @@ using Localization = MistikLauncher.Localization;
 
 static class ModCatalogUiTests
 {
-    public static int Run(MainWindow window, Action<string> capture)
+    public static int Run(MainWindow window, Action<string> capture, Action<string, int, int>? compactCapture = null)
     {
         var frame = (Frame)window.FindName("MainFrame"); var previous = frame.Content;
         var fixture = new Fixture(window);
@@ -75,6 +76,27 @@ static class ModCatalogUiTests
             if (Nodes(versions).OfType<Button>().Count() != 1 || Nodes(versions).OfType<TextBlock>().Any(text => text.Text.Contains("Wrong build")))
                 throw new Exception("Only compatible versions may offer installation.");
             Console.WriteLine("PASS project version list excludes incompatible builds");
+            var selectedProfile = window.Config.Version;
+            var preservedDescription = ((TabItem)tabs.Items[0]).Content;
+            window.SetVersion("fabric-0.0.1"); Flush(window);
+            if (Nodes(detail).OfType<Button>().Single(button => button.Name == "ProjectInstallButton").IsEnabled ||
+                Nodes((DependencyObject)((TabItem)tabs.Items[1]).Content).OfType<Button>().Any() ||
+                !ReferenceEquals(preservedDescription, ((TabItem)tabs.Items[0]).Content) || tabs.SelectedIndex != 1)
+                throw new Exception("Selecting an incompatible profile must immediately update install eligibility and versions while preserving the description and selected tab.");
+            window.SetVersion(selectedProfile); Flush(window);
+            if (!Nodes(detail).OfType<Button>().Single(button => button.Name == "ProjectInstallButton").IsEnabled ||
+                Nodes((DependencyObject)((TabItem)tabs.Items[1]).Content).OfType<Button>().Count() != 1)
+                throw new Exception("Returning to a compatible profile must restore its installable version without reopening the project.");
+            Console.WriteLine("PASS profile selection refreshes detail compatibility without reloading project content");
+            var alternateProfile = GameProfiles.Loader(App.GameDir, selectedProfile) + "-" + GameProfiles.MinecraftVersion(App.GameDir, selectedProfile) + "-alternate";
+            window.SetVersion(alternateProfile); Flush(window);
+            var installForProfile = (Func<string?, Task<bool>>)typeof(ModProjectView).GetField("install", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(detail)!;
+            try { installForProfile("compatible").GetAwaiter().GetResult(); }
+            catch (HttpRequestException) { }
+            if (fixture.InstallRequests != 1)
+                throw new Exception("Project detail install must use the currently selected compatible profile rather than reject the profile captured when opening the page.");
+            window.SetVersion(selectedProfile); Flush(window);
+            Console.WriteLine("PASS detail installation uses click-time profile and reaches guarded download after profile selection");
             tabs.SelectedIndex = 2; capture("mod-catalog-gallery");
             var gallery = (DependencyObject)((TabItem)tabs.Items[2]).Content;
             if (!Nodes(gallery).OfType<TextBlock>().Any(text => text.Text.Contains("gallery", StringComparison.OrdinalIgnoreCase) || text.Text.Contains("galeri")))
@@ -104,6 +126,20 @@ static class ModCatalogUiTests
                 throw new Exception("Long project headings must keep installation in bounds and preserve a usable detail viewport at compact size.");
             capture("mod-catalog-long-heading");
             Console.WriteLine("PASS long project heading preserves compact install controls and content viewport");
+            var shell = (FrameworkElement)window.Content;
+            foreach (var size in new[] { new Size(800, 500), new Size(768, 540) })
+            {
+                shell.Measure(size); shell.Arrange(new Rect(size)); shell.UpdateLayout();
+                tabs.SelectedIndex = 1; shell.UpdateLayout(); tabs.ApplyTemplate();
+                compactContent = (FrameworkElement)tabs.Template.FindName("PART_SelectedContentHost", tabs);
+                if (compactContent.ActualHeight < 100 ||
+                    projectInstall.TranslatePoint(new Point(projectInstall.ActualWidth, projectInstall.ActualHeight), shell).X > size.Width ||
+                    compactContent.TranslatePoint(new Point(0, compactContent.ActualHeight), shell).Y > size.Height)
+                    throw new Exception($"Full compact client must preserve100DIP content: shell{size}, page{detail.ActualWidth}x{detail.ActualHeight}, summary{summary.ActualHeight}, content{compactContent.ActualHeight}, installRight{projectInstall.TranslatePoint(new Point(projectInstall.ActualWidth, projectInstall.ActualHeight), shell).X}, contentBottom{compactContent.TranslatePoint(new Point(0, compactContent.ActualHeight), shell).Y}.");
+                compactCapture?.Invoke("mod-detail-compact-" + (int)size.Width, (int)size.Width, (int)size.Height);
+            }
+            shell.Measure(new Size(1200, 820)); shell.Arrange(new Rect(0, 0, 1200, 820)); shell.UpdateLayout();
+            Console.WriteLine("PASS full compact client preserves usable mod detail content with long metadata");
             var successfulPending = new TaskCompletionSource<HttpResponseMessage>();
             fixture.PendingProject = successfulPending;
             var obsoleteSuccess = (Task)typeof(ModProjectView).GetMethod("Load", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(detail, null)!;
@@ -140,7 +176,42 @@ static class ModCatalogUiTests
                 throw new Exception("A project with a dollar sign in its name should be searchable across all versions.");
             Console.WriteLine("PASS exact search finds Double $1 Every Minute despite selected profile mismatch");
             Console.WriteLine("PASS gallery empty state and back navigation preserve original catalog");
-            return 8;
+            var pendingInstall = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            int installCalls = 0;
+            var busyDetail = new ModProjectView(window, client, "fixture", () => { }, _ => { installCalls++; return pendingInstall.Task; });
+            page.Content = busyDetail; busyDetail.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent)); Flush(window);
+            var context = SynchronizationContext.Current;
+            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(window.Dispatcher));
+            try
+            {
+                var busyHeader = Nodes(busyDetail).OfType<Button>().Single(button => button.Name == "ProjectInstallButton");
+                busyHeader.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                window.SetVersion("fabric-0.0.1"); Flush(window);
+                if (busyHeader.IsEnabled) throw new Exception("Pending install must keep an incompatible profile's header disabled.");
+                pendingInstall.SetException(new IOException("Controlled previous-profile install failure."));
+                var deadline = DateTime.UtcNow.AddSeconds(3);
+                var busyFlag = typeof(ModProjectView).GetField("installing", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+                while ((bool)busyFlag.GetValue(busyDetail)! && DateTime.UtcNow < deadline) { Flush(window); Thread.Sleep(1); }
+                if ((bool)busyFlag.GetValue(busyDetail)! || busyHeader.IsEnabled)
+                    throw new Exception("Old install completion must revalidate the current incompatible profile rather than enable installation.");
+                window.SetVersion(selectedProfile); Flush(window);
+                pendingInstall = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                busyHeader.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                window.SetVersion(alternateProfile); Flush(window);
+                var busyVersions = (DependencyObject)((TabItem)busyDetail.Children.OfType<TabControl>().Single().Items[1]).Content;
+                var busyRow = Nodes(busyVersions).OfType<Button>().Single();
+                if (busyHeader.IsEnabled || busyRow.IsEnabled) throw new Exception("Compatible profile refresh must keep every install action disabled during an install.");
+                busyRow.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                busyHeader.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                if (installCalls != 2) throw new Exception("Pending detail install must reject duplicate header or row invocation.");
+                pendingInstall.SetResult(false); deadline = DateTime.UtcNow.AddSeconds(3);
+                while ((bool)busyFlag.GetValue(busyDetail)! && DateTime.UtcNow < deadline) { Flush(window); Thread.Sleep(1); }
+                if ((bool)busyFlag.GetValue(busyDetail)! || !busyHeader.IsEnabled)
+                    throw new Exception("Completed install must restore availability for the current compatible profile.");
+            }
+            finally { window.SetVersion(selectedProfile); SynchronizationContext.SetSynchronizationContext(context); }
+            Console.WriteLine("PASS pending detail install blocks duplicate actions and revalidates changed-profile availability after completion");
+            return 12;
         }
         finally { frame.Content = previous; }
     }
@@ -158,6 +229,7 @@ static class ModCatalogUiTests
     sealed class Fixture(MainWindow window) : HttpMessageHandler
     {
         public List<Uri> SearchRequests { get; } = new();
+        public int InstallRequests { get; private set; }
         public TaskCompletionSource<HttpResponseMessage>? PendingProject { get; set; }
         public string ProjectTitle { get; set; } = "Example project";
         public string ProjectDescription { get; set; } = "An illustrated catalog card opens description, versions and gallery.";
@@ -168,6 +240,11 @@ static class ModCatalogUiTests
         };
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (request.RequestUri!.AbsolutePath.EndsWith("/version/compatible", StringComparison.Ordinal))
+            {
+                InstallRequests++;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { Content = new StringContent("Controlled install stop before file downloads.") });
+            }
             if (PendingProject is not null && request.RequestUri!.AbsolutePath.EndsWith("/project/fixture")) return PendingProject.Task;
             var hit = new JObject { ["project_id"]="fixture", ["title"]="Example project", ["description"]="An illustrated catalog card opens description, versions and gallery.", ["downloads"]=12500, ["author"]="Example author", ["categories"]=new JArray("optimization", "fabric", "forge", "neoforge", "quilt"), ["versions"]=new JArray("1.20.1") };
             string game = GameProfiles.MinecraftVersion(App.GameDir, window.Config.Version);

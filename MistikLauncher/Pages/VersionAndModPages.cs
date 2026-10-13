@@ -1045,22 +1045,17 @@ namespace MistikLauncher.Pages
                 finally { restoreBtn.Content = Localization.T("modBackupRestore"); backupBtn.IsEnabled = restoreBtn.IsEnabled = cleanBtn.IsEnabled = true; }
             };
             cleanBtn.Click += (_, _) => {
+                var profile = _main.Config.LastSyncedVersion ?? "";
                 var confirm = MessageBox.Show(
-                    "Aktif mod klasöründeki tüm modları silmek istediğinizden emin misiniz?\n\nBu işlem eski/uyumsuz kalıntı modları temizlemek için önerilir.",
+                    "Aktif mod klasöründeki tüm modları yedeğe taşıyıp klasörü temizlemek istediğinizden emin misiniz?\n\nDosyalar .backups klasöründe korunur.",
                     "Klasörü Temizle", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 if (confirm == MessageBoxResult.Yes)
                 {
                     try
                     {
-                        if (Directory.Exists(App.ModsDir))
-                        {
-                            foreach (var jar in Directory.GetFiles(App.ModsDir, "*.jar"))
-                            {
-                                try { File.Delete(jar); } catch { }
-                            }
-                        }
+                        var backup = _main.WithSyncedMods(profile, ModFiles.Clear);
                         RenderInstalledMods();
-                        MessageBox.Show("Mod klasörü başarıyla temizlendi!", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                        MessageBox.Show("Mod klasörü temizlendi. Dosyalar yedekte korundu:\n" + backup, "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     catch (Exception ex)
                     {
@@ -1207,11 +1202,7 @@ namespace MistikLauncher.Pages
         void OpenProject(string id, string name)
         {
             var previous = Content;
-            var profile = _main.Config.Version ?? "";
-            Content = new ModProjectView(_main, _client, id, () => Content = previous, async version => {
-                if (_main.Config.Version != profile) throw new IOException(Localization.T("modProfileChanged"));
-                return await InstallMod(id, name, version);
-            });
+            Content = new ModProjectView(_main, _client, id, () => Content = previous, version => InstallMod(id, name, version));
         }
 
         internal static async Task RunInstallButton(Button button, Func<Task<bool>> install, Action<Exception> failure, string success = "OK")
@@ -1475,6 +1466,8 @@ namespace MistikLauncher.Pages
         }
         void RenderInstalledMods(string? directory = null)
         {
+            // The active folder can still belong to the previous profile while background synchronization runs.
+            var profile = directory == null ? _main.Config.LastSyncedVersion ?? "" : _main.Config.Version ?? "";
             var modDirectory = directory ?? App.ModsDir;
             _installedModsWriteTimeUtc = InstalledModsWriteTimeUtc(modDirectory);
             _installedPanel.Children.Clear();
@@ -1527,7 +1520,7 @@ namespace MistikLauncher.Pages
                 var toggle=PageHelpers.MkBtn(Localization.T(enabled?"modDisable":"modEnable"),"#226DA0",120); toggle.Margin=new Thickness(0,0,8,0);
                 toggle.ToolTip=Localization.T("modToggleHelp");
                 toggle.Click+=(_,_)=> {
-                    try { ModFiles.Toggle(modDirectory,filePath); RenderInstalledMods(directory); }
+                    try { _main.WithSyncedMods(profile, _ => ModFiles.Toggle(modDirectory,filePath)); RenderInstalledMods(directory); }
                     catch(Exception ex) { MessageBox.Show(Localization.T("modToggleFailed")+"\n"+ex.Message,Localization.T("error")); }
                 };
                 controls.Children.Add(toggle);
@@ -1547,8 +1540,8 @@ namespace MistikLauncher.Pages
                     {
                         try
                         {
-                            File.Delete(filePath);
-                            App.Log($"Mod deleted by user: {fileName}");
+                            var backup = _main.WithSyncedMods(profile, _ => ModFiles.Remove(modDirectory,filePath));
+                            App.Log($"Mod removed by user: {fileName}; backup: {backup}");
                         }
                         catch (Exception ex)
                         {

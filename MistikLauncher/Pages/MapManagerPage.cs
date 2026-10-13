@@ -12,6 +12,10 @@ namespace MistikLauncher.Pages
     public class MapManagerPage : Page
     {
         readonly MainWindow _main;
+        const long MaxArchiveBytes = 256L * 1024 * 1024;
+        const long MaxExtractedBytes = 1024L * 1024 * 1024;
+        const long MaxEntryBytes = 256L * 1024 * 1024;
+        const int MaxEntries = 32768;
         static readonly HttpClient Http = CreateHttpClient();
 
         static HttpClient CreateHttpClient()
@@ -119,8 +123,20 @@ namespace MistikLauncher.Pages
                 zipPath = Path.Combine(App.AppData, "map-" + Guid.NewGuid().ToString("N") + ".zip");
 
                 // Download
-                var bytes = await Http.GetByteArrayAsync(zipUrl);
-                await File.WriteAllBytesAsync(zipPath, bytes);
+                using (var cancellation = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(60)))
+                using (var response = await Http.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead, cancellation.Token))
+                {
+                    response.EnsureSuccessStatusCode();
+                    if (response.Content.Headers.ContentLength > MaxArchiveBytes) throw new IOException("Map download exceeds its safe size limit.");
+                    using var input = await response.Content.ReadAsStreamAsync(cancellation.Token);
+                    using var output = File.Create(zipPath);
+                    var buffer = new byte[81920]; long total = 0; int read;
+                    while ((read = await input.ReadAsync(buffer, cancellation.Token)) != 0)
+                    {
+                        if ((total += read) > MaxArchiveBytes) throw new IOException("Map download exceeds its safe size limit.");
+                        await output.WriteAsync(buffer.AsMemory(0, read), cancellation.Token);
+                    }
+                }
 
                 // Extract
                 btn.Content = "Kuruluyor...";
@@ -150,11 +166,45 @@ namespace MistikLauncher.Pages
         {
             if (string.IsNullOrWhiteSpace(mapName) || mapName is "." or ".." || mapName != Path.GetFileName(mapName) || mapName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
                 throw new InvalidDataException("Invalid map name.");
+            if (new FileInfo(zipPath).Length > MaxArchiveBytes) throw new InvalidDataException("Map archive exceeds its safe size limit.");
+            ModFiles.EnsureRoot(savesDir);
             var tempExtract = Path.Combine(savesDir, "temp_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(tempExtract);
             try
             {
-                ZipFile.ExtractToDirectory(zipPath, tempExtract);
+                using (var archive = ZipFile.OpenRead(zipPath))
+                {
+                    if (archive.Entries.Count > MaxEntries) throw new InvalidDataException("Map archive contains too many entries.");
+                    long expectedTotal = 0;
+                    var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var entry in archive.Entries)
+                    {
+                        var relative = entry.FullName.Replace('\\', '/');
+                        var parts = relative.TrimEnd('/').Split('/');
+                        if (parts.Any(part => string.IsNullOrEmpty(part) || part is "." or ".." || part.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) ||
+                            !paths.Add(relative.TrimEnd('/')) || entry.Length > MaxEntryBytes || (expectedTotal += entry.Length) > MaxExtractedBytes)
+                            throw new InvalidDataException("Map archive contains unsafe paths or exceeds its safe size limit.");
+                    }
+                    long total = 0;
+                    foreach (var entry in archive.Entries)
+                    {
+                        var relative = entry.FullName.Replace('\\', '/');
+                        var destination = Path.Combine(tempExtract, relative.Replace('/', Path.DirectorySeparatorChar));
+                        if (relative.EndsWith('/')) { Directory.CreateDirectory(destination); continue; }
+                        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                        using var input = entry.Open();
+                        using var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                        var buffer = new byte[81920]; long copied = 0; int read;
+                        while ((read = input.Read(buffer, 0, buffer.Length)) != 0)
+                        {
+                            copied += read; total += read;
+                            if (copied > entry.Length || copied > MaxEntryBytes || total > MaxExtractedBytes)
+                                throw new InvalidDataException("Map archive extraction exceeds its safe size limit.");
+                            output.Write(buffer, 0, read);
+                        }
+                        if (copied != entry.Length) throw new InvalidDataException("Map archive contains a truncated file.");
+                    }
+                }
                 var levelDat = Directory.GetFiles(tempExtract, "level.dat", SearchOption.AllDirectories).FirstOrDefault()
                     ?? throw new FileNotFoundException("Harita veri dosyası (level.dat) zip içeriğinde bulunamadı.");
                 var targetDir = Path.Combine(savesDir, mapName);

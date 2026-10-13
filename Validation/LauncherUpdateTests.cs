@@ -122,10 +122,23 @@ static class LauncherUpdateTests
         File.SetAttributes(Path.Combine(payload,names[0]),FileAttributes.ReadOnly);
         try {
             using var locked=new FileStream(Path.Combine(target,names[1]),FileMode.Open,FileAccess.Read,FileShare.None);
-            try { UpdateEngine.Apply(payload,target); } catch(UnauthorizedAccessException) { rollbackFailed=true; }
+            try { UpdateEngine.Apply(payload,target); } catch(AggregateException ex) { rollbackFailed=ex.InnerExceptions.Any(error=>error is UnauthorizedAccessException); }
         } finally { File.SetAttributes(Path.Combine(payload,names[0]),FileAttributes.Normal); File.SetAttributes(Path.Combine(target,names[0]),FileAttributes.Normal); }
         var recovery=Directory.EnumerateDirectories(root,"backup-*").SingleOrDefault();
         Check(rollbackFailed && recovery!=null && File.ReadAllText(Path.Combine(recovery,names[0]))=="old "+names[0],"failed update rollback retains the original executable in its recovery backup");
+        foreach(var name in names) File.WriteAllText(Path.Combine(target,name),"old "+name);
+        var priorRecovery=Directory.EnumerateDirectories(root,"backup-*").ToHashSet(StringComparer.OrdinalIgnoreCase);
+        AggregateException? partialRollback=null;
+        File.SetAttributes(Path.Combine(payload,names[1]),FileAttributes.ReadOnly);
+        try {
+            using var locked=new FileStream(Path.Combine(target,names[2]),FileMode.Open,FileAccess.Read,FileShare.None);
+            try { UpdateEngine.Apply(payload,target); } catch(AggregateException ex) { partialRollback=ex; }
+        } finally { File.SetAttributes(Path.Combine(payload,names[1]),FileAttributes.Normal); File.SetAttributes(Path.Combine(target,names[1]),FileAttributes.Normal); }
+        var partialRecovery=Directory.EnumerateDirectories(root,"backup-*").SingleOrDefault(path=>!priorRecovery.Contains(path));
+        Check(partialRollback?.InnerExceptions.Count>=2 && partialRollback.InnerExceptions[0] is IOException &&
+            partialRecovery!=null && File.ReadAllText(Path.Combine(target,names[0]))=="old "+names[0] &&
+            File.ReadAllText(Path.Combine(partialRecovery,names[1]))=="old "+names[1] && partialRollback.Message.Contains(partialRecovery,StringComparison.Ordinal),
+            "rollback restores remaining files after one recovery fails and preserves original error plus recovery location");
         foreach(var name in names) File.WriteAllText(Path.Combine(target,name),"old "+name);
         bool rejected=false;
         try { UpdateEngine.SafePath(target,"../outside.exe"); } catch(InvalidDataException) { rejected=true; }
