@@ -19,6 +19,7 @@ static class ModAndMapRegressionTests
         Directory.CreateDirectory(root);
         int checks = await ModInstallSystemTests.Run(Path.Combine(root, "install-systems"));
         checks += ModMutationSafetyTests.Run(Path.Combine(root, "mutation-safety"));
+        checks += ModImportBoundaryTests.Run(Path.Combine(root, "import-boundaries"));
         void Check(bool condition, string name)
         {
             if (!condition) throw new Exception(name);

@@ -405,6 +405,7 @@ class Program
             checks += ModCatalogUiTests.Run(window, name => Capture(window, Path.Combine(output,name+".png"), name == "mod-catalog-long-heading" ? 960 : 1200, name == "mod-catalog-long-heading" ? 640 : 820),
                 (name,width,height) => Capture(window, Path.Combine(output,name+".png"), width, height));
             checks += WindowScalingUiTests.Run(window);
+            checks += ModToolsLayoutTests.Run(window);
             var horizontal=new System.Windows.Controls.Primitives.ScrollBar { Orientation=Orientation.Horizontal,Style=(Style)application.FindResource(typeof(System.Windows.Controls.Primitives.ScrollBar)) };
             horizontal.ApplyTemplate();
             var track=(System.Windows.Controls.Primitives.Track)horizontal.Template.FindName("PART_Track",horizontal);

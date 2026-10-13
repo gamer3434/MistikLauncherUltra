@@ -60,11 +60,16 @@ public static class ModFiles
         string filename=Path.GetFileName(source);
         if(!filename.EndsWith(".jar",StringComparison.OrdinalIgnoreCase) || (File.GetAttributes(source)&FileAttributes.ReparsePoint)!=0)
             throw new IOException(Localization.T("modToggleInvalid"));
+        using var input=new FileStream(source,FileMode.Open,FileAccess.Read,FileShare.Read);
+        if(input.Length is <= 0 or > 128L*1024*1024) throw new IOException(Localization.T("modImportInvalidSize"));
         EnsureRoot(root);
         string target=Path.Combine(root,filename);
         if(File.Exists(target) || File.Exists(target+".disabled")) return false;
         string temporary=Path.Combine(root,".import-"+Guid.NewGuid().ToString("N")+".tmp");
-        try { File.Copy(source,temporary); File.Move(temporary,target); return true; }
+        try {
+            using(var output=new FileStream(temporary,FileMode.CreateNew,FileAccess.Write,FileShare.None)) input.CopyTo(output);
+            File.Move(temporary,target); return true;
+        }
         finally { if(File.Exists(temporary)) File.Delete(temporary); }
     }
     public static IEnumerable<string> List(string root)=>Directory.Exists(root)?Directory.GetFiles(root).Where(p=>p.EndsWith(".jar",StringComparison.OrdinalIgnoreCase)||p.EndsWith(".jar.disabled",StringComparison.OrdinalIgnoreCase)):Array.Empty<string>();

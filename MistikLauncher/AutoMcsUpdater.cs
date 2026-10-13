@@ -48,8 +48,14 @@ public sealed class AutoMcsUpdater
         try { InstalledVersion=ReadReceipt()?.Version ?? (File.Exists(ExecutablePath)?"?":"—"); } catch { }
     }
     AutoMcsReceipt? ReadReceipt() => File.Exists(ReceiptPath) ? JsonSerializer.Deserialize<AutoMcsReceipt>(File.ReadAllText(ReceiptPath)) : null;
+    void NotifyChanged()
+    {
+        foreach(var observer in Changed?.GetInvocationList() ?? Array.Empty<Delegate>())
+            try { ((Action)observer)(); }
+            catch(Exception ex) { App.Log("Auto-MCS update notification failed: "+ex.Message); }
+    }
     void Publish(string key, double progress=0)
-    { StatusKey=key; Progress=progress; Changed?.Invoke(); }
+    { StatusKey=key; Progress=progress; NotifyChanged(); }
     public static AutoMcsRelease ParseRelease(string json)
     {
         using var document=JsonDocument.Parse(json);
@@ -157,7 +163,7 @@ public sealed class AutoMcsUpdater
         {
             if(staging!=null) { try { foreach(var file in Directory.EnumerateFiles(staging)) File.Delete(file); Directory.Delete(staging); } catch { } }
             Busy=false;
-            try { Changed?.Invoke(); } finally { gate.Release(); }
+            try { NotifyChanged(); } finally { gate.Release(); }
         }
     }
     void ResetTransfer()

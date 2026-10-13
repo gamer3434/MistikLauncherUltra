@@ -36,6 +36,20 @@ static class AutoMcsTests
         File.WriteAllText(updater.ExecutablePath,"damaged executable");
         Check(await updater.CheckAsync(true) && transport.AssetRequests==2,"damaged installed executable repaired");
 
+        var notificationFolder=Path.Combine(root,"mcs-notification-failure");
+        using var notificationClient=new HttpClient(new Stub(Manifest(digest),zip));
+        var notified=new AutoMcsUpdater(notificationClient,notificationFolder,()=>false);
+        bool laterObserverSawCommit=false;
+        notified.Changed+=()=> { if(notified.StatusKey=="mcsUpdated") throw new InvalidOperationException("Committed update notification fixture"); };
+        notified.Changed+=()=> { if(notified.StatusKey=="mcsUpdated") laterObserverSawCommit=true; };
+        Check(await notified.CheckAsync(true) && notified.StatusKey=="mcsUpdated" && notified.Error==null && !notified.Busy && laterObserverSawCommit &&
+            File.ReadAllBytes(notified.ExecutablePath).SequenceEqual(executable) &&
+            JsonSerializer.Deserialize<AutoMcsReceipt>(File.ReadAllText(Path.Combine(notificationFolder,"auto-mcs.version.json")))?.Version=="v9.1.0",
+            "Auto-MCS observer failure cannot turn a committed executable and receipt into a false update error");
+        notified.Changed+=()=>throw new InvalidOperationException("Auto-MCS observer fixture");
+        Check(await notified.CheckAsync(true) && notified.StatusKey=="mcsCurrent" && notified.Error==null && !notified.Busy,
+            "Auto-MCS check remains usable when status and completion observers throw");
+
         var commitFolder=Path.Combine(root,"mcs-receipt-locked"); Directory.CreateDirectory(commitFolder);
         byte[] oldExecutable=(byte[])executable.Clone(); oldExecutable[^1]=42;
         string oldReceipt=JsonSerializer.Serialize(new AutoMcsReceipt("v8.0.0",Convert.ToHexString(SHA256.HashData(oldExecutable))));

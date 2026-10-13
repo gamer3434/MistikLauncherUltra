@@ -214,6 +214,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.27","2026-10-13","#00D4AA", new[]{
+                "Dar pencerelerde mod yedekleme, geri yükleme ve temizleme düğmeleri içerik genişliğine sığar.",
+                "Boş veya 128 MiB üzerindeki yerel mod dosyaları kurulmadan reddedilir; kopyalama sırasında kaynak korunur.",
+                "Auto-MCS bildirim hataları başarılı güncellemeyi başarısız göstermez. Mod kaldırma onayı yedekleme davranışını açıklar.",
+                "Mod backup, restore and cleanup controls fit compact viewports.",
+                "Empty or oversized local mods are rejected before installation; source files stay protected during copying.",
+                "Auto-MCS observer failures no longer misreport committed updates; mod removal confirmations explain backup behavior."
+            }),
             new("v6.2.26","2026-10-13","#00D4AA", new[]{
                 "Dar pencerelerde mod ayrıntıları içerik alanını korur; profil değişince uyumluluk ve kurulum durumu yeniden hesaplanır.",
                 "Harita indirme/açma işlemleri boyut ve yol sınırlarıyla korunur. Mod silme ve toplu temizleme dosyaları yedekte tutar ve yanlış profile uygulanmaz.",

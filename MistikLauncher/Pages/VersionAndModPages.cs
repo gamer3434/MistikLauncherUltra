@@ -990,7 +990,9 @@ namespace MistikLauncher.Pages
             // ── Kurulu Modlar Bölümü ─────────────────────────────────────────
             sp.Children.Add(new Separator { Background = PageHelpers.HexBrush("#282828"), Margin = new Thickness(0, 24, 0, 10) });
 
-            var instHeader = new Grid();
+            var instHeader = new Grid { Name = "InstalledModsHeader" };
+            instHeader.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            instHeader.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             instHeader.ColumnDefinitions.Add(new ColumnDefinition());
             instHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
@@ -1063,12 +1065,19 @@ namespace MistikLauncher.Pages
                     }
                 }
             };
-            var modActions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+            var modActions = new WrapPanel { Name = "InstalledModActions", HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
             modActions.Children.Add(backupBtn);
             modActions.Children.Add(restoreBtn);
             modActions.Children.Add(cleanBtn);
             Grid.SetColumn(modActions, 1);
             instHeader.Children.Add(modActions);
+            instHeader.SizeChanged += (_, _) => {
+                bool compact = instHeader.ActualWidth < 700;
+                Grid.SetRow(modActions, compact ? 1 : 0);
+                Grid.SetColumn(modActions, compact ? 0 : 1);
+                Grid.SetColumnSpan(modActions, compact ? 2 : 1);
+                modActions.Margin = compact ? new Thickness(0, 8, 0, 0) : new Thickness(0);
+            };
             sp.Children.Add(instHeader);
 
             sp.Children.Add(PageHelpers.Lbl("modBackupHelp", 12, "#9FB4CA", wrap: TextWrapping.Wrap));

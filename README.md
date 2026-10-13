@@ -1,62 +1,41 @@
 # Mistik Launcher Ultra
 
-Windows x64 için Türkçe / English Minecraft launcher. Oyuncu ayarları cihazında saklanır; sürüm, mod, skin ve yerel sunucu yönetimi içerir.
+**Windows x64 için Minecraft launcher · Türkçe / English**
 
-[Yayımlanan sürümleri indir](https://github.com/gamer3434/MistikLauncherUltra/releases/latest) · [Web sitesi](https://mistiklauncherultra.web.app/) · [6.2.15 değişiklikleri](docs/RELEASE-6.2.15.md)
+[⬇ Son sürümü indir](https://github.com/gamer3434/MistikLauncherUltra/releases/latest) · [Web sitesi](https://mistiklauncherultra.web.app/) · [Sürüm notları](https://github.com/gamer3434/MistikLauncherUltra/releases)
 
-## Kurulum ve onarım
+![Mistik Launcher ana paneli](docs/screenshots/home-tr.png)
 
-Sürüm sayfasından online veya offline kurulum EXE'sini seçin. Taşınabilir kullanım için ZIP'in tüm dosyalarını aynı klasöre çıkartıp `MistikLauncher.exe` dosyasını açın. .NET çalışma zamanı pakete dahildir.
+## Öne çıkanlar
 
-Onarma seçeneği yalnızca kurucudadır: **Mevcut kurulumu onar**. Program bozulursa launcher'ı kapatın, aynı veya daha yeni sürümün `MistikRepair-6.2.15.exe` dosyasını açıp kurulum klasöründe **Onar** seçin. Onarıcı internet gerektirmez; program dosyalarını doğrular ve yeniler. Ayarlar, modlar ve dünyalar korunur.
+- **Sürüm yönetimi:** Vanilla, Fabric, Forge, NeoForge ve Quilt profilleri.
+- **Mod merkezi:** Modrinth araması, açıklama/galeri, uyumlu sürümler ve bağımlılık kurulumu. Mod taşıma, yedekleme ve geri yükleme.
+- **Kişiselleştirme:** 20 renk teması, 16 pencere düğmesi stili, skin ve yerel sunucu araçları.
+- **Güncelleme ve kurtarma:** Güncelleme/sürüm düşürme Ayarlar’da; onarım kurucuda. Oyuncu ayarları, modlar ve dünyalar korunur.
 
-Mod merkezinde resimli Modrinth kartları, sıralama ve sayfalama bulunur. Karta tıklayınca açıklama, uyumlu sürümler ve galeri açılır. Kurulum zorunlu bağımlılıkları da indirir. Yerel JAR dosyaları da içe aktarılabilir.
+![Tema ve pencere düğmesi tasarımları](docs/screenshots/window-styles-tr.png)
 
+*Görüntüler test profiliyle alınmış gerçek launcher arayüzüdür.*
 
+## Hızlı başlangıç
 
-Varsayılan kurulum: `%LOCALAPPDATA%\Programs\MistikLauncherUltra`. Oyuncu verileri: `%APPDATA%\.mistik_ultra`. Şifreli ayarlar aynı Windows kullanıcı hesabında açılır. Paket şu anda genel yayıncı sertifikasıyla imzalı değildir.
+1. Son sürümden **Online** veya **Offline** kurucuyu indir. Taşınabilir kullanım için ZIP’in tamamını çıkarıp `MistikLauncher.exe` dosyasını aç.
+2. Oyuncu adını ve belleği Ayarlar’dan seç; oyun sürümünü kurup **Oyunu başlat** düğmesini kullan.
 
-Güncellemeler **Ayarlar** bölümündedir. Kaydedilmiş oyuncu adı ve profil tercihleri sürümler arasında aynı şifreli veri klasöründe korunur.
+Veriler `%APPDATA%\.mistik_ultra` klasöründedir. Kullanım/hata paylaşımı varsayılan kapalıdır. Microsoft hesabıyla giriş henüz desteklenmez.
 
-## Kullanım
+<details>
+<summary>Geliştirici bilgileri</summary>
 
-1. Sağ üstten Türkçe veya English seçin.
-2. Ayarlarda oyuncu adını ve belleği kaydedin.
-3. Sürümler sayfasından oyun sürümünü kurup alt çubuktan seçin.
-4. Uyumlu modları seçip **Oyunu başlat** düğmesini kullanın.
-
-Minecraft ve mod lisanslarına uyun. Microsoft hesabı kimlik doğrulaması bu launcher'a eklenmemiştir.
-
-## Kaynaktan derleme
-
+Windows ve .NET 8 SDK gerekir:
 
 ```powershell
 dotnet build MistikLauncher/MistikLauncher.csproj -c Release
 dotnet run --project Validation -c Release -- artifacts/screenshots-ordinary
-node --test Validation/WebsiteReleaseTests.js Validation/WebsitePrivacyTests.js
 ./scripts/Build-Package.ps1
 ./scripts/Build-Installers.ps1
 ```
 
-Normal paket kod gizleme olmadan derlenir. İsteğe bağlı korumalı derleme için `./scripts/Build-Protected.ps1` kullanılabilir. Paketler `artifacts/` altında üretilir. Sürüm yayımlama iş akışı yalnızca proje sürümüyle eşleşen `v*` etiketlerinde çalışır. EXE, ZIP, PDB ve kişisel yapılandırmalar kaynak deposuna eklenmez.
+[Gizlilik ve depo bilgileri](docs/REPOSITORY-PRIVACY.md)
 
-## Depo yapısı
-
-| Klasör | İçerik |
-| --- | --- |
-| `MistikLauncher/` | Launcher ve dil kaynakları |
-| `Installer/`, `Repair/`, `Uninstaller/`, `Updater/` | Kurulum, onarım ve güncelleme araçları |
-| `Validation/`, `UpdateFixture/` | Doğrulama ve güncelleme test uygulaması |
-| `site/` | Statik web sitesi |
-| `scripts/`, `.github/` | Derleme ve yayın iş akışları |
-| `docs/` | Sürüm notları ve teknik belgeler |
-
-Eski Firebase hesapları, telemetri ve yönetici paneli kaldırılmıştır. İsteğe bağlı site dağıtımı için kişisel Firebase proje eşlemesi yerel `.firebaserc` dosyasındadır; depoda yalnızca örnek ve erişimi kapatan kurallar tutulur. [Gizlilik ve geçmiş temizliği](docs/REPOSITORY-PRIVACY.md).
-
-## English
-
-A bilingual Windows x64 Minecraft launcher with local player settings, version and mod management, skins and local server tools. Download the latest published installer or extract the complete portable ZIP. If an installation breaks, close the launcher and use the matching or newer repair EXE; settings, mods and worlds are preserved. Build and validation commands are above. Firebase account services and telemetry are retired; deployment mappings and credentials remain local.
-
-Sürüm düşürmek için **Ayarlar → Sürüm düşür → Eski sürümleri yükle** bölümünü açın. Hesap ve oyun dosyaları korunur; otomatik güncelleme kapatılır.
-
-Kullanım/hata paylaşımı varsayılan kapalıdır. İsteyen kullanıcı Ayarlar’dan açabilir. [Firebase yönetim paneli](https://mistiklauncherultra.web.app/admin/) yalnızca yetkili Google hesabına açıktır; anonim kurulum, aktiflik ve hata kategorilerini gösterir. Kurulum sayısı kişi sayısı değildir.
+</details>
