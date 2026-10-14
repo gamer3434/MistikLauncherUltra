@@ -214,6 +214,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.31","2026-10-14","#00D4AA", new[]{
+                "Mod kartları seçili profilde bulunan modları Kurulu veya Devre dışı olarak gösterir.",
+                "Kurulum, kaldırma ve profil değişikliklerinden sonra mod durumu yeniden kontrol edilir.",
+                "Elle eklenen modlar dosya içeriğiyle tanınır; aynı isimdeki farklı dosyalar kurulu kabul edilmez.",
+                "Mod cards show Installed or Disabled for files in the selected profile.",
+                "Mod state refreshes after installation, removal and profile changes.",
+                "Manually added mods are identified by file content rather than filename guesses."
+            }),
             new("v6.2.30","2026-10-14","#00D4AA", new[]{
                 "Mod merkezinde tüm projeler veya seçili Minecraft/yükleyici profiline uyumlu projeler arasında geçiş yapılabilir.",
                 "Profil değişince liste ve mod ayrıntıları yenilenir; dar pencerelerde arama araçları satırlara sığar.",

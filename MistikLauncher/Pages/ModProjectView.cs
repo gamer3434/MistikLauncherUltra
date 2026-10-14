@@ -16,6 +16,7 @@ public sealed class ModProjectView : Grid
     readonly MainWindow main;
     readonly string id;
     readonly Func<string?, Task<bool>> install;
+    readonly Func<string?, CatalogInstallState>? installedState;
     readonly StackPanel heading = new();
     readonly TabControl tabs = new() { Background = Brushes.Transparent, Foreground = Brushes.White };
     readonly TextBlock status = PageHelpers.Lbl("", 13, "#ADBED6", wrap: TextWrapping.Wrap);
@@ -28,12 +29,14 @@ public sealed class ModProjectView : Grid
     Border? projectSummary;
     FrameworkElement? projectIcon;
     TextBlock? projectTitle, projectDescription;
+    TextBlock? projectInstalledStatus;
     FrameworkElement? projectCategories;
     string T(string tr, string en) => Localization.Language == "en" ? en : tr;
 
-    public ModProjectView(MainWindow main, HttpClient client, string id, Action back, Func<string?, Task<bool>> install)
+    public ModProjectView(MainWindow main, HttpClient client, string id, Action back, Func<string?, Task<bool>> install, Func<string?, CatalogInstallState>? installedState = null)
     {
         this.main = main; this.client = client; this.id = id; this.install = install;
+        this.installedState = installedState;
         tabs.BorderBrush = PageHelpers.HexBrush("#3A3F46"); tabs.Padding = new Thickness(12);
         tabs.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse("""
             <ControlTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="TabControl">
@@ -157,6 +160,31 @@ public sealed class ModProjectView : Grid
             var card = PageHelpers.Card("#202731", 10, "#303A45"); card.Child = row; versionPanel.Children.Add(card);
         }
         ((TabItem)tabs.Items[1]).Content = new ScrollViewer { Content = versionPanel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        RefreshInstalledStatus();
+    }
+
+    internal void RefreshInstalledStatus()
+    {
+        if (installedState == null) return;
+        var projectState = installedState(null);
+        if (projectInstalledStatus != null)
+        {
+            projectInstalledStatus.Text = projectState == CatalogInstallState.Available ? "" : InstalledModCatalog.Label(projectState);
+            projectInstalledStatus.Visibility = projectState == CatalogInstallState.Available ? Visibility.Collapsed : Visibility.Visible;
+        }
+        foreach (var button in installButtons)
+        {
+            var state = installedState(button.Tag as string);
+            bool installed = state is CatalogInstallState.Installed or CatalogInstallState.Disabled;
+            button.Content = installed ? Localization.T("modCatalogInstalled") : Localization.T("modInstall");
+            if (installed) button.ToolTip = InstalledModCatalog.Label(state);
+            var profile = main.Config.Version ?? "";
+            bool compatible = button != projectInstall || (projectVersions?.Any(version => ModManagerPage.CheckCompatibility(version,
+                GameProfiles.MinecraftVersion(App.GameDir, profile), GameProfiles.Loader(App.GameDir, profile))) ?? false);
+            button.IsEnabled = !installed && !installing && compatible && state != CatalogInstallState.Checking;
+            if (button == projectInstall && state is CatalogInstallState.Checking or CatalogInstallState.Unknown)
+                button.ToolTip = InstalledModCatalog.Label(state);
+        }
     }
 
     internal static WrapPanel CategoryBadges(IEnumerable<string> categories)
@@ -224,6 +252,7 @@ public sealed class ModProjectView : Grid
             title.ToolTip = title.Text + "\n\n" + summary.Text;
             copy.Children.Add(summary);
             copy.Children.Add(PageHelpers.Lbl($"↓ {project["downloads"]?.Value<long>() ?? 0:N0}   ♡ {project["followers"]?.Value<long>() ?? 0:N0}", 13, "#ADBED6"));
+            projectInstalledStatus = PageHelpers.Lbl("", 12, "#ADBED6", wrap: TextWrapping.Wrap); copy.Children.Add(projectInstalledStatus);
             var categories = CategoryBadges((project["categories"] as JArray ?? new()).Select(value => value.ToString()));
             copy.Children.Add(categories);
             projectCategories = categories;
@@ -309,6 +338,7 @@ public sealed class ModProjectView : Grid
     Button InstallButton(string? version)
     {
         var button = PageHelpers.MkBtn(T("↓ Kur", "↓ Install"), "#159D59", 118);
+        button.Tag = version;
         button.VerticalAlignment = VerticalAlignment.Top; button.Margin = new Thickness(12, 0, 0, 0);
         button.IsEnabled = !installing; installButtons.Add(button);
         button.Click += async (_, _) => {

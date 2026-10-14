@@ -20,6 +20,14 @@ static class ModCatalogUiTests
         var fixture = new Fixture(window);
         using var client = new HttpClient(fixture);
         var page = new ModManagerPage(window, client);
+        void FlushPage()
+        {
+            Flush(window);
+            var pending = typeof(ModManagerPage).GetField("_installedCancellation", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (pending.GetValue(page) != null && DateTime.UtcNow < deadline) { Flush(window); Thread.Sleep(1); }
+            if (pending.GetValue(page) != null) throw new Exception("Installed catalog state did not settle.");
+        }
         try
         {
             frame.Content = page; Flush(window); capture("mod-catalog-cards");
@@ -74,11 +82,31 @@ static class ModCatalogUiTests
                 throw new Exception("Cached mod sorting and pagination labels must follow the selected language.");
             Localization.SetLanguage(oldLanguage); page.RefreshLanguage(); Flush(window);
             Console.WriteLine("PASS compatibility filter resets pages, follows selected profile, explains Vanilla, restores all mods and translates controls");
+            FlushPage();
+            var statusSnapshot = new InstalledModCatalog();
+            var states = (Dictionary<string, CatalogInstallState>)typeof(InstalledModCatalog).GetField("projects", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(statusSnapshot)!;
+            var versionStates = (Dictionary<string, CatalogInstallState>)typeof(InstalledModCatalog).GetField("versions", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(statusSnapshot)!;
+            states["fixture"] = versionStates["compatible"] = CatalogInstallState.Installed;
+            typeof(ModManagerPage).GetField("_catalogInstalled", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(page, statusSnapshot);
+            var applyStatus = typeof(ModManagerPage).GetMethod("ApplyCatalogStatus", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            applyStatus.Invoke(page, null);
+            var installedButton = Nodes(page).OfType<Button>().Single(button => Equals(button.Content, Localization.T("modCatalogInstalled")));
+            if (installedButton.IsEnabled) throw new Exception("Verified installed card must replace install with a disabled installed button.");
+            capture("mod-catalog-installed");
+            states["fixture"] = CatalogInstallState.Disabled; applyStatus.Invoke(page, null);
+            if (installedButton.IsEnabled || !Nodes(page).OfType<TextBlock>().Any(text => text.Text == Localization.T("modCatalogDisabled")))
+                throw new Exception("Disabled mod must retain a readable disabled label rather than offering duplicate installation.");
+            states["fixture"] = CatalogInstallState.Installed; applyStatus.Invoke(page, null);
+            Console.WriteLine("PASS catalog installed and disabled states replace duplicate install action");
             var open = Nodes(page).OfType<Button>().Single(button => System.Windows.Automation.AutomationProperties.GetName(button).StartsWith("Example project ·", StringComparison.Ordinal));
             open.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
             if (page.Content is not ModProjectView detail) throw new Exception("Card should open project inside its mod page.");
             detail.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent)); Flush(window); capture("mod-catalog-description");
             var tabs = detail.Children.OfType<TabControl>().Single();
+            var installedHeader = Nodes(detail).OfType<Button>().Single(button => button.Name == "ProjectInstallButton");
+            if (!Equals(installedHeader.Content, Localization.T("modCatalogInstalled")) || installedHeader.IsEnabled)
+                throw new Exception("Project details must share the catalog's verified installed state.");
+            Console.WriteLine("PASS project detail shares installed state from its catalog without extra requests");
             if (tabs.Items.Count != 3) throw new Exception("Description, versions and gallery must all load. " + string.Join(" | ", Nodes(detail).OfType<TextBlock>().Select(text => text.Text)));
             if (tabs.Items.Cast<TabItem>().Any(tab => tab.MinWidth != 120)) throw new Exception("Project detail tabs should have consistent minimum widths without clipping translated labels.");
             if (tabs.ItemsPanel.LoadContent() is not StackPanel { Orientation: Orientation.Horizontal, Margin.Left: 0 } ) throw new Exception("Project detail tabs should share a flush horizontal strip without negative insets.");
@@ -113,7 +141,7 @@ static class ModCatalogUiTests
                 Nodes((DependencyObject)((TabItem)tabs.Items[1]).Content).OfType<Button>().Any() ||
                 !ReferenceEquals(preservedDescription, ((TabItem)tabs.Items[0]).Content) || tabs.SelectedIndex != 1)
                 throw new Exception("Selecting an incompatible profile must immediately update install eligibility and versions while preserving the description and selected tab.");
-            window.SetVersion(selectedProfile); Flush(window);
+            window.SetVersion(selectedProfile); FlushPage();
             if (!Nodes(detail).OfType<Button>().Single(button => button.Name == "ProjectInstallButton").IsEnabled ||
                 Nodes((DependencyObject)((TabItem)tabs.Items[1]).Content).OfType<Button>().Count() != 1)
                 throw new Exception("Returning to a compatible profile must restore its installable version without reopening the project.");
@@ -246,7 +274,7 @@ static class ModCatalogUiTests
             }
             finally { window.SetVersion(selectedProfile); SynchronizationContext.SetSynchronizationContext(context); }
             Console.WriteLine("PASS pending detail install blocks duplicate actions and revalidates changed-profile availability after completion");
-            return 13;
+            return 15;
         }
         finally { frame.Content = previous; selectNav.Invoke(window, new object[] { previousNav }); }
     }

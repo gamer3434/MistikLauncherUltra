@@ -1,4 +1,8 @@
 {
+  "modCatalogInstalled": "✓ Kurulu",
+  "modCatalogDisabled": "Kurulu · Devre dışı",
+  "modCatalogChecking": "Kurulum durumu kontrol ediliyor…",
+  "modCatalogUnknown": "Kurulum durumu doğrulanamadı",
   "clientPresetTitle": "Oyun arayüzü",
   "clientPresetHelp": "Oyun menüsü ve arayüz görünümü.",
   "clientInstallInterface": "Modern arayüzü kur",

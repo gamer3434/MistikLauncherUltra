@@ -1,4 +1,8 @@
 {
+  "modCatalogInstalled": "✓ Installed",
+  "modCatalogDisabled": "Installed · Disabled",
+  "modCatalogChecking": "Checking installed files…",
+  "modCatalogUnknown": "Installation status could not be verified",
   "clientPresetTitle": "Game interface",
   "clientPresetHelp": "Game menu and interface appearance.",
   "clientInstallInterface": "Install modern interface",

@@ -710,6 +710,63 @@ namespace MistikLauncher.Pages
         TextBlock _pageNumber = null!, _catalogProfile = null!;
         CheckBox _compatibleOnly = null!;
         ComboBox _sortBox = null!;
+        InstalledModCatalog? _catalogInstalled;
+        string? _catalogInstalledProfile;
+        int _installedGeneration;
+        System.Threading.CancellationTokenSource? _installedCancellation;
+        readonly List<(string Project, Button Button, TextBlock Status, bool Compatible)> _catalogButtons = new();
+        readonly HashSet<Button> _catalogInstalling = new();
+
+        internal CatalogInstallState CatalogState(string project, string? version = null) =>
+            _catalogInstalledProfile == (_main.Config.Version ?? "") ? _catalogInstalled?.State(project, version) ?? CatalogInstallState.Checking : CatalogInstallState.Checking;
+
+        void ApplyCatalogStatus()
+        {
+            foreach (var entry in _catalogButtons)
+            {
+                var state = CatalogState(entry.Project);
+                bool installed = state is CatalogInstallState.Installed or CatalogInstallState.Disabled;
+                entry.Button.Content = installed ? Localization.T("modCatalogInstalled") : Localization.T(entry.Compatible ? "modInstall" : "modIncompatible");
+                entry.Button.IsEnabled = entry.Compatible && !installed && state != CatalogInstallState.Checking && !_catalogInstalling.Contains(entry.Button);
+                entry.Status.Text = state == CatalogInstallState.Available ? "" : InstalledModCatalog.Label(state);
+                entry.Status.Visibility = state == CatalogInstallState.Available ? Visibility.Collapsed : Visibility.Visible;
+            }
+            if (Content is ModProjectView detail) detail.RefreshInstalledStatus();
+        }
+
+        async Task RefreshInstalledStatus()
+        {
+            int generation = ++_installedGeneration;
+            _installedCancellation?.Cancel();
+            using var cancellation = new System.Threading.CancellationTokenSource();
+            _installedCancellation = cancellation;
+            string profile; string? directory;
+            lock (_main.ConfigurationGate)
+            {
+                profile = _main.Config.Version ?? "";
+                try { directory = InstalledModCatalog.ProfileDirectory(App.GameDir, App.AppData, App.ModsDir, profile, _main.Config.LastSyncedVersion ?? ""); }
+                catch { directory = null; }
+            }
+            _catalogInstalledProfile = profile; _catalogInstalled = null; ApplyCatalogStatus();
+            try
+            {
+                var snapshot = directory == null ? new InstalledModCatalog() : await Task.Run(() => InstalledModCatalog.ReadAsync(_client, directory, cancellation.Token));
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    if (generation != _installedGeneration || profile != (_main.Config.Version ?? "")) return;
+                    string? currentDirectory;
+                    lock (_main.ConfigurationGate)
+                    {
+                        try { currentDirectory = InstalledModCatalog.ProfileDirectory(App.GameDir, App.AppData, App.ModsDir, profile, _main.Config.LastSyncedVersion ?? ""); }
+                        catch { currentDirectory = null; }
+                        if (!string.Equals(directory, currentDirectory, StringComparison.OrdinalIgnoreCase)) { _ = RefreshInstalledStatus(); return; }
+                        _catalogInstalled = snapshot; ApplyCatalogStatus();
+                    }
+                });
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+            finally { if (ReferenceEquals(_installedCancellation, cancellation)) _installedCancellation = null; }
+        }
 
         public void RefreshLanguage() { installedHelp.Text=Localization.T("modToggleHelp"); System.Windows.Automation.AutomationProperties.SetName(_searchBox,Localization.T("modSearch")); System.Windows.Automation.AutomationProperties.SetName(_migrationTargetCombo,Localization.T("modTargetProfile")); RenderInstalledMods(); Localization.TranslateTree(this); RefreshCatalogLabels(); if (Content is ModProjectView detail) detail.RefreshLanguage(); }
         static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30),MaxResponseContentBufferSize=128*1024*1024 };
@@ -1103,7 +1160,9 @@ namespace MistikLauncher.Pages
             Loaded += (_, _) => {
                 if (InstalledModsWriteTimeUtc() != _installedModsWriteTimeUtc) RenderInstalledMods();
                 if (_searchProfile != (_main.Config.Version ?? "")) _ = SearchMods();
+                _ = RefreshInstalledStatus();
             };
+            Unloaded += (_, _) => { ++_installedGeneration; _installedCancellation?.Cancel(); };
         }
 
         static DateTime InstalledModsWriteTimeUtc(string? directory = null) => Directory.Exists(directory ?? App.ModsDir)
@@ -1111,6 +1170,7 @@ namespace MistikLauncher.Pages
 
         public void RefreshProfile()
         {
+            _ = RefreshInstalledStatus();
             RefreshCatalogLabels();
             if (Content is ModProjectView detail) detail.RefreshProfile();
             else if (_searchProfile != (_main.Config.Version ?? "")) _ = SearchMods();
@@ -1160,6 +1220,7 @@ namespace MistikLauncher.Pages
             using var cancellation = new System.Threading.CancellationTokenSource();
             _searchCancellation = cancellation;
             _resultsPanel.Children.Clear();
+            _catalogButtons.Clear();
             _resultsPanel.Children.Add(PageHelpers.Lbl("modSearching", 13, "#A0A0A0"));
             try
             {
@@ -1185,6 +1246,7 @@ namespace MistikLauncher.Pages
                 if (generation != _searchGeneration) return;
                 if ((_main.Config.Version ?? "") != profile) { await SearchMods(); return; }
                 _resultsPanel.Children.Clear();
+                _catalogButtons.Clear();
                 _previousPage.IsEnabled = _searchOffset > 0;
                 _nextPage.IsEnabled = _searchOffset + 20 < (response["total_hits"]?.Value<int>() ?? hits?.Count ?? 0);
                 var totalHits = response["total_hits"]?.Value<int>() ?? hits?.Count ?? 0;
@@ -1240,16 +1302,24 @@ namespace MistikLauncher.Pages
                     ToolTipService.SetShowOnDisabled(installBtn, true);
                     installBtn.VerticalAlignment = VerticalAlignment.Center;
                     installBtn.Click += async (_, _) => {
-                        await RunInstallButton(installBtn, async () => {
-                            return await InstallMod(cId, mname);
-                        }, ex => MessageBox.Show("Mod kurulamadı" + ": " + ex.Message,
-                            Localization.T("error"), MessageBoxButton.OK, MessageBoxImage.Warning));
+                        if (!_catalogInstalling.Add(installBtn)) return;
+                        try {
+                            await RunInstallButton(installBtn, async () => {
+                                return await InstallMod(cId, mname);
+                            }, ex => MessageBox.Show("Mod kurulamadı" + ": " + ex.Message,
+                                Localization.T("error"), MessageBoxButton.OK, MessageBoxImage.Warning));
+                        }
+                        finally { _catalogInstalling.Remove(installBtn); ApplyCatalogStatus(); }
                     };
                     var actions = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; actions.Children.Add(installBtn);
+                    var installedStatus = PageHelpers.Lbl("", 11, "#ADBED6", wrap: TextWrapping.Wrap);
+                    installedStatus.MaxWidth = 136; actions.Children.Add(installedStatus);
+                    _catalogButtons.Add((cId, installBtn, installedStatus, canInstall));
 
                     Grid.SetColumn(actions, 1); grid.Children.Add(actions);
                     card.Child = grid; _resultsPanel.Children.Add(card);
                 }
+                ApplyCatalogStatus();
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
             catch (Exception ex)
@@ -1266,7 +1336,7 @@ namespace MistikLauncher.Pages
         void OpenProject(string id, string name)
         {
             var previous = Content;
-            Content = new ModProjectView(_main, _client, id, () => { Content = previous; RefreshProfile(); }, version => InstallMod(id, name, version));
+            Content = new ModProjectView(_main, _client, id, () => { Content = previous; RefreshProfile(); }, version => InstallMod(id, name, version), version => CatalogState(id, version));
         }
 
         internal static async Task RunInstallButton(Button button, Func<Task<bool>> install, Action<Exception> failure, string success = "OK")
@@ -1530,6 +1600,7 @@ namespace MistikLauncher.Pages
         }
         void RenderInstalledMods(string? directory = null)
         {
+            _ = RefreshInstalledStatus();
             // The active folder can still belong to the previous profile while background synchronization runs.
             var profile = directory == null ? _main.Config.LastSyncedVersion ?? "" : _main.Config.Version ?? "";
             var modDirectory = directory ?? App.ModsDir;
