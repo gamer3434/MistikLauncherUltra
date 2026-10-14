@@ -1,12 +1,29 @@
 import { summarize } from './metrics.mjs';
 const $ = id => document.getElementById(id);
 function status(message, error = false) { $('status').textContent = message; $('status').dataset.error = String(error); }
-function clear() { $('dashboard').hidden = true; for (const id of ['installations','active','daily','recentErrors']) $(id).textContent = '—'; for (const id of ['versions','categories','errors']) $(id).replaceChildren(); }
-function table(id, rows, columns) {
+let displayedErrors = [];
+function clear() { $('dashboard').hidden = true; for (const id of ['installations','active','daily','recentErrors','lastUpdated']) $(id).textContent = '—'; for (const id of ['versions','categories','errors']) $(id).replaceChildren(); displayedErrors = []; $('errorCount').textContent = ''; }
+function table(id, rows, columns, emptyMessage = 'Henüz veri yok') {
   const body = $(id); body.replaceChildren();
-  if (!rows.length) rows = [Array.from({length:columns}, (_,i) => i ? '—' : 'Henüz veri yok')];
+  if (!rows.length) rows = [Array.from({length:columns}, (_,i) => i ? '—' : emptyMessage)];
   for (const row of rows) { const tr = document.createElement('tr'); for (const value of row) { const td = document.createElement('td'); td.textContent = String(value); tr.append(td); } body.append(tr); }
 }
+function errorFilter(id, values, label) {
+  const select = $(id), selected = select.value;
+  select.replaceChildren(Object.assign(document.createElement('option'), {value:'', textContent:label}));
+  for (const value of values) select.append(Object.assign(document.createElement('option'), {value, textContent:value}));
+  select.value = values.includes(selected) ? selected : '';
+}
+function renderErrors() {
+  const category = $('errorCategory').value, version = $('errorVersion').value;
+  const matches = displayedErrors.filter(item => (!category || item.label === category) && (!version || item.version === version));
+  table('errors', matches.map(item => [item.label, item.version, new Date(item.lastSeen).toLocaleString('tr-TR'), new Intl.NumberFormat('tr-TR').format(item.count)]), 4, displayedErrors.length ? 'Bu filtrelere uyan bildirim yok' : 'Henüz hata bildirilmedi');
+  $('errorCount').textContent = `${matches.length} / ${displayedErrors.length} kayıt gösteriliyor`;
+  $('resetErrors').disabled = !category && !version;
+}
+$('errorCategory').onchange = renderErrors;
+$('errorVersion').onchange = renderErrors;
+$('resetErrors').onclick = () => { $('errorCategory').value = ''; $('errorVersion').value = ''; renderErrors(); };
 function externalLink(url, label) {
   const link = document.createElement('a'); link.href = url; link.textContent = label;
   link.target = '_blank'; link.rel = 'noopener noreferrer'; return link;
@@ -48,11 +65,16 @@ async function loadCatalogMods() {
     if (!panel.childElementCount) throw new Error('empty catalog');
   } catch { panel.replaceChildren(Object.assign(document.createElement('p'), {className:'empty-state', textContent:'Mod kataloğu şu anda alınamadı.'})); }
 }
-function render(data, now) {
+function render(data, now, receivedAt = now) {
   const result = summarize(data, now);
   for (const id of ['installations','active','daily','recentErrors']) $(id).textContent = new Intl.NumberFormat('tr-TR').format(result[id]);
   table('versions', result.versions, 2); table('categories', result.categories, 2);
-  table('errors', result.errors.map(item => [item.label, item.version, new Date(item.lastSeen).toLocaleString('tr-TR'), item.count]), 4);
+  displayedErrors = result.errors;
+  errorFilter('errorCategory', [...new Set(displayedErrors.map(item => item.label))].sort((a,b) => a.localeCompare(b, 'tr')), 'Tüm kategoriler');
+  errorFilter('errorVersion', [...new Set(displayedErrors.map(item => item.version))].sort((a,b) => b.localeCompare(a, undefined, {numeric:true})), 'Tüm sürümler');
+  renderErrors();
+  $('lastUpdated').textContent = new Date(receivedAt).toLocaleTimeString('tr-TR');
+  $('lastUpdated').dateTime = new Date(receivedAt).toISOString();
   $('dashboard').hidden = false;
 }
 try {
@@ -71,7 +93,7 @@ try {
   await authSdk.setPersistence(auth, authSdk.browserSessionPersistence);
   let redirectError;
   try { await authSdk.getRedirectResult(auth); } catch (error) { redirectError = error?.code || "bağlantı"; }
-  let unsubscribe = () => {}, connectedStop = () => {}, offsetStop = () => {}, timer, data, connected = false, offset = 0;
+  let unsubscribe = () => {}, connectedStop = () => {}, offsetStop = () => {}, timer, data, receivedAt, connected = false, offset = 0;
   $('login').disabled = false;
   $('login').onclick = async () => {
     $('login').disabled = true;
@@ -79,20 +101,25 @@ try {
     catch (error) { clear(); status(error?.code === 'auth/unauthorized-domain' ? 'Bu site Firebase Authentication yetkili alan adlarına eklenmemiş.' : 'Google giriş sayfası açılamadı. (' + (error?.code || 'bağlantı') + ')', true); }
     finally { $('login').disabled = false; }
   };
-  $('logout').onclick = async () => { await authSdk.signOut(auth); };
+  $('logout').onclick = async () => {
+    $('logout').disabled = true;
+    try { await authSdk.signOut(auth); }
+    catch { status('Oturum kapatılamadı. Bağlantını kontrol edip yeniden dene.', true); }
+    finally { $('logout').disabled = false; }
+  };
   authSdk.onAuthStateChanged(auth, user => {
     unsubscribe(); connectedStop(); offsetStop(); clearInterval(timer); data = undefined; connected = false; clear();
     $('login').hidden = !!user; $('logout').hidden = !user;
     if (!user) { status(redirectError ? 'Google girişi tamamlanamadı. (' + redirectError + ')' : 'Bu panel yalnızca yetkili Google hesabına açıktır.', !!redirectError); return; }
     status('Yetki ve Firebase verileri kontrol ediliyor…');
     void loadLauncherDetails(); void loadCatalogMods();
-    const update = () => { if (connected && data !== undefined) { render(data, Date.now() + offset); status('Bağlı · Canlı veriler; aktiflik her 30 saniyede yenilenir.'); } };
+    const update = () => { if (connected && data !== undefined) { render(data, Date.now() + offset, receivedAt); status('Bağlı · Canlı veriler; aktiflik her 30 saniyede yenilenir.'); } };
     connectedStop = dbSdk.onValue(dbSdk.ref(database, '.info/connected'), snapshot => {
       connected = snapshot.val() === true;
       if (!connected) { clear(); status('Bağlantı bekleniyor; mevcut sayılar doğrulanamıyor.', true); } else update();
     });
     offsetStop = dbSdk.onValue(dbSdk.ref(database, '.info/serverTimeOffset'), snapshot => { offset = Number(snapshot.val()) || 0; update(); });
-    unsubscribe = dbSdk.onValue(dbSdk.ref(database, 'launcherMetrics'), snapshot => { data = snapshot.val() || {}; update(); }, () => {
+    unsubscribe = dbSdk.onValue(dbSdk.ref(database, 'launcherMetrics'), snapshot => { data = snapshot.val() || {}; receivedAt = Date.now() + offset; update(); }, () => {
       data = undefined; clear(); status('Veriler okunamadı. Hesabın yönetici yetkisini ve veritabanı kurallarını kontrol edin.', true);
     });
     timer = setInterval(update, 30000);

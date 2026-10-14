@@ -21,6 +21,11 @@ static class ModToolsLayoutTests
                 foreach (var width in new[] { 640d, 768d, 1200d })
                 {
                     page.Measure(new Size(width, 720)); page.Arrange(new Rect(0, 0, width, 720)); page.UpdateLayout();
+                    var searchControls = Nodes(page).OfType<Grid>().Single(grid => grid.Name == "ModSearchControls");
+                    if (searchControls.Children.OfType<FrameworkElement>().Any(control => control.TranslatePoint(new Point(control.ActualWidth, control.ActualHeight), searchControls).X > searchControls.ActualWidth + 1))
+                        throw new Exception("Search, import and folder controls must fit the catalog at compact widths.");
+                    if (searchControls.ActualWidth < 650 && searchControls.Children.OfType<Button>().Count(button => Grid.GetRow(button) == 1) != 2)
+                        throw new Exception("Compact catalog tools should flow below search instead of squeezing its input.");
                     var header = Nodes(page).OfType<Grid>().Single(grid => grid.Name == "InstalledModsHeader");
                     var actions = Nodes(page).OfType<WrapPanel>().Single(panel => panel.Name == "InstalledModActions");
                     var title = header.Children.OfType<TextBlock>().Single();
@@ -31,8 +36,9 @@ static class ModToolsLayoutTests
                         throw new Exception("Compact mod backup actions must move below their heading.");
                 }
             }
-            Console.WriteLine("PASS installed-mod backup controls and heading fit640/768/1200DIP in both languages");
-            return 1;
+            Console.WriteLine("PASS installed-mod backup controls and heading fit 640/768/1200 DIP in both languages");
+            Console.WriteLine("PASS catalog search controls reflow at compact widths in both languages");
+            return 2;
         }
         finally { Localization.SetLanguage(previousLanguage); }
     }

@@ -55,8 +55,8 @@ test('homepage has no public presence counter and includes privacy and keyboard 
   assert.match(home, /<main\b[^>]*id="main-content"[^>]*tabindex="-1"/);
   assert.doesNotMatch(home, /presence\.js|active-count|active-status|activeSessions/);
   const words = read('../site/assets/site.js');
-  assert.match(words, /'fact\.local':'Ayarların cihazında saklanır'/);
-  assert.match(words, /'fact\.local':'Settings stay on your device'/);
+  assert.match(words, /"fact\.local": "Ayarların cihazında saklanır"/);
+  assert.match(words, /"fact\.local": "Settings stay on your device"/);
   assert.doesNotMatch(words, /'fact\.active'|'presence\./);
   assert.equal(existsSync(resolve(__dirname, '../site/assets/presence.js')), false);
   assert.equal(existsSync(resolve(__dirname, '../site/hesap/index.html')), false);

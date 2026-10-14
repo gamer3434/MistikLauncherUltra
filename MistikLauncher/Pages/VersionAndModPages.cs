@@ -707,9 +707,11 @@ namespace MistikLauncher.Pages
         int _searchOffset;
         string _sort = "relevance", _lastQuery = "";
         Button _previousPage = null!, _nextPage = null!;
-        TextBlock _pageNumber = null!;
+        TextBlock _pageNumber = null!, _catalogProfile = null!;
+        CheckBox _compatibleOnly = null!;
+        ComboBox _sortBox = null!;
 
-        public void RefreshLanguage() { installedHelp.Text=Localization.T("modToggleHelp"); System.Windows.Automation.AutomationProperties.SetName(_searchBox,Localization.T("modSearch")); System.Windows.Automation.AutomationProperties.SetName(_migrationTargetCombo,Localization.T("modTargetProfile")); RenderInstalledMods(); Localization.TranslateTree(this); if (Content is ModProjectView detail) detail.RefreshLanguage(); }
+        public void RefreshLanguage() { installedHelp.Text=Localization.T("modToggleHelp"); System.Windows.Automation.AutomationProperties.SetName(_searchBox,Localization.T("modSearch")); System.Windows.Automation.AutomationProperties.SetName(_migrationTargetCombo,Localization.T("modTargetProfile")); RenderInstalledMods(); Localization.TranslateTree(this); RefreshCatalogLabels(); if (Content is ModProjectView detail) detail.RefreshLanguage(); }
         static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30),MaxResponseContentBufferSize=128*1024*1024 };
         static ModManagerPage() => Http.DefaultRequestHeaders.UserAgent.ParseAdd("MistikLauncher/6.2 (gamer3434/MistikLauncherUltra)");
 
@@ -855,7 +857,9 @@ namespace MistikLauncher.Pages
 
             optiCard.Child = optiSp;
 
-            var searchRow = new Grid { Margin = new Thickness(0, 12, 0, 10) };
+            var searchRow = new Grid { Name = "ModSearchControls", Margin = new Thickness(0, 12, 0, 10) };
+            searchRow.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            searchRow.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             searchRow.ColumnDefinitions.Add(new ColumnDefinition());
             for(int column=0;column<3;column++) searchRow.ColumnDefinitions.Add(new ColumnDefinition { Width=GridLength.Auto });
             sp.Children.Add(PageHelpers.Lbl("modSearch",14,"#FFFFFF",true));
@@ -902,7 +906,26 @@ namespace MistikLauncher.Pages
             Grid.SetColumn(searchBtn,1); Grid.SetColumn(folderBtn,2); Grid.SetColumn(importBtn,3);
             searchRow.Children.Add(_searchBox); searchRow.Children.Add(searchBtn); searchRow.Children.Add(folderBtn); searchRow.Children.Add(importBtn);
             foreach (var button in new[] { searchBtn, folderBtn, importBtn }) button.Padding = new Thickness(12, 6, 12, 6);
+            searchRow.SizeChanged += (_, _) => {
+                bool compact = searchRow.ActualWidth < 650;
+                Grid.SetColumnSpan(_searchBox, compact ? 3 : 1);
+                Grid.SetColumn(searchBtn, compact ? 3 : 1);
+                Grid.SetRow(folderBtn, compact ? 1 : 0); Grid.SetColumn(folderBtn, compact ? 0 : 2);
+                Grid.SetRow(importBtn, compact ? 1 : 0); Grid.SetColumn(importBtn, compact ? 1 : 3);
+                Grid.SetColumnSpan(importBtn, compact ? 3 : 1);
+                folderBtn.HorizontalAlignment = importBtn.HorizontalAlignment = compact ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+                folderBtn.Margin = compact ? new Thickness(0, 8, 0, 0) : new Thickness(8, 0, 0, 0);
+                importBtn.Margin = compact ? new Thickness(8, 8, 0, 0) : new Thickness(8, 0, 0, 0);
+            };
             sp.Children.Add(searchRow);
+            var profileControls = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
+            _compatibleOnly = new CheckBox { Name = "ModCompatibleOnly", Foreground = PageHelpers.HexBrush("#EFF5FF"),
+                MinHeight = 32, VerticalContentAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 18, 0) };
+            Localization.RegisterText(_compatibleOnly, "modCompatibleOnly");
+            _compatibleOnly.Checked += async (_, _) => { _searchOffset = 0; await SearchMods(); };
+            _compatibleOnly.Unchecked += async (_, _) => { _searchOffset = 0; await SearchMods(); };
+            _catalogProfile = PageHelpers.Lbl("", 12, "#98A8BB"); _catalogProfile.MaxWidth = 500;
+            profileControls.Children.Add(_compatibleOnly); profileControls.Children.Add(_catalogProfile); sp.Children.Add(profileControls);
 
             var catalogControls = new DockPanel { Margin = new Thickness(0, 0, 0, 12) };
             var sorting = new ComboBox { Name = "ModSort", Width = 200, MinHeight = 36,
@@ -911,7 +934,7 @@ namespace MistikLauncher.Pages
                 BorderBrush = PageHelpers.HexBrush("#36363C"), BorderThickness = new Thickness(1) };
             foreach (var item in new[] { ("modSortRelevance", "relevance"), ("modSortDownloads", "downloads"), ("modSortUpdated", "updated"), ("modSortNewest", "newest") })
                 sorting.Items.Add(new ComboBoxItem { Content = Localization.T(item.Item1), Tag = item.Item2 });
-            sorting.SelectedIndex = 0;
+            _sortBox = sorting; sorting.SelectedIndex = 0;
             sorting.SelectionChanged += async (_, _) => { _sort = ((ComboBoxItem)sorting.SelectedItem).Tag.ToString()!; _searchOffset = 0; await SearchMods(); };
             catalogControls.Children.Add(sorting);
             var pagination = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
@@ -971,7 +994,8 @@ namespace MistikLauncher.Pages
             migSp.Children.Add(migControls);
             migCard.Child = migSp;
             extraTools.Children.Add(migCard);
-            sp.Children.Add(new Expander { Header = Localization.T("modTools"), Content = extraTools, Foreground = Brushes.White, Margin = new Thickness(0, 16, 0, 12) });
+            var toolsExpander = new Expander { Content = extraTools, Foreground = Brushes.White, Margin = new Thickness(0, 16, 0, 12) };
+            Localization.RegisterText(toolsExpander, "modTools"); sp.Children.Add(toolsExpander);
 
             // ── Kurulu Modlar Bölümü ─────────────────────────────────────────
             sp.Children.Add(new Separator { Background = PageHelpers.HexBrush("#282828"), Margin = new Thickness(0, 24, 0, 10) });
@@ -1085,6 +1109,31 @@ namespace MistikLauncher.Pages
         static DateTime InstalledModsWriteTimeUtc(string? directory = null) => Directory.Exists(directory ?? App.ModsDir)
             ? Directory.GetLastWriteTimeUtc(directory ?? App.ModsDir) : DateTime.MinValue;
 
+        public void RefreshProfile()
+        {
+            RefreshCatalogLabels();
+            if (Content is ModProjectView detail) detail.RefreshProfile();
+            else if (_searchProfile != (_main.Config.Version ?? "")) _ = SearchMods();
+        }
+
+        void RefreshCatalogLabels()
+        {
+            var profile = _main.Config.Version ?? "";
+            var game = GameProfiles.MinecraftVersion(App.GameDir, profile);
+            var loader = GameProfiles.Loader(App.GameDir, profile);
+            _compatibleOnly.Content = Localization.T("modCompatibleOnly");
+            _catalogProfile.Text = string.Format(Localization.T("modCatalogProfile"), game, loader);
+            _catalogProfile.ToolTip = profile;
+            _previousPage.ToolTip = Localization.T("modPreviousPage"); _nextPage.ToolTip = Localization.T("modNextPage");
+            System.Windows.Automation.AutomationProperties.SetName(_previousPage, Localization.T("modPreviousPage"));
+            System.Windows.Automation.AutomationProperties.SetName(_nextPage, Localization.T("modNextPage"));
+            System.Windows.Automation.AutomationProperties.SetName(_sortBox, Localization.T("modSortLabel"));
+            foreach (ComboBoxItem item in _sortBox.Items)
+                item.Content = Localization.T(item.Tag!.ToString() switch {
+                    "relevance" => "modSortRelevance", "downloads" => "modSortDownloads",
+                    "updated" => "modSortUpdated", _ => "modSortNewest" });
+        }
+
         async Task LoadCatalog()
         {
             await SearchMods();
@@ -1111,12 +1160,24 @@ namespace MistikLauncher.Pages
             using var cancellation = new System.Threading.CancellationTokenSource();
             _searchCancellation = cancellation;
             _resultsPanel.Children.Clear();
-            _resultsPanel.Children.Add(PageHelpers.Lbl("Aranıyor...", 13, "#A0A0A0"));
+            _resultsPanel.Children.Add(PageHelpers.Lbl("modSearching", 13, "#A0A0A0"));
             try
             {
                 string game = GameProfiles.MinecraftVersion(App.GameDir, profile);
                 string loader = GameProfiles.Loader(App.GameDir, profile);
+                RefreshCatalogLabels();
                 var facets = new JArray { new JArray { "project_type:mod" } };
+                if (_compatibleOnly.IsChecked == true)
+                {
+                    if (loader is not ("fabric" or "forge" or "neoforge" or "quilt"))
+                    {
+                        _pageNumber.Text = "0 / 0";
+                        _resultsPanel.Children.Clear();
+                        _resultsPanel.Children.Add(PageHelpers.Lbl("modFilterNeedsLoader", 13, "#F0CF84"));
+                        return;
+                    }
+                    facets.Add(new JArray { "versions:" + game }); facets.Add(new JArray { "categories:" + loader });
+                }
                 var searchUrl = $"https://api.modrinth.com/v2/search?limit=20&offset={_searchOffset}&index={_sort}&facets={Uri.EscapeDataString(facets.ToString(Newtonsoft.Json.Formatting.None))}";
                 if (q.Length > 0) searchUrl += "&query=" + Uri.EscapeDataString(q);
                 var resp = await _client.GetStringAsync(searchUrl, cancellation.Token);
@@ -1128,7 +1189,7 @@ namespace MistikLauncher.Pages
                 _nextPage.IsEnabled = _searchOffset + 20 < (response["total_hits"]?.Value<int>() ?? hits?.Count ?? 0);
                 var totalHits = response["total_hits"]?.Value<int>() ?? hits?.Count ?? 0;
                 _pageNumber.Text = $"{_searchOffset / 20 + 1} / {Math.Max(1, (totalHits + 19) / 20)}  ·  {totalHits:N0}";
-                if (hits == null || hits.Count == 0) { _resultsPanel.Children.Add(PageHelpers.Lbl("Mod bulunamadı.", 13, "#A0A0A0")); return; }
+                if (hits == null || hits.Count == 0) { _resultsPanel.Children.Add(PageHelpers.Lbl("modNoResults", 13, "#A0A0A0")); return; }
                 foreach (var hit in hits)
                 {
                     var modId = hit["project_id"]?.ToString() ?? "";
@@ -1172,8 +1233,12 @@ namespace MistikLauncher.Pages
                     details.Click += (_, _) => OpenProject(cId, mname);
                     Grid.SetColumn(details, 0); grid.Children.Add(details);
 
-                    var installBtn = PageHelpers.MkBtn(Localization.T(canInstall ? "modInstall" : "modIncompatible"), canInstall ? "#159D59" : "#333333", 136);
-                    installBtn.IsEnabled = canInstall; installBtn.VerticalAlignment = VerticalAlignment.Center;
+                    var installBtn = PageHelpers.MkBtn(canInstall ? "modInstall" : "modIncompatible", canInstall ? "#159D59" : "#333333", 136);
+                    installBtn.IsEnabled = canInstall;
+                    installBtn.ToolTip = canInstall ? string.Format(Localization.T("modInstallProfile"), game, loader)
+                        : string.Format(Localization.T("modMismatchHelp"), game, loader);
+                    ToolTipService.SetShowOnDisabled(installBtn, true);
+                    installBtn.VerticalAlignment = VerticalAlignment.Center;
                     installBtn.Click += async (_, _) => {
                         await RunInstallButton(installBtn, async () => {
                             return await InstallMod(cId, mname);
@@ -1201,7 +1266,7 @@ namespace MistikLauncher.Pages
         void OpenProject(string id, string name)
         {
             var previous = Content;
-            Content = new ModProjectView(_main, _client, id, () => Content = previous, version => InstallMod(id, name, version));
+            Content = new ModProjectView(_main, _client, id, () => { Content = previous; RefreshProfile(); }, version => InstallMod(id, name, version));
         }
 
         internal static async Task RunInstallButton(Button button, Func<Task<bool>> install, Action<Exception> failure, string success = "OK")

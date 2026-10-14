@@ -549,7 +549,7 @@ namespace MistikLauncher
             if(_pageCache.TryGetValue("Vers",out var page) && page is Pages.VersionManagerPage versions && versions.IsLoaded)
                 versions.RefreshSelection();
             if(_pageCache.TryGetValue("Dash", out var homePage) && homePage is Pages.ModernHomePage home) { home.RefreshLanguage(); home.InvalidateReadiness(); }
-            if (MainFrame.Content is Pages.ModManagerPage { Content: Pages.ModProjectView detail }) detail.RefreshProfile();
+            if (MainFrame.Content is Pages.ModManagerPage mods) mods.RefreshProfile();
         }
 
         static List<int> GetVersionNumbers(string input)

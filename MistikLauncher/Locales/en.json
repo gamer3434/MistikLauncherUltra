@@ -435,5 +435,15 @@
   "luDowngradeConfirm": "Return to {0}? Automatic updates will be turned off. Older releases may not support newer settings.",
   "usageMetricsToggle": "Share anonymous usage and error statistics",
   "usageMetricsHelp": "Optional: active usage, launcher version and error codes are shared. Usernames and account details are excluded. Turning this off stops reporting; when connected, this device’s records are deleted.",
-  "usageMetricsUnavailable": "The statistics connection is not ready yet. Your preference will apply when it becomes available."
+  "usageMetricsUnavailable": "The statistics connection is not ready yet. Your preference will apply when it becomes available.",
+  "modCompatibleOnly": "Only compatible with my profile",
+  "modCatalogProfile": "Selected profile: {0} · {1}",
+  "modFilterNeedsLoader": "Select a Fabric, Forge, NeoForge or Quilt profile to find compatible mods. Turn off the filter to browse all mods.",
+  "modInstallProfile": "Install into {0} / {1}.",
+  "modMismatchHelp": "No match for {0} / {1}. Open details to see supported versions; choose another profile to install.",
+  "modPreviousPage": "Previous page",
+  "modNextPage": "Next page",
+  "modSortLabel": "Sort mods",
+  "modSearching": "Searching…",
+  "modNoResults": "No mods found. Try a different name or turn off the compatibility filter."
 }

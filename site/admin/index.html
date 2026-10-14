@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="admin.css">
 </head>
 <body>
+<a class="skip-link" href="#page-title">İçeriğe geç</a>
 <main class="shell">
   <header class="topbar">
     <div class="brand-block">
@@ -22,14 +23,14 @@
 
   <section class="intro" aria-labelledby="page-title">
     <p class="eyebrow">YÖNETİM MERKEZİ <span aria-hidden="true">/</span> ANALİTİK</p>
-    <h1 id="page-title">Kullanım görünümü</h1>
+    <h1 id="page-title" tabindex="-1">Kullanım görünümü</h1>
     <p class="intro-copy">Kurulum etkinliğini ve uygulama hata bildirimlerini tek bir yerde takip et.</p>
   </section>
 
   <p id="status" class="status-banner" role="status" aria-live="polite">Firebase bağlantısı hazırlanıyor…</p>
 
   <section id="dashboard" class="dashboard" hidden aria-label="Kullanım bilgileri">
-    <div class="section-heading"><div><p class="eyebrow">GENEL BAKIŞ</p><h2>Kurulum ve etkinlik</h2></div><span class="live-label"><i aria-hidden="true"></i> CANLI</span></div>
+    <div class="section-heading"><div><p class="eyebrow">GENEL BAKIŞ</p><h2>Kurulum ve etkinlik</h2></div><div class="data-freshness"><span class="live-label"><i aria-hidden="true"></i> CANLI</span><span>Son veri: <time id="lastUpdated">—</time></span></div></div>
     <div class="cards">
       <article class="metric-card"><div class="metric-top"><span>Katılan kurulumlar</span><span class="metric-icon" aria-hidden="true">01</span></div><strong id="installations">—</strong><p>İstatistik paylaşan kurulum kimlikleri</p></article>
       <article class="metric-card metric-active"><div class="metric-top"><span>Şimdi aktif</span><span class="metric-icon" aria-hidden="true">02</span></div><strong id="active">—</strong><p>Son 5 dakikada bağlantı bildirenler</p></article>
@@ -47,7 +48,17 @@
       <section class="data-panel"><div class="panel-heading"><div><p class="eyebrow">ÖZET</p><h2>Hata kategorileri</h2></div><span class="panel-caption">Bildirim sayısı</span></div><div class="table-scroll"><table><thead><tr><th scope="col">Kategori</th><th scope="col">Bildirim</th></tr></thead><tbody id="categories"></tbody></table></div></section>
     </div>
 
-    <section class="data-panel error-panel"><div class="panel-heading"><div><p class="eyebrow">SON AKTİVİTE</p><h2>Hata bildirimleri</h2></div><span class="panel-caption">En yeni bildirimler</span></div><div class="table-scroll"><table><thead><tr><th scope="col">Hata</th><th scope="col">Sürüm</th><th scope="col">Son bildirim</th><th scope="col">Toplam</th></tr></thead><tbody id="errors"></tbody></table></div></section>
+    <section class="data-panel error-panel" aria-labelledby="errors-title">
+      <div class="panel-heading"><div><p class="eyebrow">SON AKTİVİTE</p><h2 id="errors-title">Hata bildirimleri</h2></div><span class="panel-caption">En yeni 50 kayıt</span></div>
+      <div class="error-toolbar">
+        <label>Kategori<select id="errorCategory"><option value="">Tüm kategoriler</option></select></label>
+        <label>Launcher sürümü<select id="errorVersion"><option value="">Tüm sürümler</option></select></label>
+        <button id="resetErrors" class="button button-quiet" type="button" disabled>Filtreleri temizle</button>
+        <p id="errorCount" class="filter-count" role="status" aria-live="polite"></p>
+      </div>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Hata bildirimleri tablosu"><table><thead><tr><th scope="col">Hata</th><th scope="col">Sürüm</th><th scope="col">Son bildirim</th><th scope="col">Toplam</th></tr></thead><tbody id="errors"></tbody></table></div>
+      <p class="panel-footnote">Toplam, ilgili kurulumun bu kategori için bildirdiği olay sayısıdır; tekil kullanıcı sayısı değildir.</p>
+    </section>
 
     <details class="privacy-note"><summary>Veri kapsamı ve gizlilik</summary><p>Bunlar kullanıcı sayısı değildir. Yalnızca paylaşımı açık kurulumlar sayılır; aynı kişinin birden fazla kurulumu olabilir. Kullanıcı adı, e-posta, mod listesi ve ham hata günlüğü toplanmaz. Hata sayıları her kurulumun her kategori için son bildirimi ve toplamıdır. Yeniden kurulum yeni kimlik oluşturabilir; paylaşımı kapatınca kayıtların silinmesi denenir; çevrimdışı kapatılan kurulumların eski kayıtları kalabilir.</p></details>
   </section>

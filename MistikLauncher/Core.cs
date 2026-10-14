@@ -214,6 +214,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.30","2026-10-14","#00D4AA", new[]{
+                "Mod merkezinde tüm projeler veya seçili Minecraft/yükleyici profiline uyumlu projeler arasında geçiş yapılabilir.",
+                "Profil değişince liste ve mod ayrıntıları yenilenir; dar pencerelerde arama araçları satırlara sığar.",
+                "Web sitesi gerçek client ekranlarıyla yenilendi. Yönetim panelinde hata kategorisi/sürüm filtreleri ve son veri zamanı görünür.",
+                "Switch between all mods and projects compatible with the selected Minecraft/loader profile.",
+                "Catalog and project compatibility refresh on profile changes; search tools fit compact windows.",
+                "The website now previews real client screens. Admin reports support category/version filters and show the last data time."
+            }),
             new("v6.2.29","2026-10-14","#00D4AA", new[]{
                 "Oyun hazırlanırken/çalışırken ve başka profillerin kullandığı sürümlerde kaldırma engellenir.",
                 "Ana oyun ve varlık indirmeleri boyut/özet doğrulamasından geçer; yarım veya hatalı indirme mevcut sağlam dosyaları bozmaz.",

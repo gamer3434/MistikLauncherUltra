@@ -435,5 +435,15 @@
   "luDowngradeConfirm": "{0} sürümüne dönülsün mü? Otomatik güncelleme kapatılacak. Eski sürümler yeni ayarları desteklemeyebilir.",
   "usageMetricsToggle": "Anonim kullanım ve hata istatistiklerini paylaş",
   "usageMetricsHelp": "İsteğe bağlı: aktif kullanım, launcher sürümü ve hata kodları paylaşılır. Kullanıcı adı ve hesap bilgileri gönderilmez. Kapatınca paylaşım durur; internet bağlantısı varsa bu cihazın kayıtları silinir.",
-  "usageMetricsUnavailable": "İstatistik bağlantısı henüz hazır değil. Hazır olduğunda tercihin uygulanır."
+  "usageMetricsUnavailable": "İstatistik bağlantısı henüz hazır değil. Hazır olduğunda tercihin uygulanır.",
+  "modCompatibleOnly": "Yalnızca profilime uyumlu modlar",
+  "modCatalogProfile": "Seçili profil: {0} · {1}",
+  "modFilterNeedsLoader": "Uyumlu modları bulmak için Fabric, Forge, NeoForge veya Quilt profili seç. Tüm modları görmek için filtreyi kapat.",
+  "modInstallProfile": "{0} / {1} profiline kur.",
+  "modMismatchHelp": "{0} / {1} için eşleşme yok. Desteklenen sürümler için detayları aç; kurmak için başka profil seç.",
+  "modPreviousPage": "Önceki sayfa",
+  "modNextPage": "Sonraki sayfa",
+  "modSortLabel": "Modları sırala",
+  "modSearching": "Aranıyor…",
+  "modNoResults": "Mod bulunamadı. Başka bir ad dene veya uyumluluk filtresini kapat."
 }

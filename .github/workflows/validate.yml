@@ -8,7 +8,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate website release and privacy
-        run: node --test Validation/WebsiteReleaseTests.js Validation/WebsitePrivacyTests.js Validation/FirebaseMetricsTests.js
+        run: node --test Validation/WebsiteReleaseTests.js Validation/WebsitePrivacyTests.js Validation/FirebaseMetricsTests.js Validation/AdminDashboardTests.js
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'

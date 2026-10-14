@@ -56,37 +56,101 @@ test('rejects leading zeroes and numeric components outside JavaScript safe inte
   ]) assert.equal(parseRelease(release({ tag_name: tag })), null, tag);
 });
 
-test('keeps a working v6.1.5 fallback and matching published digests', () => {
+test('keeps a working v6.2.29 fallback and matching published digests', () => {
   const home = readFileSync(require.resolve('../site/index.html'), 'utf8');
   const download = readFileSync(require.resolve('../site/indir/index.html'), 'utf8');
   const releaseScript = readFileSync(require.resolve('../site/assets/release.js'), 'utf8');
-  assert.match(releaseScript, /fallbackVersion = '6\.1\.5'/);
-  assert.match(home, /data-release-version>v6\.1\.5/);
+  assert.match(releaseScript, /fallbackVersion = '6\.2\.29'/);
+  assert.match(home, /data-release-version>v6\.2\.29/);
   for (const [kind, name] of Object.entries({
-    online: 'MistikSetup-Online-6.1.5.exe',
-    offline: 'MistikSetup-Offline-6.1.5.exe',
-    portable: 'MistikLauncher-6.1.5-win-x64.zip'
+    online: 'MistikSetup-Online-6.2.29.exe',
+    offline: 'MistikSetup-Offline-6.2.29.exe',
+    portable: 'MistikLauncher-6.2.29-win-x64.zip'
   })) {
-    assert.match(download, new RegExp(`data-release-asset="${kind}" href="https://github\\.com/${repo}/releases/download/v6\\.1\\.5/${name.replaceAll('.', '\\.')}"`));
+    assert.match(download, new RegExp(`data-release-asset="${kind}" href="https://github\\.com/${repo}/releases/download/v6\\.2\\.29/${name.replaceAll('.', '\\.')}"`));
     const row = new RegExp(`data-release-hash="${kind}">[\\s\\S]*?<code>([a-f0-9]{64})</code>[\\s\\S]*?data-copy-hash="([a-f0-9]{64})"`).exec(download);
     assert.ok(row, `${kind} fallback hash exists`);
     assert.equal(row[1], {
-      online: 'ec2f62878ae63086a6f6d0f524b4db25cc55f7e869d87ef302f0d48d632bacf4',
-      offline: 'fc686ab0d91045b0acafb387cd1427de62c3d759352c8afd47b19fd7cd36ccf1',
-      portable: 'ad86ea9a1f1488c776b377bd187511bcdfce34c294f37f83935401baa9b0f139'
+      online: '40218ef56828a61a6656daae3563d2c42be84e52dd0d6a0c15a9d20b38d66d09',
+      offline: '0f1bd7c3c11bcf435c77a4eb56f5c14aad83dcf5c6d7c4ee5d44129f9213ba1d',
+      portable: 'dfd660895de76b6d569e2ec5e8974a35121a3b21226056fb8c2851a6613ac0ad'
     }[kind]);
     assert.equal(row[1], row[2]);
   }
 });
 
-test('preview sample labels translate and decorative switches stay silent', () => {
+test('real client preview has translated descriptions, matching panels and local images', () => {
   const preview = readFileSync(require.resolve('../site/onizleme/index.html'), 'utf8');
   const script = readFileSync(require.resolve('../site/assets/site.js'), 'utf8');
   const context = { window: {} };
   runInNewContext(script.slice(0, script.indexOf('let lang=')), context);
-  assert.equal(context.window.mistikWords.en['screen.versions.sampleProfile'], 'Modded world');
-  assert.equal(context.window.mistikWords.en['screen.settings.currentLanguage'], 'English ⌄');
-  assert.match(preview, /data-i18n="screen\.versions\.sampleProfile"/);
-  assert.match(preview, /data-i18n="screen\.settings\.currentLanguage"/);
-  assert.doesNotMatch(preview, /class="toggle-demo" aria-label=/);
+  assert.equal(context.window.mistikWords.en['demo.home.alt'], 'Mistik Launcher home: profile, version and launch readiness.');
+  assert.match(context.window.mistikWords.en['demo.sectionIntro'], /sample profile and mod data/);
+  for (const screen of ['home', 'mods']) {
+    assert.match(preview, new RegExp(`id="tab-${screen}"[^>]+aria-controls="panel-${screen}"`));
+    assert.match(preview, new RegExp(`id="panel-${screen}"[^>]+aria-labelledby="tab-${screen}"`));
+  }
+  for (const image of ['client-home-tr.png','client-home-en.png','client-mods.png']) {
+    assert.ok(readFileSync(require.resolve(`../site/assets/${image}`)).length > 1000);
+  }
+  assert.doesNotMatch(preview, /tab-updates|panel-updates|6\.1\.5/);
+});
+
+test('public pages have complete TR/EN labels and do not advertise a removed update menu', () => {
+  const script = readFileSync(require.resolve('../site/assets/site.js'), 'utf8');
+  const context = { window: {} };
+  runInNewContext(script.slice(0, script.indexOf('let lang=')), context);
+  for (const page of ['index.html','indir/index.html','ozellikler/index.html','onizleme/index.html']) {
+    const html = readFileSync(require.resolve(`../site/${page}`), 'utf8');
+    for (const [,key] of html.matchAll(/data-i18n(?:-alt|-aria)?="([^"]+)"/g)) {
+      for (const language of ['tr','en']) assert.ok(context.window.mistikWords[language][key], `${page}: ${language} ${key}`);
+    }
+    assert.doesNotMatch(html, /Güncellemeler menüsünden|6\.1\.5/);
+  }
+  assert.match(context.window.mistikWords.en['feature.versions.copy'], /Fabric, Forge, NeoForge and Quilt/);
+  assert.match(context.window.mistikWords.en['feature.updates.copy'], /Settings/);
+});
+
+test('preview switching keeps pressed states, visible panels and translated screenshot in sync', () => {
+  const element = dataset => ({
+    dataset, attributes: {}, listeners: {},
+    addEventListener(name, handler) { this.listeners[name] = handler; },
+    setAttribute(name, value) { this.attributes[name] = value; }
+  });
+  const language = element({}), theme = element({}), year = element({});
+  const tabs = ['home','mods'].map(screen => element({screen}));
+  const panels = ['home','mods'].map(panel => element({panel}));
+  const image = element({srcTr:'/assets/client-home-tr.png',srcEn:'/assets/client-home-en.png',i18nAlt:'demo.home.alt'});
+  const previewMenu = element({i18nAria:'demo.screens'});
+  const nodes = {
+    '[data-screen]':tabs, '[data-panel]':panels, '[data-preview-image]':[image],
+    '[data-i18n-alt]':[image], '[data-i18n-aria]':[previewMenu]
+  };
+  const document = {
+    documentElement: element({}), body: element({}),
+    getElementById(id) { return {language,theme,year}[id]; },
+    querySelectorAll(selector) { return nodes[selector] || []; },
+    querySelector() { return element({}); },
+    dispatchEvent() {}
+  };
+  document.documentElement.removeAttribute = () => {};
+  runInNewContext(readFileSync(require.resolve('../site/assets/site.js'), 'utf8'), {
+    window:{}, document, Event:class {},
+    localStorage:{getItem(){return null;},setItem(){}},
+    getComputedStyle(){return {getPropertyValue(){return '#111315';}};},
+    matchMedia(){return {addEventListener(){}};}
+  });
+  tabs[1].listeners.click();
+  assert.equal(panels[0].hidden,true);
+  assert.equal(panels[1].hidden,false);
+  assert.equal(tabs[0].attributes['aria-pressed'],'false');
+  assert.equal(tabs[1].attributes['aria-pressed'],'true');
+  language.listeners.click();
+  assert.equal(document.documentElement.lang,'en');
+  assert.equal(image.src,'/assets/client-home-en.png');
+  assert.equal(image.alt,'Mistik Launcher home: profile, version and launch readiness.');
+  assert.equal(previewMenu.attributes['aria-label'],'Launcher screens');
+  tabs[0].listeners.click();
+  assert.equal(panels[0].hidden,false);
+  assert.equal(panels[1].hidden,true);
 });

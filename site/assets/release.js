@@ -3,17 +3,17 @@
 
   const repo = 'gamer3434/MistikLauncherUltra';
   const minimumVersion = [6, 1, 5];
-  const fallbackVersion = '6.1.5';
+  const fallbackVersion = '6.2.29';
   const fallbackNotes = {
   "tr": [
-    "Web sitesi ve launcher hesap ekranları kaldırıldı.",
+    "Oyun ve kaynak dosyaları boyut ve SHA-1 doğrulamasıyla indirilir.",
     "Oyuncu profilleri ve launcher ayarları cihazında saklanır.",
-    "Güncellemeler menüsünden kurulu sürümünü ve sürüm duyurularını görüntüle."
+    "Bağımlı profili olan sürümlerin silinmesi engellenir."
   ],
   "en": [
-    "Website and launcher account screens were removed.",
+    "Game and asset downloads verify file size and SHA-1.",
     "Player profiles and launcher settings stay on your device.",
-    "View your installed version and release announcements in Updates."
+    "Versions required by other profiles cannot be removed."
   ]
 };
 
@@ -125,6 +125,6 @@
   }).then(release => {
     current = parseRelease(release);
     if (current) render();
-  }).catch(() => { /* The verified 6.1.5 fallback remains usable offline. */ })
+  }).catch(() => { /* The verified 6.2.29 fallback remains usable offline. */ })
     .finally(() => clearTimeout(timeout));
 }());

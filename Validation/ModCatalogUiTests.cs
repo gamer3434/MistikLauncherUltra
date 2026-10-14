@@ -14,6 +14,9 @@ static class ModCatalogUiTests
     public static int Run(MainWindow window, Action<string> capture, Action<string, int, int>? compactCapture = null)
     {
         var frame = (Frame)window.FindName("MainFrame"); var previous = frame.Content;
+        var selectNav = typeof(MainWindow).GetMethod("SelectNav", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        var previousNav = (string)typeof(MainWindow).GetField("_currentNav", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(window)!;
+        selectNav.Invoke(window, new object[] { "Mods" });
         var fixture = new Fixture(window);
         using var client = new HttpClient(fixture);
         var page = new ModManagerPage(window, client);
@@ -44,6 +47,33 @@ static class ModCatalogUiTests
             if (!fixture.SearchRequests.Any(uri => uri.Query.Contains("offset=20")))
                 throw new Exception("Next page should load the next group of matching mods.");
             Console.WriteLine("PASS empty search browses mods across versions and loaders, labels incompatible projects, and paginates");
+            var compatibility = Nodes(page).OfType<CheckBox>().Single(box => box.Name == "ModCompatibleOnly");
+            compatibility.IsChecked = true; Flush(window);
+            var filteredRequest = Uri.UnescapeDataString(fixture.SearchRequests.Last().Query);
+            var filterGame = GameProfiles.MinecraftVersion(App.GameDir, window.Config.Version);
+            var filterLoader = GameProfiles.Loader(App.GameDir, window.Config.Version);
+            if (!filteredRequest.Contains("offset=0") || !filteredRequest.Contains("versions:" + filterGame) || !filteredRequest.Contains("categories:" + filterLoader))
+                throw new Exception("Compatibility filter must reset pagination and query the selected Minecraft version and loader together.");
+            var beforeFilterProfile = window.Config.Version;
+            var previousRequests = fixture.SearchRequests.Count;
+            window.SetVersion("1.21.1"); Flush(window);
+            if (fixture.SearchRequests.Count != previousRequests || !Nodes(page).OfType<TextBlock>().Any(text => text.Text == Localization.T("modFilterNeedsLoader")) || nextPage.IsEnabled)
+                throw new Exception("Vanilla compatibility filter must show guidance without querying invalid loader facets or retaining old results.");
+            window.SetVersion(beforeFilterProfile); Flush(window);
+            if (fixture.SearchRequests.Count <= previousRequests || !Uri.UnescapeDataString(fixture.SearchRequests.Last().Query).Contains("categories:" + filterLoader))
+                throw new Exception("Changing back to a modded profile must automatically refresh filtered results.");
+            compatibility.IsChecked = false; Flush(window);
+            if (Uri.UnescapeDataString(fixture.SearchRequests.Last().Query).Contains("versions:"))
+                throw new Exception("Turning the compatibility filter off must restore all-version browsing.");
+            var oldLanguage = Localization.Language;
+            Localization.SetLanguage(oldLanguage == "en" ? "tr" : "en"); page.RefreshLanguage();
+            if (((ComboBoxItem)sortBox.Items[0]).Content?.ToString() != Localization.T("modSortRelevance") ||
+                System.Windows.Automation.AutomationProperties.GetName(nextPage) != Localization.T("modNextPage") ||
+                !Nodes(page).OfType<Button>().Any(button => Equals(button.Content, Localization.T("modInstall"))) ||
+                !Nodes(page).OfType<Expander>().Any(expander => Equals(expander.Header, Localization.T("modTools"))))
+                throw new Exception("Cached mod sorting and pagination labels must follow the selected language.");
+            Localization.SetLanguage(oldLanguage); page.RefreshLanguage(); Flush(window);
+            Console.WriteLine("PASS compatibility filter resets pages, follows selected profile, explains Vanilla, restores all mods and translates controls");
             var open = Nodes(page).OfType<Button>().Single(button => System.Windows.Automation.AutomationProperties.GetName(button).StartsWith("Example project ·", StringComparison.Ordinal));
             open.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
             if (page.Content is not ModProjectView detail) throw new Exception("Card should open project inside its mod page.");
@@ -165,7 +195,12 @@ static class ModCatalogUiTests
                 !Nodes(detail).OfType<TextBlock>().Select(text => text.Text).SequenceEqual(unloadedText))
                 throw new Exception("Completing a pending request after unload must not mutate detail content or status.");
             Console.WriteLine("PASS unloaded detail ignores late metadata response");
+            window.SetVersion(alternateProfile); Flush(window);
+            var requestsBeforeBack = fixture.SearchRequests.Count;
             Nodes(detail).OfType<Button>().First().RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
+            if (fixture.SearchRequests.Count <= requestsBeforeBack)
+                throw new Exception("Returning from details after changing profile must refresh catalog compatibility instead of restoring stale install controls.");
+            window.SetVersion(selectedProfile); Flush(window);
             if (page.Content is ModProjectView) throw new Exception("Back should restore the original search and results.");
             var search = Nodes(page).OfType<TextBox>().Single();
             search.Text = "Double $1 Every Minute";
@@ -211,9 +246,9 @@ static class ModCatalogUiTests
             }
             finally { window.SetVersion(selectedProfile); SynchronizationContext.SetSynchronizationContext(context); }
             Console.WriteLine("PASS pending detail install blocks duplicate actions and revalidates changed-profile availability after completion");
-            return 12;
+            return 13;
         }
-        finally { frame.Content = previous; }
+        finally { frame.Content = previous; selectNav.Invoke(window, new object[] { previousNav }); }
     }
     static void Flush(Window window)
     {
