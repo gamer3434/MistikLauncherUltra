@@ -1036,6 +1036,15 @@ namespace MistikLauncher
             }
         }
 
+        public void RemoveInstalledVersion(string id)
+        {
+            lock (_modSyncGate)
+            {
+                if (launchPreparing || gameRunning) throw new IOException(Localization.T("versionRemoveBusy"));
+                GameProfiles.Remove(App.GameDir, id);
+            }
+        }
+
         public T WithSyncedMods<T>(string expectedVersion, Func<string,T> write)
         {
             lock (_modSyncGate)

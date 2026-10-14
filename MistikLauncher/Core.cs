@@ -214,6 +214,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.29","2026-10-14","#00D4AA", new[]{
+                "Oyun hazırlanırken/çalışırken ve başka profillerin kullandığı sürümlerde kaldırma engellenir.",
+                "Ana oyun ve varlık indirmeleri boyut/özet doğrulamasından geçer; yarım veya hatalı indirme mevcut sağlam dosyaları bozmaz.",
+                "Mod ikonlarında eski istekler iptal edilir. Eş zamanlı hata günlükleri kaybolmaz; başarısız temel oyun kurulumu Fabric kurulumunu durdurur.",
+                "Version removal is blocked during game launch/play and when other profiles depend on the version.",
+                "Game and asset downloads verify size and hashes; interrupted or invalid transfers preserve existing files.",
+                "Obsolete mod icon requests are canceled. Concurrent logs are preserved; Fabric stops if its base game installation fails."
+            }),
             new("v6.2.28","2026-10-14","#00D4AA", new[]{
                 "Sade ve kompakt arayüz: daha ince üst/alt çubuklar, modlara ayrılan daha geniş alan.",
                 "Modrinth tarzı resimli kartlar, küçük kategori etiketleri ve hizalı açıklama/sürüm/galeri sekmeleri.",
@@ -494,14 +502,18 @@ namespace MistikLauncher
             new("v4.0.0","2026-05-16","#FFB100", new[]{ "Sürüm Yöneticisi","Mod Merkezi (Modrinth)","Bulut güncellemeler" }),
         };
 
+        static readonly object LogGate = new();
         public static void Log(string msg)
         {
-            try
+            lock (LogGate)
             {
-                Directory.CreateDirectory(AppData);
-                File.AppendAllText(LogFile, $"[{DateTime.Now:HH:mm:ss}] {msg}\n");
+                try
+                {
+                    Directory.CreateDirectory(AppData);
+                    File.AppendAllText(LogFile, $"[{DateTime.Now:HH:mm:ss}] {msg}\n");
+                }
+                catch { }
             }
-            catch { }
         }
     }
 

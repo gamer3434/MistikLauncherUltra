@@ -67,6 +67,29 @@ public static class GameProfiles
     }
     public static IEnumerable<string> InstalledIds(string root) => Directory.Exists(Path.Combine(root,"versions")) ?
         Directory.GetDirectories(Path.Combine(root,"versions")).Select(Path.GetFileName).OfType<string>().Where(id=>IsInstalled(root,id)) : Array.Empty<string>();
+    public static void Remove(string root, string id)
+    {
+        if (!SafeId(id)) throw new IOException(Localization.T("versionRemoveInvalid"));
+        string directory = Path.Combine(root, "versions", id);
+        if (!Directory.Exists(directory)) throw new DirectoryNotFoundException(Localization.T("versionRemoveInvalid"));
+        ModFiles.EnsureRoot(directory);
+        var dependents = new List<string>();
+        foreach (var path in Directory.GetDirectories(Path.Combine(root, "versions")))
+        {
+            string candidate = Path.GetFileName(path);
+            if (candidate.Equals(id, StringComparison.OrdinalIgnoreCase)) continue;
+            var current = candidate; var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            while (SafeId(current) && seen.Count < 16 && seen.Add(current))
+            {
+                string? parent = Read(root, current)?["inheritsFrom"]?.ToString();
+                if (string.IsNullOrEmpty(parent)) break;
+                if (parent.Equals(id, StringComparison.OrdinalIgnoreCase)) { dependents.Add(candidate); break; }
+                current = parent;
+            }
+        }
+        if (dependents.Count > 0) throw new IOException(string.Format(Localization.T("versionRequiredBy"), string.Join(", ", dependents)));
+        Directory.Delete(directory, recursive: true);
+    }
     public static IEnumerable<string> Arguments(JToken? tokens)
     {
         if(tokens is not JArray array) yield break;

@@ -100,6 +100,9 @@ public sealed class ModProjectView : Grid
     internal static Uri? GalleryImageUrl(string? raw, string? preview) => ImageUrl(raw) ?? ImageUrl(preview);
 
     internal static FrameworkElement Icon(string? raw, int size)
+        => Icon(raw, size, ModCatalogImages.LoadAsync);
+
+    internal static FrameworkElement Icon(string? raw, int size, Func<Uri, int, CancellationToken, Task<BitmapSource?>> load)
     {
         var border = new Border { Width = size, Height = size, CornerRadius = new CornerRadius(12),
             Background = PageHelpers.HexBrush("#34383E"), Margin = new Thickness(0, 0, 18, 0), ClipToBounds = true,
@@ -107,12 +110,22 @@ public sealed class ModProjectView : Grid
         var url = ImageUrl(raw);
         if (url != null)
         {
-            async Task LoadIcon()
+            CancellationTokenSource? request = null;
+            border.Loaded += async (_, _) =>
             {
-                var picture = await ModCatalogImages.LoadAsync(url, size);
-                if (picture != null) border.Child = new Image { Source = picture, Stretch = Stretch.Uniform };
-            }
-            _ = LoadIcon();
+                if (request != null || border.Child is Image { Source: not null }) return;
+                var pending = new CancellationTokenSource(); request = pending;
+                try
+                {
+                    var picture = await load(url, size, pending.Token);
+                    if (ReferenceEquals(request, pending) && !pending.IsCancellationRequested && picture != null)
+                        border.Child = new Image { Source = picture, Stretch = Stretch.Uniform };
+                }
+                catch (OperationCanceledException) when (pending.IsCancellationRequested) { }
+                catch (Exception ex) { App.Log("Mod icon could not load: " + ex.Message); }
+                finally { if (ReferenceEquals(request, pending)) request = null; pending.Dispose(); }
+            };
+            border.Unloaded += (_, _) => { var pending = request; request = null; pending?.Cancel(); };
         }
         return border;
     }

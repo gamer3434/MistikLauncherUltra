@@ -327,9 +327,8 @@ namespace MistikLauncher.Pages
                     delBtn.Click += (_, _) => {
                         if (MessageBox.Show($"{vid} silinsin mi?", "Onay", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
                         {
-                            var path = Path.Combine(App.GameDir, "versions", installedFolder);
-                            if (Directory.Exists(path)) Directory.Delete(path, true);
-                            RenderList(); _main.PopulateVersionBox();
+                            try { _main.RemoveInstalledVersion(installedFolder); RenderList(); _main.PopulateVersionBox(); }
+                            catch (Exception ex) { MessageBox.Show(ex.Message, Localization.T("error"), MessageBoxButton.OK, MessageBoxImage.Warning); }
                         }
                     };
                     btnSp.Children.Add(selBtn); btnSp.Children.Add(delBtn);
@@ -429,7 +428,9 @@ namespace MistikLauncher.Pages
 
                 // Download jar with dynamic speed reporting
                 var jarPath = Path.Combine(verDir, $"{version}.jar");
-                await DownloadFileWithProgressAsync(clientUrl, jarPath, progress, 10, 65);
+                await DownloadFileWithProgressAsync(clientUrl, jarPath, progress, 10, 65,
+                    expectedSha1: verJson["downloads"]?["client"]?["sha1"]?.ToString(),
+                    expectedSize: verJson["downloads"]?["client"]?["size"]?.Value<long>());
 
                 // Download assets index
                 var assetsId  = verJson["assetIndex"]?["id"]?.ToString() ?? version;
@@ -444,61 +445,10 @@ namespace MistikLauncher.Pages
 
                     // Download asset objects (language files, sounds, textures)
                     progress(82, "Oyun varlıkları (diller, sesler) indiriliyor...");
-                    try
-                    {
-                        var assetIndexObj = JObject.Parse(assetsJson);
-                        var objects = assetIndexObj["objects"] as JObject;
-                        if (objects != null)
-                        {
-                            var objectsDir = Path.Combine(App.GameDir, "assets", "objects");
-                            var entries = objects.Properties().ToList();
-                            int total = entries.Count, done = 0;
-
-                            // Using a Semaphore to run up to 8 downloads concurrently
-                            var sem = new System.Threading.SemaphoreSlim(8);
-                            var tasks = entries.Select(async prop =>
-                            {
-                                var hash = prop.Value["hash"]?.ToString();
-                                if (string.IsNullOrEmpty(hash)) return;
-                                var prefix = hash.Substring(0, 2);
-                                var destDir = Path.Combine(objectsDir, prefix);
-                                var destFile = Path.Combine(destDir, hash);
-                                if (File.Exists(destFile))
-                                {
-                                    System.Threading.Interlocked.Increment(ref done);
-                                    return;
-                                }
-
-                                await sem.WaitAsync();
-                                try
-                                {
-                                    Directory.CreateDirectory(destDir);
-                                    var url2 = $"https://resources.download.minecraft.net/{prefix}/{hash}";
-                                    var data = await _http.GetByteArrayAsync(url2);
-                                    await File.WriteAllBytesAsync(destFile, data);
-                                }
-                                catch (Exception ex)
-                                {
-                                    App.Log($"Failed to download asset {hash}: {ex.Message}");
-                                }
-                                finally
-                                {
-                                    sem.Release();
-                                    int d = System.Threading.Interlocked.Increment(ref done);
-                                    if (d % 100 == 0 || d == total)
-                                    {
-                                        double pct = 82.0 + ((double)d / total) * 12.0;
-                                        progress(pct, $"Varlıklar indiriliyor: {d}/{total}");
-                                    }
-                                }
-                            });
-                            await Task.WhenAll(tasks);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        App.Log($"Varlık indirme hatası: {ex.Message}");
-                    }
+                    await GameRuntimeHealth.EnsureAssetsAsync(App.GameDir, JObject.Parse(assetsJson), _http, (done, total) => {
+                        if (done % 100 == 0 || done == total)
+                            progress(82.0 + (double)done / total * 12.0, $"Varlıklar indiriliyor: {done}/{total}");
+                    });
                 }
                 progress(95, "Yapılandırma dosyaları yazılıyor...");
 
@@ -518,56 +468,90 @@ namespace MistikLauncher.Pages
             }
         }
 
-        public static async Task DownloadFileWithProgressAsync(string url, string destinationPath, Action<double, string> progress, double progressStart, double progressWeight)
+        public static async Task DownloadFileWithProgressAsync(string url, string destinationPath, Action<double, string> progress, double progressStart, double progressWeight,
+            HttpClient? client = null, CancellationToken cancellationToken = default, string? expectedSha1 = null, long? expectedSize = null)
         {
-            using var response = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.UserInfo.Length != 0 ||
+                expectedSize is <= 0 or > 1024L * 1024 * 1024 || expectedSha1 != null && !System.Text.RegularExpressions.Regex.IsMatch(expectedSha1, "^[a-fA-F0-9]{40}$"))
+                throw new InvalidDataException("Invalid game download metadata.");
+            destinationPath = Path.GetFullPath(destinationPath);
+            string parent = Path.GetDirectoryName(destinationPath)!;
+            if (!GameRuntimeHealth.TryChildPath(parent, Path.GetFileName(destinationPath), out _)) throw new IOException("Invalid game download path.");
+            client ??= _http;
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(client.Timeout == Timeout.InfiniteTimeSpan ? TimeSpan.FromMinutes(10) : client.Timeout);
+            var token = timeout.Token;
+            using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, token);
             response.EnsureSuccessStatusCode();
 
-            var totalBytes = response.Content.Headers.ContentLength ?? -1L;
-            using var contentStream = await response.Content.ReadAsStreamAsync();
-            using var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
-
-            var buffer = new byte[8192];
-            long totalReadBytes = 0L;
-            int readBytes;
-            var sw = Stopwatch.StartNew();
-
-            long lastReportBytes = 0L;
-            var lastReportTime = sw.ElapsedMilliseconds;
-
-            while ((readBytes = await contentStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            var totalBytes = response.Content.Headers.ContentLength ?? expectedSize ?? -1L;
+            if (totalBytes > 1024L * 1024 * 1024 || expectedSize != null && totalBytes >= 0 && totalBytes != expectedSize)
+                throw new InvalidDataException("Game download size does not match its metadata.");
+            using var contentStream = await response.Content.ReadAsStreamAsync(token);
+            Directory.CreateDirectory(parent);
+            string temporary = Path.Combine(parent, "." + Path.GetFileName(destinationPath) + ".download-" + Guid.NewGuid().ToString("N") + ".tmp");
+            try
             {
-                await fileStream.WriteAsync(buffer, 0, readBytes);
-                totalReadBytes += readBytes;
-
-                var now = sw.ElapsedMilliseconds;
-                if (now - lastReportTime >= 200 || totalReadBytes == totalBytes)
+                await using (var fileStream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 8192, true))
                 {
-                    double pct = totalBytes > 0 ? (double)totalReadBytes / totalBytes * 100.0 : 0.0;
-                    double currentProgress = progressStart + pct * (progressWeight / 100.0);
 
-                    // Speed calculation
-                    double elapsedSec = (now - lastReportTime) / 1000.0;
-                    if (elapsedSec <= 0) elapsedSec = 0.001;
+                    var buffer = new byte[8192];
+                    long totalReadBytes = 0L;
+                    int readBytes;
+                    var sw = Stopwatch.StartNew();
 
-                    long bytesInInterval = totalReadBytes - lastReportBytes;
-                    double bytesPerSec = bytesInInterval / elapsedSec;
-                    double mbPerSec = bytesPerSec / (1024.0 * 1024.0);
+                    long lastReportBytes = 0L;
+                    var lastReportTime = sw.ElapsedMilliseconds;
 
-                    string speedStr = mbPerSec >= 1.0
-                        ? $"{mbPerSec:F2} MB/s"
-                        : $"{bytesPerSec / 1024.0:F1} KB/s";
+                    while ((readBytes = await contentStream.ReadAsync(buffer.AsMemory(), token)) > 0)
+                    {
+                        if (totalReadBytes + readBytes > (expectedSize ?? (totalBytes >= 0 ? totalBytes : 1024L * 1024 * 1024)))
+                            throw new InvalidDataException("Game download exceeds its expected size.");
+                        await fileStream.WriteAsync(buffer.AsMemory(0, readBytes), token);
+                        totalReadBytes += readBytes;
 
-                    string sizeStr = totalBytes > 0
-                        ? $"{totalReadBytes / (1024.0 * 1024.0):F1} MB / {totalBytes / (1024.0 * 1024.0):F1} MB"
-                        : $"{totalReadBytes / (1024.0 * 1024.0):F1} MB";
+                        var now = sw.ElapsedMilliseconds;
+                        if (now - lastReportTime >= 200 || totalReadBytes == totalBytes)
+                        {
+                            double pct = totalBytes > 0 ? (double)totalReadBytes / totalBytes * 100.0 : 0.0;
+                            double currentProgress = progressStart + pct * (progressWeight / 100.0);
 
-                    progress(currentProgress, $"İndiriliyor... {pct:F1}% ({sizeStr}) - Hız: {speedStr}");
+                            // Speed calculation
+                            double elapsedSec = (now - lastReportTime) / 1000.0;
+                            if (elapsedSec <= 0) elapsedSec = 0.001;
 
-                    lastReportBytes = totalReadBytes;
-                    lastReportTime = now;
+                            long bytesInInterval = totalReadBytes - lastReportBytes;
+                            double bytesPerSec = bytesInInterval / elapsedSec;
+                            double mbPerSec = bytesPerSec / (1024.0 * 1024.0);
+
+                            string speedStr = mbPerSec >= 1.0
+                                ? $"{mbPerSec:F2} MB/s"
+                                : $"{bytesPerSec / 1024.0:F1} KB/s";
+
+                            string sizeStr = totalBytes > 0
+                                ? $"{totalReadBytes / (1024.0 * 1024.0):F1} MB / {totalBytes / (1024.0 * 1024.0):F1} MB"
+                                : $"{totalReadBytes / (1024.0 * 1024.0):F1} MB";
+
+                            progress(currentProgress, $"İndiriliyor... {pct:F1}% ({sizeStr}) - Hız: {speedStr}");
+
+                            lastReportBytes = totalReadBytes;
+                            lastReportTime = now;
+                        }
+                    }
+                    if (totalReadBytes == 0 || totalBytes >= 0 && totalReadBytes != totalBytes || expectedSize != null && totalReadBytes != expectedSize)
+                        throw new InvalidDataException("Game download is empty or incomplete.");
                 }
+                if (expectedSha1 != null)
+                {
+                    await using var downloaded = File.OpenRead(temporary);
+                    var actual = Convert.ToHexString(await System.Security.Cryptography.SHA1.HashDataAsync(downloaded, token));
+                    if (!actual.Equals(expectedSha1, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Game download SHA-1 mismatch.");
+                }
+                token.ThrowIfCancellationRequested();
+                File.Move(temporary, destinationPath, overwrite: true);
             }
+            finally { if (File.Exists(temporary)) File.Delete(temporary); }
         }
 
         static async Task<string> InstallFabricAsync(string gameVersion, Action<double, string> progress)
@@ -576,7 +560,8 @@ namespace MistikLauncher.Pages
             {
                 progress(10, "[Fabric] Temel oyun sürümü indiriliyor...");
                 // Ensure vanilla base version is installed first
-                await DownloadVersionAsync(gameVersion, (p, status) => progress(10 + p * 0.45, $"[Fabric] {status}")); // takes up to 55%
+                var baseId = await DownloadVersionAsync(gameVersion, (p, status) => progress(10 + p * 0.45, $"[Fabric] {status}"));
+                if (baseId == null) throw new IOException(Localization.T("fabricBaseFailed"));
 
                 progress(60, "[Fabric] Fabric yükleyici bilgileri alınıyor...");
                 // Fetch loaders

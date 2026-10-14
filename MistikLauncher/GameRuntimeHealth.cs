@@ -235,6 +235,36 @@ public static class GameRuntimeHealth
         return repaired;
     }
 
+    public static async Task<int> EnsureAssetsAsync(string root, JObject index, HttpClient httpClient,
+        Action<int, int>? progress = null, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (index["objects"] is not JObject objects) throw new InvalidDataException("Asset index is missing its objects.");
+        var assets = new Dictionary<string, ArtifactSpec>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in objects.Properties())
+        {
+            if (entry.Value is not JObject metadata) throw new InvalidDataException("Invalid asset metadata.");
+            string hash = metadata["hash"]?.ToString() ?? "";
+            long? size = ReadSize(metadata["size"]);
+            if (!IsSha1(hash) || size is null or <= 0 || size > MaxUnspecifiedDownloadBytes)
+                throw new InvalidDataException("Invalid asset hash or size: " + entry.Name);
+            hash = hash.ToLowerInvariant();
+            if (!TryChildPath(root, "assets/objects/" + hash[..2] + "/" + hash, out var path))
+                throw new InvalidDataException("Invalid asset destination.");
+            if (assets.TryGetValue(hash, out var previous) && previous.Size != size)
+                throw new InvalidDataException("Conflicting asset size metadata.");
+            assets[hash] = new("asset:" + entry.Name, path, new Uri("https://resources.download.minecraft.net/" + hash[..2] + "/" + hash), size, hash);
+        }
+        int done = 0, repaired = 0;
+        await Parallel.ForEachAsync(assets.Values, new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = cancellationToken }, async (asset, token) => {
+            var outcome = await EnsureArtifactAsync(asset, httpClient, false, token, null).ConfigureAwait(false);
+            if (!outcome.Success) throw new IOException(outcome.Artifact + ": " + outcome.Reason);
+            if (outcome.Repaired) Interlocked.Increment(ref repaired);
+            progress?.Invoke(Interlocked.Increment(ref done), assets.Count);
+        }).ConfigureAwait(false);
+        return repaired;
+    }
+
     static async Task<ArtifactOutcome> EnsureArtifactAsync(
         ArtifactSpec artifact,
         HttpClient httpClient,

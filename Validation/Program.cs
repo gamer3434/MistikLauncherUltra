@@ -31,6 +31,7 @@ class Program
             string testRoot = Path.Combine(Path.GetTempPath(), "MistikValidation", Guid.NewGuid().ToString("N"));
             Environment.SetEnvironmentVariable("MISTIK_DATA_DIR", testRoot);
             Directory.CreateDirectory(testRoot);
+            checks+=LoggingTests.Run();
             InstallerTests.Run(testRoot,Check);
             Check(CrashDiagnostics.Category("java.lang.OutOfMemoryError")=="MLU-MEMORY","memory failure classification");
             Check(CrashDiagnostics.Category("UnsupportedClassVersionError")=="MLU-JAVA","Java failure classification");
@@ -174,9 +175,14 @@ class Program
             checks+=SecurityTests.Run();
             checks+=OptimizationTests.Run(Path.Combine(testRoot,"graphics-tests"));
             checks+=GameRuntimeHealthTests.Run(Path.Combine(testRoot,"runtime-health")).GetAwaiter().GetResult();
+            checks+=MinecraftAssetTests.Run(Path.Combine(testRoot,"assets")).GetAwaiter().GetResult();
+            checks+=GameDownloadTests.Run(Path.Combine(testRoot,"game-downloads")).GetAwaiter().GetResult();
+            if(args.Contains("--live-game")) checks+=GameDownloadTests.Live(Path.Combine(testRoot,"official-game")).GetAwaiter().GetResult();
+            if(args.Contains("--live-assets")) checks+=MinecraftAssetTests.Live(Path.Combine(testRoot,"official-assets")).GetAwaiter().GetResult();
             checks+=LaunchReadinessTests.Run(Path.Combine(testRoot,"readiness-tests"));
             var window=new MainWindow { Width=1200, Height=820 };
             checks+=LaunchLifecycleTests.Run(window);
+            checks+=VersionRemovalTests.Run(Path.Combine(testRoot,"version-removal"),window);
             checks+=LaunchReadinessTests.RunHome(window);
             checks+=ModPagePerformanceTests.Run(window,Path.Combine(testRoot,"mod-page-performance"));
             checks+=ForgeTests.Classpath(window);
@@ -405,6 +411,7 @@ class Program
             checks += ModCatalogUiTests.Run(window, name => Capture(window, Path.Combine(output,name+".png"), name == "mod-catalog-long-heading" ? 960 : 1200, name == "mod-catalog-long-heading" ? 640 : 820),
                 (name,width,height) => Capture(window, Path.Combine(output,name+".png"), width, height));
             checks += WindowScalingUiTests.Run(window);
+            checks += ModImageLifecycleTests.Run();
             checks += ModToolsLayoutTests.Run(window);
             var horizontal=new System.Windows.Controls.Primitives.ScrollBar { Orientation=Orientation.Horizontal,Style=(Style)application.FindResource(typeof(System.Windows.Controls.Primitives.ScrollBar)) };
             horizontal.ApplyTemplate();
