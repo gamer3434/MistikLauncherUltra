@@ -209,7 +209,7 @@ public sealed class ModProjectView : Grid
         tabs.Padding = new Thickness(compact ? 8 : 12);
         if (projectSummary == null || projectIcon == null || projectTitle == null || projectDescription == null || projectCategories == null) return;
         projectSummary.Padding = new Thickness(compact ? 8 : 14);
-        projectSummary.Margin = compact ? new Thickness(0, 6, 0, 6) : new Thickness(0, 10, 0, 12);
+        projectSummary.Margin = compact ? new Thickness(0, 4, 0, 4) : new Thickness(0, 10, 0, 12);
         projectIcon.Width = projectIcon.Height = compact ? 48 : 76;
         projectIcon.Margin = new Thickness(0, 0, compact ? 12 : 18, 0);
         projectTitle.MaxHeight = compact ? 28 : 56;
