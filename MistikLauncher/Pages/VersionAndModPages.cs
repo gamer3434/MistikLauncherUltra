@@ -714,8 +714,9 @@ namespace MistikLauncher.Pages
         string? _catalogInstalledProfile;
         int _installedGeneration;
         System.Threading.CancellationTokenSource? _installedCancellation;
-        readonly List<(string Project, Button Button, TextBlock Status, bool Compatible)> _catalogButtons = new();
+        readonly List<(string Project, Button Button, Button Remove, TextBlock Status, bool Compatible)> _catalogButtons = new();
         readonly HashSet<Button> _catalogInstalling = new();
+        bool _catalogRemoving;
 
         internal CatalogInstallState CatalogState(string project, string? version = null) =>
             _catalogInstalledProfile == (_main.Config.Version ?? "") ? _catalogInstalled?.State(project, version) ?? CatalogInstallState.Checking : CatalogInstallState.Checking;
@@ -727,11 +728,32 @@ namespace MistikLauncher.Pages
                 var state = CatalogState(entry.Project);
                 bool installed = state is CatalogInstallState.Installed or CatalogInstallState.Disabled;
                 entry.Button.Content = installed ? Localization.T("modCatalogInstalled") : Localization.T(entry.Compatible ? "modInstall" : "modIncompatible");
-                entry.Button.IsEnabled = entry.Compatible && !installed && state != CatalogInstallState.Checking && !_catalogInstalling.Contains(entry.Button);
+                entry.Button.IsEnabled = entry.Compatible && !installed && state != CatalogInstallState.Checking && !_catalogInstalling.Contains(entry.Button) && !_catalogRemoving;
+                entry.Remove.Visibility = installed && _catalogInstalled?.CanRemove(entry.Project) == true ? Visibility.Visible : Visibility.Collapsed;
+                entry.Remove.IsEnabled = !_catalogRemoving && _catalogInstalling.Count == 0 && _installedCancellation == null;
+                entry.Remove.ToolTip = Localization.T("modCatalogRemove");
+                System.Windows.Automation.AutomationProperties.SetName(entry.Remove, Localization.T("modCatalogRemove") + " · " + entry.Remove.Tag);
                 entry.Status.Text = state == CatalogInstallState.Available ? "" : InstalledModCatalog.Label(state);
                 entry.Status.Visibility = state == CatalogInstallState.Available ? Visibility.Collapsed : Visibility.Visible;
             }
             if (Content is ModProjectView detail) detail.RefreshInstalledStatus();
+        }
+
+        internal IReadOnlyList<string> RemoveCatalogProject(string profile, InstalledModCatalog snapshot, string project)
+            => _main.RemoveCatalogMod(profile, snapshot, project);
+
+        async Task RemoveCatalogProject(string project, string name)
+        {
+            var profile = _main.Config.Version ?? "";
+            var snapshot = _catalogInstalled;
+            if (_catalogRemoving || _catalogInstalling.Count > 0 || _installedCancellation != null ||
+                _catalogInstalledProfile != profile || snapshot?.CanRemove(project) != true) return;
+            if (MessageBox.Show(string.Format(Localization.T("modCatalogRemoveConfirm"), name, profile),
+                Localization.T("modCatalogRemove"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            _catalogRemoving = true; ApplyCatalogStatus();
+            try { await Task.Run(() => RemoveCatalogProject(profile, snapshot, project)); }
+            catch (Exception ex) { MessageBox.Show(ex.Message, Localization.T("error"), MessageBoxButton.OK, MessageBoxImage.Warning); }
+            finally { _catalogRemoving = false; RenderInstalledMods(); }
         }
 
         async Task RefreshInstalledStatus()
@@ -760,6 +782,7 @@ namespace MistikLauncher.Pages
                         try { currentDirectory = InstalledModCatalog.ProfileDirectory(App.GameDir, App.AppData, App.ModsDir, profile, _main.Config.LastSyncedVersion ?? ""); }
                         catch { currentDirectory = null; }
                         if (!string.Equals(directory, currentDirectory, StringComparison.OrdinalIgnoreCase)) { _ = RefreshInstalledStatus(); return; }
+                        if (ReferenceEquals(_installedCancellation, cancellation)) _installedCancellation = null;
                         _catalogInstalled = snapshot; ApplyCatalogStatus();
                     }
                 });
@@ -781,20 +804,6 @@ namespace MistikLauncher.Pages
             var sp = new StackPanel { Margin = new Thickness(20, 16, 20, 16) };
             sp.Children.Add(PageHelpers.Lbl("modCenterTitle", 24, "#FFFFFF", true));
             sp.Children.Add(PageHelpers.Lbl("modCenterIntro", 13, "#A0A0A0"));
-
-            var clientCard = PageHelpers.Card("#192C46", 14, "#365574");
-            clientCard.Margin = new Thickness(0, 14, 0, 10);
-            var clientPanel = new StackPanel { Margin = new Thickness(16) };
-            clientPanel.Children.Add(PageHelpers.Lbl("clientPresetTitle", 18, "#FFFFFF", true));
-            clientPanel.Children.Add(PageHelpers.Lbl("clientPresetHelp", 13, "#ADBED6", wrap: TextWrapping.Wrap));
-            var interfaceButton = PageHelpers.MkBtn("clientInstallInterface", "#203853");
-            interfaceButton.Click += async (_, _) => await InstallModpack(
-                new[] { "fabric-api", "modern-ui" }, new[] { "Fabric API", "Modern UI" }, interfaceButton,
-                Localization.T("clientInterfaceTitle"), "fabric");
-            clientPanel.Children.Add(interfaceButton);
-            clientPanel.Children.Add(PageHelpers.Lbl("clientInterfaceHelp", 12, "#ADBED6", wrap: TextWrapping.Wrap,
-                pad: new Thickness(0, 8, 0, 0)));
-            clientCard.Child = clientPanel;
 
             // Mistik Özel Hazır Mod Paketleri Card
             var packsCard = PageHelpers.Card("#192C46", 14, "#365574");
@@ -1006,7 +1015,7 @@ namespace MistikLauncher.Pages
             _resultsPanel = new StackPanel();
             sp.Children.Add(_resultsPanel);
             var extraTools = new StackPanel();
-            extraTools.Children.Add(clientCard); extraTools.Children.Add(packsCard); extraTools.Children.Add(optiCard);
+            extraTools.Children.Add(packsCard); extraTools.Children.Add(optiCard);
 
             // ── Toplu Mod Sürüm Taşıyıcı (Migrator) Kartı ──
             var migCard = PageHelpers.Card("#192C46", 14, "#365574");
@@ -1311,10 +1320,19 @@ namespace MistikLauncher.Pages
                         }
                         finally { _catalogInstalling.Remove(installBtn); ApplyCatalogStatus(); }
                     };
-                    var actions = new StackPanel { VerticalAlignment = VerticalAlignment.Center }; actions.Children.Add(installBtn);
+                    var actions = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+                    var actionButtons = new StackPanel { Orientation = Orientation.Horizontal }; actionButtons.Children.Add(installBtn); actions.Children.Add(actionButtons);
+                    var removeBtn = PageHelpers.MkBtn("×", "#70383F", 32);
+                    removeBtn.Tag = mname;
+                    removeBtn.Name = "CatalogRemoveButton"; removeBtn.Margin = new Thickness(6, 0, 0, 0);
+                    removeBtn.Padding = new Thickness(0); removeBtn.MinWidth = 32; removeBtn.FontSize = 18;
+                    removeBtn.ToolTip = Localization.T("modCatalogRemove"); removeBtn.Visibility = Visibility.Collapsed;
+                    System.Windows.Automation.AutomationProperties.SetName(removeBtn, Localization.T("modCatalogRemove") + " · " + mname);
+                    removeBtn.Click += async (_, _) => await RemoveCatalogProject(cId, mname);
+                    actionButtons.Children.Add(removeBtn);
                     var installedStatus = PageHelpers.Lbl("", 11, "#ADBED6", wrap: TextWrapping.Wrap);
                     installedStatus.MaxWidth = 136; actions.Children.Add(installedStatus);
-                    _catalogButtons.Add((cId, installBtn, installedStatus, canInstall));
+                    _catalogButtons.Add((cId, installBtn, removeBtn, installedStatus, canInstall));
 
                     Grid.SetColumn(actions, 1); grid.Children.Add(actions);
                     card.Child = grid; _resultsPanel.Children.Add(card);
@@ -1520,8 +1538,7 @@ namespace MistikLauncher.Pages
             }
         }
 
-        async Task InstallModpack(string[] slugs, string[] names, Button btn, string packName,
-            string? requiredLoader = null, Action? afterInstall = null)
+        async Task InstallModpack(string[] slugs, string[] names, Button btn, string packName)
         {
             btn.IsEnabled = false;
             var originalText = btn.Content.ToString();
@@ -1530,9 +1547,6 @@ namespace MistikLauncher.Pages
                 var currentVer = _main.Config.Version ?? "";
                 var mcVersion = GameProfiles.MinecraftVersion(App.GameDir, currentVer);
                 var loader = GameProfiles.Loader(App.GameDir, currentVer);
-                if (requiredLoader != null && (loader != requiredLoader || mcVersion != "1.21.1"))
-                    throw new IOException(Localization.T("clientFabricRequired"));
-
                 // Eğer kullanıcı vanilla'daysa mod paketi kurmak risklidir — uyarı ver
                 if (loader == "vanilla")
                 {
@@ -1571,7 +1585,6 @@ namespace MistikLauncher.Pages
                 if (skippedCount == 0)
                 {
                     if (_main.Config.Version != currentVer) throw new IOException("The selected Minecraft version changed during mod installation.");
-                    afterInstall?.Invoke();
                 }
                 btn.Content = skippedCount == 0 ? "✓ KURULDU!" : "⚠ EKSİK KURULUM";
                 RenderInstalledMods();

@@ -58,6 +58,31 @@ static class InstalledModCatalogTests
         using var cancel = new CancellationTokenSource(); cancel.Cancel(); File.WriteAllBytes(jar, bytes);
         bool canceled = false; try { await InstalledModCatalog.ReadAsync(client, active, cancel.Token); } catch (OperationCanceledException) { canceled = true; }
         Check(canceled, "obsolete installed-file scans honor cancellation before hashing or networking");
+        var removalRoot = Path.Combine(root, "removal"); Directory.CreateDirectory(removalRoot);
+        var enabled = Path.Combine(removalRoot, "voice.jar"); var disabled = Path.Combine(removalRoot, "voice-old.jar.disabled");
+        var dependency = Path.Combine(removalRoot, "dependency.jar");
+        var older = System.Text.Encoding.UTF8.GetBytes("older project version");
+        var olderHash = Convert.ToHexString(SHA512.HashData(older)).ToLowerInvariant();
+        File.WriteAllBytes(enabled, bytes); File.WriteAllBytes(disabled, older); File.WriteAllText(dependency, "unrelated dependency");
+        using var removalClient = new HttpClient(new Handler((_, _) => Task.FromResult(Json(new JObject { [hash] = Version(hash), [olderHash] = Version(olderHash) }))));
+        var removal = await InstalledModCatalog.ReadAsync(removalClient, removalRoot, default);
+        Check(removal.CanRemove("voice-project") && !removal.CanRemove("unknown-project"), "remove inventory is available only for hash-verified project files");
+        File.WriteAllBytes(disabled, System.Text.Encoding.UTF8.GetBytes("replaced same filename"));
+        bool refused = false; try { removal.RemoveVerified(removalRoot, "voice-project"); } catch (IOException) { refused = true; }
+        Check(refused && File.Exists(enabled) && File.Exists(disabled) && !Directory.Exists(Path.Combine(removalRoot, ".backups")),
+            "all selected project hashes are preflighted before any move so replaced second file preserves the entire set");
+        File.WriteAllBytes(disabled, older);
+        var wrongRoot = Path.Combine(root, "wrong-profile"); Directory.CreateDirectory(wrongRoot);
+        File.WriteAllText(Path.Combine(wrongRoot, "voice.jar"), "different profile bytes");
+        refused = false; try { removal.RemoveVerified(wrongRoot, "voice-project"); } catch (IOException) { refused = true; }
+        Check(refused && File.ReadAllText(Path.Combine(wrongRoot, "voice.jar")) == "different profile bytes" && !Directory.Exists(Path.Combine(wrongRoot, ".backups")),
+            "same filename in a different profile does not authorize removing different content");
+        var backups = removal.RemoveVerified(removalRoot, "voice-project");
+        Check(backups.Count == 2 && !File.Exists(enabled) && !File.Exists(disabled) && File.ReadAllText(dependency) == "unrelated dependency" &&
+            backups.All(File.Exists) && backups.Any(path => File.ReadAllBytes(path).SequenceEqual(bytes)) && backups.Any(path => File.ReadAllBytes(path).SequenceEqual(older)),
+            "removal backs up enabled and disabled versions of exactly one project while retaining dependencies");
+        Check((await InstalledModCatalog.ReadAsync(removalClient, removalRoot, default)).State("voice-project") != CatalogInstallState.Installed,
+            "removed project is no longer installed and backup files are excluded from the catalog");
         return checks;
     }
 }

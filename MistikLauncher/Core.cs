@@ -214,6 +214,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.33","2026-10-15","#00D4AA", new[]{
+                "Kurulu mod kartlarında küçük Kaldır düğmesi görünür; doğrulanan mod dosyaları yedeklenerek kaldırılır.",
+                "Kaldırma seçili profilin dosyalarını yeniden doğrular; diğer modlar ve bağımlılıklar korunur.",
+                "Modern görünüm paketi kurulum seçeneği launcher'dan kaldırıldı.",
+                "Installed mod cards show a compact Remove button that backs up verified mod files.",
+                "Removal revalidates files in the selected profile and preserves other mods and dependencies.",
+                "The modern interface preset installer has been removed from the launcher."
+            }),
             new("v6.2.32","2026-10-14","#00D4AA", new[]{
                 "Mod kartları seçili profilde bulunan modları Kurulu veya Devre dışı olarak gösterir.",
                 "Kurulum, kaldırma ve profil değişikliklerinden sonra mod durumu yeniden kontrol edilir.",

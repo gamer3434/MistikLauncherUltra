@@ -11,11 +11,37 @@ public sealed class InstalledModCatalog
 {
     readonly Dictionary<string, CatalogInstallState> projects = new(StringComparer.Ordinal);
     readonly Dictionary<string, CatalogInstallState> versions = new(StringComparer.Ordinal);
+    sealed record InstalledFile(string Name, string Hash);
+    readonly Dictionary<string, List<InstalledFile>> projectFiles = new(StringComparer.Ordinal);
     bool complete;
 
     public CatalogInstallState State(string project, string? version = null) =>
         (version == null ? projects : versions).TryGetValue(version ?? project, out var state) ? state :
         complete ? CatalogInstallState.Available : CatalogInstallState.Unknown;
+
+    public bool CanRemove(string project) => projectFiles.TryGetValue(project, out var files) && files.Count > 0;
+
+    public IReadOnlyList<string> RemoveVerified(string directory, string project)
+    {
+        if (!projectFiles.TryGetValue(project, out var files) || files.Count == 0) throw new IOException(Localization.T("modCatalogRemoveChanged"));
+        for (string? current = Path.GetFullPath(directory); current != null; current = Path.GetDirectoryName(current))
+            if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) throw new IOException(Localization.T("modToggleInvalid"));
+        var paths = new List<string>();
+        foreach (var file in files)
+        {
+            if (file.Name != Path.GetFileName(file.Name)) throw new IOException(Localization.T("modToggleInvalid"));
+            var path = Path.Combine(directory, file.Name);
+            var info = new FileInfo(path);
+            if (!info.Exists || (info.Attributes & FileAttributes.ReparsePoint) != 0 || info.Length is <= 0 or > 128L * 1024 * 1024)
+                throw new IOException(Localization.T("modCatalogRemoveChanged"));
+            using var stream = File.OpenRead(path);
+            if (!Convert.ToHexString(SHA512.HashData(stream)).Equals(file.Hash, StringComparison.OrdinalIgnoreCase))
+                throw new IOException(Localization.T("modCatalogRemoveChanged"));
+            paths.Add(path);
+        }
+        // Verify the whole project before moving any file, so a stale snapshot cannot partially remove it.
+        return paths.Select(path => ModFiles.Remove(directory, path)).ToArray();
+    }
 
     internal static string ProfileDirectory(string gameRoot, string appRoot, string active, string selected, string synced)
     {
@@ -38,6 +64,7 @@ public sealed class InstalledModCatalog
                 if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) throw new IOException("Invalid mod directory.");
             var files = ModFiles.List(directory).OrderBy(value => value, StringComparer.Ordinal).ToArray();
             var hashes = new Dictionary<string, CatalogInstallState>(StringComparer.OrdinalIgnoreCase);
+            var names = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
             var stamps = new List<(string Path, long Length, DateTime Written)>();
             foreach (var path in files)
             {
@@ -49,6 +76,8 @@ public sealed class InstalledModCatalog
                 using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true);
                 var hash = Convert.ToHexString(await SHA512.HashDataAsync(file, token).ConfigureAwait(false)).ToLowerInvariant();
                 stamps.Add(stamp);
+                if (!names.TryGetValue(hash, out var matching)) names[hash] = matching = new();
+                matching.Add(Path.GetFileName(path));
                 var state = ModFiles.Enabled(path) ? CatalogInstallState.Installed : CatalogInstallState.Disabled;
                 if (!hashes.TryGetValue(hash, out var prior) || state == CatalogInstallState.Installed) hashes[hash] = state;
             }
@@ -72,6 +101,8 @@ public sealed class InstalledModCatalog
                     var state = hashes[hash];
                     if (!result.projects.TryGetValue(projectId, out var prior) || state == CatalogInstallState.Installed) result.projects[projectId] = state;
                     if (!result.versions.TryGetValue(versionId, out prior) || state == CatalogInstallState.Installed) result.versions[versionId] = state;
+                    if (!result.projectFiles.TryGetValue(projectId, out var matching)) result.projectFiles[projectId] = matching = new();
+                    matching.AddRange(names[hash].Select(name => new InstalledFile(name, hash)));
                 }
             }
             // A directory changed during the request must not publish stale installed labels.

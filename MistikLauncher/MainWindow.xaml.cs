@@ -1045,6 +1045,15 @@ namespace MistikLauncher
             }
         }
 
+        internal IReadOnlyList<string> RemoveCatalogMod(string expectedProfile, InstalledModCatalog snapshot, string project)
+        {
+            lock (_modSyncGate)
+            {
+                if (launchPreparing || gameRunning) throw new IOException(Localization.T("modCatalogRemoveBusy"));
+                return WithSyncedMods(expectedProfile, directory => snapshot.RemoveVerified(directory, project));
+            }
+        }
+
         public T WithSyncedMods<T>(string expectedVersion, Func<string,T> write)
         {
             lock (_modSyncGate)

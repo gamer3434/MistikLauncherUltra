@@ -83,7 +83,27 @@ static class ModCatalogUiTests
             Localization.SetLanguage(oldLanguage); page.RefreshLanguage(); Flush(window);
             Console.WriteLine("PASS compatibility filter resets pages, follows selected profile, explains Vanilla, restores all mods and translates controls");
             FlushPage();
-            var statusSnapshot = new InstalledModCatalog();
+            var statusRoot = Path.Combine(App.AppData, "catalog-remove-fixture"); Directory.CreateDirectory(statusRoot);
+            var statusJar = Path.Combine(statusRoot, "fixture.jar"); File.WriteAllText(statusJar, "verified catalog project fixture");
+            var statusHash = Convert.ToHexString(System.Security.Cryptography.SHA512.HashData(File.ReadAllBytes(statusJar))).ToLowerInvariant();
+            fixture.InstalledVersionFiles[statusHash] = new JObject { ["id"] = "compatible", ["project_id"] = "fixture", ["files"] = new JArray(new JObject { ["hashes"] = new JObject { ["sha512"] = statusHash } }) };
+            var statusSnapshot = InstalledModCatalog.ReadAsync(client, statusRoot, default).GetAwaiter().GetResult();
+            var profileDirectory = (string)typeof(InstalledModCatalog).GetMethod("ProfileDirectory", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!.Invoke(null,
+                new object[] { App.GameDir, App.AppData, App.ModsDir, window.Config.Version, window.Config.LastSyncedVersion })!;
+            Directory.CreateDirectory(profileDirectory);
+            var profileJar = Path.Combine(profileDirectory, "catalog-verified-fixture.jar"); File.Copy(statusJar, profileJar);
+            var refreshInstalled = typeof(ModManagerPage).GetMethod("RefreshInstalledStatus", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            try {
+                _ = refreshInstalled.Invoke(page, null); FlushPage();
+                var actualRemove = Nodes(page).OfType<Button>().Single(button => button.Name == "CatalogRemoveButton" && button.Visibility == Visibility.Visible);
+                if (!actualRemove.IsEnabled) throw new Exception("Settled asynchronous hash lookup must enable the verified remove action.");
+                capture("mod-catalog-remove");
+            }
+            finally { File.Delete(profileJar); }
+            _ = refreshInstalled.Invoke(page, null); FlushPage();
+            if (Nodes(page).OfType<Button>().Any(button => button.Name == "CatalogRemoveButton" && button.Visibility == Visibility.Visible))
+                throw new Exception("Deleting the verified JAR must hide the mini remove action after refreshed lookup.");
+            Console.WriteLine("PASS asynchronous verified lookup enables mini remove and file deletion hides it again");
             var states = (Dictionary<string, CatalogInstallState>)typeof(InstalledModCatalog).GetField("projects", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(statusSnapshot)!;
             var versionStates = (Dictionary<string, CatalogInstallState>)typeof(InstalledModCatalog).GetField("versions", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(statusSnapshot)!;
             states["fixture"] = versionStates["compatible"] = CatalogInstallState.Installed;
@@ -92,6 +112,34 @@ static class ModCatalogUiTests
             applyStatus.Invoke(page, null);
             var installedButton = Nodes(page).OfType<Button>().Single(button => Equals(button.Content, Localization.T("modCatalogInstalled")));
             if (installedButton.IsEnabled) throw new Exception("Verified installed card must replace install with a disabled installed button.");
+            var removeButton = Nodes(page).OfType<Button>().Single(button => button.Name == "CatalogRemoveButton" && button.Visibility == Visibility.Visible);
+            if (!removeButton.IsEnabled || !System.Windows.Automation.AutomationProperties.GetName(removeButton).Contains("Example project"))
+                throw new Exception("Only verified installed cards must expose an accessible mini remove action.");
+            var removeBusy = typeof(ModManagerPage).GetField("_catalogRemoving", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            removeBusy.SetValue(page, true); applyStatus.Invoke(page, null);
+            if (removeButton.IsEnabled || Nodes(page).OfType<Button>().Any(button => Equals(button.Content, Localization.T("modInstall")) && button.IsEnabled))
+                throw new Exception("A removal in progress must block duplicate removal and catalog installation.");
+            removeBusy.SetValue(page, false); applyStatus.Invoke(page, null);
+            var removeProject = typeof(ModManagerPage).GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Single(method => method.Name == "RemoveCatalogProject" && method.GetParameters().Length == 3);
+            bool profileRejected = false;
+            var beforeSynced = window.Config.LastSyncedVersion;
+            try { removeProject.Invoke(page, new object[] { "fabric-999.999", statusSnapshot, "fixture" }); }
+            catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException is IOException) { profileRejected = true; }
+            if (!profileRejected || window.Config.LastSyncedVersion != beforeSynced || !File.Exists(statusJar))
+                throw new Exception("A changed selected profile must reject removal before synchronizing or modifying files.");
+            foreach (var flag in new[] { "launchPreparing", "gameRunning" })
+            {
+                var field = typeof(MainWindow).GetField(flag, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+                var old = field.GetValue(window); bool blocked = false;
+                try {
+                    field.SetValue(window, true);
+                    try { removeProject.Invoke(page, new object[] { window.Config.Version, statusSnapshot, "fixture" }); }
+                    catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException is IOException error && error.Message == Localization.T("modCatalogRemoveBusy")) { blocked = true; }
+                }
+                finally { field.SetValue(window, old); }
+                if (!blocked || !File.Exists(statusJar)) throw new Exception("Launch preparation and running games must block catalog removal before file changes.");
+            }
+            Console.WriteLine("PASS verified mini remove action blocks duplicate operations, changed profiles and active launch lifecycle");
             capture("mod-catalog-installed");
             states["fixture"] = CatalogInstallState.Disabled; applyStatus.Invoke(page, null);
             if (installedButton.IsEnabled || !Nodes(page).OfType<TextBlock>().Any(text => text.Text == Localization.T("modCatalogDisabled")))
@@ -274,7 +322,7 @@ static class ModCatalogUiTests
             }
             finally { window.SetVersion(selectedProfile); SynchronizationContext.SetSynchronizationContext(context); }
             Console.WriteLine("PASS pending detail install blocks duplicate actions and revalidates changed-profile availability after completion");
-            return 15;
+            return 17;
         }
         finally { frame.Content = previous; selectNav.Invoke(window, new object[] { previousNav }); }
     }
@@ -297,12 +345,15 @@ static class ModCatalogUiTests
         public string ProjectTitle { get; set; } = "Example project";
         public string ProjectDescription { get; set; } = "An illustrated catalog card opens description, versions and gallery.";
         public JArray ProjectCategories { get; set; } = new("optimization", "fabric");
+        public JObject InstalledVersionFiles { get; } = new();
         public static HttpResponseMessage ProjectResponse(string title) => new(HttpStatusCode.OK) {
             Content = new StringContent(new JObject { ["id"]="fixture", ["project_type"]="mod", ["title"]=title,
                 ["description"]="Late response", ["body"]="Late description", ["gallery"]=new JArray(), ["categories"]=new JArray("fabric") }.ToString())
         };
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (request.RequestUri!.AbsolutePath.EndsWith("/version_files", StringComparison.Ordinal))
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(InstalledVersionFiles.ToString()) });
             if (request.RequestUri!.AbsolutePath.EndsWith("/version/compatible", StringComparison.Ordinal))
             {
                 InstallRequests++;
