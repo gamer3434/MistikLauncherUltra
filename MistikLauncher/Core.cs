@@ -214,6 +214,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.28","2026-10-14","#00D4AA", new[]{
+                "Sade ve kompakt arayüz: daha ince üst/alt çubuklar, modlara ayrılan daha geniş alan.",
+                "Modrinth tarzı resimli kartlar, küçük kategori etiketleri ve hizalı açıklama/sürüm/galeri sekmeleri.",
+                "Uzun mod başlıkları ve açıklamaları kartları taşırmaz; tam metin araç ipucunda görünür.",
+                "A compact interface with slimmer window and launch bars leaves more room for mods.",
+                "Modrinth-inspired illustrated cards, category badges and aligned description/version/gallery tabs.",
+                "Long mod titles and descriptions stay bounded, with complete text available in tooltips."
+            }),
             new("v6.2.27","2026-10-13","#00D4AA", new[]{
                 "Dar pencerelerde mod yedekleme, geri yükleme ve temizleme düğmeleri içerik genişliğine sığar.",
                 "Boş veya 128 MiB üzerindeki yerel mod dosyaları kurulmadan reddedilir; kopyalama sırasında kaynak korunur.",

@@ -21,6 +21,12 @@ static class WindowScalingUiTests
                 var launch = (Button)window.FindName("BtnLaunch");
                 var version = (ComboBox)window.FindName("VerBox");
                 var nav = (WrapPanel)window.FindName("QuickBarPanel");
+                var caption = (Border)window.FindName("CaptionHost");
+                var chrome = System.Windows.Shell.WindowChrome.GetWindowChrome(window);
+                var launchRow = (RowDefinition)window.FindName("ControlBarRow");
+                double pixelTolerance = 1 / System.Windows.Media.VisualTreeHelper.GetDpi(caption).DpiScaleY;
+                if (caption.ActualHeight > 38 + pixelTolerance || chrome.CaptionHeight != caption.Height || launchRow.ActualHeight > 54 + pixelTolerance)
+                    throw new Exception($"Compact bars must preserve content space and match the native drag region: caption={caption.ActualHeight}/{caption.Height}, chrome={chrome.CaptionHeight}, footer={launchRow.ActualHeight}.");
                 if (frame.ActualHeight < 250 || frame.TranslatePoint(new Point(0, frame.ActualHeight), root).Y > version.TranslatePoint(new Point(), root).Y)
                     throw new Exception("Compact shell must preserve a usable content viewport above the launch bar.");
                 if (launch.TranslatePoint(new Point(launch.ActualWidth, launch.ActualHeight), root).X > size.Width ||

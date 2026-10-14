@@ -330,11 +330,11 @@ namespace MistikLauncher
         void UpdateCompactShell()
         {
             bool compact = WindowSurface.ActualWidth > 0 && WindowSurface.ActualWidth < 1050;
-            ShellHeader.Margin = compact ? new Thickness(16, 4, 16, 2) : new Thickness(24, 4, 24, 2);
+            ShellHeader.Margin = compact ? new Thickness(16, 2, 16, 2) : new Thickness(20, 2, 20, 2);
             UserNameLbl.MaxWidth = compact ? 120 : 180;
             BtnDiscord.Padding = BtnYoutube.Padding = new Thickness(compact ? 10 : 18, 0, compact ? 10 : 18, 0);
             BtnDiscord.Visibility = BtnYoutube.Visibility = WindowSurface.ActualWidth > 0 && WindowSurface.ActualWidth < 800 ? Visibility.Collapsed : Visibility.Visible;
-            ControlBarRow.Height = new GridLength(WindowSurface.ActualHeight > 0 && WindowSurface.ActualHeight < 720 ? 52 : 60);
+            ControlBarRow.Height = new GridLength(WindowSurface.ActualHeight > 0 && WindowSurface.ActualHeight < 720 ? 50 : 54);
             foreach (var button in quickButtons.Values)
             {
                 button.Padding = new Thickness(compact ? 8 : 12, 0, compact ? 8 : 12, 0);

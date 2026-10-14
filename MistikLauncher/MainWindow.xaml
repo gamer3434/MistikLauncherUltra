@@ -121,7 +121,7 @@
     </Window.Resources>
 
     <DockPanel x:Name="WindowSurface">
-        <Border x:Name="CaptionHost" DockPanel.Dock="Top" Height="42" Background="{DynamicResource Theme0D1727}" BorderBrush="{DynamicResource Theme365574}" BorderThickness="0,0,0,1">
+        <Border x:Name="CaptionHost" DockPanel.Dock="Top" Height="38" Background="{DynamicResource Theme0D1727}" BorderBrush="{DynamicResource Theme365574}" BorderThickness="0,0,0,1">
             <Grid>
                 <TextBlock x:Name="CaptionTitle" Text="MISTIK LAUNCHER" Foreground="#A5A5B0" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center" IsHitTestVisible="False"/>
                 <StackPanel x:Name="CaptionButtons" Orientation="Horizontal" Margin="12,0" VerticalAlignment="Center" HorizontalAlignment="Right"/>
@@ -134,24 +134,24 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="4"/>
-            <RowDefinition x:Name="ControlBarRow" Height="60"/>
+            <RowDefinition x:Name="ControlBarRow" Height="54"/>
         </Grid.RowDefinitions>
 
         <!-- ═══ CONTENT ═══════════════════════════════════════════════════════ -->
         <DockPanel Grid.Column="0" Grid.Row="0">
-            <Grid x:Name="ShellHeader" DockPanel.Dock="Top" Margin="24,4,24,2">
+            <Grid x:Name="ShellHeader" DockPanel.Dock="Top" Margin="20,2,20,2">
                 <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock x:Name="LogoText" Text="MISTIK" FontSize="22" FontWeight="Black" Foreground="{DynamicResource Theme00A3FF}" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="LogoText" Text="MISTIK" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource Theme00A3FF}" VerticalAlignment="Center"/>
                     <Button x:Name="BtnDiscord" Content="GitHub" Style="{StaticResource NavBtn}" Margin="18,0,0,0"/>
                     <Button x:Name="BtnYoutube" Content="Releases" Style="{StaticResource NavBtn}"/>
                     <TextBlock x:Name="RelayStatusLbl" Visibility="Collapsed"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <ComboBox x:Name="LanguageBox" Width="110" Margin="0,0,14,0" AutomationProperties.Name="Türkçe / English"><ComboBoxItem Content="Türkçe"/><ComboBoxItem Content="English"/></ComboBox>
+                    <ComboBox x:Name="LanguageBox" Width="104" MinHeight="36" Margin="0,0,10,0" AutomationProperties.Name="Türkçe / English"><ComboBoxItem Content="Türkçe"/><ComboBoxItem Content="English"/></ComboBox>
                     <Button x:Name="ProfileButton" Style="{StaticResource NavBtn}" Padding="8,0" MinHeight="40" ToolTip="Profile">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Border Width="32" Height="32" CornerRadius="8" Background="{DynamicResource Theme203853}" ClipToBounds="True" Margin="0,0,8,0"><Image x:Name="AvatarImg" RenderOptions.BitmapScalingMode="NearestNeighbor" Stretch="UniformToFill"/></Border>
+                            <Border Width="28" Height="28" CornerRadius="7" Background="{DynamicResource Theme203853}" ClipToBounds="True" Margin="0,0,8,0"><Image x:Name="AvatarImg" RenderOptions.BitmapScalingMode="NearestNeighbor" Stretch="UniformToFill"/></Border>
                             <TextBlock x:Name="UserNameLbl" Foreground="#EFF5FF" FontSize="14" FontWeight="SemiBold" MaxWidth="180" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>

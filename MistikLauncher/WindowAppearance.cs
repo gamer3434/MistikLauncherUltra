@@ -43,7 +43,7 @@ public partial class MainWindow
         string style=WindowButtonStyles.Contains(Config.WindowButtons)?Config.WindowButtons:"MacOS";
         CaptionHost.Visibility=Visibility.Visible;
         WindowSurface.Margin=WindowState==WindowState.Maximized?new Thickness(6):new Thickness(0);
-        WindowChrome.SetWindowChrome(this,new WindowChrome { CaptionHeight=42,ResizeBorderThickness=new Thickness(6),GlassFrameThickness=new Thickness(0),CornerRadius=new CornerRadius(0),UseAeroCaptionButtons=false });
+        WindowChrome.SetWindowChrome(this,new WindowChrome { CaptionHeight=38,ResizeBorderThickness=new Thickness(6),GlassFrameThickness=new Thickness(0),CornerRadius=new CornerRadius(0),UseAeroCaptionButtons=false });
         if(WindowStyle!=WindowStyle.None) WindowStyle=WindowStyle.None;
         CaptionButtons.HorizontalAlignment=style=="MacOS"?HorizontalAlignment.Left:HorizontalAlignment.Right;
         WindowChrome.SetIsHitTestVisibleInChrome(CaptionButtons,true);

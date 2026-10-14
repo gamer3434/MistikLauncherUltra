@@ -27,7 +27,8 @@ public sealed class ModProjectView : Grid
     bool installing;
     Border? projectSummary;
     FrameworkElement? projectIcon;
-    TextBlock? projectTitle, projectDescription, projectCategories;
+    TextBlock? projectTitle, projectDescription;
+    FrameworkElement? projectCategories;
     string T(string tr, string en) => Localization.Language == "en" ? en : tr;
 
     public ModProjectView(MainWindow main, HttpClient client, string id, Action back, Func<string?, Task<bool>> install)
@@ -57,11 +58,11 @@ public sealed class ModProjectView : Grid
         tabs.ItemContainerStyle = (Style)System.Windows.Markup.XamlReader.Parse("""
             <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="TabItem">
               <Setter Property="Foreground" Value="#C6CBD2"/><Setter Property="Background" Value="#30343A"/>
-              <Setter Property="FontSize" Value="15"/><Setter Property="FontWeight" Value="SemiBold"/>
+              <Setter Property="FontSize" Value="14"/><Setter Property="FontWeight" Value="SemiBold"/>
               <Setter Property="MinWidth" Value="120"/><Setter Property="Margin" Value="0,0,8,0"/><Setter Property="MinHeight" Value="44"/>
               <Setter Property="BorderBrush" Value="Transparent"/><Setter Property="BorderThickness" Value="2"/>
               <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabItem">
-                <Border Background="{TemplateBinding Background}" CornerRadius="18" Padding="18,8"
+                <Border Background="{TemplateBinding Background}" CornerRadius="8" Padding="16,8"
                         BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
                   <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True"/>
                 </Border>
@@ -71,7 +72,7 @@ public sealed class ModProjectView : Grid
                 <Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="BorderBrush" Value="#38E58E"/></Trigger></Style.Triggers>
             </Style>
             """);
-        Margin = new Thickness(22, 16, 22, 16);
+        Margin = new Thickness(20, 12, 20, 12);
         RowDefinitions.Add(new() { Height = GridLength.Auto });
         RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) });
         var backButton = PageHelpers.MkBtn(T("← Modlara dön", "← Back to mods"), "#28445E");
@@ -145,15 +146,30 @@ public sealed class ModProjectView : Grid
         ((TabItem)tabs.Items[1]).Content = new ScrollViewer { Content = versionPanel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
     }
 
+    internal static WrapPanel CategoryBadges(IEnumerable<string> categories)
+    {
+        var values = categories.Take(5).ToArray();
+        var badges = new WrapPanel { Margin = new Thickness(0, 6, 0, 0), ToolTip = string.Join(" · ", values) };
+        foreach (var category in values)
+        {
+            var label = PageHelpers.Lbl(category, 12, "#BDC8D5", wrap: TextWrapping.NoWrap);
+            label.TextTrimming = TextTrimming.CharacterEllipsis; label.MaxWidth = 150;
+            badges.Children.Add(new Border { Child = label, Background = PageHelpers.HexBrush("#282E36"),
+                BorderBrush = PageHelpers.HexBrush("#39424D"), BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(7), Padding = new Thickness(8, 3, 8, 3), Margin = new Thickness(0, 0, 6, 5) });
+        }
+        return badges;
+    }
+
     void UpdateCompactLayout()
     {
         bool compact = ActualHeight > 0 && ActualHeight + Margin.Top + Margin.Bottom < 432;
-        Margin = compact ? new Thickness(16, 10, 16, 10) : new Thickness(22, 16, 22, 16);
+        Margin = compact ? new Thickness(16, 10, 16, 10) : new Thickness(20, 12, 20, 12);
         tabs.Padding = new Thickness(compact ? 8 : 12);
         if (projectSummary == null || projectIcon == null || projectTitle == null || projectDescription == null || projectCategories == null) return;
-        projectSummary.Padding = new Thickness(compact ? 8 : 16);
-        projectSummary.Margin = compact ? new Thickness(0, 6, 0, 6) : new Thickness(0, 12, 0, 14);
-        projectIcon.Width = projectIcon.Height = compact ? 48 : 92;
+        projectSummary.Padding = new Thickness(compact ? 8 : 14);
+        projectSummary.Margin = compact ? new Thickness(0, 6, 0, 6) : new Thickness(0, 10, 0, 12);
+        projectIcon.Width = projectIcon.Height = compact ? 48 : 76;
         projectIcon.Margin = new Thickness(0, 0, compact ? 12 : 18, 0);
         projectTitle.MaxHeight = compact ? 28 : 56;
         projectDescription.Visibility = projectCategories.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
@@ -195,8 +211,8 @@ public sealed class ModProjectView : Grid
             title.ToolTip = title.Text + "\n\n" + summary.Text;
             copy.Children.Add(summary);
             copy.Children.Add(PageHelpers.Lbl($"↓ {project["downloads"]?.Value<long>() ?? 0:N0}   ♡ {project["followers"]?.Value<long>() ?? 0:N0}", 13, "#ADBED6"));
-            var categories = PageHelpers.Lbl(string.Join("  ·  ", (project["categories"] as JArray ?? new()).Select(value => value.ToString())), 12, "#ADBED6", wrap: TextWrapping.NoWrap);
-            categories.TextTrimming = TextTrimming.CharacterEllipsis; categories.ToolTip = categories.Text; copy.Children.Add(categories);
+            var categories = CategoryBadges((project["categories"] as JArray ?? new()).Select(value => value.ToString()));
+            copy.Children.Add(categories);
             projectCategories = categories;
             var latest = InstallButton(null); latest.Name = "ProjectInstallButton"; SetColumn(latest, 2); header.Children.Add(latest);
             projectSummary = new Border { Name = "ProjectSummary", Child = header, Padding = new Thickness(16),

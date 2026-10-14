@@ -734,9 +734,9 @@ namespace MistikLauncher.Pages
             _client = client ?? Http;
 
             Background = Brushes.Transparent;
-            var sp = new StackPanel { Margin = new Thickness(32, 20, 32, 20) };
-            sp.Children.Add(PageHelpers.Lbl("modCenterTitle", 28, "#FFFFFF", true));
-            sp.Children.Add(PageHelpers.Lbl("modCenterIntro", 14, "#A0A0A0"));
+            var sp = new StackPanel { Margin = new Thickness(20, 16, 20, 16) };
+            sp.Children.Add(PageHelpers.Lbl("modCenterTitle", 24, "#FFFFFF", true));
+            sp.Children.Add(PageHelpers.Lbl("modCenterIntro", 13, "#A0A0A0"));
 
             var clientCard = PageHelpers.Card("#192C46", 14, "#365574");
             clientCard.Margin = new Thickness(0, 14, 0, 10);
@@ -916,6 +916,7 @@ namespace MistikLauncher.Pages
 
             Grid.SetColumn(searchBtn,1); Grid.SetColumn(folderBtn,2); Grid.SetColumn(importBtn,3);
             searchRow.Children.Add(_searchBox); searchRow.Children.Add(searchBtn); searchRow.Children.Add(folderBtn); searchRow.Children.Add(importBtn);
+            foreach (var button in new[] { searchBtn, folderBtn, importBtn }) button.Padding = new Thickness(12, 6, 12, 6);
             sp.Children.Add(searchRow);
 
             var catalogControls = new DockPanel { Margin = new Thickness(0, 0, 0, 12) };
@@ -1152,18 +1153,22 @@ namespace MistikLauncher.Pages
                     var mname = name; var cId = modId;
                     var canInstall = SearchResultSupportsProfile(hit, game, loader);
 
-                    var card = PageHelpers.Card("#25282E", 16, "#3A3F46", margin: new Thickness(0, 7, 0, 7));
-                    var grid = new Grid { Margin = new Thickness(16, 12, 16, 12) };
+                    var card = PageHelpers.Card("#1B2027", 12, "#343C47", margin: new Thickness(0, 5, 0, 5));
+                    var grid = new Grid { Margin = new Thickness(14, 12, 14, 12) };
                     grid.ColumnDefinitions.Add(new ColumnDefinition());
                     grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
                     var info = new StackPanel();
-                    info.Children.Add(PageHelpers.Lbl(name, 20, "#FFFFFF", true, wrap: TextWrapping.Wrap));
-                    info.Children.Add(PageHelpers.Lbl(desc, 14, "#ADBED6", wrap: TextWrapping.Wrap));
-                    info.Children.Add(PageHelpers.Lbl($"↓ {dl:N0}   ·   {hit["author"]}   ·   Modrinth", 12, "#ADBED6"));
-                    info.Children.Add(PageHelpers.Lbl(string.Join("  ·  ", (hit["categories"] as JArray ?? new()).Take(6).Select(value => value.ToString())), 12, "#ADBED6", wrap: TextWrapping.Wrap));
+                    var title = PageHelpers.Lbl(name, 18, "#F2F5F9", true, wrap: TextWrapping.Wrap);
+                    title.LineHeight = 24; title.MaxHeight = 48; title.TextTrimming = TextTrimming.CharacterEllipsis; title.ToolTip = name;
+                    var description = PageHelpers.Lbl(desc, 13, "#ADBED6", wrap: TextWrapping.Wrap);
+                    description.LineHeight = 19; description.MaxHeight = 38; description.TextTrimming = TextTrimming.CharacterEllipsis; description.ToolTip = desc;
+                    info.Children.Add(title); info.Children.Add(description);
+                    var metadata = PageHelpers.Lbl($"↓ {dl:N0}   ·   {hit["author"]}   ·   Modrinth", 11, "#98A8BB");
+                    metadata.TextTrimming = TextTrimming.CharacterEllipsis; metadata.ToolTip = metadata.Text; info.Children.Add(metadata);
+                    info.Children.Add(ModProjectView.CategoryBadges((hit["categories"] as JArray ?? new()).Select(value => value.ToString())));
                     var summary = new Grid(); summary.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); summary.ColumnDefinitions.Add(new ColumnDefinition());
-                    summary.Children.Add(ModProjectView.Icon(hit["icon_url"]?.ToString(), 84)); Grid.SetColumn(info, 1); summary.Children.Add(info);
+                    summary.Children.Add(ModProjectView.Icon(hit["icon_url"]?.ToString(), 68)); Grid.SetColumn(info, 1); summary.Children.Add(info);
                     var details = new Button { Content = summary, Background = Brushes.Transparent, Foreground = Brushes.White, BorderThickness = new Thickness(0),
                         HorizontalContentAlignment = HorizontalAlignment.Stretch, Padding = new Thickness(0), Cursor = System.Windows.Input.Cursors.Hand,
                         Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse("""

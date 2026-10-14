@@ -13,9 +13,9 @@
 - **Kişiselleştirme:** 20 renk teması, 16 pencere düğmesi stili, skin ve yerel sunucu araçları.
 - **Güncelleme ve kurtarma:** Güncelleme/sürüm düşürme Ayarlar’da; onarım kurucuda. Oyuncu ayarları, modlar ve dünyalar korunur.
 
-![Tema ve pencere düğmesi tasarımları](docs/screenshots/window-styles-tr.png)
+![Kompakt mod merkezi](docs/screenshots/mod-catalog.png)
 
-*Görüntüler test profiliyle alınmış gerçek launcher arayüzüdür.*
+*Görüntüler test profiliyle alınmış gerçek arayüzdür. Mod kataloğu görselinde örnek test verileri kullanılır.*
 
 ## Hızlı başlangıç
 
