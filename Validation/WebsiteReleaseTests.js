@@ -56,24 +56,24 @@ test('rejects leading zeroes and numeric components outside JavaScript safe inte
   ]) assert.equal(parseRelease(release({ tag_name: tag })), null, tag);
 });
 
-test('keeps a working v6.2.29 fallback and matching published digests', () => {
+test('keeps a working v6.2.30 fallback and matching published digests', () => {
   const home = readFileSync(require.resolve('../site/index.html'), 'utf8');
   const download = readFileSync(require.resolve('../site/indir/index.html'), 'utf8');
   const releaseScript = readFileSync(require.resolve('../site/assets/release.js'), 'utf8');
-  assert.match(releaseScript, /fallbackVersion = '6\.2\.29'/);
-  assert.match(home, /data-release-version>v6\.2\.29/);
+  assert.match(releaseScript, /fallbackVersion = '6\.2\.30'/);
+  assert.match(home, /data-release-version>v6\.2\.30/);
   for (const [kind, name] of Object.entries({
-    online: 'MistikSetup-Online-6.2.29.exe',
-    offline: 'MistikSetup-Offline-6.2.29.exe',
-    portable: 'MistikLauncher-6.2.29-win-x64.zip'
+    online: 'MistikSetup-Online-6.2.30.exe',
+    offline: 'MistikSetup-Offline-6.2.30.exe',
+    portable: 'MistikLauncher-6.2.30-win-x64.zip'
   })) {
-    assert.match(download, new RegExp(`data-release-asset="${kind}" href="https://github\\.com/${repo}/releases/download/v6\\.2\\.29/${name.replaceAll('.', '\\.')}"`));
+    assert.match(download, new RegExp(`data-release-asset="${kind}" href="https://github\\.com/${repo}/releases/download/v6\\.2\\.30/${name.replaceAll('.', '\\.')}"`));
     const row = new RegExp(`data-release-hash="${kind}">[\\s\\S]*?<code>([a-f0-9]{64})</code>[\\s\\S]*?data-copy-hash="([a-f0-9]{64})"`).exec(download);
     assert.ok(row, `${kind} fallback hash exists`);
     assert.equal(row[1], {
-      online: '40218ef56828a61a6656daae3563d2c42be84e52dd0d6a0c15a9d20b38d66d09',
-      offline: '0f1bd7c3c11bcf435c77a4eb56f5c14aad83dcf5c6d7c4ee5d44129f9213ba1d',
-      portable: 'dfd660895de76b6d569e2ec5e8974a35121a3b21226056fb8c2851a6613ac0ad'
+      online: 'e0bf9d791ddf154df659143e85208caf02b3cd6749d5175af368ff99f89a8099',
+      offline: 'c97af54c339c85df86529215949d40f238896da6ec8fb3dd7235f44e1f7af09e',
+      portable: 'b89283931440e8a121fb30e72f8a7e0c1ef168da4a131876d0b1444dc25bd32f'
     }[kind]);
     assert.equal(row[1], row[2]);
   }
@@ -153,4 +153,29 @@ test('preview switching keeps pressed states, visible panels and translated scre
   tabs[0].listeners.click();
   assert.equal(panels[0].hidden,false);
   assert.equal(panels[1].hidden,true);
+});
+
+test('public guides explain compatibility, backup scope, privacy consent and real installation paths', () => {
+  const script = readFileSync(require.resolve('../site/assets/site.js'), 'utf8');
+  const context = {window:{}};
+  runInNewContext(script.slice(0,script.indexOf('let lang=')),context);
+  const words = context.window.mistikWords.en;
+  assert.match(words['workflow.backup.copy'], /does not overwrite existing mods/);
+  assert.match(words['workflow.safety'], /does not include worlds/);
+  assert.match(words['workflow.migrate.copy'], /cannot convert mods/);
+  assert.match(words['privacy.metrics.copy'], /off by default/);
+  assert.match(words['privacy.metrics.copy'], /mod lists are not sent/);
+  assert.match(words['faq.account.a'], /Microsoft sign-in is not supported/);
+  assert.match(words['maintenance.update.copy'], /in Settings/);
+  assert.match(words['maintenance.repair.copy'], /run the installer and choose Repair/);
+  const features = readFileSync(require.resolve('../site/ozellikler/index.html'),'utf8');
+  for (const loader of ['Vanilla','Fabric','Forge','NeoForge','Quilt']) {
+    assert.ok(features.includes(`<th scope="row">${loader}</th>`),loader);
+  }
+  const home = readFileSync(require.resolve('../site/index.html'),'utf8');
+  assert.equal((home.match(/class="faq-item"/g)||[]).length,6);
+  for (const section of ['baslangic','gizlilik','sorular']) assert.ok(home.includes(`id="${section}"`));
+  const downloads = readFileSync(require.resolve('../site/indir/index.html'),'utf8');
+  assert.match(downloads,/class="package-guide"/);
+  assert.match(downloads,/id="guncelleme"/);
 });

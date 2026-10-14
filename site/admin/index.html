@@ -24,7 +24,7 @@
   <section class="intro" aria-labelledby="page-title">
     <p class="eyebrow">YÖNETİM MERKEZİ <span aria-hidden="true">/</span> ANALİTİK</p>
     <h1 id="page-title" tabindex="-1">Kullanım görünümü</h1>
-    <p class="intro-copy">Kurulum etkinliğini ve uygulama hata bildirimlerini tek bir yerde takip et.</p>
+    <p class="intro-copy">Etkinlik, sürüm dağılımı ve hata kayıtlarını kaynaklarıyla birlikte incele.</p>
   </section>
 
   <p id="status" class="status-banner" role="status" aria-live="polite">Firebase bağlantısı hazırlanıyor…</p>
@@ -32,32 +32,59 @@
   <section id="dashboard" class="dashboard" hidden aria-label="Kullanım bilgileri">
     <div class="section-heading"><div><p class="eyebrow">GENEL BAKIŞ</p><h2>Kurulum ve etkinlik</h2></div><div class="data-freshness"><span class="live-label"><i aria-hidden="true"></i> CANLI</span><span>Son veri: <time id="lastUpdated">—</time></span></div></div>
     <div class="cards">
-      <article class="metric-card"><div class="metric-top"><span>Katılan kurulumlar</span><span class="metric-icon" aria-hidden="true">01</span></div><strong id="installations">—</strong><p>İstatistik paylaşan kurulum kimlikleri</p></article>
-      <article class="metric-card metric-active"><div class="metric-top"><span>Şimdi aktif</span><span class="metric-icon" aria-hidden="true">02</span></div><strong id="active">—</strong><p>Son 5 dakikada bağlantı bildirenler</p></article>
-      <article class="metric-card"><div class="metric-top"><span>Son 24 saatte aktif</span><span class="metric-icon" aria-hidden="true">03</span></div><strong id="daily">—</strong><p>Son 24 saatte bağlantı bildirenler</p></article>
-      <article class="metric-card metric-errors"><div class="metric-top"><span>Son 24 saatte hata</span><span class="metric-icon" aria-hidden="true">04</span></div><strong id="recentErrors">—</strong><p>Son bildirimi alınan hata kategorileri</p></article>
+      <article class="metric-card"><div class="metric-top"><span>Katılan kurulumlar</span><span class="metric-icon" aria-hidden="true">01</span></div><strong id="installations">—</strong><p>Geçerli, paylaşım yapan kurulum kayıtları</p></article>
+      <article class="metric-card metric-active"><div class="metric-top"><span>Şimdi aktif</span><span class="metric-icon" aria-hidden="true">02</span></div><strong id="active">—</strong><p>Launcher oturumu son 5 dakikada bildirim gönderen kurulumlar</p></article>
+      <article class="metric-card"><div class="metric-top"><span>Son 24 saatte aktif</span><span class="metric-icon" aria-hidden="true">03</span></div><strong id="daily">—</strong><p>Son 24 saatte bildirim gönderen kurulumlar</p></article>
+      <article class="metric-card metric-errors"><div class="metric-top"><span>24 saatte güncellenen hata kayıtları</span><span class="metric-icon" aria-hidden="true">04</span></div><strong id="recentErrors">—</strong><p>Son hatası bu aralıkta olan kurulum + kategori grupları; olay toplamı değil</p></article>
+      <article class="metric-card"><div class="metric-top"><span>Son 7 günde aktif</span><span class="metric-icon" aria-hidden="true">05</span></div><strong id="weekly">—</strong><p>Son 7 günde bildirim gönderen kurulumlar</p></article>
+      <article class="metric-card"><div class="metric-top"><span>Son 30 günde aktif</span><span class="metric-icon" aria-hidden="true">06</span></div><strong id="monthly">—</strong><p>Son 30 günde bildirim gönderen kurulumlar</p></article>
+      <article class="metric-card"><div class="metric-top"><span>Yeni katılan · 24 saat</span><span class="metric-icon" aria-hidden="true">07</span></div><strong id="newDaily">—</strong><p>İlk bildirimi son 24 saat içinde alınan kurulumlar</p></article>
+      <article class="metric-card"><div class="metric-top"><span>Yeni katılan · 7 gün</span><span class="metric-icon" aria-hidden="true">08</span></div><strong id="newWeekly">—</strong><p>İlk bildirimi son 7 gün içinde alınan kurulumlar</p></article>
     </div>
 
+    <section class="data-panel quality-panel" aria-labelledby="quality-title">
+      <div class="panel-heading"><div><p class="eyebrow">ÖLÇÜMÜ ANLA</p><h2 id="quality-title">Veri kapsamı ve güncellik</h2></div><span class="panel-caption">Firebase · İsteğe bağlı paylaşım</span></div>
+      <dl class="quality-grid">
+        <div><dt>Son kurulum bildirimi</dt><dd><time id="lastHeartbeat">—</time></dd></div>
+        <div><dt>Geçerli oturum kaydı</dt><dd id="validSessions">—</dd></div>
+        <div><dt>Hesaba katılmayan kayıt</dt><dd id="ignoredRecords">—</dd><p class="quality-help">Doğrulamayı geçemeyen kayıtlar</p></div>
+      </dl>
+      <p id="coverageNote" class="coverage-note">Henüz katılım kaydı yok; toplam launcher kullanıcı sayısı bilinmiyor. İstatistik paylaşımı Ayarlar’dan isteğe bağlı açılır.</p>
+      <ul class="method-list">
+        <li><strong>Kurulum, kişi değildir.</strong> Aynı kişinin birden fazla kurulumu olabilir. Paylaşımı kapalı kurulumlar bu verilere dahil değildir; toplam kullanıcı sayısı bilinmez.</li>
+        <li><strong>Etkinlik, son bildirimden hesaplanır.</strong> Şimdi aktif olanlar, geçerli kurulum kaydıyla eşleşen ve son 5 dakikada bildirim gönderen oturumlardır. Oyun oynama süresi veya çevrimiçi oyuncu sayısı ölçülmez.</li>
+        <li><strong>Hatalar birikimli sayaçlardır.</strong> Her kurulum ve hata kategorisi için yalnızca son bildirim ve toplam saklanır. Son 24 saatteki tek tek olayların sayısı veya gün gün hata geçmişi bu kayıtlardan çıkarılamaz.</li>
+        <li><strong>Eski sayaçlar ayrı tutulur.</strong> Eski <code>stats</code>, <code>global_crashes</code> ve <code>activeSessions</code> verileri bu panelin kullanım toplamına eklenmez; dönemleri ve sayım yöntemleri yeni katılım kayıtlarıyla karşılaştırılamaz.</li>
+      </ul>
+      <p class="panel-footnote">“Son veri” panelin veriyi aldığı zamanı, “son kurulum bildirimi” launcher tarafından gönderilen son geçerli kaydı gösterir. Saatler tarayıcının yerel saat dilimindedir.</p>
+    </section>
+
     <div class="tables">
-      <section class="data-panel"><div class="panel-heading"><div><p class="eyebrow">GÜNCEL SÜRÜM</p><h2>Launcher ayrıntıları</h2></div><span class="panel-caption">GitHub Releases</span></div><div id="releaseDetails" class="detail-content"><p class="empty-state">Sürüm bilgisi yükleniyor…</p></div></section>
+      <section class="data-panel"><div class="panel-heading"><div><p class="eyebrow">GÜNCEL SÜRÜM</p><h2>Launcher dosyaları</h2></div><span class="panel-caption">GitHub Releases</span></div><div id="releaseDetails" class="detail-content"><p class="empty-state">Sürüm bilgisi yükleniyor…</p></div><p class="panel-footnote">GitHub dosya indirme adetleri tekil kullanıcı sayısı değildir. Aynı kişi birden fazla dosya indirebilir; bu bölüm yalnızca son yayını kapsar.</p></section>
       <section class="data-panel"><div class="panel-heading"><div><p class="eyebrow">MODRINTH</p><h2>Mod kataloğu</h2></div><span class="panel-caption">İndirmeye göre öne çıkanlar</span></div><div id="catalogMods" class="mod-list"><p class="empty-state">Mod kataloğu yükleniyor…</p></div><p class="panel-footnote">Bu liste Modrinth kataloğundandır; kullanıcıların cihazındaki modları göstermez.</p></section>
     </div>
 
     <div class="tables">
-      <section class="data-panel"><div class="panel-heading"><div><p class="eyebrow">DAĞILIM</p><h2>Sürümler</h2></div><span class="panel-caption">Kurulum sayısı</span></div><div class="table-scroll"><table><thead><tr><th scope="col">Sürüm</th><th scope="col">Kurulum</th></tr></thead><tbody id="versions"></tbody></table></div></section>
-      <section class="data-panel"><div class="panel-heading"><div><p class="eyebrow">ÖZET</p><h2>Hata kategorileri</h2></div><span class="panel-caption">Bildirim sayısı</span></div><div class="table-scroll"><table><thead><tr><th scope="col">Kategori</th><th scope="col">Bildirim</th></tr></thead><tbody id="categories"></tbody></table></div></section>
+      <section class="data-panel distribution-panel"><div class="panel-heading"><div><p class="eyebrow">DAĞILIM</p><h2>Sürümler</h2></div><span class="panel-caption">Geçerli kurulum kayıtları</span></div><div class="table-scroll" tabindex="0" role="region" aria-label="Launcher sürüm dağılımı tablosu"><table><thead><tr><th scope="col">Sürüm</th><th scope="col">Kurulum</th><th scope="col">Şimdi aktif</th><th scope="col">Pay (%)</th></tr></thead><tbody id="versions"></tbody></table></div><p class="panel-footnote">Pay, yalnızca istatistik paylaşan geçerli kurulumlar içindeki orandır.</p></section>
+      <section class="data-panel distribution-panel"><div class="panel-heading"><div><p class="eyebrow">BİRİKİMLİ ÖZET</p><h2>Hata kategorileri</h2></div><span class="panel-caption">Kayıtlardaki olay toplamı</span></div><div class="table-scroll" tabindex="0" role="region" aria-label="Hata kategorisi dağılımı tablosu"><table><thead><tr><th scope="col">Kategori</th><th scope="col">Birikimli olay</th><th scope="col">Etkilenen kurulum</th><th scope="col">Son bildirim</th></tr></thead><tbody id="categories"></tbody></table></div><p class="panel-footnote">Görünen kayıtların tüm zamanlardaki sayaçlarıdır; son 24 saatin olay sayısı hesaplanamaz.</p></section>
     </div>
 
+    <section class="data-panel installation-panel" aria-labelledby="installations-title">
+      <div class="panel-heading"><div><p class="eyebrow">KURULUM AYRINTILARI</p><h2 id="installations-title">Anonim kurulum kayıtları</h2></div><span class="panel-caption" id="installationCount">En son 100 kayıt</span></div>
+      <div class="table-scroll record-scroll" tabindex="0" role="region" aria-label="Anonim kurulum kayıtları tablosu"><table><thead><tr><th scope="col">Kurulum</th><th scope="col">Sürüm</th><th scope="col">İlk bildirim</th><th scope="col">Son bildirim</th><th scope="col">Etkinlik</th><th scope="col">Birikimli hata</th></tr></thead><tbody id="installationRows"></tbody></table></div>
+      <p class="panel-footnote">Son etkinliğe göre en yeni 100 kayıt gösterilir. Sıra etiketleri kişileri tanımlamaz; ilk bildirim, programın kurulduğu tarih anlamına gelmez. Kullanıcı adı, e-posta ve cihazdaki modlar toplanmaz.</p>
+    </section>
+
     <section class="data-panel error-panel" aria-labelledby="errors-title">
-      <div class="panel-heading"><div><p class="eyebrow">SON AKTİVİTE</p><h2 id="errors-title">Hata bildirimleri</h2></div><span class="panel-caption">En yeni 50 kayıt</span></div>
+      <div class="panel-heading"><div><p class="eyebrow">SON AKTİVİTE</p><h2 id="errors-title">Hata bildirimleri</h2></div><span class="panel-caption">Filtreye uyan en yeni 50 kayıt</span></div>
       <div class="error-toolbar">
         <label>Kategori<select id="errorCategory"><option value="">Tüm kategoriler</option></select></label>
         <label>Launcher sürümü<select id="errorVersion"><option value="">Tüm sürümler</option></select></label>
         <button id="resetErrors" class="button button-quiet" type="button" disabled>Filtreleri temizle</button>
         <p id="errorCount" class="filter-count" role="status" aria-live="polite"></p>
       </div>
-      <div class="table-scroll" tabindex="0" role="region" aria-label="Hata bildirimleri tablosu"><table><thead><tr><th scope="col">Hata</th><th scope="col">Sürüm</th><th scope="col">Son bildirim</th><th scope="col">Toplam</th></tr></thead><tbody id="errors"></tbody></table></div>
-      <p class="panel-footnote">Toplam, ilgili kurulumun bu kategori için bildirdiği olay sayısıdır; tekil kullanıcı sayısı değildir.</p>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Hata bildirimleri tablosu"><table><thead><tr><th scope="col">Hata</th><th scope="col">Son bildirimin sürümü</th><th scope="col">Son bildirim</th><th scope="col">Birikimli olay</th></tr></thead><tbody id="errors"></tbody></table></div>
+      <p class="panel-footnote">Her satır bir kurulumun bir hata kategorisindeki son bildirimidir. Birikimli olay, bu grubun tüm zamanlardaki sayacıdır; belirli bir günün veya tekil kullanıcıların sayısı değildir.</p>
     </section>
 
     <details class="privacy-note"><summary>Veri kapsamı ve gizlilik</summary><p>Bunlar kullanıcı sayısı değildir. Yalnızca paylaşımı açık kurulumlar sayılır; aynı kişinin birden fazla kurulumu olabilir. Kullanıcı adı, e-posta, mod listesi ve ham hata günlüğü toplanmaz. Hata sayıları her kurulumun her kategori için son bildirimi ve toplamıdır. Yeniden kurulum yeni kimlik oluşturabilir; paylaşımı kapatınca kayıtların silinmesi denenir; çevrimdışı kapatılan kurulumların eski kayıtları kalabilir.</p></details>

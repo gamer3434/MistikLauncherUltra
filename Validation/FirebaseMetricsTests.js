@@ -17,13 +17,13 @@ test('metrics count opt-in installations, distinct recent sessions and bounded c
   assert.equal(value.installations,2); assert.equal(value.active,1); assert.equal(value.daily,1); assert.equal(value.recentErrors,1);
   assert.deepEqual(value.categories, [['Java sürümü',5]]); assert.equal(value.errors[0].version,'6.2.14');
 });
-test('metrics reject unexpected raw data and cap displayed errors', async () => {
+test('metrics reject unexpected raw data and preserve errors for filtering before display limits', async () => {
   const {summarize} = await model;
   assert.equal(summarize(null, Date.now()).installations,0);
   const invalid = {errors:{a:{unknown:{code:'<script>',version:'6.2.14',lastSeen:1,count:1},bad:{code:'MLU-JAVA',version:'secret',lastSeen:1,count:1}}}};
   assert.equal(summarize(invalid,2).errors.length,0);
   const many = {errors:Object.fromEntries(Array.from({length:70}, (_,i)=>[i,{java:{code:'MLU-JAVA',version:'6.2.14',lastSeen:i,count:1}}]))};
-  assert.equal(summarize(many,100).errors.length,50);
+  assert.equal(summarize(many,100).errors.length,70);
 });
 test('dashboard never injects metric strings into HTML and failures clear previous counts', () => {
   const source=read('site/admin/admin.js');
