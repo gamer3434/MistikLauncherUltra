@@ -424,6 +424,7 @@ class Program
             }
             checks += ModCatalogUiTests.Run(window, name => Capture(window, Path.Combine(output,name+".png"), name == "mod-catalog-long-heading" ? 960 : 1200, name == "mod-catalog-long-heading" ? 640 : 820),
                 (name,width,height) => Capture(window, Path.Combine(output,name+".png"), width, height));
+            checks += ModCatalogPositionTests.Run(window, name => Capture(window, Path.Combine(output,name+".png")));
             checks += WindowScalingUiTests.Run(window, (name,width,height) => Capture(window, Path.Combine(output,name+".png"), width, height));
             checks += ModImageLifecycleTests.Run();
             checks += ModToolsLayoutTests.Run(window);

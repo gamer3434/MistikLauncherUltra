@@ -214,6 +214,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.37","2026-10-15","#00D4AA", new[]{
+                "Mod silme, açma/kapatma ve durum yenilemelerinde görünen bölümün konumu korunur.",
+                "Bekleyen mod kontrolü kartları geçici olarak yeniden düzenlemez; işlem düğmeleri kontrol bitene kadar kilitli kalır.",
+                "Mod işlemlerinde odak sabit tutulur ve kaldırma onayları launcher penceresine bağlı açılır.",
+                "Removing, toggling and refreshing mods preserves the visible browsing section.",
+                "Pending installed checks retain card layout while disabling mutation actions.",
+                "Mod actions retain stable focus and removal confirmations belong to the launcher window."
+            }),
             new("v6.2.36","2026-10-15","#00D4AA", new[]{
                 "Mod ayrıntılarında ve galeride yeniden deneme, gereksiz indirmeleri durdurma ve kurulu sürüm rehberi eklendi.",
                 "Mod taşıma, skin modu kurulumu ve ayar kaydı profil değişikliklerine karşı güçlendirildi.",

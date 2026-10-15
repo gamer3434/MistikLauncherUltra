@@ -702,6 +702,7 @@ namespace MistikLauncher.Pages
 
         StackPanel _resultsPanel = null!;
         StackPanel _installedPanel = null!;
+        ScrollViewer _catalogScroll = null!;
         TextBlock installedHelp=null!;
         DateTime _installedModsWriteTimeUtc;
         int _visibleInstalledMods = 40;
@@ -726,11 +727,42 @@ namespace MistikLauncher.Pages
         internal CatalogInstallState CatalogState(string project, string? version = null) =>
             _catalogInstalledProfile == (_main.Config.Version ?? "") ? _catalogInstalled?.State(project, version) ?? CatalogInstallState.Checking : CatalogInstallState.Checking;
 
-        void ApplyCatalogStatus()
+        void KeepModActionFocus(FrameworkElement action)
+        {
+            if (ReferenceEquals(Content, _catalogScroll) && action.IsKeyboardFocusWithin) _catalogScroll.Focus();
+        }
+
+        void KeepCatalogPosition(Action update, bool replacingInstalledRows = false)
+        {
+            var scroll = _catalogScroll;
+            if (scroll == null || !ReferenceEquals(Content, scroll) || scroll.ViewportHeight <= 0) { update(); return; }
+            scroll.UpdateLayout();
+            var anchor = _resultsPanel.Children.OfType<FrameworkElement>().FirstOrDefault(element => {
+                var top = element.TranslatePoint(new Point(), scroll).Y;
+                return element.ActualHeight > 0 && top < scroll.ViewportHeight && top + element.ActualHeight > 0;
+            }) ?? (FrameworkElement)_installedPanel;
+            double offset = scroll.VerticalOffset, topBefore = anchor.TranslatePoint(new Point(), scroll).Y;
+            if (replacingInstalledRows && System.Windows.Input.Keyboard.FocusedElement is DependencyObject focused && _installedPanel.IsAncestorOf(focused))
+                scroll.Focus();
+            update();
+            if (!ReferenceEquals(Content, scroll)) return;
+            scroll.UpdateLayout();
+            scroll.ScrollToVerticalOffset(offset + anchor.TranslatePoint(new Point(), scroll).Y - topBefore);
+            scroll.UpdateLayout();
+        }
+
+        void ApplyCatalogStatus() => KeepCatalogPosition(ApplyCatalogStatusCore);
+
+        void ApplyCatalogStatusCore()
         {
             foreach (var entry in _catalogButtons)
             {
                 var state = CatalogState(entry.Project);
+                if (state == CatalogInstallState.Checking)
+                {
+                    entry.Button.IsEnabled = entry.Remove.IsEnabled = false;
+                    continue;
+                }
                 bool installed = state is CatalogInstallState.Installed or CatalogInstallState.Disabled;
                 entry.Button.Content = installed ? Localization.T("modCatalogInstalled") : Localization.T(entry.Compatible ? "modInstall" : "modIncompatible");
                 entry.Button.IsEnabled = entry.Compatible && !installed && state != CatalogInstallState.Checking && !_catalogInstalling.Contains(entry.Button) && !_catalogRemoving;
@@ -753,8 +785,9 @@ namespace MistikLauncher.Pages
             var snapshot = _catalogInstalled;
             if (_catalogRemoving || _catalogInstalling.Count > 0 || _installedCancellation != null ||
                 _catalogInstalledProfile != profile || snapshot?.CanRemove(project) != true) return;
-            if (MessageBox.Show(string.Format(Localization.T("modCatalogRemoveConfirm"), name, profile),
+            if (MessageBox.Show(_main, string.Format(Localization.T("modCatalogRemoveConfirm"), name, profile),
                 Localization.T("modCatalogRemove"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+            KeepModActionFocus(_resultsPanel);
             _catalogRemoving = true; ApplyCatalogStatus();
             try { await Task.Run(() => RemoveCatalogProject(profile, snapshot, project)); }
             catch (Exception ex) { MessageBox.Show(ex.Message, Localization.T("error"), MessageBoxButton.OK, MessageBoxImage.Warning); }
@@ -955,6 +988,7 @@ namespace MistikLauncher.Pages
                     MessageBox.Show(".minecraft/mods klasöründe hiç mod bulunamadı.", "Boş", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
+                KeepModActionFocus(importBtn);
                 importBtn.IsEnabled = false; importBtn.Content = "Aktarılıyor...";
                 var importVersion = _main.Config.Version ?? "";
                 try
@@ -1098,6 +1132,7 @@ namespace MistikLauncher.Pages
                 };
                 if (dialog.ShowDialog() != true) return;
                 string archivePath = dialog.FileName;
+                KeepModActionFocus(backupBtn);
                 backupBtn.IsEnabled = restoreBtn.IsEnabled = cleanBtn.IsEnabled = false;
                 backupBtn.Content = Localization.T("modBackupWorking");
                 try {
@@ -1117,6 +1152,7 @@ namespace MistikLauncher.Pages
                 if (dialog.ShowDialog() != true) return;
                 string archivePath = dialog.FileName;
                 if (MessageBox.Show(Localization.T("modBackupRestoreConfirm") + "\n\n" + profile, "Mistik Launcher", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+                KeepModActionFocus(restoreBtn);
                 backupBtn.IsEnabled = restoreBtn.IsEnabled = cleanBtn.IsEnabled = false;
                 restoreBtn.Content = Localization.T("modBackupWorking");
                 try {
@@ -1135,6 +1171,7 @@ namespace MistikLauncher.Pages
                     "Klasörü Temizle", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 if (confirm == MessageBoxResult.Yes)
                 {
+                    KeepModActionFocus(cleanBtn);
                     cleanBtn.IsEnabled = false;
                     try
                     {
@@ -1169,7 +1206,7 @@ namespace MistikLauncher.Pages
             _installedPanel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
             sp.Children.Add(_installedPanel);
 
-            Content = new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            Content = _catalogScroll = new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
 
             // Load popular mods on open
             _ = LoadCatalog();
@@ -1320,6 +1357,7 @@ namespace MistikLauncher.Pages
                     installBtn.VerticalAlignment = VerticalAlignment.Center;
                     installBtn.Click += async (_, _) => {
                         if (!_catalogInstalling.Add(installBtn)) return;
+                        KeepModActionFocus(installBtn);
                         try {
                             await RunInstallButton(installBtn, async () => {
                                 return await InstallMod(cId, mname);
@@ -1339,6 +1377,7 @@ namespace MistikLauncher.Pages
                     removeBtn.Click += async (_, _) => await RemoveCatalogProject(cId, mname);
                     actionButtons.Children.Add(removeBtn);
                     var installedStatus = PageHelpers.Lbl("", 11, "#ADBED6", wrap: TextWrapping.Wrap);
+                    installedStatus.Visibility = Visibility.Collapsed;
                     installedStatus.MaxWidth = 136; actions.Children.Add(installedStatus);
                     _catalogButtons.Add((cId, installBtn, removeBtn, installedStatus, canInstall));
 
@@ -1618,7 +1657,9 @@ namespace MistikLauncher.Pages
                 btn.IsEnabled = true;
             }
         }
-        void RenderInstalledMods(string? directory = null)
+        void RenderInstalledMods(string? directory = null) => KeepCatalogPosition(() => RenderInstalledModsCore(directory), true);
+
+        void RenderInstalledModsCore(string? directory)
         {
             _ = RefreshInstalledStatus();
             // The active folder can still belong to the previous profile while background synchronization runs.
@@ -1676,6 +1717,7 @@ namespace MistikLauncher.Pages
                 toggle.ToolTip=Localization.T("modToggleHelp");
                 toggle.Click+=async (_,_)=> {
                     if (!controls.IsEnabled) return;
+                    KeepModActionFocus(controls);
                     controls.IsEnabled = false;
                     try { await Task.Run(() => _main.WithModChanges(profile, _ => ModFiles.Toggle(modDirectory,filePath))); RenderInstalledMods(directory); }
                     catch(Exception ex) { MessageBox.Show(Localization.T("modToggleFailed")+"\n"+ex.Message,Localization.T("error")); }
@@ -1692,11 +1734,12 @@ namespace MistikLauncher.Pages
                 delBtn.Click += async (_, _) =>
                 {
                     if (!controls.IsEnabled) return;
-                    var confirm = MessageBox.Show(
+                    var confirm = MessageBox.Show(_main,
                         Localization.T("modDeleteConfirm")+"\n\n"+fileName,
                         Localization.T("modDelete"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
                     if (confirm == MessageBoxResult.Yes)
                     {
+                        KeepModActionFocus(controls);
                         controls.IsEnabled = false;
                         try
                         {
