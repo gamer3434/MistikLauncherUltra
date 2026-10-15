@@ -1,6 +1,7 @@
 {
   "modCatalogRemove": "Modu kaldır",
   "modCatalogRemoveBusy": "Minecraft açılırken veya çalışırken mod kaldırılamaz. Oyunu kapatıp tekrar dene.",
+  "modChangesBusy": "Minecraft açılırken veya çalışırken mod dosyaları değiştirilemez. Oyunu kapatıp tekrar dene.",
   "modCatalogRemoveConfirm": "{0} modunu {1} profilinden kaldırmak istiyor musun?\n\nBu moda ait doğrulanmış etkin ve devre dışı JAR dosyaları .backups klasörüne taşınır. Diğer modlar ve bağımlılıklar korunur.",
   "modCatalogRemoveChanged": "Mod dosyaları değişti. Hiçbir dosya kaldırılmadı; listeyi yenileyip tekrar dene.",
   "modCatalogInstalled": "✓ Kurulu",

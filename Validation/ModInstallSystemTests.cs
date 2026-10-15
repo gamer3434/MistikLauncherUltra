@@ -56,6 +56,10 @@ static class ModInstallSystemTests
         });
         using var graphClient = new HttpClient(graph);
         var page = (ModManagerPage)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(ModManagerPage));
+        var poolOwner = (MainWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(MainWindow));
+        poolOwner.Config = new LauncherConfig { Version = "fixture-profile" };
+        typeof(MainWindow).GetField("_modSyncGate", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(poolOwner, new object());
+        typeof(ModManagerPage).GetField("_main", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(page, poolOwner);
         Task Install() => (Task)typeof(ModManagerPage).GetMethod("DownloadModAndDependencies", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(page, new object?[] { "parent", "parent", new List<string>(), true, new HashSet<string>(), null, "94.1", "fabric", "fixture-profile", graphClient })!;
         var pool = Path.Combine(App.AppData, "mods_pool", GameProfiles.VersionPoolKey("94.1", "fabric"));

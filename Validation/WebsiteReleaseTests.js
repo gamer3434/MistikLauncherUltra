@@ -56,6 +56,27 @@ test('rejects leading zeroes and numeric components outside JavaScript safe inte
   ]) assert.equal(parseRelease(release({ tag_name: tag })), null, tag);
 });
 
+test('a newer release without translated notes never presents old fallback announcements', async () => {
+  const elements = new Map();
+  const node = () => ({textContent:'',dataset:{},replaceChildren(...children){this.children=children;}});
+  const document = {
+    documentElement:{lang:'tr'},
+    querySelector(selector) { if (!elements.has(selector)) elements.set(selector,node()); return elements.get(selector); },
+    querySelectorAll() { return []; },
+    createElement:node,
+    addEventListener() {}
+  };
+  const source = readFileSync(require.resolve('../site/assets/release.js'),'utf8');
+  runInNewContext(source, {document, AbortController, setTimeout, clearTimeout,
+    fetch:async()=>({ok:true,json:async()=>release({tag_name:'v6.2.33',body:''})})});
+  await new Promise(resolve=>setImmediate(resolve));
+  const announcements = elements.get('[data-release-announcements]').children;
+  assert.equal(announcements.length,1);
+  assert.equal(announcements[0].textContent,'Bu sürümün ayrıntıları için GitHub sürüm notlarını aç.');
+  assert.equal(elements.get('[data-release-notes]').children[0].textContent,announcements[0].textContent);
+  assert.equal(elements.get('[data-release-title]').textContent,'6.2.33 yenilikleri');
+});
+
 test('keeps a working v6.2.30 fallback and matching published digests', () => {
   const home = readFileSync(require.resolve('../site/index.html'), 'utf8');
   const download = readFileSync(require.resolve('../site/indir/index.html'), 'utf8');

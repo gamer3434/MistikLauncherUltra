@@ -66,7 +66,9 @@
   function render() {
     const language = document.documentElement.lang === 'en' ? 'en' : 'tr';
     const version = current ? current.version : fallbackVersion;
-    const notes = current && current.notes[language].length ? current.notes[language] : fallbackNotes[language];
+    const notes = current ? (current.notes[language].length ? current.notes[language] : [language === 'tr'
+      ? 'Bu sürümün ayrıntıları için GitHub sürüm notlarını aç.'
+      : 'Open the GitHub release notes for details about this version.']) : fallbackNotes[language];
     const label = document.querySelector('[data-release-version-label]');
     if (label) label.textContent = `v${version} · Windows x64`;
     document.querySelectorAll('[data-release-version]').forEach(node => { node.textContent = `v${version}`; });

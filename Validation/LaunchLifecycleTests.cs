@@ -9,6 +9,16 @@ static class LaunchLifecycleTests
     public static int Run(MainWindow window)
     {
         var flags=BindingFlags.Instance|BindingFlags.NonPublic;
+        bool ChangeMods(string profile, Func<string, bool> change)
+        {
+            try { return (bool)typeof(MainWindow).GetMethod("WithModChanges", flags)!.MakeGenericMethod(typeof(bool)).Invoke(window, new object[] { profile, change })!; }
+            catch (TargetInvocationException error) { throw error.InnerException!; }
+        }
+        string ChangePool(string game, string loader)
+        {
+            try { return (string)typeof(MainWindow).GetMethod("WithModPoolChanges", flags)!.MakeGenericMethod(typeof(string)).Invoke(window, new object[] { game, loader, (Func<string, string>)(directory => directory) })!; }
+            catch (TargetInvocationException error) { throw error.InnerException!; }
+        }
         var selected=(ComboBox)typeof(MainWindow).GetField("VerBox",flags)!.GetValue(window)!;
         var handler=typeof(MainWindow).GetMethod("HandleLaunch",flags)!;
         var original=window.Config.Version;
@@ -32,6 +42,18 @@ static class LaunchLifecycleTests
                     handler.Invoke(window,null);
                     if(window.Config.Version!=original || !(bool)field.GetValue(window)!) throw new Exception("Repeated launch altered an active launch.");
                     Console.WriteLine("PASS repeated launch is ignored while "+state); checks++;
+                    var invoked = false;
+                    bool rejected = false;
+                    try { ChangeMods(original, _ => invoked = true); }
+                    catch (IOException error) when (error.Message == Localization.T("modChangesBusy")) { rejected = true; }
+                    if (!rejected || invoked || window.Config.LastSyncedVersion != previousSynced)
+                        throw new Exception("Mod edits must stop before synchronization or writes while " + state);
+                    Console.WriteLine("PASS mod changes are blocked before synchronization while " + state); checks++;
+                    rejected = false;
+                    try { ChangePool("1.21.1", "fabric"); }
+                    catch (IOException error) when (error.Message == Localization.T("modChangesBusy")) { rejected = true; }
+                    if (!rejected) throw new Exception("Queued pool writes must be blocked while " + state);
+                    Console.WriteLine("PASS queued mod pool changes are blocked while " + state); checks++;
                 }
                 finally { field.SetValue(window,false); }
             }
@@ -75,6 +97,13 @@ static class LaunchLifecycleTests
             var quarantined = Path.Combine(App.AppData, "mods_pool", "incompatible", "late-wrong-loader.jar");
             if (!File.Exists(quarantined)) throw new Exception("Wrong-loader mod must remain recoverable in its quarantine pool.");
             File.Delete(quarantined);
+            if (!ChangeMods(window.Config.Version, directory => directory == App.ModsDir))
+                throw new Exception("Idle mod actions must retain selected-profile access.");
+            Console.WriteLine("PASS idle mod changes retain access to the synchronized selected profile"); checks++;
+            if (ChangePool("1.21.1", "fabric") != App.ModsDir ||
+                ChangePool("1.20.1", "forge") != Path.Combine(App.AppData, "mods_pool", "1.20.1_forge"))
+                throw new Exception("Queued mod writes must resolve selected pools to the active folder and other profiles to their own pool.");
+            Console.WriteLine("PASS queued writes follow a newly selected active pool and isolate other profiles"); checks++;
             Console.WriteLine("PASS launch rechecks same-profile wrong-loader mods and preserves quarantined bytes"); checks++;
             var serverPage=new MistikLauncher.Pages.ServerManagerPage(window);
             var serverType=serverPage.GetType();

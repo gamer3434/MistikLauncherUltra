@@ -1,6 +1,7 @@
 {
   "modCatalogRemove": "Remove mod",
   "modCatalogRemoveBusy": "Mods cannot be removed while Minecraft is starting or running. Close the game and try again.",
+  "modChangesBusy": "Mod files cannot be changed while Minecraft is starting or running. Close the game and try again.",
   "modCatalogRemoveConfirm": "Remove {0} from profile {1}?\n\nVerified enabled and disabled JARs belonging to this mod move into .backups. Other mods and dependencies are kept.",
   "modCatalogRemoveChanged": "The mod files changed. No files were removed; refresh the list and try again.",
   "modCatalogInstalled": "✓ Installed",

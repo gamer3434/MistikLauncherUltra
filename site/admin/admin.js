@@ -49,9 +49,13 @@ async function loadLauncherDetails() {
     const published = Date.parse(release.published_at);
     const version = release.tag_name.slice(1);
     const names = new Set([`MistikSetup-Online-${version}.exe`, `MistikSetup-Offline-${version}.exe`, `MistikRepair-${version}.exe`, `MistikLauncher-${version}-win-x64.zip`]);
-    const assets = (Array.isArray(release.assets) ? release.assets : []).filter(asset => names.has(asset.name) && asset.browser_download_url === `https://github.com/gamer3434/MistikLauncherUltra/releases/download/${release.tag_name}/${asset.name}`);
+    const assets = [...names].flatMap(name => {
+      const matches = (Array.isArray(release.assets) ? release.assets : []).filter(asset => asset && asset.name === name && asset.browser_download_url === `https://github.com/gamer3434/MistikLauncherUltra/releases/download/${release.tag_name}/${name}`);
+      return matches.length === 1 ? matches : [];
+    });
     const validCount = count => Number.isSafeInteger(count) && count >= 0;
-    const downloads = assets.length && assets.every(asset => validCount(asset.download_count)) ? assets.reduce((sum, asset) => sum + asset.download_count, 0) : null;
+    const total = assets.reduce((sum, asset) => sum + (validCount(asset.download_count) ? asset.download_count : 0), 0);
+    const downloads = assets.length === names.size && assets.every(asset => validCount(asset.download_count)) && Number.isSafeInteger(total) ? total : null;
     panel.replaceChildren();
     const versionLine = document.createElement('strong'); versionLine.className = 'release-version'; versionLine.textContent = 'v' + version; panel.append(versionLine);
     const facts = document.createElement('div'); facts.className = 'release-facts';

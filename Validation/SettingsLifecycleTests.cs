@@ -93,6 +93,15 @@ static class SettingsLifecycleTests
             Control<ComboBox>(settings,"language").SelectedIndex=previous.Lang=="English"?0:1;
             using(var locked=new FileStream(configPath,FileMode.Open,FileAccess.Read,FileShare.Read))
             {
+                var headerLanguage=(ComboBox)window.FindName("LanguageBox");
+                var previousHeaderIndex=headerLanguage.SelectedIndex;
+                var targetHeaderLanguage=previous.Lang=="English"?"Turkce":"English";
+                bool languageSaveFailed=false;
+                try { window.SwitchLanguage(targetHeaderLanguage); }
+                catch(Exception ex) when(ex is IOException or UnauthorizedAccessException) { languageSaveFailed=true; }
+                Check(languageSaveFailed && window.Config.Lang==previous.Lang && Localization.Language==originalLanguage && File.ReadAllBytes(configPath).SequenceEqual(savedBytes),"failed header language persistence preserves the active language and saved preferences");
+                headerLanguage.SelectedIndex=previousHeaderIndex==1?0:1;
+                Check(headerLanguage.SelectedIndex==previousHeaderIndex && window.Config.Lang==previous.Lang && Localization.Language==originalLanguage && ((TextBlock)window.FindName("StatusLbl")).Text.StartsWith(Localization.T("error")),"header language selector restores its selection and displays save errors without escaping the UI event");
                 var appearance=(window.Config.Accent,window.Config.WindowButtons,window.Config.CloseLighting);
                 var links=window.Config.QuickLinks.ToArray();
                 var accent=ColorThemes.Accent;

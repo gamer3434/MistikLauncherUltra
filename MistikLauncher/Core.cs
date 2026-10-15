@@ -214,6 +214,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.34","2026-10-15","#00D4AA", new[]{
+                "Mod kurulumundaki dosya doğrulama ve yazma işlemleri arka planda çalışır; dosya boyutları daha okunur.",
+                "Oyun açılırken veya çalışırken mod kurulumu, içe aktarma ve yedekten geri yükleme dosyaları değiştiremez.",
+                "Dil ayarı kaydedilemezse önceki dil korunur ve hata arayüzde gösterilir.",
+                "Mod installation verifies and writes files in the background; file sizes are easier to read.",
+                "Mod installation, imports and restores cannot change files while Minecraft starts or runs.",
+                "Failed language saves preserve the active language and show an error in the interface."
+            }),
             new("v6.2.33","2026-10-15","#00D4AA", new[]{
                 "Kurulu mod kartlarında küçük Kaldır düğmesi görünür; doğrulanan mod dosyaları yedeklenerek kaldırılır.",
                 "Kaldırma seçili profilin dosyalarını yeniden doğrular; diğer modlar ve bağımlılıklar korunur.",

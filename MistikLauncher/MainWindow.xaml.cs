@@ -95,7 +95,14 @@ namespace MistikLauncher
 
             Localization.SetLanguage(Config.Lang);
             LanguageBox.SelectedIndex = Localization.Language == "en" ? 1 : 0;
-            LanguageBox.SelectionChanged += (_,_) => SwitchLanguage(LanguageBox.SelectedIndex == 1 ? "English" : "Turkce");
+            LanguageBox.SelectionChanged += (_,_) => {
+                try { SwitchLanguage(LanguageBox.SelectedIndex == 1 ? "English" : "Turkce"); }
+                catch (Exception ex) {
+                    LanguageBox.SelectedIndex = Localization.Language == "en" ? 1 : 0;
+                    StatusLbl.Text = Localization.T("error") + ex.Message;
+                    App.Log("Language preference save: " + ex.Message);
+                }
+            };
             Localization.Changed += RefreshLanguage;
             MainFrame.LoadCompleted += (_, e) => {
 
@@ -182,10 +189,15 @@ namespace MistikLauncher
         public void SwitchLanguage(string code)
         {
             var language = code == "English" || code == "en" ? "English" : "Turkce";
-            if (Config.Lang == language && Localization.Language == (language == "English" ? "en" : "tr")) return;
-            Config.Lang = language;
-            ConfigManager.Save(Config);
-            Localization.SetLanguage(Config.Lang);
+            lock (ConfigurationGate)
+            {
+                if (Config.Lang == language && Localization.Language == (language == "English" ? "en" : "tr")) return;
+                var previous = Config.Lang;
+                Config.Lang = language;
+                try { ConfigManager.Save(Config); }
+                catch { Config.Lang = previous; throw; }
+            }
+            Localization.SetLanguage(language);
         }
         void RefreshLanguage()
         {
@@ -1051,6 +1063,27 @@ namespace MistikLauncher
             {
                 if (launchPreparing || gameRunning) throw new IOException(Localization.T("modCatalogRemoveBusy"));
                 return WithSyncedMods(expectedProfile, directory => snapshot.RemoveVerified(directory, project));
+            }
+        }
+
+        internal T WithModChanges<T>(string expectedVersion, Func<string,T> write)
+        {
+            lock (_modSyncGate)
+            {
+                if (launchPreparing || gameRunning) throw new IOException(Localization.T("modChangesBusy"));
+                return WithSyncedMods(expectedVersion, write);
+            }
+        }
+
+        internal T WithModPoolChanges<T>(string game, string loader, Func<string,T> write)
+        {
+            lock (_modSyncGate)
+            {
+                if (launchPreparing || gameRunning) throw new IOException(Localization.T("modChangesBusy"));
+                var key = GameProfiles.VersionPoolKey(game, loader);
+                var selected = Config.Version ?? "";
+                var selectedKey = GameProfiles.VersionPoolKey(GameProfiles.MinecraftVersion(App.GameDir, selected), GameProfiles.Loader(App.GameDir, selected));
+                return key == selectedKey ? WithSyncedMods(selected, write) : write(Path.Combine(App.AppData, "mods_pool", key));
             }
         }
 

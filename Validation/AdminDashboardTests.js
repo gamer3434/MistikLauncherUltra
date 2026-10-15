@@ -166,6 +166,18 @@ test('invalid or missing release download counts remain unknown instead of becom
   }
 });
 
+test('partial, duplicated and overflowing program asset totals remain unknown', async () => {
+  const incomplete = releaseFixture(); incomplete.assets.splice(1,1);
+  const duplicated = releaseFixture(); duplicated.assets.push({...duplicated.assets[0]});
+  const overflow = releaseFixture(); overflow.assets[0].download_count = Number.MAX_SAFE_INTEGER;
+  for (const release of [incomplete, duplicated, overflow]) {
+    const {elements, loadLauncherDetails} = await dashboard(async()=>({ok:true,json:async()=>release}));
+    await loadLauncherDetails();
+    assert.match(content(elements.get('releaseDetails')),/İndirme sayısı doğrulanamadı/);
+    assert.doesNotMatch(content(elements.get('releaseDetails')),/\d+ program dosyası indirmesi/);
+  }
+});
+
 test('unofficial release links and failed requests cannot retain previously verified release data', async () => {
   const variants = [
     {html_url:'https://github.com/other/project/releases/tag/v6.2.30'},

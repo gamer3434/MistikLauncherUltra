@@ -954,7 +954,7 @@ namespace MistikLauncher.Pages
                 var importVersion = _main.Config.Version ?? "";
                 try
                 {
-                    int count = await Task.Run(() => _main.WithSyncedMods(importVersion, destination => {
+                    int count = await Task.Run(() => _main.WithModChanges(importVersion, destination => {
                         int copied = 0;
                         foreach (var jar in jars) {
                             try { if (ModFiles.Import(destination,jar)) copied++; }
@@ -1096,7 +1096,7 @@ namespace MistikLauncher.Pages
                 backupBtn.IsEnabled = restoreBtn.IsEnabled = cleanBtn.IsEnabled = false;
                 backupBtn.Content = Localization.T("modBackupWorking");
                 try {
-                    await Task.Run(() => _main.WithSyncedMods(profile, modsDirectory => { ModBackup.Create(modsDirectory, archivePath); return true; }));
+                    await Task.Run(() => _main.WithModChanges(profile, modsDirectory => { ModBackup.Create(modsDirectory, archivePath); return true; }));
                     MessageBox.Show(Localization.T("modBackupCreated") + "\n" + archivePath, "Mistik Launcher", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
                 catch (Exception ex) { MessageBox.Show(Localization.T("modBackupFailed") + "\n" + ex.Message, "Mistik Launcher", MessageBoxButton.OK, MessageBoxImage.Error); }
@@ -1115,7 +1115,7 @@ namespace MistikLauncher.Pages
                 backupBtn.IsEnabled = restoreBtn.IsEnabled = cleanBtn.IsEnabled = false;
                 restoreBtn.Content = Localization.T("modBackupWorking");
                 try {
-                    var result = await Task.Run(() => _main.WithSyncedMods(profile, modsDirectory => ModBackup.Restore(modsDirectory, archivePath)));
+                    var result = await Task.Run(() => _main.WithModChanges(profile, modsDirectory => ModBackup.Restore(modsDirectory, archivePath)));
                     if (_main.Config.Version == profile) RenderInstalledMods();
                     MessageBox.Show(string.Format(Localization.T("modBackupRestored"), result.Restored, result.Skipped), "Mistik Launcher", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
@@ -1131,7 +1131,7 @@ namespace MistikLauncher.Pages
                 {
                     try
                     {
-                        var backup = _main.WithSyncedMods(profile, ModFiles.Clear);
+                        var backup = _main.WithModChanges(profile, ModFiles.Clear);
                         RenderInstalledMods();
                         MessageBox.Show("Mod klasörü temizlendi. Dosyalar yedekte korundu:\n" + backup, "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
@@ -1481,7 +1481,7 @@ namespace MistikLauncher.Pages
             {
                 versions = JArray.Parse(await http.GetStringAsync($"https://api.modrinth.com/v2/project/{Uri.EscapeDataString(projectId)}/version"));
                 var existingRoot = queueGame == null
-                    ? _main.WithSyncedMods(currentVer, destination => destination)
+                    ? await Task.Run(() => _main.WithModChanges(currentVer, destination => destination))
                     : Path.Combine(App.AppData, "mods_pool", GameProfiles.VersionPoolKey(mcVersion, loader));
                 targetVersion = FindInstalledCompatibleVersion(versions, existingRoot, mcVersion, loader)
                     ?? FindCompatibleVersion(versions, mcVersion, loader);
@@ -1494,13 +1494,12 @@ namespace MistikLauncher.Pages
                 var targetLoader = (latest["loaders"] as JArray)?.Select(value => value.ToString().ToLowerInvariant())
                     .FirstOrDefault(value => value is "fabric" or "forge" or "neoforge" or "quilt")
                     ?? throw new IOException("No supported mod loader is available.");
-                var poolKey = GameProfiles.VersionPoolKey(targetGame, targetLoader);
                 await InstallRequiredDependencies(latest, (dependencyProject, dependencyVersion) =>
                     DownloadModAndDependencies(dependencyProject, dependencyProject, new List<string>(), true, visited, dependencyVersion, targetGame, targetLoader, currentVer, http));
                 var file = (latest["files"] as JArray)?.FirstOrDefault(value => value["primary"]?.Value<bool>() == true)
                     ?? latest["files"]?.FirstOrDefault() ?? throw new InvalidDataException("Missing mod file.");
                 var bytes = await http.GetByteArrayAsync(ModFiles.DownloadUrl(file["url"]?.ToString() ?? ""));
-                InstallDownloadedMod(Path.Combine(App.AppData, "mods_pool", poolKey), file, bytes, false);
+                await Task.Run(() => _main.WithModPoolChanges(targetGame, targetLoader, destination => InstallDownloadedMod(destination, file, bytes, false)));
                 MessageBox.Show($"'{name}' modu şu anki oyun sürümünüz ({mcVersion} {loader}) ile uyumsuz!\n\n'{targetGame} {targetLoader}' havuzuna indirildi. Bu sürüm ve yükleyici seçildiğinde otomatik olarak etkinleştirilecektir.", "Sürüm Beklemeye Alındı", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
@@ -1516,8 +1515,8 @@ namespace MistikLauncher.Pages
                 var file = (targetVersion["files"] as JArray)?.FirstOrDefault(value => value["primary"]?.Value<bool>() == true)
                     ?? targetVersion["files"]?.FirstOrDefault() ?? throw new InvalidDataException("Missing mod file.");
                 var reused = await Task.Run(() => queueGame == null
-                    ? _main.WithSyncedMods(currentVer, destination => FindVerifiedInstalledMod(destination, file, isDependency, versions))
-                    : FindVerifiedInstalledMod(Path.Combine(App.AppData, "mods_pool", GameProfiles.VersionPoolKey(mcVersion, loader)), file, isDependency, versions));
+                    ? _main.WithModChanges(currentVer, destination => FindVerifiedInstalledMod(destination, file, isDependency, versions))
+                    : _main.WithModPoolChanges(mcVersion, loader, destination => FindVerifiedInstalledMod(destination, file, isDependency, versions)));
                 if (reused != null)
                 {
                     if (isDependency) name = Path.GetFileName(reused);
@@ -1526,9 +1525,9 @@ namespace MistikLauncher.Pages
                 }
                 var bytes = await http.GetByteArrayAsync(ModFiles.DownloadUrl(file["url"]?.ToString() ?? ""));
                 if (queueGame == null && _main.Config.Version != currentVer) throw new IOException("The selected Minecraft version changed during mod installation. Please retry.");
-                var installedPath = queueGame == null
-                    ? _main.WithSyncedMods(currentVer, destination => InstallDownloadedMod(destination, file, bytes, isDependency, versions))
-                    : InstallDownloadedMod(Path.Combine(App.AppData, "mods_pool", GameProfiles.VersionPoolKey(mcVersion, loader)), file, bytes, isDependency, versions);
+                var installedPath = await Task.Run(() => queueGame == null
+                    ? _main.WithModChanges(currentVer, destination => InstallDownloadedMod(destination, file, bytes, isDependency, versions))
+                    : _main.WithModPoolChanges(mcVersion, loader, destination => InstallDownloadedMod(destination, file, bytes, isDependency, versions)));
                 if (isDependency) name = Path.GetFileName(installedPath);
                 if (!installedList.Contains(name)) installedList.Add(name);
             }
@@ -1659,7 +1658,7 @@ namespace MistikLauncher.Pages
                 Grid.SetColumn(nameLbl, 0);
                 grid.Children.Add(nameLbl);
 
-                var sizeLbl = PageHelpers.Lbl(sizeStr, 11, "#666666");
+                var sizeLbl = PageHelpers.Lbl(sizeStr, 11, "#ADBED6");
                 sizeLbl.Margin = new Thickness(12, 0, 12, 0);
                 Grid.SetColumn(sizeLbl, 1);
                 grid.Children.Add(sizeLbl);
@@ -1668,7 +1667,7 @@ namespace MistikLauncher.Pages
                 var toggle=PageHelpers.MkBtn(Localization.T(enabled?"modDisable":"modEnable"),"#226DA0",120); toggle.Margin=new Thickness(0,0,8,0);
                 toggle.ToolTip=Localization.T("modToggleHelp");
                 toggle.Click+=(_,_)=> {
-                    try { _main.WithSyncedMods(profile, _ => ModFiles.Toggle(modDirectory,filePath)); RenderInstalledMods(directory); }
+                    try { _main.WithModChanges(profile, _ => ModFiles.Toggle(modDirectory,filePath)); RenderInstalledMods(directory); }
                     catch(Exception ex) { MessageBox.Show(Localization.T("modToggleFailed")+"\n"+ex.Message,Localization.T("error")); }
                 };
                 controls.Children.Add(toggle);
@@ -1688,7 +1687,7 @@ namespace MistikLauncher.Pages
                     {
                         try
                         {
-                            var backup = _main.WithSyncedMods(profile, _ => ModFiles.Remove(modDirectory,filePath));
+                            var backup = _main.WithModChanges(profile, _ => ModFiles.Remove(modDirectory,filePath));
                             App.Log($"Mod removed by user: {fileName}; backup: {backup}");
                         }
                         catch (Exception ex)
