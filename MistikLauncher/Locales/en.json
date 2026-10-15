@@ -448,5 +448,8 @@
   "modNextPage": "Next page",
   "modSortLabel": "Sort mods",
   "modSearching": "Searching…",
-  "modNoResults": "No mods found. Try a different name or turn off the compatibility filter."
+  "modNoResults": "No mods found. Try a different name or turn off the compatibility filter.",
+  "modGalleryLoading": "Loading image…",
+  "modGalleryFailed": "Image could not load. Check your connection and retry.",
+  "modGalleryRetry": "Retry"
 }

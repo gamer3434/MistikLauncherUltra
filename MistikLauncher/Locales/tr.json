@@ -448,5 +448,8 @@
   "modNextPage": "Sonraki sayfa",
   "modSortLabel": "Modları sırala",
   "modSearching": "Aranıyor…",
-  "modNoResults": "Mod bulunamadı. Başka bir ad dene veya uyumluluk filtresini kapat."
+  "modNoResults": "Mod bulunamadı. Başka bir ad dene veya uyumluluk filtresini kapat.",
+  "modGalleryLoading": "Resim yükleniyor…",
+  "modGalleryFailed": "Resim yüklenemedi. Bağlantını kontrol edip tekrar dene.",
+  "modGalleryRetry": "Tekrar dene"
 }

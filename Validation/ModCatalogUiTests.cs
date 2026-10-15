@@ -151,6 +151,11 @@ static class ModCatalogUiTests
             if (page.Content is not ModProjectView detail) throw new Exception("Card should open project inside its mod page.");
             detail.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent)); Flush(window); capture("mod-catalog-description");
             var tabs = detail.Children.OfType<TabControl>().Single();
+            void ReloadDetail()
+            {
+                _ = (Task)typeof(ModProjectView).GetMethod("Load", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(detail, null)!;
+                Flush(window);
+            }
             var installedHeader = Nodes(detail).OfType<Button>().Single(button => button.Name == "ProjectInstallButton");
             if (!Equals(installedHeader.Content, Localization.T("modCatalogInstalled")) || installedHeader.IsEnabled)
                 throw new Exception("Project details must share the catalog's verified installed state.");
@@ -215,6 +220,20 @@ static class ModCatalogUiTests
             window.SetVersion(selectedProfile); Flush(window);
             Console.WriteLine("PASS detail installation uses click-time profile and reaches guarded download after profile selection");
             tabs.SelectedIndex = 2; capture("mod-catalog-gallery");
+            var detailLanguage = Localization.Language;
+            var preservedTabs = tabs.Items.Cast<TabItem>().Select(tab => tab.Content).ToArray();
+            var metadataRequests = fixture.MetadataRequests;
+            fixture.MetadataOffline = true;
+            try
+            {
+                Localization.SetLanguage(detailLanguage == "en" ? "tr" : "en"); detail.RefreshLanguage(); Flush(window);
+                if (tabs.SelectedIndex != 2 || ((TabItem)tabs.Items[2]).Header?.ToString() != (Localization.Language == "en" ? "Gallery" : "Galeri") ||
+                    !tabs.Items.Cast<TabItem>().Select(tab => tab.Content).SequenceEqual(preservedTabs) || fixture.MetadataRequests != metadataRequests)
+                    throw new Exception("Changing language must translate detail tabs without moving the user out of the selected gallery.");
+            }
+            finally { Localization.SetLanguage(detailLanguage); detail.RefreshLanguage(); Flush(window); fixture.MetadataOffline = false; }
+            if (tabs.SelectedIndex != 2) throw new Exception("Restoring the detail language must retain the selected gallery.");
+            Console.WriteLine("PASS offline language changes translate detail headers while retaining selected gallery, browser and version content without HTTP");
             var gallery = (DependencyObject)((TabItem)tabs.Items[2]).Content;
             if (!Nodes(gallery).OfType<TextBlock>().Any(text => text.Text.Contains("gallery", StringComparison.OrdinalIgnoreCase) || text.Text.Contains("galeri")))
                 throw new Exception("Empty gallery should explain that no pictures were supplied.");
@@ -225,20 +244,34 @@ static class ModCatalogUiTests
             if (!Nodes(gallery).OfType<Button>().Any(button => button.Name == "GalleryRetryButton" && button.IsEnabled)) throw new Exception("A failed gallery image must have an accessible enabled retry action.");
             capture("mod-catalog-gallery-retry");
             Console.WriteLine("PASS gallery failure retains an in-place retry action inside the detail viewport");
+            try
+            {
+                Localization.SetLanguage(detailLanguage == "en" ? "tr" : "en"); detail.RefreshLanguage(); Flush(window);
+                if (!ReferenceEquals(gallery, ((TabItem)tabs.Items[2]).Content) ||
+                    !Nodes(gallery).OfType<Button>().Any(button => button.Name == "GalleryRetryButton" && Equals(button.Content, Localization.T("modGalleryRetry"))))
+                    throw new Exception("A visible gallery failure must translate its retry action without replacing the gallery.");
+            }
+            finally { Localization.SetLanguage(detailLanguage); detail.RefreshLanguage(); Flush(window); }
+            Console.WriteLine("PASS gallery retry translates in place without replacing failed image content");
             var failedProject = new TaskCompletionSource<HttpResponseMessage>(); fixture.PendingProject = failedProject;
             var failedLoad = (Task)typeof(ModProjectView).GetMethod("Load", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(detail, null)!;
+            var pendingMetadataRequests = fixture.MetadataRequests;
+            detail.RefreshLanguage(); Flush(window);
+            if (failedLoad.IsCompleted || fixture.MetadataRequests != pendingMetadataRequests)
+                throw new Exception("Language refresh must not cancel or duplicate a pending project request.");
+            Console.WriteLine("PASS language refresh preserves pending project work without duplicate metadata requests");
             failedProject.SetException(new HttpRequestException("Controlled connection failure")); Flush(window);
             var retryProject = Nodes(detail).OfType<Button>().Single(button => button.Name == "ProjectRetryButton");
             if (!failedLoad.IsCompleted || retryProject.Visibility != Visibility.Visible) throw new Exception("Failed metadata must expose an immediate retry action.");
             capture("mod-catalog-project-retry"); fixture.PendingProject = null;
             retryProject.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
-            if (tabs.Items.Count != 3 || retryProject.Visibility != Visibility.Collapsed) throw new Exception("Metadata retry must recover all three detail tabs without leaving its error control visible.");
+            if (tabs.Items.Count != 3 || retryProject.Visibility != Visibility.Collapsed || tabs.SelectedIndex != 2) throw new Exception("Metadata retry must recover all three detail tabs and the selected gallery without leaving its error control visible.");
             Console.WriteLine("PASS failed metadata offers an accessible retry and recovers the detail page in place");
             var pending = new TaskCompletionSource<HttpResponseMessage>();
             fixture.PendingProject = pending;
             var obsoleteLoad = (Task)typeof(ModProjectView).GetMethod("Load", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(detail, null)!;
             fixture.PendingProject = null;
-            detail.RefreshLanguage(); Flush(window);
+            ReloadDetail();
             pending.SetException(new HttpRequestException("Obsolete request failed")); Flush(window);
             if (!obsoleteLoad.IsCompleted || Nodes(detail).OfType<TextBlock>().Any(text => text.Text.Contains("Obsolete request failed")))
                 throw new Exception("An obsolete failed request must not overwrite the successfully refreshed project.");
@@ -246,7 +279,7 @@ static class ModCatalogUiTests
             fixture.ProjectTitle = string.Join(" ", Enumerable.Repeat("Uzun mod başlığı / Long project title", 10));
             fixture.ProjectDescription = string.Join(" ", Enumerable.Repeat("Uzun açıklama compact profile description", 24));
             fixture.ProjectCategories = new JArray(Enumerable.Repeat("long-category-name", 16));
-            detail.RefreshLanguage(); Flush(window);
+            ReloadDetail();
             detail.Measure(new Size(620, 480)); detail.Arrange(new Rect(0, 0, 620, 480)); detail.UpdateLayout();
             tabs.ApplyTemplate();
             var compactContent = (FrameworkElement)tabs.Template.FindName("PART_SelectedContentHost", tabs);
@@ -279,7 +312,7 @@ static class ModCatalogUiTests
             fixture.PendingProject = null;
             fixture.ProjectTitle = "Refreshed project"; fixture.ProjectDescription = "Refreshed description";
             fixture.ProjectCategories = new JArray("fabric", "optimization");
-            detail.RefreshLanguage(); Flush(window);
+            ReloadDetail();
             successfulPending.SetResult(Fixture.ProjectResponse("Obsolete successful project")); Flush(window);
             if (!obsoleteSuccess.IsCompleted || tabs.Items.Count != 3 ||
                 !Nodes(detail).OfType<TextBlock>().Any(text => text.Text == "Refreshed project") ||
@@ -349,7 +382,7 @@ static class ModCatalogUiTests
             }
             finally { window.SetVersion(selectedProfile); SynchronizationContext.SetSynchronizationContext(context); }
             Console.WriteLine("PASS pending detail install blocks duplicate actions and revalidates changed-profile availability after completion");
-            return 20;
+            return 23;
         }
         finally { frame.Content = previous; selectNav.Invoke(window, new object[] { previousNav }); }
     }
@@ -368,6 +401,8 @@ static class ModCatalogUiTests
     {
         public List<Uri> SearchRequests { get; } = new();
         public int InstallRequests { get; private set; }
+        public int MetadataRequests { get; private set; }
+        public bool MetadataOffline { get; set; }
         public TaskCompletionSource<HttpResponseMessage>? PendingProject { get; set; }
         public string ProjectTitle { get; set; } = "Example project";
         public string ProjectDescription { get; set; } = "An illustrated catalog card opens description, versions and gallery.";
@@ -379,6 +414,11 @@ static class ModCatalogUiTests
         };
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (request.RequestUri!.AbsolutePath.Contains("/project/", StringComparison.Ordinal))
+            {
+                MetadataRequests++;
+                if (MetadataOffline) throw new HttpRequestException("Controlled offline metadata fixture.");
+            }
             if (request.RequestUri!.AbsolutePath.EndsWith("/version_files", StringComparison.Ordinal))
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(InstalledVersionFiles.ToString()) });
             if (request.RequestUri!.AbsolutePath.EndsWith("/version/compatible", StringComparison.Ordinal))

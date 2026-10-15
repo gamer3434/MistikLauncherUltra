@@ -214,6 +214,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.38","2026-10-15","#00D4AA", new[]{
+                "Dil değişiminde açık mod sekmesi, açıklama ve galeri korunur; mod bilgileri yeniden indirilmez.",
+                "Yükleme hatası sonrasında tekrar deneme önceki sekmeyi geri açar.",
+                "Galeri hata ve yeniden deneme metinleri açık içerik değiştirilmeden çevrilir.",
+                "Language changes preserve the open mod tab, description and gallery without fetching metadata again.",
+                "Retrying a failed project load restores the previously selected tab.",
+                "Gallery failure and retry labels translate without replacing open content."
+            }),
             new("v6.2.37","2026-10-15","#00D4AA", new[]{
                 "Mod silme, açma/kapatma ve durum yenilemelerinde görünen bölümün konumu korunur.",
                 "Bekleyen mod kontrolü kartları geçici olarak yeniden düzenlemez; işlem düğmeleri kontrol bitene kadar kilitli kalır.",

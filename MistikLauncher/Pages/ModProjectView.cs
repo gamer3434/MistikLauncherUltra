@@ -32,6 +32,9 @@ public sealed class ModProjectView : Grid
     TextBlock? projectTitle, projectDescription;
     TextBlock? projectInstalledStatus;
     FrameworkElement? projectCategories;
+    TextBlock? profileLabel, incompatibleLabel, galleryEmptyLabel;
+    string? loadError;
+    int selectedTab;
     string T(string tr, string en) => Localization.Language == "en" ? en : tr;
 
     public ModProjectView(MainWindow main, HttpClient client, string id, Action back, Func<string?, Task<bool>> install, Func<string?, CatalogInstallState>? installedState = null)
@@ -136,19 +139,39 @@ public sealed class ModProjectView : Grid
         return border;
     }
 
-    public void RefreshLanguage() => _ = Load();
+    public void RefreshLanguage()
+    {
+        ((Button)heading.Children[0]).Content = T("← Modlara dön", "← Back to mods");
+        retry.Content = T("Tekrar dene", "Retry");
+        if (projectVersions == null)
+        {
+            status.Text = loadError == null ? T("Mod bilgileri yükleniyor…", "Loading project…")
+                : T("Yüklenemedi: ", "Could not load: ") + loadError;
+            return;
+        }
+        var headers = new[] { T("Açıklama", "Description"), T("Sürümler", "Versions"), T("Galeri", "Gallery") };
+        for (int index = 0; index < tabs.Items.Count; index++) ((TabItem)tabs.Items[index]).Header = headers[index];
+        var profile = main.Config.Version ?? "";
+        if (profileLabel != null) profileLabel.Text = T("Seçili profil: ", "Selected profile: ") +
+            GameProfiles.MinecraftVersion(App.GameDir, profile) + " / " + GameProfiles.Loader(App.GameDir, profile);
+        if (incompatibleLabel != null) incompatibleLabel.Text = T("Bu profil için uyumlu sürüm yok.", "No compatible version for this profile.");
+        if (galleryEmptyLabel != null) galleryEmptyLabel.Text = T("Bu modun galeri resmi yok.", "This project has no gallery images.");
+        if (tabs.Items.Count > 2) Localization.TranslateTree((DependencyObject)((TabItem)tabs.Items[2]).Content);
+        if (installedState == null && !installing)
+            foreach (var button in installButtons) button.Content = T("↓ Kur", "↓ Install");
+        RefreshInstalledStatus();
+    }
 
     internal static Border GalleryImage(Uri url, Uri? preview, CancellationToken pageToken,
         Func<Uri, int, CancellationToken, Task<BitmapSource?>> load)
     {
-        string Text(string tr, string en) => Localization.Language == "en" ? en : tr;
         var surface = new Border { MinHeight = 160, Background = PageHelpers.HexBrush("#0C1118"), CornerRadius = new CornerRadius(8), Margin = new Thickness(0, 10, 0, 10) };
         CancellationTokenSource? request = null;
         async Task LoadImage()
         {
             if (request != null || pageToken.IsCancellationRequested || surface.Child is Image) return;
             var pending = CancellationTokenSource.CreateLinkedTokenSource(pageToken); request = pending;
-            surface.Child = PageHelpers.Lbl(Text("Resim yükleniyor…", "Loading image…"), 14, "#ADBED6", pad: new Thickness(16));
+            surface.Child = PageHelpers.Lbl("modGalleryLoading", 14, "#ADBED6", pad: new Thickness(16));
             BitmapSource? picture = null;
             try
             {
@@ -167,8 +190,8 @@ public sealed class ModProjectView : Grid
                     else
                     {
                         var failure = new StackPanel { Margin = new Thickness(16) };
-                        failure.Children.Add(PageHelpers.Lbl(Text("Resim yüklenemedi. Bağlantını kontrol edip tekrar dene.", "Image could not load. Check your connection and retry."), 14, "#F0CF84", wrap: TextWrapping.Wrap));
-                        var retryImage = PageHelpers.MkBtn(Text("Tekrar dene", "Retry"), "#28445E");
+                        failure.Children.Add(PageHelpers.Lbl("modGalleryFailed", 14, "#F0CF84", wrap: TextWrapping.Wrap));
+                        var retryImage = PageHelpers.MkBtn("modGalleryRetry", "#28445E");
                         retryImage.Name = "GalleryRetryButton"; retryImage.HorizontalAlignment = HorizontalAlignment.Left;
                         retryImage.Click += async (_, _) => await LoadImage(); failure.Children.Add(retryImage); surface.Child = failure;
                     }
@@ -177,7 +200,7 @@ public sealed class ModProjectView : Grid
                 pending.Dispose();
             }
         }
-        surface.Loaded += async (_, _) => await LoadImage();
+        surface.Loaded += async (_, _) => { Localization.TranslateTree(surface); await LoadImage(); };
         surface.Unloaded += (_, _) => { var pending = request; request = null; pending?.Cancel(); };
         return surface;
     }
@@ -194,8 +217,9 @@ public sealed class ModProjectView : Grid
         projectInstall.IsEnabled = !installing && compatible.Length > 0;
         projectInstall.ToolTip = compatible.Length == 0 ? T("Bu Minecraft sürümü ve yükleyici için uyumlu dosya yok.", "No compatible file for this Minecraft version and loader.") : T("Seçili profile en güncel uyumlu sürümü kur.", "Install the latest compatible version into the selected profile.");
         System.Windows.Controls.ToolTipService.SetShowOnDisabled(projectInstall, true);
-        versionPanel.Children.Add(PageHelpers.Lbl(T("Seçili profil: ", "Selected profile: ") + game + " / " + loader, 14, "#ADBED6"));
-        if (compatible.Length == 0) versionPanel.Children.Add(PageHelpers.Lbl(T("Bu profil için uyumlu sürüm yok.", "No compatible version for this profile."), 15, "#F0CF84"));
+        versionPanel.Children.Add(profileLabel = PageHelpers.Lbl(T("Seçili profil: ", "Selected profile: ") + game + " / " + loader, 14, "#ADBED6"));
+        incompatibleLabel = null;
+        if (compatible.Length == 0) versionPanel.Children.Add(incompatibleLabel = PageHelpers.Lbl(T("Bu profil için uyumlu sürüm yok.", "No compatible version for this profile."), 15, "#F0CF84"));
         foreach (var version in compatible)
         {
             var row = new DockPanel { Margin = new Thickness(14) };
@@ -267,9 +291,11 @@ public sealed class ModProjectView : Grid
 
     async Task Load()
     {
+        if (tabs.SelectedIndex >= 0) selectedTab = tabs.SelectedIndex;
         cancellation?.Cancel(); cancellation?.Dispose(); cancellation = new(); var token = cancellation.Token;
         browser?.Dispose(); browser = null;
         projectVersions = null; projectInstall = null;
+        profileLabel = incompatibleLabel = galleryEmptyLabel = null; loadError = null;
         tabs.Items.Clear(); tabs.Visibility = Visibility.Collapsed;
         while (heading.Children.Count > 3) heading.Children.RemoveAt(3);
         retry.Content = T("Tekrar dene", "Retry"); retry.Visibility = Visibility.Collapsed;
@@ -330,8 +356,9 @@ public sealed class ModProjectView : Grid
                 if (!string.IsNullOrWhiteSpace(item["description"]?.ToString())) entry.Children.Add(PageHelpers.Lbl(item["description"]!.ToString(), 14, "#ADBED6"));
                 var card = PageHelpers.Card("#202731", 12, "#303A45"); card.Padding = new Thickness(14); card.Child = entry; gallery.Children.Add(card);
             }
-            if (gallery.Children.Count == 0) gallery.Children.Add(PageHelpers.Lbl(T("Bu modun galeri resmi yok.", "This project has no gallery images."), 15, "#ADBED6"));
+            if (gallery.Children.Count == 0) gallery.Children.Add(galleryEmptyLabel = PageHelpers.Lbl(T("Bu modun galeri resmi yok.", "This project has no gallery images."), 15, "#ADBED6"));
             tabs.Items.Add(new TabItem { Header = T("Galeri", "Gallery"), Content = new ScrollViewer { Content = gallery, VerticalScrollBarVisibility = ScrollBarVisibility.Auto } });
+            tabs.SelectedIndex = selectedTab;
             var activeBrowser = browser;
             try
             {
@@ -363,7 +390,7 @@ public sealed class ModProjectView : Grid
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-        catch (Exception error) { if (!token.IsCancellationRequested) { status.Visibility = retry.Visibility = Visibility.Visible; status.Text = T("Yüklenemedi: ", "Could not load: ") + error.Message; } }
+        catch (Exception error) { if (!token.IsCancellationRequested) { loadError = error.Message; status.Visibility = retry.Visibility = Visibility.Visible; status.Text = T("Yüklenemedi: ", "Could not load: ") + loadError; } }
     }
 
     Button InstallButton(string? version)
