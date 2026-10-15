@@ -26,8 +26,12 @@ public static class ModBackup
         var mods = ModFiles.List(modsDirectory).ToArray();
         if (mods.Length > MaxMods) throw new IOException($"A backup can contain up to {MaxMods} mods.");
         long totalBytes = 0;
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var mod in mods)
         {
+            var name = Path.GetFileName(mod);
+            var enabledName = name.EndsWith(".jar.disabled", StringComparison.OrdinalIgnoreCase) ? name[..^9] : name;
+            if (!names.Add(enabledName)) throw new IOException("The mod folder contains conflicting enabled/disabled copies. Resolve the duplicate before creating a backup.");
             if ((File.GetAttributes(mod) & FileAttributes.ReparsePoint) != 0) throw new IOException("A mod file is not a regular file.");
             long size = new FileInfo(mod).Length;
             if (size <= 0 || size > MaxModBytes || (totalBytes += size) > MaxTotalBytes) throw new IOException("The mod backup contains an empty mod or exceeds its safe size limit.");

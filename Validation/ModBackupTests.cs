@@ -34,6 +34,13 @@ public static class ModBackupTests
         string backup = Path.Combine(root, "mods.zip");
         ModBackup.Create(mods, backup);
         var savedBackup = File.ReadAllBytes(backup);
+        File.WriteAllText(enabled + ".disabled", "conflicting disabled duplicate");
+        rejected = false;
+        try { ModBackup.Create(mods, backup); } catch (IOException) { rejected = true; }
+        Check(rejected && File.ReadAllBytes(backup).SequenceEqual(savedBackup) && File.ReadAllText(enabled) == "enabled original" &&
+            File.ReadAllText(enabled + ".disabled") == "conflicting disabled duplicate" && !Directory.GetFiles(root, ".mistik-mod-backup-*.tmp").Any(),
+            "backup rejects conflicting enabled/disabled copies before overwriting the previous archive or touching source mods");
+        File.Delete(enabled + ".disabled");
         using (var lockedMod = new FileStream(disabled, FileMode.Open, FileAccess.Read, FileShare.None))
         {
             rejected = false;
