@@ -26,6 +26,7 @@ namespace MistikLauncher
         [JsonProperty("usage_metrics_enabled")] public bool UsageMetricsEnabled { get; set; } = false;
         [JsonProperty("support_sharing_enabled")] public bool SupportSharingEnabled { get; set; } = false;
         [JsonProperty("support_requests_enabled")] public bool SupportRequestsEnabled { get; set; } = false;
+        [JsonProperty("support_auto_install_enabled")] public bool SupportAutoInstallEnabled { get; set; } = false;
 
         [JsonProperty("user")]       public string User       { get; set; } = "Oyuncu";
         [JsonProperty("version")]    public string Version    { get; set; } = "1.21";
@@ -70,6 +71,7 @@ namespace MistikLauncher
             cfg.Lang = cfg.Lang == "English" || cfg.Lang == "en" ? "English" : "Turkce";
             cfg.Ram = Math.Clamp(cfg.Ram, 1, 32);
             cfg.TunnelPort = Math.Clamp(cfg.TunnelPort, 1, 65535);
+            if (!cfg.SupportSharingEnabled || !cfg.SupportRequestsEnabled) cfg.SupportAutoInstallEnabled = false;
 
               cfg.User = Regex.IsMatch(cfg.User ?? "", @"^[A-Za-z0-9_]{3,16}$") ? cfg.User! : "Player";
               cfg.Version ??= "";
@@ -216,6 +218,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.40","2026-10-15","#00D4AA", new[]{
+                "Ayarlar’a bir kez izin vererek yönetici modlarını tekrar onay penceresi olmadan kurma seçeneği eklendi.",
+                "Otomatik kurulum ayrı ve varsayılan kapalıdır; eski öneri izni otomatik kuruluma dönüşmez.",
+                "Oyun çalışırken, profil değiştiğinde veya izin kapatıldığında kurulum engellenir.",
+                "Settings can explicitly allow administrator mod installs without repeated confirmation dialogs.",
+                "Automatic installation is separate and off by default; older suggestion consent does not enable it.",
+                "Running games, changed profiles and withdrawn permission still block installation."
+            }),
             new("v6.2.39","2026-10-15","#00D4AA", new[]{
                 "Backspace ve gizli geri/ileri geçmişi artık launcher menüsünü değiştirmez; metin silme çalışmaya devam eder.",
                 "Ayrı izinle yönetici panelinde oyuncu adı, etkinlik, profil ve kurulu mod dosyaları paylaşılabilir.",

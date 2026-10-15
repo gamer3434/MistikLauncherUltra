@@ -96,10 +96,13 @@ test('support DOM fixture sends canonical proposal once, blocks pending and offl
   global.fetch=async()=>new Response(JSON.stringify({hits:[{project_type:'mod',project_id:'AbCd1234',title:'Voice chat'}]}));
   $('supportSearch').value='voice';await $('supportSearchForm').onsubmit({preventDefault(){}});
   $('supportSearchResults').children[0].onclick();assert.equal($('supportSend').disabled,false);
+  assert.match($('supportRequestStatus').textContent,/izinlere göre otomatik kurulur veya launcher onayı beklenir/);
   await $('supportSend').onclick();assert.equal(transactions.length,1);assert.equal(transactions[0].key,'launcherSupport/requests/device');
+  assert.match($('supportStatus').textContent,/izinlere göre otomatik kurulur veya launcher onayı beklenir/);
   assert.equal(transactions[0].existing,undefined);assert.equal(transactions[0].options.applyLocally,false);
   assert.equal(transactions[0].payload.profile,'fabric-loader-0.19.5-1.21.1');
   pending({id:'pending'});await $('supportSend').onclick();assert.equal(transactions.length,1);
+  assert.match($('supportRequestStatus').textContent,/Launcher’ın işlemesi bekleniyor/);
   pending(null);support.connection(false);await $('supportSend').onclick();assert.equal(transactions.length,1);
 });
 test('support DOM fixture ignores late search results after target disappears', async t => {

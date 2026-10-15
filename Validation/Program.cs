@@ -424,6 +424,7 @@ class Program
                 Check(Texts((DependencyObject)((Frame)window.FindName("MainFrame")).Content).Contains(Localization.T("optTitle")),"optimization page opens in selected language: "+code);
             }
             checks += NavigationKeyboardTests.Run(window);
+            checks += SupportAutoInstallTests.Run(window);
             checks += ModCatalogUiTests.Run(window, name => Capture(window, Path.Combine(output,name+".png"), name == "mod-catalog-long-heading" ? 960 : 1200, name == "mod-catalog-long-heading" ? 640 : 820),
                 (name,width,height) => Capture(window, Path.Combine(output,name+".png"), width, height));
             checks += ModCatalogPositionTests.Run(window, name => Capture(window, Path.Combine(output,name+".png")));

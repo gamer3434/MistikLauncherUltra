@@ -22,6 +22,8 @@ The administrator may create one pending `launcherSupport/requests/<uid>` record
 
 The template adds these narrowly scoped rules without granting writes at the support root or changing the existing metrics and retired-account policies. Publish only a reviewed private rules file with the administrator placeholder replaced.
 
+Support sharing, suggestions and automatic installation each default to off. Version upgrades do not treat existing suggestion consent as automatic-install permission. A recipient can explicitly allow compatible Modrinth mods and their dependencies to install without repeated dialogs in local Settings; otherwise each request asks for confirmation. Turning off suggestions or support revokes the automatic preference. Profile, game-running, cancellation and verified-download checks apply in both modes. Administrators cannot enable this local setting remotely.
+
 ## Checks
 
 Run frontend aggregation and configuration checks:

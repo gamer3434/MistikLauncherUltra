@@ -166,12 +166,13 @@ namespace MistikLauncher
             if (UsageMetrics != null) await UsageMetrics.SetEnabledAsync(enabled);
         }
 
-        public async Task SetSupportSharing(bool enabled, bool requests)
+        public async Task SetSupportSharing(bool enabled, bool requests, bool autoInstall = false)
         {
-            var previous = (Config.SupportSharingEnabled, Config.SupportRequestsEnabled);
+            var previous = (Config.SupportSharingEnabled, Config.SupportRequestsEnabled, Config.SupportAutoInstallEnabled);
             Config.SupportSharingEnabled = enabled; Config.SupportRequestsEnabled = enabled && requests;
+            Config.SupportAutoInstallEnabled = enabled && requests && autoInstall;
             try { ConfigManager.Save(Config); }
-            catch { (Config.SupportSharingEnabled, Config.SupportRequestsEnabled) = previous; throw; }
+            catch { (Config.SupportSharingEnabled, Config.SupportRequestsEnabled, Config.SupportAutoInstallEnabled) = previous; throw; }
             if (Support != null) {
                 if (enabled && Support.Enabled) await Support.StopAsync();
                 await Support.SetEnabledAsync(enabled);
@@ -191,21 +192,30 @@ namespace MistikLauncher
         async Task ApproveSupportRequest(SupportRequest request, CancellationToken cancellation)
         {
             if (Dispatcher.HasShutdownStarted) return;
-            await Dispatcher.InvokeAsync(async () => {
-                if (cancellation.IsCancellationRequested || !Config.SupportSharingEnabled || !Config.SupportRequestsEnabled ||
-                    Config.Version != request.Profile || launchPreparing || gameRunning) return;
-                var en = Localization.Language == "en";
-                var message = en ? $"The launcher administrator suggests installing {request.ProjectName}.\nModrinth ID: {request.ProjectId}\n\nProfile: {request.Profile}\n\nInstall this mod and its required dependencies?"
-                    : $"Launcher yöneticisi {request.ProjectName} modunu kurmayı öneriyor.\nModrinth kimliği: {request.ProjectId}\n\nProfil: {request.Profile}\n\nMod ve gerekli bağımlılıkları kurulsun mu?";
-                if (MessageBox.Show(this, message, en ? "Mod installation request" : "Mod kurulum isteği", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
-                if (cancellation.IsCancellationRequested || !Config.SupportSharingEnabled || !Config.SupportRequestsEnabled ||
-                    Config.Version != request.Profile || launchPreparing || gameRunning) return;
-                try {
+            await Dispatcher.InvokeAsync(() => ApplySupportRequest(request, cancellation,
+                (message, title) => MessageBox.Show(this, message, title, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes,
+                async () => {
                     var page = new Pages.ModManagerPage(this, initializeCatalog: false);
                     await page.InstallSupportMod(request.ProjectId, request.Profile, cancellation);
-                    StatusLbl.Text = en ? "Requested mod installed." : "İstenen mod kuruldu.";
-                } catch (Exception ex) { StatusLbl.Text = Localization.T("error") + ": " + ex.Message; }
-            }, System.Windows.Threading.DispatcherPriority.Background, cancellation).Task.Unwrap();
+                }), System.Windows.Threading.DispatcherPriority.Background, cancellation).Task.Unwrap();
+        }
+
+        internal async Task ApplySupportRequest(SupportRequest request, CancellationToken cancellation,
+            Func<string, string, bool> confirm, Func<Task> install)
+        {
+            if (cancellation.IsCancellationRequested || !Config.SupportSharingEnabled || !Config.SupportRequestsEnabled ||
+                Config.Version != request.Profile || launchPreparing || gameRunning) return;
+            var en = Localization.Language == "en";
+            var message = en ? $"The launcher administrator suggests installing {request.ProjectName}.\nModrinth ID: {request.ProjectId}\n\nProfile: {request.Profile}\n\nInstall this mod and its required dependencies?"
+                : $"Launcher yöneticisi {request.ProjectName} modunu kurmayı öneriyor.\nModrinth kimliği: {request.ProjectId}\n\nProfil: {request.Profile}\n\nMod ve gerekli bağımlılıkları kurulsun mu?";
+            if (!Config.SupportAutoInstallEnabled && !confirm(message, en ? "Mod installation request" : "Mod kurulum isteği")) return;
+            if (cancellation.IsCancellationRequested || !Config.SupportSharingEnabled || !Config.SupportRequestsEnabled ||
+                Config.Version != request.Profile || launchPreparing || gameRunning) return;
+            try {
+                StatusLbl.Text = (en ? "Installing administrator suggestion: " : "Yönetici önerisi kuruluyor: ") + request.ProjectName;
+                await install();
+                StatusLbl.Text = en ? "Requested mod installed." : "İstenen mod kuruldu.";
+            } catch (Exception ex) { StatusLbl.Text = Localization.T("error") + ": " + ex.Message; }
         }
 
         void ShowCrashReport(string report)

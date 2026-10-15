@@ -56,7 +56,7 @@ export function mountSupport({database, sdk, now}) {
     $('supportModCount').textContent = `${device.mods.length} / ${device.modCount} mod dosyası${device.truncated ? ' · Liste ilk 300 dosyayla sınırlı' : ''}. Mod paketi kimliği bu dosyalardan belirlenemez.`;
     $('supportModList').replaceChildren(...device.mods.map(mod => node('li', `${mod.name} · ${mod.enabled ? 'Açık' : 'Kapalı'}`)));
     if (!device.mods.length) $('supportModList').append(node('li', 'Bu profilde mod dosyası bildirilmemiş.'));
-    $('supportRequestStatus').textContent = !connected ? 'Çevrimdışı; istek gönderilemez.' : !device.active ? 'Kurulumun güncel etkinlik sinyali yok.' : !device.allowRequests ? 'Bu kurulum mod önerilerini kabul etmiyor.' : !requestLoaded ? 'İstek durumu kontrol ediliyor…' : pending !== null ? 'Bekleyen kurulum isteği var. Kullanıcının onayı veya reddi bekleniyor; üzerine yazılmaz.' : 'Yeni istek gönderilebilir. Kurulumdan önce kullanıcı launcher içinde onay verir.';
+    $('supportRequestStatus').textContent = !connected ? 'Çevrimdışı; istek gönderilemez.' : !device.active ? 'Kurulumun güncel etkinlik sinyali yok.' : !device.allowRequests ? 'Bu kurulum mod önerilerini kabul etmiyor.' : !requestLoaded ? 'İstek durumu kontrol ediliyor…' : pending !== null ? 'Bekleyen kurulum isteği var. Launcher’ın işlemesi bekleniyor; üzerine yazılmaz.' : 'Yeni istek gönderilebilir. Kullanıcının verdiği izinlere göre otomatik kurulur veya launcher onayı beklenir.';
     actions();
   }
   function render() {
@@ -118,7 +118,7 @@ export function mountSupport({database, sdk, now}) {
     try {
       const result = await sdk.runTransaction(sdk.ref(database, `launcherSupport/requests/${device.uid}`), value => value === null ? payload : undefined, {applyLocally:false});
       if (stopped || current !== detailGeneration) return;
-      message(result.committed ? 'İstek gönderildi. Kullanıcının launcher içinde onaylaması gerekiyor.' : 'Zaten bekleyen bir istek var; yeni istek gönderilmedi.');
+      message(result.committed ? 'İstek gönderildi. Kullanıcının verdiği izinlere göre otomatik kurulur veya launcher onayı beklenir. Uyumluluk launcher’da kontrol edilir.' : 'Zaten bekleyen bir istek var; yeni istek gönderilmedi.');
     } catch { if (!stopped && current === detailGeneration) message('İstek gönderilemedi. Yetkini, bağlantıyı ve bekleyen isteği kontrol et.'); }
     finally { submitting = false; if (!stopped) details(); }
   };

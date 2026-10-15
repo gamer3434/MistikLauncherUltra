@@ -405,17 +405,22 @@ public class ModernSettingsPage : Page, ILanguagePage
         stack.Children.Add(PageHelpers.Lbl(Localization.T("usageMetricsHelp"),12,"#BDCAD8",wrap:TextWrapping.Wrap));
         var supportSharing = new CheckBox { Name="SupportSharingToggle", Content=Localization.T("supportSharingToggle"), IsChecked=main.Config.SupportSharingEnabled, Foreground=Brushes.White, Margin=new Thickness(0,12,0,8), MinHeight=32, IsEnabled=main.Support!=null };
         var supportRequests = new CheckBox { Name="SupportRequestsToggle", Content=Localization.T("supportRequestsToggle"), IsChecked=main.Config.SupportRequestsEnabled, Foreground=Brushes.White, Margin=new Thickness(0,0,0,8), MinHeight=32, IsEnabled=main.Config.SupportSharingEnabled && main.Support!=null };
+        var supportAutoInstall = new CheckBox { Name="SupportAutoInstallToggle", Content=PageHelpers.Lbl("supportAutoInstallToggle",13,wrap:TextWrapping.Wrap), IsChecked=main.Config.SupportAutoInstallEnabled, Foreground=Brushes.White, Margin=new Thickness(0,0,0,8), MinHeight=32, IsEnabled=main.Config.SupportSharingEnabled && main.Config.SupportRequestsEnabled && main.Support!=null };
+        System.Windows.Automation.AutomationProperties.SetName(supportAutoInstall,Localization.T("supportAutoInstallToggle"));
         async Task SaveSupport() {
-            supportSharing.IsEnabled=supportRequests.IsEnabled=false;
-            try { await main.SetSupportSharing(supportSharing.IsChecked==true,supportRequests.IsChecked==true); }
+            supportSharing.IsEnabled=supportRequests.IsEnabled=supportAutoInstall.IsEnabled=false;
+            try { await main.SetSupportSharing(supportSharing.IsChecked==true,supportRequests.IsChecked==true,supportAutoInstall.IsChecked==true); }
             catch(Exception ex) { result.Text=Localization.T("error")+": "+ex.Message; }
             finally {
                 supportSharing.IsChecked=main.Config.SupportSharingEnabled; supportRequests.IsChecked=main.Config.SupportRequestsEnabled;
+                supportAutoInstall.IsChecked=main.Config.SupportAutoInstallEnabled;
                 supportSharing.IsEnabled=main.Support!=null; supportRequests.IsEnabled=main.Config.SupportSharingEnabled && main.Support!=null;
+                supportAutoInstall.IsEnabled=main.Config.SupportSharingEnabled && main.Config.SupportRequestsEnabled && main.Support!=null;
             }
         }
         supportSharing.Click+=async (_,_)=>await SaveSupport(); supportRequests.Click+=async (_,_)=>await SaveSupport();
-        stack.Children.Add(supportSharing); stack.Children.Add(supportRequests);
+        supportAutoInstall.Click+=async (_,_)=>await SaveSupport();
+        stack.Children.Add(supportSharing); stack.Children.Add(supportRequests); stack.Children.Add(supportAutoInstall);
         stack.Children.Add(PageHelpers.Lbl(Localization.T("supportSharingHelp"),12,"#BDCAD8",wrap:TextWrapping.Wrap));
         if(!main.UsageMetricsAvailable) stack.Children.Add(PageHelpers.Lbl(Localization.T("usageMetricsUnavailable"),12,"#F0CF84",wrap:TextWrapping.Wrap));
         var privacy=PageHelpers.Lbl(Localization.T("privacyText"),13,"#BDCAD8",wrap:TextWrapping.Wrap);
