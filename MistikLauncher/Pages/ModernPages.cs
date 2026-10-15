@@ -165,6 +165,9 @@ public class ModernSettingsPage : Page, ILanguagePage
     CheckBox close = null!, autoUpdate = null!;
     TextBlock result = null!, updateStatus = null!, updateNotes = null!;
     Button updateButton = null!;
+    Button loadOlderButton = null!, downgradeButton = null!;
+    ComboBox olderVersions = null!;
+    bool loadingOlderVersions;
     ProgressBar updateProgress = null!;
     Expander? appearance;
     public ModernSettingsPage(MainWindow window, bool updatesOnly=false)
@@ -178,6 +181,7 @@ public class ModernSettingsPage : Page, ILanguagePage
     public void RefreshLanguage() => Render();
     void Render()
     {
+        loadingOlderVersions=false;
         var draftUser=user?.Text??main.Config.User;
         var draftRam=ram?.Text??main.Config.Ram.ToString();
         var draftProvider=provider?.SelectedIndex??(main.Config.AuthType=="elyby"?1:0);
@@ -208,24 +212,37 @@ public class ModernSettingsPage : Page, ILanguagePage
         var downgrade=new Expander { Header=Localization.T("luDowngrade"), Foreground=Brushes.White, Margin=new Thickness(0,14,0,0) };
         var downgradeContent=new StackPanel();
         downgradeContent.Children.Add(PageHelpers.Lbl(Localization.T("luDowngradeHelp"),13,"#ADBED6",wrap:TextWrapping.Wrap));
-        var versions=new ComboBox { Name="LauncherDowngradeVersion", Margin=new Thickness(0,10,0,10), MinHeight=34 };
+        var versions=olderVersions=new ComboBox { Name="LauncherDowngradeVersion", Margin=new Thickness(0,10,0,10), MinHeight=34 };
         System.Windows.Automation.AutomationProperties.SetName(versions,Localization.T("luDowngrade"));
-        var load=PageHelpers.MkBtn(Localization.T("luOlderVersions"),"#226DA0");
+        var versionListStatus=PageHelpers.Lbl("",13,"#ADBED6",wrap:TextWrapping.Wrap); versionListStatus.Visibility=Visibility.Collapsed;
+        System.Windows.Automation.AutomationProperties.SetLiveSetting(versionListStatus,System.Windows.Automation.AutomationLiveSetting.Polite);
+        var load=loadOlderButton=PageHelpers.MkBtn(Localization.T("luOlderVersions"),"#226DA0");
+        load.Name="LoadOlderReleasesButton"; load.HorizontalAlignment=HorizontalAlignment.Left;
         load.Click+=async (_,_)=> {
-            load.IsEnabled=false;
-            try { versions.ItemsSource=await main.LauncherUpdates.OlderVersionsAsync(); versions.SelectedIndex=versions.Items.Count>0?0:-1; }
-            catch(Exception ex) { updateStatus.Text=Localization.T("luError")+"\n"+ex.Message; }
-            finally { load.IsEnabled=true; }
+            if(loadingOlderVersions || main.LauncherUpdates.Busy) return;
+            loadingOlderVersions=true; UpdateStatus();
+            versionListStatus.Text=Localization.Language=="en"?"Loading older releases…":"Eski sürümler yükleniyor…"; versionListStatus.Visibility=Visibility.Visible;
+            try {
+                var releases=await main.LauncherUpdates.OlderVersionsAsync();
+                if(!ReferenceEquals(olderVersions,versions)) return;
+                versions.ItemsSource=releases; versions.SelectedIndex=versions.Items.Count>0?0:-1;
+                versionListStatus.Text=Localization.Language=="en"?"No verified older release is available.":"Geri dönülebilecek doğrulanmış eski sürüm bulunamadı.";
+                versionListStatus.Visibility=versions.Items.Count==0?Visibility.Visible:Visibility.Collapsed;
+            }
+            catch(Exception ex) { if(ReferenceEquals(olderVersions,versions)) { versionListStatus.Text=Localization.T("luError")+"\n"+ex.Message; versionListStatus.Visibility=Visibility.Visible; } }
+            finally { if(ReferenceEquals(olderVersions,versions)) { loadingOlderVersions=false; UpdateStatus(); } }
         };
-        var installOlder=PageHelpers.MkBtn(Localization.T("luDowngrade"),"#226DA0");
+        var installOlder=downgradeButton=PageHelpers.MkBtn(Localization.T("luDowngrade"),"#226DA0");
+        installOlder.Name="DowngradeLauncherButton"; installOlder.HorizontalAlignment=HorizontalAlignment.Left;
+        versions.SelectionChanged+=(_,_)=>UpdateStatus();
         installOlder.Click+=async (_,_)=> {
-            if(versions.SelectedItem is not string version || main.LauncherUpdates.Busy) return;
+            if(!installOlder.IsEnabled || versions.SelectedItem is not string version || main.LauncherUpdates.Busy) return;
             if(MessageBox.Show(string.Format(Localization.T("luDowngradeConfirm"),version),Localization.T("luDowngrade"),MessageBoxButton.YesNo,MessageBoxImage.Question)!=MessageBoxResult.Yes) return;
             installOlder.IsEnabled=false;
             try { await main.DowngradeLauncherAsync(version); }
-            finally { installOlder.IsEnabled=true; }
+            finally { if(ReferenceEquals(olderVersions,versions)) UpdateStatus(); }
         };
-        downgradeContent.Children.Add(load); downgradeContent.Children.Add(versions); downgradeContent.Children.Add(installOlder);
+        downgradeContent.Children.Add(load); downgradeContent.Children.Add(versionListStatus); downgradeContent.Children.Add(versions); downgradeContent.Children.Add(installOlder);
         downgrade.Content=downgradeContent; updateContent.Children.Add(downgrade);
         updateStatus=PageHelpers.Lbl("",13,"#ADBED6",pad:new Thickness(0,10,0,0),wrap:TextWrapping.Wrap); updateContent.Children.Add(updateStatus);
         updateNotes=PageHelpers.Lbl("",13,"#D7E5F5",pad:new Thickness(0,10,0,0),wrap:TextWrapping.Wrap); updateContent.Children.Add(updateNotes);
@@ -373,6 +390,9 @@ public class ModernSettingsPage : Page, ILanguagePage
         var save=PageHelpers.MkBtn(Localization.T("save"),"#226DA0"); save.Name="SaveSettingsButton"; save.HorizontalAlignment=HorizontalAlignment.Right;
         save.Click += (_,_) => Save();
         result=PageHelpers.Lbl("",13,"#F0CF84",wrap:TextWrapping.Wrap); result.Name="SettingsResult"; result.Margin=new Thickness(0,0,24,0);
+        result.LineHeight=18; result.MaxHeight=72; result.TextTrimming=TextTrimming.CharacterEllipsis;
+        result.SetBinding(ToolTipProperty,new System.Windows.Data.Binding("Text") { Source=result });
+        result.SetBinding(System.Windows.Automation.AutomationProperties.HelpTextProperty,new System.Windows.Data.Binding("Text") { Source=result });
         var usageMetrics=new CheckBox { Name="UsageMetricsToggle", Content=Localization.T("usageMetricsToggle"), IsChecked=main.Config.UsageMetricsEnabled, Foreground=Brushes.White, Margin=new Thickness(0,8,0,8), MinHeight=32 };
         System.Windows.Automation.AutomationProperties.SetName(usageMetrics,Localization.T("usageMetricsToggle"));
         usageMetrics.Click+=async (_,_)=> {
@@ -409,6 +429,9 @@ public class ModernSettingsPage : Page, ILanguagePage
         updateNotes.Text=notes.Length==0?"":Localization.T("luReleaseNotes")+"\n"+notes;
         updateNotes.Visibility=notes.Length==0?Visibility.Collapsed:Visibility.Visible;
         updateButton.IsEnabled=!main.LauncherUpdates.Busy;
+        loadOlderButton.IsEnabled=!main.LauncherUpdates.Busy && !loadingOlderVersions;
+        olderVersions.IsEnabled=loadOlderButton.IsEnabled && olderVersions.Items.Count>0;
+        downgradeButton.IsEnabled=loadOlderButton.IsEnabled && olderVersions.SelectedItem is string;
         updateProgress.Visibility=main.LauncherUpdates.Busy?Visibility.Visible:Visibility.Collapsed;
         updateProgress.IsIndeterminate=main.LauncherUpdates.Busy && main.LauncherUpdates.TotalBytes<=0;
         updateProgress.Value=Math.Clamp(main.LauncherUpdates.Progress,0,100);

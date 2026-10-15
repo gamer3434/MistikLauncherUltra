@@ -103,6 +103,7 @@ public sealed class LauncherMetrics
                 running = new CancellationTokenSource();
                 loop = RunAsync(running.Token);
             } else {
+                enabled = false; running?.Cancel();
                 if (refresh != null || File.Exists(tokenPath)) {
                     using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(8));
                     try {
@@ -158,6 +159,7 @@ public sealed class LauncherMetrics
         if (loop != null) { try { await loop.ConfigureAwait(false); } catch (OperationCanceledException) { } }
         await gate.WaitAsync().ConfigureAwait(false);
         try {
+            enabled = false; running?.Cancel();
             if (token == null || uid == null) return;
             using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(4));
             await AuthenticateAsync(cancellation.Token).ConfigureAwait(false);

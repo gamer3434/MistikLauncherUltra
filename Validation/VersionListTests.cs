@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -88,6 +89,33 @@ static class VersionListTests
             unavailable.Response.SetResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
             Wait(failedRefresh);
             Check(Nodes(page).OfType<TextBlock>().Any(label=>label.Text=="catalog-refreshed"),"offline refresh preserves the working in-memory version catalog");
+
+            window.PopulateVersionBox();
+            var versionBox=(ComboBox)window.FindName("VerBox");
+            var rollbackVersion=window.Config.Version;
+            var targetVersion=versionBox.Items.OfType<string>().First(id=>id!=rollbackVersion);
+            ConfigManager.Save(window.Config);
+            var configPath=Path.Combine(App.AppData,"config.json");
+            var savedBytes=File.ReadAllBytes(configPath);
+            using(var locked=new FileStream(configPath,FileMode.Open,FileAccess.Read,FileShare.Read)) {
+                bool rejected=false; try { window.SetVersion(targetVersion); } catch(Exception ex) when(ex is IOException or UnauthorizedAccessException) { rejected=true; }
+                Check(rejected && window.Config.Version==rollbackVersion && File.ReadAllBytes(configPath).SequenceEqual(savedBytes),"failed profile save rolls back the selected game version and preserves persisted settings");
+                versionBox.SelectedItem=targetVersion;
+                Check(Equals(versionBox.SelectedItem,rollbackVersion) && window.Config.Version==rollbackVersion && ((TextBlock)window.FindName("StatusLbl")).Text.StartsWith(Localization.T("error")) && File.ReadAllBytes(configPath).SequenceEqual(savedBytes),"profile dropdown restores its previous selection and shows save failure without escaping the selection event");
+                Filter("Vanilla");
+                Selection("batch-selection-second").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Check(window.Config.Version==rollbackVersion && Selection("batch-selection-second").IsEnabled && ((TextBlock)window.FindName("StatusLbl")).Text.StartsWith(Localization.T("error")),"installed version selection handles a failed save without reporting success or changing the profile");
+                var launchButton=(Button)window.FindName("BtnLaunch"); var launchEnabled=launchButton.IsEnabled;
+                typeof(MainWindow).GetMethod("HandleLaunch",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,null);
+                Check(window.Config.Version==rollbackVersion && launchButton.IsEnabled==launchEnabled && !(bool)typeof(MainWindow).GetField("launchPreparing",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)! && ((TextBlock)window.FindName("StatusLbl")).Text.StartsWith(Localization.T("error")),"launch stops before preparation when the selected game profile cannot be saved");
+            }
+            var syncGate=typeof(MainWindow).GetField("_modSyncGate",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
+            bool savedUnderGate=false;
+            void ObserveProfileSave(LauncherConfig _) => savedUnderGate=System.Threading.Monitor.IsEntered(syncGate);
+            ConfigManager.Saved+=ObserveProfileSave;
+            try { versionBox.SelectedItem=targetVersion; }
+            finally { ConfigManager.Saved-=ObserveProfileSave; }
+            Check(savedUnderGate && window.Config.Version==targetVersion && ConfigManager.Load().Version==targetVersion && Equals(versionBox.SelectedItem,targetVersion),"profile dropdown retries successfully after unlock and saves under the mod synchronization gate");
         }
         finally { catalog.SetValue(null,previous); window.Config.Version=previousVersion; Localization.SetLanguage(previousLanguage); }
         return checks;

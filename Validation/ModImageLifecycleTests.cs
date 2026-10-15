@@ -32,7 +32,28 @@ static class ModImageLifecycleTests
         icon.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
         if (requests.Count != 2) throw new Exception("Reattaching a rendered icon must reuse its image instead of starting another request.");
         Console.WriteLine("PASS mod icon unload cancels work, late results are ignored, reload resumes and rendered images are reused");
-        return 4;
+        var gallery = (Border)typeof(ModProjectView).GetMethod("GalleryImage", BindingFlags.NonPublic | BindingFlags.Static)!
+            .Invoke(null, new object?[] { new Uri("https://cdn.modrinth.com/original.png"), new Uri("https://cdn.modrinth.com/preview.png"), CancellationToken.None, load })!;
+        gallery.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+        gallery.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+        if (requests.Count != 3 || !requests[2].Token.IsCancellationRequested) throw new Exception("Leaving the gallery must cancel its outstanding image request.");
+        gallery.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+        requests[2].Result.SetResult(bitmap); Flush();
+        if (gallery.Child is Image || requests.Count != 4) throw new Exception("An obsolete gallery request must not overwrite a newly opened gallery.");
+        requests[3].Result.SetResult(null); Flush();
+        if (requests.Count != 5) throw new Exception("A failed original must try the safe preview source.");
+        requests[4].Result.SetResult(null); Flush();
+        var retry = ((StackPanel)gallery.Child).Children.OfType<Button>().Single();
+        retry.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        retry.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        if (requests.Count != 6) throw new Exception("Gallery retry must start one request and reject duplicate retries while pending.");
+        requests[5].Result.SetResult(bitmap); Flush();
+        if (gallery.Child is not Image { Source: not null }) throw new Exception("Retry must replace the failure panel with the recovered gallery image.");
+        gallery.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+        gallery.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+        if (requests.Count != 6) throw new Exception("A decoded gallery image must be reused across tab switches.");
+        Console.WriteLine("PASS gallery cancellation ignores late responses, preview fallback and explicit retry recover images without duplicate requests");
+        return 10;
     }
     static void Flush()
     {

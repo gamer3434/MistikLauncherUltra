@@ -84,7 +84,8 @@ public static class ModBackup
                     if (!name.EndsWith(".jar", StringComparison.OrdinalIgnoreCase) && !name.EndsWith(".jar.disabled", StringComparison.OrdinalIgnoreCase)) continue;
                     if (name != Path.GetFileName(name) || name.Contains('/') || name.Contains('\\') || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || IsReservedWindowsName(name) || entry.Length <= 0)
                         throw new IOException("The backup contains an invalid mod path.");
-                    if (!names.Add(name)) throw new IOException("The backup contains duplicate mod names.");
+                    var enabledName = name.EndsWith(".jar.disabled", StringComparison.OrdinalIgnoreCase) ? name[..^9] : name;
+                    if (!names.Add(enabledName)) throw new IOException("The backup contains duplicate or conflicting enabled/disabled mod names.");
                     if (staged.Count >= MaxMods || entry.Length > MaxModBytes || (totalBytes += entry.Length) > MaxTotalBytes)
                         throw new IOException("The mod backup exceeds its safe size limit.");
 

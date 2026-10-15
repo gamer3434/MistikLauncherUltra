@@ -20,6 +20,7 @@ public sealed class ModProjectView : Grid
     readonly StackPanel heading = new();
     readonly TabControl tabs = new() { Background = Brushes.Transparent, Foreground = Brushes.White };
     readonly TextBlock status = PageHelpers.Lbl("", 13, "#ADBED6", wrap: TextWrapping.Wrap);
+    readonly Button retry = PageHelpers.MkBtn("", "#28445E");
     CancellationTokenSource? cancellation;
     WebView2? browser;
     JArray? projectVersions;
@@ -81,7 +82,9 @@ public sealed class ModProjectView : Grid
         var backButton = PageHelpers.MkBtn(T("← Modlara dön", "← Back to mods"), "#28445E");
         backButton.HorizontalAlignment = HorizontalAlignment.Left;
         backButton.Click += (_, _) => back(); heading.Children.Add(backButton);
-        heading.Children.Add(status); Children.Add(heading);
+        heading.Children.Add(status);
+        retry.Name = "ProjectRetryButton"; retry.HorizontalAlignment = HorizontalAlignment.Left; retry.Visibility = Visibility.Collapsed;
+        retry.Click += async (_, _) => await Load(); heading.Children.Add(retry); Children.Add(heading);
         SetRow(tabs, 1); Children.Add(tabs);
         Loaded += async (_, _) => await Load();
         SizeChanged += (_, _) => UpdateCompactLayout();
@@ -135,6 +138,50 @@ public sealed class ModProjectView : Grid
 
     public void RefreshLanguage() => _ = Load();
 
+    internal static Border GalleryImage(Uri url, Uri? preview, CancellationToken pageToken,
+        Func<Uri, int, CancellationToken, Task<BitmapSource?>> load)
+    {
+        string Text(string tr, string en) => Localization.Language == "en" ? en : tr;
+        var surface = new Border { MinHeight = 160, Background = PageHelpers.HexBrush("#0C1118"), CornerRadius = new CornerRadius(8), Margin = new Thickness(0, 10, 0, 10) };
+        CancellationTokenSource? request = null;
+        async Task LoadImage()
+        {
+            if (request != null || pageToken.IsCancellationRequested || surface.Child is Image) return;
+            var pending = CancellationTokenSource.CreateLinkedTokenSource(pageToken); request = pending;
+            surface.Child = PageHelpers.Lbl(Text("Resim yükleniyor…", "Loading image…"), 14, "#ADBED6", pad: new Thickness(16));
+            BitmapSource? picture = null;
+            try
+            {
+                picture = await load(url, 1200, pending.Token);
+                if (picture == null && !pending.IsCancellationRequested && preview != null && preview != url)
+                    picture = await load(preview, 1200, pending.Token);
+            }
+            catch (OperationCanceledException) when (pending.IsCancellationRequested) { }
+            catch (Exception error) { App.Log("Mod gallery image unavailable: " + error.Message); }
+            finally
+            {
+                if (ReferenceEquals(request, pending) && !pending.IsCancellationRequested)
+                {
+                    if (picture != null) surface.Child = new Image { Source = picture, MaxHeight = 520, MaxWidth = 1200,
+                        HorizontalAlignment = HorizontalAlignment.Center, Stretch = Stretch.Uniform, Margin = new Thickness(0, 10, 0, 12) };
+                    else
+                    {
+                        var failure = new StackPanel { Margin = new Thickness(16) };
+                        failure.Children.Add(PageHelpers.Lbl(Text("Resim yüklenemedi. Bağlantını kontrol edip tekrar dene.", "Image could not load. Check your connection and retry."), 14, "#F0CF84", wrap: TextWrapping.Wrap));
+                        var retryImage = PageHelpers.MkBtn(Text("Tekrar dene", "Retry"), "#28445E");
+                        retryImage.Name = "GalleryRetryButton"; retryImage.HorizontalAlignment = HorizontalAlignment.Left;
+                        retryImage.Click += async (_, _) => await LoadImage(); failure.Children.Add(retryImage); surface.Child = failure;
+                    }
+                }
+                if (ReferenceEquals(request, pending)) request = null;
+                pending.Dispose();
+            }
+        }
+        surface.Loaded += async (_, _) => await LoadImage();
+        surface.Unloaded += (_, _) => { var pending = request; request = null; pending?.Cancel(); };
+        return surface;
+    }
+
     public void RefreshProfile()
     {
         if (projectVersions == null || projectInstall == null || tabs.Items.Count < 2) return;
@@ -176,14 +223,16 @@ public sealed class ModProjectView : Grid
         {
             var state = installedState(button.Tag as string);
             bool installed = state is CatalogInstallState.Installed or CatalogInstallState.Disabled;
+            bool otherInstalled = !installed && button != projectInstall && projectState is CatalogInstallState.Installed or CatalogInstallState.Disabled;
             button.Content = installed ? Localization.T("modCatalogInstalled") : Localization.T("modInstall");
-            if (installed) button.ToolTip = InstalledModCatalog.Label(state);
             var profile = main.Config.Version ?? "";
             bool compatible = button != projectInstall || (projectVersions?.Any(version => ModManagerPage.CheckCompatibility(version,
                 GameProfiles.MinecraftVersion(App.GameDir, profile), GameProfiles.Loader(App.GameDir, profile))) ?? false);
-            button.IsEnabled = !installed && !installing && compatible && state != CatalogInstallState.Checking;
-            if (button == projectInstall && state is CatalogInstallState.Checking or CatalogInstallState.Unknown)
-                button.ToolTip = InstalledModCatalog.Label(state);
+            button.IsEnabled = !installed && !otherInstalled && !installing && compatible && state != CatalogInstallState.Checking;
+            button.ToolTip = otherInstalled ? T("Başka bir sürüm kurulu. Sürüm değiştirmeden önce kurulu modu kaldır.", "Another version is installed. Remove it before changing versions.")
+                : installed || state is CatalogInstallState.Checking or CatalogInstallState.Unknown ? InstalledModCatalog.Label(state)
+                : !compatible ? T("Bu Minecraft sürümü ve yükleyici için uyumlu dosya yok.", "No compatible file for this Minecraft version and loader.")
+                : T("Seçili profile uyumlu sürümü kur.", "Install this compatible version into the selected profile.");
         }
     }
 
@@ -221,8 +270,9 @@ public sealed class ModProjectView : Grid
         cancellation?.Cancel(); cancellation?.Dispose(); cancellation = new(); var token = cancellation.Token;
         browser?.Dispose(); browser = null;
         projectVersions = null; projectInstall = null;
-        tabs.Items.Clear();
-        while (heading.Children.Count > 2) heading.Children.RemoveAt(2);
+        tabs.Items.Clear(); tabs.Visibility = Visibility.Collapsed;
+        while (heading.Children.Count > 3) heading.Children.RemoveAt(3);
+        retry.Content = T("Tekrar dene", "Retry"); retry.Visibility = Visibility.Collapsed;
         ((Button)heading.Children[0]).Content = T("← Modlara dön", "← Back to mods");
         status.Visibility = Visibility.Visible;
         status.Text = T("Mod bilgileri yükleniyor…", "Loading project…");
@@ -236,7 +286,7 @@ public sealed class ModProjectView : Grid
             if (project["project_type"]?.ToString() != "mod" || project["id"]?.ToString() != id)
                 throw new InvalidOperationException(T("Geçersiz mod bilgisi.", "Invalid project metadata."));
             var versions = JArray.Parse(await versionsTask);
-            while (heading.Children.Count > 2) heading.Children.RemoveAt(2);
+            while (heading.Children.Count > 3) heading.Children.RemoveAt(3);
             var header = new Grid();
             header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
             header.ColumnDefinitions.Add(new()); header.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
@@ -261,7 +311,7 @@ public sealed class ModProjectView : Grid
                 CornerRadius = new CornerRadius(14), BorderThickness = new Thickness(1), BorderBrush = PageHelpers.HexBrush("#303A45"),
                 Background = PageHelpers.HexBrush("#171B22"), Margin = new Thickness(0, 12, 0, 14) };
             heading.Children.Add(projectSummary); UpdateCompactLayout();
-            status.Text = ""; status.Visibility = Visibility.Collapsed; tabs.Items.Clear();
+            status.Text = ""; status.Visibility = Visibility.Collapsed; tabs.Items.Clear(); tabs.Visibility = Visibility.Visible;
             var description = new Grid();
             browser = new WebView2 { DefaultBackgroundColor = System.Drawing.Color.FromArgb(255, 23, 27, 34) };
             description.Children.Add(browser);
@@ -276,26 +326,7 @@ public sealed class ModProjectView : Grid
                 if (GalleryImageUrl(item["raw_url"]?.ToString(), previewUrl?.AbsoluteUri) is not Uri url) continue;
                 var entry = new StackPanel();
                 if (!string.IsNullOrWhiteSpace(item["title"]?.ToString())) entry.Children.Add(PageHelpers.Lbl(item["title"]!.ToString(), 16, "#FFFFFF", true));
-                var image = new Image { MaxHeight = 520, MaxWidth = 1200, HorizontalAlignment = HorizontalAlignment.Center,
-                    Stretch = Stretch.Uniform, Margin = new Thickness(0, 10, 0, 12) };
-                var imageState = new Border { MinHeight = 160, Background = PageHelpers.HexBrush("#0C1118"), CornerRadius = new CornerRadius(8), Margin = new Thickness(0, 10, 0, 10),
-                    Child = PageHelpers.Lbl(T("Resim yükleniyor…", "Loading image…"), 14, "#ADBED6", pad: new Thickness(16)) };
-                entry.Children.Add(imageState);
-                async Task LoadGalleryImage()
-                {
-                    var picture = await ModCatalogImages.LoadAsync(url, 1200, token);
-                    if (picture is null && previewUrl is not null && previewUrl != url)
-                        picture = await ModCatalogImages.LoadAsync(previewUrl, 1200, token);
-                    if (token.IsCancellationRequested) return;
-                    if (picture is not null) { image.Source = picture; imageState.Child = image; }
-                    else imageState.Child = PageHelpers.Lbl(T("Resim yüklenemedi. İnternet bağlantını kontrol edip sayfayı tekrar aç.", "Image could not load. Check your connection and reopen this page."), 14, "#F0CF84", pad: new Thickness(16));
-                }
-                bool requested = false;
-                imageState.Loaded += async (_, _) => {
-                    if (requested || token.IsCancellationRequested) return;
-                    requested = true;
-                    await LoadGalleryImage();
-                };
+                entry.Children.Add(GalleryImage(url, previewUrl, token, ModCatalogImages.LoadAsync));
                 if (!string.IsNullOrWhiteSpace(item["description"]?.ToString())) entry.Children.Add(PageHelpers.Lbl(item["description"]!.ToString(), 14, "#ADBED6"));
                 var card = PageHelpers.Card("#202731", 12, "#303A45"); card.Padding = new Thickness(14); card.Child = entry; gallery.Children.Add(card);
             }
@@ -332,7 +363,7 @@ public sealed class ModProjectView : Grid
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-        catch (Exception error) { if (!token.IsCancellationRequested) { status.Visibility = Visibility.Visible; status.Text = T("Yüklenemedi: ", "Could not load: ") + error.Message; } }
+        catch (Exception error) { if (!token.IsCancellationRequested) { status.Visibility = retry.Visibility = Visibility.Visible; status.Text = T("Yüklenemedi: ", "Could not load: ") + error.Message; } }
     }
 
     Button InstallButton(string? version)
@@ -341,8 +372,9 @@ public sealed class ModProjectView : Grid
         button.Tag = version;
         button.VerticalAlignment = VerticalAlignment.Top; button.Margin = new Thickness(12, 0, 0, 0);
         button.IsEnabled = !installing; installButtons.Add(button);
+        ToolTipService.SetShowOnDisabled(button, true);
         button.Click += async (_, _) => {
-            if (installing) return;
+            if (installing || !button.IsEnabled) return;
             installing = true;
             foreach (var pendingButton in installButtons) pendingButton.IsEnabled = false;
             try

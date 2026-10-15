@@ -182,6 +182,17 @@ static class ModCatalogUiTests
             if (Nodes(versions).OfType<Button>().Count() != 1 || Nodes(versions).OfType<TextBlock>().Any(text => text.Text.Contains("Wrong build")))
                 throw new Exception("Only compatible versions may offer installation.");
             Console.WriteLine("PASS project version list excludes incompatible builds");
+            var projectVersions = (JArray)typeof(ModProjectView).GetField("projectVersions", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(detail)!;
+            var alternateBuild = (JObject)projectVersions[0]!.DeepClone(); alternateBuild["id"] = "other-compatible"; alternateBuild["name"] = "Another compatible version"; projectVersions.Add(alternateBuild);
+            detail.RefreshProfile(); Flush(window);
+            var otherInstall = Nodes((DependencyObject)((TabItem)tabs.Items[1]).Content).OfType<Button>().Single(button => Equals(button.Tag, "other-compatible"));
+            if (otherInstall.IsEnabled || !otherInstall.ToolTip!.ToString()!.Contains(Localization.Language == "en" ? "Remove" : "kaldır"))
+                throw new Exception("A different version of the installed project must explain the required removal before offering a conflicting install.");
+            states["fixture"] = versionStates["compatible"] = CatalogInstallState.Available; applyStatus.Invoke(page, null);
+            if (!otherInstall.IsEnabled || otherInstall.ToolTip!.ToString()!.Contains(Localization.Language == "en" ? "Remove" : "kaldır"))
+                throw new Exception("Removing an installed project must restore version eligibility and clear its stale removal tooltip.");
+            projectVersions.Remove(alternateBuild); detail.RefreshProfile(); Flush(window);
+            Console.WriteLine("PASS alternate installed version is blocked with removal guidance and becomes available after removal");
             var selectedProfile = window.Config.Version;
             var preservedDescription = ((TabItem)tabs.Items[0]).Content;
             window.SetVersion("fabric-0.0.1"); Flush(window);
@@ -207,6 +218,22 @@ static class ModCatalogUiTests
             var gallery = (DependencyObject)((TabItem)tabs.Items[2]).Content;
             if (!Nodes(gallery).OfType<TextBlock>().Any(text => text.Text.Contains("gallery", StringComparison.OrdinalIgnoreCase) || text.Text.Contains("galeri")))
                 throw new Exception("Empty gallery should explain that no pictures were supplied.");
+            var failedImage = (Border)typeof(ModProjectView).GetMethod("GalleryImage", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!.Invoke(null,
+                new object?[] { new Uri("https://cdn.modrinth.com/fixture.png"), null, CancellationToken.None,
+                    (Func<Uri, int, CancellationToken, Task<System.Windows.Media.Imaging.BitmapSource?>>)((_, _, _) => Task.FromResult<System.Windows.Media.Imaging.BitmapSource?>(null)) })!;
+            ((ScrollViewer)gallery).Content = failedImage; failedImage.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent)); Flush(window);
+            if (!Nodes(gallery).OfType<Button>().Any(button => button.Name == "GalleryRetryButton" && button.IsEnabled)) throw new Exception("A failed gallery image must have an accessible enabled retry action.");
+            capture("mod-catalog-gallery-retry");
+            Console.WriteLine("PASS gallery failure retains an in-place retry action inside the detail viewport");
+            var failedProject = new TaskCompletionSource<HttpResponseMessage>(); fixture.PendingProject = failedProject;
+            var failedLoad = (Task)typeof(ModProjectView).GetMethod("Load", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(detail, null)!;
+            failedProject.SetException(new HttpRequestException("Controlled connection failure")); Flush(window);
+            var retryProject = Nodes(detail).OfType<Button>().Single(button => button.Name == "ProjectRetryButton");
+            if (!failedLoad.IsCompleted || retryProject.Visibility != Visibility.Visible) throw new Exception("Failed metadata must expose an immediate retry action.");
+            capture("mod-catalog-project-retry"); fixture.PendingProject = null;
+            retryProject.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Flush(window);
+            if (tabs.Items.Count != 3 || retryProject.Visibility != Visibility.Collapsed) throw new Exception("Metadata retry must recover all three detail tabs without leaving its error control visible.");
+            Console.WriteLine("PASS failed metadata offers an accessible retry and recovers the detail page in place");
             var pending = new TaskCompletionSource<HttpResponseMessage>();
             fixture.PendingProject = pending;
             var obsoleteLoad = (Task)typeof(ModProjectView).GetMethod("Load", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(detail, null)!;
@@ -322,7 +349,7 @@ static class ModCatalogUiTests
             }
             finally { window.SetVersion(selectedProfile); SynchronizationContext.SetSynchronizationContext(context); }
             Console.WriteLine("PASS pending detail install blocks duplicate actions and revalidates changed-profile availability after completion");
-            return 17;
+            return 20;
         }
         finally { frame.Content = previous; selectNav.Invoke(window, new object[] { previousNav }); }
     }

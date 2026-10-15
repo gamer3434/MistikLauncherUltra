@@ -27,9 +27,21 @@ public static class ModFiles
     }
     internal static void EnsureRoot(string root)
     {
-        Directory.CreateDirectory(root);
-        for(string? current=Path.GetFullPath(root);current!=null;current=Path.GetDirectoryName(current))
-            if((File.GetAttributes(current)&FileAttributes.ReparsePoint)!=0) throw new IOException(Localization.T("modToggleInvalid"));
+        var full = Path.GetFullPath(root);
+        void ValidateAncestors()
+        {
+            for (string? current = full; current != null; current = Path.GetDirectoryName(current))
+            {
+                FileAttributes attributes;
+                try { attributes = File.GetAttributes(current); }
+                catch (FileNotFoundException) { continue; }
+                catch (DirectoryNotFoundException) { continue; }
+                if ((attributes & FileAttributes.ReparsePoint) != 0) throw new IOException(Localization.T("modToggleInvalid"));
+            }
+        }
+        ValidateAncestors();
+        Directory.CreateDirectory(full);
+        ValidateAncestors();
     }
     public static Uri DownloadUrl(string raw)
     {

@@ -183,6 +183,7 @@ class Program
             checks+=LaunchReadinessTests.Run(Path.Combine(testRoot,"readiness-tests"));
             var window=new MainWindow { Width=1200, Height=820 };
             checks+=LaunchLifecycleTests.Run(window);
+            checks+=ModMigrationTargetTests.RunSource(window,Path.Combine(testRoot,"migration-source"));
             checks+=VersionRemovalTests.Run(Path.Combine(testRoot,"version-removal"),window);
             checks+=LaunchReadinessTests.RunHome(window);
             checks+=ModPagePerformanceTests.Run(window,Path.Combine(testRoot,"mod-page-performance"));
@@ -227,9 +228,21 @@ class Program
                         stack.Children.OfType<TextBlock>().Any(label => label.Text.EndsWith("kept.jar", StringComparison.Ordinal))));
                 return (Button)((Grid)row.Child!).Children.OfType<StackPanel>().Last().Children[0];
             }
-            ModToggleButton().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-            Check(File.Exists(disabledMod[..^9]) && !File.Exists(disabledMod),"installed mod Enable button applies immediately");
-            ModToggleButton().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            void ToggleInstalledMod()
+            {
+                var button=ModToggleButton(); var context=SynchronizationContext.Current;
+                SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(window.Dispatcher));
+                try {
+                    button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    var deadline=DateTime.UtcNow.AddSeconds(5);
+                    while(!button.IsEnabled && DateTime.UtcNow<deadline) { window.Dispatcher.Invoke(()=>{},DispatcherPriority.ApplicationIdle); Thread.Sleep(1); }
+                    if(!button.IsEnabled) throw new Exception("Installed mod toggle did not complete.");
+                }
+                finally { SynchronizationContext.SetSynchronizationContext(context); }
+            }
+            ToggleInstalledMod();
+            Check(File.Exists(disabledMod[..^9]) && !File.Exists(disabledMod),"installed mod Enable button applies after its background operation completes");
+            ToggleInstalledMod();
             Check(File.Exists(disabledMod) && File.ReadAllText(disabledMod)=="kept bytes","installed mod Disable button preserves file and refreshes row");
             void ModFixture(string path,params (string name,string content)[] entries) {
                 using var archive=System.IO.Compression.ZipFile.Open(path,System.IO.Compression.ZipArchiveMode.Create);
@@ -411,7 +424,7 @@ class Program
             }
             checks += ModCatalogUiTests.Run(window, name => Capture(window, Path.Combine(output,name+".png"), name == "mod-catalog-long-heading" ? 960 : 1200, name == "mod-catalog-long-heading" ? 640 : 820),
                 (name,width,height) => Capture(window, Path.Combine(output,name+".png"), width, height));
-            checks += WindowScalingUiTests.Run(window);
+            checks += WindowScalingUiTests.Run(window, (name,width,height) => Capture(window, Path.Combine(output,name+".png"), width, height));
             checks += ModImageLifecycleTests.Run();
             checks += ModToolsLayoutTests.Run(window);
             var horizontal=new System.Windows.Controls.Primitives.ScrollBar { Orientation=Orientation.Horizontal,Style=(Style)application.FindResource(typeof(System.Windows.Controls.Primitives.ScrollBar)) };

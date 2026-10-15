@@ -46,6 +46,8 @@ test('rejects prereleases, unofficial links, and incomplete assets', () => {
   assert.equal(parseRelease(release({ html_url: 'https://example.com/fake' })), null);
   assert.equal(parseRelease(release({ assets: release().assets.slice(1) })), null);
   assert.equal(parseRelease(release({ tag_name: 'v6.1.4' })), null);
+  assert.equal(parseRelease(release({ assets: [...release().assets,release().assets[0]] })), null);
+  assert.equal(parseRelease(release({ assets: [null,...release().assets] })).version, '6.2.0');
 });
 
 test('rejects leading zeroes and numeric components outside JavaScript safe integers', () => {
@@ -75,6 +77,21 @@ test('a newer release without translated notes never presents old fallback annou
   assert.equal(announcements[0].textContent,'Bu sürümün ayrıntıları için GitHub sürüm notlarını aç.');
   assert.equal(elements.get('[data-release-notes]').children[0].textContent,announcements[0].textContent);
   assert.equal(elements.get('[data-release-title]').textContent,'6.2.33 yenilikleri');
+});
+
+test('verified fallback-version metadata still refreshes notes and hides unavailable hashes', async () => {
+  const elements=new Map();
+  const node=()=>({textContent:'',dataset:{},replaceChildren(...children){this.children=children;}});
+  const document={documentElement:{lang:'tr'},querySelector(selector){if(!elements.has(selector))elements.set(selector,node());return elements.get(selector);},
+    querySelectorAll(){return [];},createElement:node,addEventListener(){}};
+  const current=release({tag_name:'v6.2.30',body:'## Türkçe\n- Doğrulanmış güncel not'});
+  current.assets.forEach(asset=>delete asset.digest);
+  runInNewContext(readFileSync(require.resolve('../site/assets/release.js'),'utf8'),{
+    document,AbortController,setTimeout,clearTimeout,fetch:async()=>({ok:true,json:async()=>current})});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(elements.get('[data-release-hashes]').hidden,true);
+  assert.equal(elements.get('[data-release-summary]').textContent,'6.2.30 yenilikleri');
+  assert.equal(elements.get('[data-release-notes]').children[0].textContent,'Doğrulanmış güncel not');
 });
 
 test('keeps a working v6.2.30 fallback and matching published digests', () => {

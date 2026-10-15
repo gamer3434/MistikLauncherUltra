@@ -108,21 +108,29 @@ public sealed class LauncherUpdater
     }
     public static LauncherRelease? ParseRelease(string json,string installed,bool downgrade=false)
     {
-        using var document=JsonDocument.Parse(json); var root=document.RootElement;
-        if(root.GetProperty("draft").GetBoolean()||root.GetProperty("prerelease").GetBoolean()) return null;
-        string version=root.GetProperty("tag_name").GetString()!;
-        if(downgrade?!IsNewer(installed,version):!IsNewer(version,installed)) return null;
-        var assets=root.GetProperty("assets").EnumerateArray().Where(item=> {
-            string name=item.GetProperty("name").GetString()??"";
-            return name.StartsWith("MistikLauncher-",StringComparison.Ordinal) && name.EndsWith("-win-x64.zip",StringComparison.Ordinal);
-        }).ToArray();
-        if(assets.Length!=1) throw new InvalidDataException("Release must contain one portable Windows ZIP.");
-        var asset=assets[0]; string url=asset.GetProperty("browser_download_url").GetString()!;
-        if(!Uri.TryCreate(url,UriKind.Absolute,out var uri)||uri.Scheme!="https"||uri.Host!="github.com"||!uri.AbsolutePath.StartsWith("/gamer3434/MistikLauncherUltra/releases/download/",StringComparison.Ordinal)) throw new InvalidDataException("Untrusted update URL.");
-        string digest=asset.TryGetProperty("digest",out var value)?value.GetString()??"":"";
-        if(!Regex.IsMatch(digest,@"^sha256:[0-9a-fA-F]{64}$")) throw new InvalidDataException("Official package digest missing.");
-        long size=asset.GetProperty("size").GetInt64(); if(size<=0||size>512L*1024*1024) throw new InvalidDataException("Invalid update size.");
-        return new(version,url,digest[7..],size);
+        try
+        {
+            using var document=JsonDocument.Parse(json); var root=document.RootElement;
+            if(root.GetProperty("draft").GetBoolean()||root.GetProperty("prerelease").GetBoolean()) return null;
+            string version=root.GetProperty("tag_name").GetString()??"";
+            if(!Regex.IsMatch(version,@"^v?\d+\.\d+\.\d+\z")) throw new InvalidDataException("Stable release tag is invalid.");
+            if(downgrade?!IsNewer(installed,version):!IsNewer(version,installed)) return null;
+            var assets=root.GetProperty("assets").EnumerateArray().Where(item=> {
+                string name=item.GetProperty("name").GetString()??"";
+                return name.StartsWith("MistikLauncher-",StringComparison.Ordinal) && name.EndsWith("-win-x64.zip",StringComparison.Ordinal);
+            }).ToArray();
+            string filename=$"MistikLauncher-{version.TrimStart('v')}-win-x64.zip";
+            if(assets.Length!=1 || assets[0].GetProperty("name").GetString()!=filename) throw new InvalidDataException("Release must contain its matching portable Windows ZIP.");
+            var asset=assets[0]; string url=asset.GetProperty("browser_download_url").GetString()!;
+            if(!Uri.TryCreate(url,UriKind.Absolute,out var uri)||uri.Scheme!="https"||uri.Host!="github.com"||!uri.IsDefaultPort||uri.UserInfo.Length!=0||uri.Query.Length!=0||uri.Fragment.Length!=0||
+                uri.AbsolutePath!=$"/gamer3434/MistikLauncherUltra/releases/download/{version}/{filename}") throw new InvalidDataException("Untrusted update URL.");
+            string digest=asset.TryGetProperty("digest",out var value)?value.GetString()??"":"";
+            if(!Regex.IsMatch(digest,@"^sha256:[0-9a-fA-F]{64}\z")) throw new InvalidDataException("Official package digest missing.");
+            long size=asset.GetProperty("size").GetInt64(); if(size<=0||size>512L*1024*1024) throw new InvalidDataException("Invalid update size.");
+            return new(version,url,digest[7..],size);
+        }
+        catch(Exception ex) when(ex is JsonException or InvalidOperationException or KeyNotFoundException or FormatException or OverflowException)
+        { throw new InvalidDataException("Release metadata is invalid.",ex); }
     }
     public async Task<string[]> OlderVersionsAsync()
     {

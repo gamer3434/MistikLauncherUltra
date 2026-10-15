@@ -48,7 +48,21 @@ static class ModPagePerformanceTests
         More()!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Check(Cards()==80 && More()!=null,"installed mod load-more expands by one forty-card batch");
         var toggle=Nodes(installed.Children.OfType<Border>().First()).OfType<Button>().Single(button=>Equals(button.Content,Localization.T("modDisable")));
-        toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var gate=typeof(MainWindow).GetField("_modSyncGate",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
+        using var gateHeld=new ManualResetEventSlim(); using var releaseGate=new ManualResetEventSlim();
+        var competingWork=Task.Run(()=> { lock(gate) { gateHeld.Set(); releaseGate.Wait(TimeSpan.FromSeconds(10)); } });
+        if(!gateHeld.Wait(TimeSpan.FromSeconds(5))) throw new Exception("Could not hold isolated mod gate.");
+        try {
+            toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Check(!competingWork.IsCompleted && !toggle.IsEnabled,"mod toggle yields without blocking the dispatcher while another mod operation owns the gate");
+            toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        }
+        finally { releaseGate.Set(); competingWork.GetAwaiter().GetResult(); }
+        var toggleDeadline=DateTime.UtcNow.AddSeconds(5);
+        while(!toggle.IsEnabled && DateTime.UtcNow<toggleDeadline) {
+            Dispatcher.CurrentDispatcher.Invoke(()=>{},DispatcherPriority.ApplicationIdle); Thread.Sleep(1);
+        }
+        Check(toggle.IsEnabled,"queued mod toggle completes and restores its controls after the competing operation releases the gate");
         Check(Cards()==80 && File.ReadAllBytes(Path.Combine(root,"mod-0000.jar.disabled")).SequenceEqual(jar) && !File.Exists(Path.Combine(root,"mod-0000.jar")),
             "mod toggle preserves expanded batch width and exact fixture bytes");
         More()!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));

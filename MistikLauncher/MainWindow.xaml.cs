@@ -82,9 +82,17 @@ namespace MistikLauncher
                 var selected = VerBox.SelectedItem?.ToString();
                 if (!string.IsNullOrEmpty(selected))
                 {
-                    SetVersion(selected);
-                    StatusLbl.Text = $"{Localization.T("version")}: {selected}";
-                    QueueBackgroundModSync();
+                    try {
+                        SetVersion(selected);
+                        StatusLbl.Text = $"{Localization.T("version")}: {selected}";
+                        QueueBackgroundModSync();
+                    } catch (Exception ex) {
+                        _isPopulatingVersionBox = true;
+                        try { VerBox.SelectedItem = Config.Version; }
+                        finally { _isPopulatingVersionBox = false; }
+                        StatusLbl.Text = Localization.T("error") + ex.Message;
+                        App.Log("Game profile preference save: " + ex.Message);
+                    }
                 }
             };
 
@@ -555,8 +563,10 @@ namespace MistikLauncher
         {
             lock (_modSyncGate)
             {
+                var previous = Config.Version;
                 Config.Version = version;
-                ConfigManager.Save(Config);
+                try { ConfigManager.Save(Config); }
+                catch { Config.Version = previous; throw; }
             }
             if(_pageCache.TryGetValue("Vers",out var page) && page is Pages.VersionManagerPage versions && versions.IsLoaded)
                 versions.RefreshSelection();
@@ -701,7 +711,12 @@ namespace MistikLauncher
                                 "Surum Bulunamadi", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            SetVersion(ver);
+            try { SetVersion(ver); }
+            catch (Exception ex) {
+                StatusLbl.Text = Localization.T("error") + ex.Message;
+                App.Log("Launch profile preference save: " + ex.Message);
+                return;
+            }
             
             _ = LaunchMinecraftAsync(ver);
         }

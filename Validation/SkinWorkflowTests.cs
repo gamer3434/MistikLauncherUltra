@@ -1,6 +1,8 @@
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
+using System.Security.Cryptography;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -8,6 +10,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using MistikLauncher;
 using MistikLauncher.Pages;
+using Newtonsoft.Json.Linq;
 using Localization = MistikLauncher.Localization;
 
 static class SkinWorkflowTests
@@ -151,6 +154,52 @@ static class SkinWorkflowTests
             window.Config.SkinType="none";
             using(var lockedOptions=new FileStream(options,FileMode.Open,FileAccess.Read,FileShare.Read))
                 Check(!Wait(window.PrepareSkinPackAsync("1.20.1",offline)) && File.ReadAllText(options)==enabledOptions && Directory.Exists(pack),"failed options update during explicit reset reports failure and leaves the active pack intact");
+
+            const string skinProfile="fabric-loader-0.1-95.14";
+            const string skinFile="validation-customskinloader-primary.jar", oldSkinFile="validation-customskinloader-older.jar";
+            var modBytes="verified skin loader fixture"u8.ToArray();
+            var modHash=Convert.ToHexString(SHA512.HashData(modBytes));
+            JObject ModFile(string filename,bool primary)=>new() { ["filename"]=filename,["primary"]=primary,["url"]="https://cdn.modrinth.com/data/fixture/"+filename,["hashes"]=new JObject { ["sha512"]=modHash } };
+            var modVersions=new JArray(new JObject { ["game_versions"]=new JArray("95.14"),["loaders"]=new JArray("fabric"),["version_type"]="release",
+                ["files"]=new JArray(ModFile("validation-customskinloader-sources.jar",false),ModFile(skinFile,true)) },
+                new JObject { ["game_versions"]=new JArray("95.13"),["loaders"]=new JArray("fabric"),["files"]=new JArray(ModFile(oldSkinFile,true)) });
+            var flags=new[]{"launchPreparing","gameRunning"}.Select(name=>typeof(MainWindow).GetField(name,BindingFlags.Instance|BindingFlags.NonPublic)!).ToArray();
+            var originalFlags=flags.Select(field=>(bool)field.GetValue(window)!).ToArray();
+            var destination=Path.Combine(App.ModsDir,skinFile); var olderDestination=Path.Combine(App.ModsDir,oldSkinFile);
+            Task<string?> InstallSkinLoader(HttpClient client)=>(Task<string?>)typeof(SkinPage).GetMethod("InstallCustomSkinLoaderAsync",BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,new object[]{window,skinProfile,client})!;
+            try {
+                window.Config=new LauncherConfig { Version=skinProfile,LastSyncedVersion=skinProfile };
+                foreach(var flag in flags) flag.SetValue(window,false);
+                using var skinLoaderHandler=new SkinLoaderHandler(modVersions,modBytes);
+                using var skinLoaderClient=new HttpClient(skinLoaderHandler);
+                Task<string?> install;
+                var gate=typeof(MainWindow).GetField("_modSyncGate",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!;
+                lock(gate) {
+                    install=InstallSkinLoader(skinLoaderClient);
+                    Check(!install.IsCompleted,"skin loader file commit waits off the UI thread for the shared mod mutation lock");
+                }
+                Check(Wait(install)==destination && File.ReadAllBytes(destination).SequenceEqual(modBytes) && skinLoaderHandler.Downloads.Single().EndsWith(skinFile),"skin loader installs the verified primary file instead of the first sources attachment");
+                File.Delete(destination);
+                foreach(var flag in flags) {
+                    using var busyHandler=new SkinLoaderHandler(modVersions,modBytes,()=>flag.SetValue(window,true));
+                    using var busyClient=new HttpClient(busyHandler);
+                    bool refused=false; try { Wait(InstallSkinLoader(busyClient)); } catch(IOException) { refused=true; }
+                    Check(refused && !File.Exists(destination),"skin loader rejects a game state change before commit: "+flag.Name);
+                    flag.SetValue(window,false);
+                }
+                using var switchedHandler=new SkinLoaderHandler(modVersions,modBytes,()=>window.Config.Version="fabric-loader-0.1-95.15");
+                using var switchedClient=new HttpClient(switchedHandler);
+                bool switched=false; try { Wait(InstallSkinLoader(switchedClient)); } catch(IOException) { switched=true; }
+                Check(switched && !File.Exists(destination),"skin loader cannot write after the selected profile changes during its download");
+                window.Config.Version=skinProfile;
+                Directory.CreateDirectory(App.ModsDir); File.WriteAllText(olderDestination,"existing skin loader version");
+                bool conflicted=false; try { Wait(InstallSkinLoader(skinLoaderClient)); } catch(IOException) { conflicted=true; }
+                Check(conflicted && !File.Exists(destination) && File.ReadAllText(olderDestination)=="existing skin loader version","skin loader preserves an already installed different project version instead of creating duplicate mods");
+            } finally {
+                for(int i=0;i<flags.Length;i++) flags[i].SetValue(window,originalFlags[i]);
+                if(File.Exists(destination)) File.Delete(destination);
+                if(File.Exists(olderDestination)) File.Delete(olderDestination);
+            }
         }
         finally { window.Config=original; }
         return checks;
@@ -195,5 +244,15 @@ static class SkinWorkflowTests
         public void Release()=>response.SetResult(new HttpResponseMessage(HttpStatusCode.OK) { Content=new StringContent("{\"SKIN\":{\"url\":\"https://textures.minecraft.net/skin/fixture\"}}") });
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken cancellationToken)
             => request.RequestUri!.Host=="skinsystem.ely.by" ? response.Task : Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content=new ByteArrayContent(skin) });
+    }
+    sealed class SkinLoaderHandler(JArray versions,byte[] bytes,Action? beforeDownload=null) : HttpMessageHandler
+    {
+        public readonly List<string> Downloads=new();
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken cancellationToken)
+        {
+            if(request.RequestUri!.Host=="api.modrinth.com") return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content=new StringContent(versions.ToString()) });
+            Downloads.Add(request.RequestUri.AbsolutePath); beforeDownload?.Invoke();
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content=new ByteArrayContent(bytes) });
+        }
     }
 }

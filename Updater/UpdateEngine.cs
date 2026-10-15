@@ -52,8 +52,14 @@ public static class UpdateEngine
             if(!Convert.ToHexString(SHA256.HashData(file)).Equals(item.Hash,StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Payload digest mismatch.");
         }
         if(!new[] {"MistikLauncher.exe","MistikLauncher.dll","MistikUpdater.exe"}.All(names.Contains)) throw new InvalidDataException("Incomplete launcher package.");
-        var actual=Directory.EnumerateFiles(payload,"*",SearchOption.AllDirectories).Select(path=>System.IO.Path.GetRelativePath(payload,path).Replace('\\','/')).Where(path=>path!="update-manifest.json");
-        if(!actual.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(names)) throw new InvalidDataException("Unlisted payload file.");
+        var actual=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach(var path in Directory.EnumerateFileSystemEntries(payload,"*",SearchOption.AllDirectories))
+        {
+            var relative=System.IO.Path.GetRelativePath(payload,path).Replace('\\','/');
+            SafePath(payload,relative);
+            if(!Directory.Exists(path) && relative!="update-manifest.json") actual.Add(relative);
+        }
+        if(!actual.SetEquals(names)) throw new InvalidDataException("Unlisted payload file.");
         return manifest;
     }
     public static void VerifyInstalled(string target,UpdateManifest manifest)

@@ -33,6 +33,14 @@ public static class ModBackupTests
         File.Delete(emptyMod);
         string backup = Path.Combine(root, "mods.zip");
         ModBackup.Create(mods, backup);
+        var savedBackup = File.ReadAllBytes(backup);
+        using (var lockedMod = new FileStream(disabled, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            rejected = false;
+            try { ModBackup.Create(mods, backup); } catch (IOException) { rejected = true; }
+            Check(rejected && File.ReadAllBytes(backup).SequenceEqual(savedBackup) && !Directory.GetFiles(root, ".mistik-mod-backup-*.tmp").Any(),
+                "failed backup overwrite preserves the complete previous archive and cleans partial staging");
+        }
         File.Delete(enabled);
         File.Delete(disabled);
         File.WriteAllText(Path.Combine(mods, "enabled.jar"), "keep installed copy");
@@ -69,6 +77,21 @@ public static class ModBackupTests
         Check(rejected && !File.Exists(Path.Combine(mods, "first.jar")) && Directory.Exists(Path.Combine(mods, "blocked.jar")),
             "failed restore rolls back files already copied and retains the conflicting path");
         Check(!Directory.GetDirectories(mods, ".restore-*").Any(), "restore removes its staging directory after success and failure");
+        foreach (bool disabledFirst in new[] { false, true })
+        {
+            var twinArchive = Path.Combine(root, "conflicting-states-" + disabledFirst + ".zip");
+            using (var archive = ZipFile.Open(twinArchive, ZipArchiveMode.Create))
+            {
+                var entries = new[] { "twinned.jar", "TWINNED.jar.disabled" };
+                foreach (var name in disabledFirst ? entries.Reverse() : entries)
+                    using (var writer = new StreamWriter(archive.CreateEntry(name).Open())) writer.Write("conflicting archived state");
+            }
+            rejected = false;
+            try { ModBackup.Restore(mods, twinArchive); } catch (IOException) { rejected = true; }
+            Check(rejected && !File.Exists(Path.Combine(mods, "twinned.jar")) && !File.Exists(Path.Combine(mods, "twinned.jar.disabled")) &&
+                File.ReadAllText(enabled) == "keep installed copy" && File.ReadAllText(disabled) == "disabled original" && !Directory.GetDirectories(mods, ".restore-*").Any(),
+                "restore rejects contradictory archived enabled/disabled states before commit regardless of entry order: " + disabledFirst);
+        }
         return checks;
     }
 }

@@ -23,6 +23,7 @@ static class LauncherUpdateTests
         Check(!LauncherUpdater.IsNewer("v5.5.2","6.0.0-preview.1") && !LauncherUpdater.IsNewer("v6.0.0","6.0.0"),"no downgrade or same-version loop");
         Check(!LauncherUpdater.IsNewer("v7.0.0junk","6.0.0") && !LauncherUpdater.IsNewer("v7.0.0","6.0.0junk") && !LauncherUpdater.IsNewer("v999999999999.0.0","6.0.0"),"malformed release version rejected");
         Check(LauncherUpdater.IsNewer("v6.0.0-preview.9","6.0.0-preview.8") && !LauncherUpdater.IsNewer("v6.0.0-preview.9","6.0.0-preview.9") && !LauncherUpdater.IsNewer("v6.0.0-preview.9","6.0.0"),"published preview comparison avoids repeat updates and stable downgrades");
+        checks+=UpdatePayloadSafetyTests.Run(root);
         string payload=Path.Combine(root,"launcher-payload"); Directory.CreateDirectory(payload);
         var names=new[] {"MistikLauncher.exe","MistikLauncher.dll","MistikUpdater.exe"};
         foreach(var name in names) File.WriteAllText(Path.Combine(payload,name),"new "+name);
@@ -42,6 +43,19 @@ static class LauncherUpdateTests
             }}
         });
         string target=Path.Combine(root,"launcher-target"); Directory.CreateDirectory(target);
+        foreach (var invalid in new[] {
+            metadata.Replace("MistikLauncher-7.0.0-win-x64.zip", "MistikLauncher-6.0.0-win-x64.zip"),
+            metadata.Replace("/download/v7.0.0/", "/download/v6.0.0/"),
+            metadata.Replace("https://github.com/", "https://github.com:444/"),
+            metadata.Replace("https://github.com/", "https://user@github.com/"),
+            metadata.Replace("tag_name\":\"v7.0.0", "tag_name\":\"v7.0.0-preview.1"),
+            "null", "{}", "{\"draft\":false,\"prerelease\":false,\"tag_name\":null}",
+            metadata.Replace("\"size\":" + zip.Length, "\"size\":\"invalid\"") })
+        {
+            bool invalidRelease=false;
+            try { LauncherUpdater.ParseRelease(invalid,"6.0.0"); } catch (InvalidDataException) { invalidRelease=true; }
+            Check(invalidRelease,"release metadata rejects mismatched identity or malformed fields without leaking parser exceptions");
+        }
         using(var fallbackClient=new HttpClient(new LatestReleaseFallback(metadata,zip)))
         {
             var fallback=new LauncherUpdater(()=>true,fallbackClient,target,"6.0.0-preview.1");
@@ -169,7 +183,7 @@ static class LauncherUpdateTests
         var damagedPayload=service.PreparedPayload;
         Check(!await service.StartInstallerAsync() && service.PreparedPayload==null && !Directory.Exists(Path.GetDirectoryName(damagedPayload!)) && !service.Busy && service.StatusKey=="luError" && !string.IsNullOrWhiteSpace(service.Error),"failed update handoff removes unusable stage and releases busy state");
         Check(await service.CheckAsync(true) && service.PreparedPayload!=null && service.PreparedPayload!=damagedPayload && UpdateEngine.Verify(service.PreparedPayload).Version=="7.0.0" && !service.Busy,"update handoff failure permits downloading and verifying a fresh package on retry");
-        using var releasesClient=new HttpClient(new Stub("["+metadata+","+metadata.Replace("sha256:","invalid:")+"]",zip));
+        using var releasesClient=new HttpClient(new Stub("[null,{},"+metadata+","+metadata.Replace("sha256:","invalid:")+","+metadata.Replace("\"size\":" + zip.Length,"\"size\":\"invalid\"")+"]",zip));
         var releasesService=new LauncherUpdater(()=>true,releasesClient,target,"8.0.0");
         Check((await releasesService.OlderVersionsAsync()).SequenceEqual(new[] {"v7.0.0"}),"older release selector excludes packages missing official digests");
         using var downgradeClient=new HttpClient(new Stub(metadata,zip));

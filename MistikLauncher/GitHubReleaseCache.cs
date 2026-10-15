@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using System.IO;
+using System.Text.Json;
 
 namespace MistikLauncher;
 
@@ -40,6 +41,7 @@ public static class GitHubReleaseCache
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
             if (json.Length == 0 || json.Length > 8 * 1024 * 1024)
                 throw new InvalidDataException("GitHub release metadata is invalid.");
+            Validate(json);
             Write(cachePath, new Entry { Json=json, ETag=response.Headers.ETag?.Tag, SavedAt=DateTimeOffset.UtcNow });
             return json;
         }
@@ -53,7 +55,23 @@ public static class GitHubReleaseCache
     static bool IsTransientLimit(HttpStatusCode status) =>
         status is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests || (int)status >= 500;
 
-    static bool Usable(Entry? entry) => entry is not null && DateTimeOffset.UtcNow - entry.SavedAt <= StaleLimit;
+    static bool Usable(Entry? entry) => entry is not null && entry.SavedAt <= DateTimeOffset.UtcNow && DateTimeOffset.UtcNow - entry.SavedAt <= StaleLimit;
+
+    static void Validate(string json)
+    {
+        try
+        {
+            using var document=JsonDocument.Parse(json);
+            var root=document.RootElement;
+            if(string.IsNullOrWhiteSpace(root.GetProperty("tag_name").GetString()) ||
+                root.GetProperty("draft").ValueKind is not (JsonValueKind.True or JsonValueKind.False) ||
+                root.GetProperty("prerelease").ValueKind is not (JsonValueKind.True or JsonValueKind.False) ||
+                root.GetProperty("assets").ValueKind!=JsonValueKind.Array)
+                throw new InvalidDataException("GitHub release metadata has invalid fields.");
+        }
+        catch(Exception ex) when(ex is JsonException or InvalidOperationException or KeyNotFoundException)
+        { throw new InvalidDataException("GitHub release metadata is invalid.",ex); }
+    }
 
     static Entry? Read(string path)
     {
@@ -67,6 +85,7 @@ public static class GitHubReleaseCache
             if(!long.TryParse(text[..first],out var ticks)) return null;
             var json=text[(second+1)..];
             if(json.Length==0 || json.Length>8*1024*1024) return null;
+            Validate(json);
             return new Entry { SavedAt=new DateTimeOffset(ticks,TimeSpan.Zero), ETag=text[(first+1)..second], Json=json };
         }
         catch { return null; }

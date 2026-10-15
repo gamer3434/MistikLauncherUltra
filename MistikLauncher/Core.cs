@@ -214,6 +214,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.35","2026-10-15","#00D4AA", new[]{
+                "Mod ayrıntılarında ve galeride yeniden deneme, gereksiz indirmeleri durdurma ve kurulu sürüm rehberi eklendi.",
+                "Mod taşıma, skin modu kurulumu ve ayar kaydı profil değişikliklerine karşı güçlendirildi.",
+                "Güncelleme doğrulaması, yedek geri yükleme ve istatistik paylaşımını kapatma hataları düzeltildi.",
+                "Mod details and galleries support retry, cancel obsolete image requests and explain installed-version conflicts.",
+                "Mod migration, skin loader installation and preference saving handle profile changes safely.",
+                "Update verification, backup restoration and usage sharing opt-out errors were fixed."
+            }),
             new("v6.2.34","2026-10-15","#00D4AA", new[]{
                 "Mod kurulumundaki dosya doğrulama ve yazma işlemleri arka planda çalışır; dosya boyutları daha okunur.",
                 "Oyun açılırken veya çalışırken mod kurulumu, içe aktarma ve yedekten geri yükleme dosyaları değiştiremez.",

@@ -47,6 +47,83 @@ test('admin filters intersect categories and versions, then reset without losing
   assert.equal(elements.get('resetErrors').disabled, true);
 });
 
+test('periodic refresh preserves the existing filter options when their values are unchanged', async () => {
+  const {elements, render} = await dashboard();
+  render(reports,now);
+  const category = elements.get('errorCategory'), version = elements.get('errorVersion');
+  const categories = [...category.children], versions = [...version.children];
+  category.value = 'Java sürümü'; version.value = '6.2.29';
+  render(reports,now+30000,now);
+  assert.deepEqual(category.children,categories);
+  assert.deepEqual(version.children,versions);
+  assert.equal(category.value,'Java sürümü'); assert.equal(version.value,'6.2.29');
+});
+
+async function liveDashboard() {
+  const {summarize} = await import(pathToFileURL(resolve(root, 'site/admin/metrics.mjs')));
+  const elements = new Map(), listeners = [], timers = new Set(), authCallbacks = {};
+  class Element {
+    constructor() { this.children=[]; this.value=''; this.dataset={}; this.textContent=''; }
+    append(...children) { this.children.push(...children); }
+    replaceChildren(...children) { this.children=children; }
+  }
+  const document = {createElement:()=>new Element(),getElementById(id){
+    if(!elements.has(id)) elements.set(id,new Element()); return elements.get(id);
+  }};
+  const authSdk = {getAuth:()=>({}),setPersistence:async()=>{},browserSessionPersistence:{},getRedirectResult:async()=>null,
+    onAuthStateChanged(auth,next,error){Object.assign(authCallbacks,{next,error});}};
+  const dbSdk = {getDatabase:()=>({}),ref:(database,path)=>path,onValue(path,next,error){
+    const listener={path,next,error,stopped:false}; listeners.push(listener); return ()=>{listener.stopped=true;};
+  }};
+  let timerId=0;
+  const source=readFileSync(resolve(root,'site/admin/admin.js'),'utf8').replace(/^import .*?;\r?\n/,'')
+    .replace(/const \[\{initializeApp\}, authSdk, dbSdk\] = await Promise\.all\(\[[\s\S]*?\]\);/,
+      'const {initializeApp,authSdk,dbSdk}=sdk;');
+  const context=vm.createContext({document,summarize,Intl,Date,URL,URLSearchParams,AbortSignal,
+    sdk:{initializeApp:()=>({}),authSdk,dbSdk},
+    fetch:async url=>url==='./admin-config.json'?{ok:true,json:async()=>({apiKey:'fixture',authDomain:'fixture',databaseURL:'https://fixture.firebaseio.com',projectId:'fixture'})}:{ok:false},
+    setInterval(callback){const timer={id:++timerId,callback}; timers.add(timer); return timer;},clearInterval(timer){timers.delete(timer);}});
+  await vm.runInContext('(async()=>{'+source+'})()',context);
+  return {elements,listeners,timers,authCallbacks};
+}
+
+test('auth failure stops realtime work and rejects already queued data and timer callbacks', async () => {
+  const {elements,listeners,timers,authCallbacks}=await liveDashboard();
+  authCallbacks.next({uid:'fixture'});
+  const first=listeners.slice(), timer=[...timers][0];
+  first.find(item=>item.path==='.info/connected').next({val:()=>true});
+  first.find(item=>item.path==='launcherMetrics').next({val:()=>({})});
+  assert.equal(elements.get('dashboard').hidden,false);
+  authCallbacks.error(new Error('Controlled auth failure'));
+  assert.equal(elements.get('dashboard').hidden,true); assert.equal(timers.size,0);
+  assert.ok(first.every(item=>item.stopped));
+  first.find(item=>item.path==='launcherMetrics').next({val:()=>reports});
+  first.find(item=>item.path==='.info/connected').next({val:()=>true}); timer.callback();
+  assert.equal(elements.get('dashboard').hidden,true);
+  assert.equal(elements.get('status').textContent,'Google oturumu doğrulanamadı.');
+  assert.equal(elements.get('login').hidden,false); assert.equal(elements.get('logout').hidden,true);
+});
+
+test('permission error is retained across connection updates and old account callbacks are ignored', async () => {
+  const {elements,listeners,authCallbacks}=await liveDashboard();
+  authCallbacks.next({uid:'first'});
+  const first=listeners.slice();
+  first.find(item=>item.path==='launcherMetrics').error(new Error('Controlled permission failure'));
+  const error=elements.get('status').textContent;
+  first.find(item=>item.path==='.info/connected').next({val:()=>false});
+  first.find(item=>item.path==='.info/connected').next({val:()=>true});
+  assert.equal(elements.get('status').textContent,error);
+  authCallbacks.next({uid:'second'});
+  first.find(item=>item.path==='launcherMetrics').next({val:()=>reports});
+  first.find(item=>item.path==='launcherMetrics').error(new Error('Old account callback'));
+  assert.equal(elements.get('dashboard').hidden,true);
+  assert.equal(elements.get('status').textContent,'Yetki ve Firebase verileri kontrol ediliyor…');
+  const current=listeners.slice(first.length);
+  current.find(item=>item.path==='.info/connected').next({val:()=>true});
+  current.find(item=>item.path==='launcherMetrics').next({val:()=>({})});
+  assert.equal(elements.get('dashboard').hidden,false);
+});
+
 test('admin distinguishes unmatched filters from no reports and clears counts on lost access', async () => {
   const {elements, render, clear} = await dashboard();
   render(reports, now);

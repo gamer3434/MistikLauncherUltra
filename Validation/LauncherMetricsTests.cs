@@ -53,6 +53,30 @@ static class LauncherMetricsTests
         Check(!File.Exists(credential) && new[] { "/sessions/", "/errors/", "/installations/" }.All(branch => fake.Requests.Any(r => r.Method == "DELETE" && r.Url.Contains(branch))), "opt-out stops reporting and deletes own online, error and installation records plus local token");
         before = fake.Requests.Count; await reopened.HeartbeatAsync(); await reopened.ReportErrorAsync("MLU-MEMORY");
         Check(fake.Requests.Count == before, "opt-out prevents further heartbeat and diagnostic writes");
+        var queuedDirectory = Path.Combine(directory, "queued-consent");
+        var queuedFake = new Fake(); using var queuedHttp = new HttpClient(queuedFake);
+        var queued = new LauncherMetrics(options, queuedHttp, queuedDirectory, "6.2.14");
+        var gate = (SemaphoreSlim)typeof(LauncherMetrics).GetField("gate", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(queued)!;
+        await gate.WaitAsync();
+        var pendingEnable = queued.SetEnabledAsync(true);
+        var pendingDisable = queued.SetEnabledAsync(false);
+        gate.Release();
+        await Task.WhenAll(pendingEnable, pendingDisable);
+        await queued.HeartbeatAsync();
+        await queued.ReportErrorAsync("MLU-APP");
+        bool consentStopped = !queued.Enabled && queuedFake.Requests.Count == 0 && !Directory.Exists(queuedDirectory);
+        await queued.StopAsync();
+        Check(consentStopped, "queued opt-out overrides an earlier pending enable without authentication, files or telemetry writes");
+        var shutdown = new LauncherMetrics(options, queuedHttp, Path.Combine(directory, "queued-shutdown"), "6.2.14");
+        var shutdownGate = (SemaphoreSlim)typeof(LauncherMetrics).GetField("gate", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(shutdown)!;
+        await shutdownGate.WaitAsync();
+        pendingEnable = shutdown.SetEnabledAsync(true);
+        var pendingStop = shutdown.StopAsync();
+        shutdownGate.Release();
+        await Task.WhenAll(pendingEnable, pendingStop);
+        await shutdown.HeartbeatAsync();
+        Check(!shutdown.Enabled && queuedFake.Requests.Count == 0 && !Directory.Exists(Path.Combine(directory, "queued-shutdown")),
+            "shutdown stops an earlier queued enable before any telemetry authentication or file creation");
         return count;
     }
 }

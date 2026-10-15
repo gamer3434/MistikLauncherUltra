@@ -51,7 +51,8 @@
     };
     const assets = {};
     for (const [kind, name] of Object.entries(names)) {
-      const asset = Array.isArray(release.assets) && release.assets.find(item => item.name === name);
+      const matches = Array.isArray(release.assets) ? release.assets.filter(item => item && item.name === name) : [];
+      const asset = matches.length === 1 ? matches[0] : null;
       const url = `https://github.com/${repo}/releases/download/${tag}/${name}`;
       if (!asset || asset.browser_download_url !== url) return null;
       assets[kind] = { url, hash: /^sha256:[a-f0-9]{64}$/i.test(asset.digest || '') ? asset.digest.slice(7).toLowerCase() : null };
@@ -103,7 +104,6 @@
       row.querySelector('code').textContent = hash;
       row.querySelector('[data-copy-hash]').dataset.copyHash = hash;
     });
-    if (version === fallbackVersion) return;
     summary.textContent = language === 'tr' ? `${version} yenilikleri${hasHashes ? ' ve SHA-256 değerleri' : ''}` : `Version ${version} notes${hasHashes ? ' and SHA-256 hashes' : ''}`;
     document.querySelector('[data-release-title]').textContent = language === 'tr' ? `${version} yenilikleri` : `What's new in ${version}`;
     document.querySelector('[data-release-intro]').textContent = language === 'tr' ? 'En yeni kararlı sürümün duyuruları:' : 'Announcements for the latest stable release:';

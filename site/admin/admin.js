@@ -1,6 +1,6 @@
 import { summarize } from './metrics.mjs';
 const $ = id => document.getElementById(id);
-function status(message, error = false) { $('status').textContent = message; $('status').dataset.error = String(error); }
+function status(message, error = false) { if ($('status').textContent !== message) $('status').textContent = message; $('status').dataset.error = String(error); }
 let displayedErrors = [];
 function clear() {
   $('dashboard').hidden = true;
@@ -15,6 +15,8 @@ function table(id, rows, columns, emptyMessage = 'Henüz veri yok') {
 }
 function errorFilter(id, values, label) {
   const select = $(id), selected = select.value;
+  const options = [...select.children];
+  if (options.length === values.length + 1 && options[0].textContent === label && values.every((value, index) => options[index + 1].value === value)) return;
   select.replaceChildren(Object.assign(document.createElement('option'), {value:'', textContent:label}));
   for (const value of values) select.append(Object.assign(document.createElement('option'), {value, textContent:value}));
   select.value = values.includes(selected) ? selected : '';
@@ -129,7 +131,12 @@ try {
   await authSdk.setPersistence(auth, authSdk.browserSessionPersistence);
   let redirectError;
   try { await authSdk.getRedirectResult(auth); } catch (error) { redirectError = error?.code || "bağlantı"; }
-  let unsubscribe = () => {}, connectedStop = () => {}, offsetStop = () => {}, timer, data, receivedAt, connected = false, offset = 0;
+  let unsubscribe = () => {}, connectedStop = () => {}, offsetStop = () => {}, timer, data, receivedAt, connected = false, offset = 0, generation = 0;
+  const stopMetrics = () => {
+    generation++; unsubscribe(); connectedStop(); offsetStop(); clearInterval(timer);
+    unsubscribe = connectedStop = offsetStop = () => {};
+    data = undefined; connected = false; offset = 0; clear();
+  };
   $('login').disabled = false;
   $('login').onclick = async () => {
     $('login').disabled = true;
@@ -144,22 +151,26 @@ try {
     finally { $('logout').disabled = false; }
   };
   authSdk.onAuthStateChanged(auth, user => {
-    unsubscribe(); connectedStop(); offsetStop(); clearInterval(timer); data = undefined; connected = false; clear();
+    stopMetrics();
     $('login').hidden = !!user; $('logout').hidden = !user;
     if (!user) { status(redirectError ? 'Google girişi tamamlanamadı. (' + redirectError + ')' : 'Bu panel yalnızca yetkili Google hesabına açıktır.', !!redirectError); return; }
     status('Yetki ve Firebase verileri kontrol ediliyor…');
     void loadLauncherDetails(); void loadCatalogMods();
-    const update = () => { if (connected && data !== undefined) { render(data, Date.now() + offset, receivedAt); status('Bağlı · Canlı veriler; aktiflik her 30 saniyede yenilenir.'); } };
+    const current = generation;
+    let readError = false;
+    const update = () => { if (current === generation && !readError && connected && data !== undefined) { render(data, Date.now() + offset, receivedAt); status('Bağlı · Canlı veriler; aktiflik her 30 saniyede yenilenir.'); } };
     connectedStop = dbSdk.onValue(dbSdk.ref(database, '.info/connected'), snapshot => {
+      if (current !== generation || readError) return;
       connected = snapshot.val() === true;
       if (!connected) { clear(); status('Bağlantı bekleniyor; mevcut sayılar doğrulanamıyor.', true); } else update();
     });
-    offsetStop = dbSdk.onValue(dbSdk.ref(database, '.info/serverTimeOffset'), snapshot => { offset = Number(snapshot.val()) || 0; update(); });
-    unsubscribe = dbSdk.onValue(dbSdk.ref(database, 'launcherMetrics'), snapshot => { data = snapshot.val() || {}; receivedAt = Date.now() + offset; update(); }, () => {
-      data = undefined; clear(); status('Veriler okunamadı. Hesabın yönetici yetkisini ve veritabanı kurallarını kontrol edin.', true);
+    offsetStop = dbSdk.onValue(dbSdk.ref(database, '.info/serverTimeOffset'), snapshot => { if (current !== generation) return; offset = Number(snapshot.val()) || 0; update(); });
+    unsubscribe = dbSdk.onValue(dbSdk.ref(database, 'launcherMetrics'), snapshot => { if (current !== generation) return; readError = false; data = snapshot.val() || {}; receivedAt = Date.now() + offset; update(); }, () => {
+      if (current !== generation) return;
+      readError = true; data = undefined; clear(); status('Veriler okunamadı. Hesabın yönetici yetkisini ve veritabanı kurallarını kontrol edin.', true);
     });
     timer = setInterval(update, 30000);
-  }, () => { clear(); status('Google oturumu doğrulanamadı.', true); });
+  }, () => { stopMetrics(); $('login').hidden = false; $('logout').hidden = true; status('Google oturumu doğrulanamadı.', true); });
 } catch {
   clear(); $('login').disabled = true;
   status('Panel yapılandırılmamış veya Firebase bağlantısı kurulamadı. Kurulum bilgilerini ve ağı kontrol edin.', true);

@@ -317,10 +317,15 @@ namespace MistikLauncher.Pages
                     else
                     {
                         selBtn.Click += (_, _) => {
-                            _main.SetVersion(installedFolder);
-                            _main.PopulateVersionBox();
-                            RefreshSelection();
-                            MessageBox.Show(Localization.Language=="en"?$"{vid} selected.":$"{vid} seçildi.", Localization.T("Basarili"), MessageBoxButton.OK, MessageBoxImage.Information);
+                            try {
+                                _main.SetVersion(installedFolder);
+                                _main.PopulateVersionBox();
+                                RefreshSelection();
+                                MessageBox.Show(Localization.Language=="en"?$"{vid} selected.":$"{vid} seçildi.", Localization.T("Basarili"), MessageBoxButton.OK, MessageBoxImage.Information);
+                            } catch (Exception ex) {
+                                _main.SetProgress(0, Localization.T("error") + ex.Message);
+                                App.Log("Installed profile selection: " + ex.Message);
+                            }
                         };
                     }
                     var delBtn = PageHelpers.MkBtn("SIL", "#FF4B4B", 60); delBtn.Margin = new Thickness(8, 0, 0, 0);
@@ -338,24 +343,22 @@ namespace MistikLauncher.Pages
                     var dlBtn = PageHelpers.MkBtn("INDIR", "#00A3FF", 80);
                     dlBtn.Click += async (_, _) => {
                         dlBtn.IsEnabled = false; dlBtn.Content = "..."; _main.SetProgress(10, "İndirme başlatılıyor...");
-                        var installedId = await DownloadVersionAsync(vid, (p, status) => Dispatcher.Invoke(() => _main.SetProgress(p, status)));
-                        _main.SetProgress(0, installedId != null ? $"Sürüm: {installedId}" : $"Sürüm: {vid}");
-                        dlBtn.Content = "INDIR"; dlBtn.IsEnabled = true;
-
-                        if (!string.IsNullOrEmpty(installedId))
-                        {
-                            var path = Path.Combine(App.GameDir, "versions", installedId);
-                            var jarFile = Path.Combine(path, $"{installedId}.jar");
-                            var jsonFile = Path.Combine(path, $"{installedId}.json");
-                            if (GameProfiles.IsInstalled(App.GameDir, installedId))
+                        try {
+                            var installedId = await DownloadVersionAsync(vid, (p, status) => Dispatcher.Invoke(() => _main.SetProgress(p, status)));
+                            _main.SetProgress(0, installedId != null ? $"Sürüm: {installedId}" : $"Sürüm: {vid}");
+                            if (!string.IsNullOrEmpty(installedId) && GameProfiles.IsInstalled(App.GameDir, installedId))
                             {
                                 _main.SetVersion(installedId);
                                 MessageBox.Show($"{installedId} başarıyla kuruldu ve seçildi!", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
                             }
+                            _main.PopulateVersionBox();
+                            RenderList();
+                        } catch (Exception ex) {
+                            _main.SetProgress(0, Localization.T("error") + ex.Message);
+                            App.Log("Downloaded profile selection: " + ex.Message);
+                        } finally {
+                            dlBtn.Content = Localization.T("INDIR"); dlBtn.IsEnabled = true;
                         }
-
-                        _main.PopulateVersionBox();
-                        RenderList();
                     };
                     btnSp.Children.Add(dlBtn);
                 }
@@ -694,6 +697,8 @@ namespace MistikLauncher.Pages
         readonly MainWindow _main;
         TextBox _searchBox = null!;
         ComboBox _migrationTargetCombo = null!;
+        Button? _migrationButton;
+        bool _migrationRunning;
 
         StackPanel _resultsPanel = null!;
         StackPanel _installedPanel = null!;
@@ -1035,7 +1040,7 @@ namespace MistikLauncher.Pages
             };
             var refreshTargetsBtn = PageHelpers.MkBtn("modMigrationRefresh", "#28445E", 110);
             refreshTargetsBtn.Margin = new Thickness(0, 0, 8, 8);
-            var migBtn = PageHelpers.MkBtn("modMigrate", "#226DA0", 240);
+            var migBtn = _migrationButton = PageHelpers.MkBtn("modMigrate", "#226DA0", 240);
             migBtn.Click += async (_, _) => {
                 if (_migrationTargetCombo.SelectedItem is MigrationTarget target)
                     await MigrateAndDownloadMods(target.ProfileId, migBtn);
@@ -1049,7 +1054,7 @@ namespace MistikLauncher.Pages
                 _migrationTargetCombo.SelectedItem = _migrationTargetCombo.Items.OfType<MigrationTarget>()
                     .FirstOrDefault(target => target.ProfileId.Equals(preferred, StringComparison.OrdinalIgnoreCase))
                     ?? _migrationTargetCombo.Items.OfType<MigrationTarget>().FirstOrDefault();
-                migBtn.IsEnabled = _migrationTargetCombo.Items.Count > 0;
+                migBtn.IsEnabled = !_migrationRunning && _migrationTargetCombo.Items.Count > 0;
             }
             refreshTargetsBtn.Click += (_, _) => RefreshMigrationTargets();
             RefreshMigrationTargets();
@@ -1122,16 +1127,18 @@ namespace MistikLauncher.Pages
                 catch (Exception ex) { MessageBox.Show(Localization.T("modBackupFailed") + "\n" + ex.Message, "Mistik Launcher", MessageBoxButton.OK, MessageBoxImage.Error); }
                 finally { restoreBtn.Content = Localization.T("modBackupRestore"); backupBtn.IsEnabled = restoreBtn.IsEnabled = cleanBtn.IsEnabled = true; }
             };
-            cleanBtn.Click += (_, _) => {
+            cleanBtn.Click += async (_, _) => {
+                if (!cleanBtn.IsEnabled) return;
                 var profile = _main.Config.LastSyncedVersion ?? "";
                 var confirm = MessageBox.Show(
                     "Aktif mod klasöründeki tüm modları yedeğe taşıyıp klasörü temizlemek istediğinizden emin misiniz?\n\nDosyalar .backups klasöründe korunur.",
                     "Klasörü Temizle", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 if (confirm == MessageBoxResult.Yes)
                 {
+                    cleanBtn.IsEnabled = false;
                     try
                     {
-                        var backup = _main.WithModChanges(profile, ModFiles.Clear);
+                        var backup = await Task.Run(() => _main.WithModChanges(profile, ModFiles.Clear));
                         RenderInstalledMods();
                         MessageBox.Show("Mod klasörü temizlendi. Dosyalar yedekte korundu:\n" + backup, "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
@@ -1139,6 +1146,7 @@ namespace MistikLauncher.Pages
                     {
                         MessageBox.Show($"Temizleme hatası: {ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
+                    finally { cleanBtn.IsEnabled = true; }
                 }
             };
             var modActions = new WrapPanel { Name = "InstalledModActions", HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
@@ -1666,9 +1674,12 @@ namespace MistikLauncher.Pages
                 var controls=new StackPanel { Orientation=Orientation.Horizontal };
                 var toggle=PageHelpers.MkBtn(Localization.T(enabled?"modDisable":"modEnable"),"#226DA0",120); toggle.Margin=new Thickness(0,0,8,0);
                 toggle.ToolTip=Localization.T("modToggleHelp");
-                toggle.Click+=(_,_)=> {
-                    try { _main.WithModChanges(profile, _ => ModFiles.Toggle(modDirectory,filePath)); RenderInstalledMods(directory); }
+                toggle.Click+=async (_,_)=> {
+                    if (!controls.IsEnabled) return;
+                    controls.IsEnabled = false;
+                    try { await Task.Run(() => _main.WithModChanges(profile, _ => ModFiles.Toggle(modDirectory,filePath))); RenderInstalledMods(directory); }
                     catch(Exception ex) { MessageBox.Show(Localization.T("modToggleFailed")+"\n"+ex.Message,Localization.T("error")); }
+                    finally { controls.IsEnabled = true; }
                 };
                 controls.Children.Add(toggle);
                 nameLbl.Text= (enabled?"● ":"○ ")+fileName;
@@ -1678,22 +1689,25 @@ namespace MistikLauncher.Pages
                 nameContent.Children.Add(PageHelpers.Lbl(Localization.T(enabled?"modEnabled":"modDisabled"),12,"#ADBED6",pad:new Thickness(0,4,0,0)));
                 grid.Children.Add(nameContent);
                 var delBtn = PageHelpers.MkBtn(Localization.T("modDelete"), "#CC2222", 80);
-                delBtn.Click += (_, _) =>
+                delBtn.Click += async (_, _) =>
                 {
+                    if (!controls.IsEnabled) return;
                     var confirm = MessageBox.Show(
                         Localization.T("modDeleteConfirm")+"\n\n"+fileName,
                         Localization.T("modDelete"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
                     if (confirm == MessageBoxResult.Yes)
                     {
+                        controls.IsEnabled = false;
                         try
                         {
-                            var backup = _main.WithModChanges(profile, _ => ModFiles.Remove(modDirectory,filePath));
+                            var backup = await Task.Run(() => _main.WithModChanges(profile, _ => ModFiles.Remove(modDirectory,filePath)));
                             App.Log($"Mod removed by user: {fileName}; backup: {backup}");
                         }
                         catch (Exception ex)
                         {
                             MessageBox.Show($"Mod silinemedi:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
                         }
+                        finally { controls.IsEnabled = true; }
                         RenderInstalledMods(directory);
                     }
                 };
@@ -1772,6 +1786,10 @@ namespace MistikLauncher.Pages
 
         private async Task MigrateAndDownloadMods(string targetProfile, Button btn)
         {
+            if (_migrationRunning || !btn.IsEnabled) return;
+            var origText = btn.Content;
+            _migrationRunning = true;
+            btn.IsEnabled = false;
             try
             {
                 var sourceVersion = _main.Config.Version ?? "";
@@ -1785,13 +1803,8 @@ namespace MistikLauncher.Pages
                     MessageBox.Show("Seçilen profil zaten aktif. Modlarınız mevcut klasörde korunmuştur.", "Mod Sürüm Taşıma", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
-                if (!Directory.Exists(App.ModsDir))
-                {
-                    MessageBox.Show("Aktif mod klasöründe taşıyacak hiç mod bulunamadı!", "Mod Yok", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-
-                var jars = Directory.GetFiles(App.ModsDir, "*.jar");
+                var jars = await Task.Run(() => _main.WithModChanges(sourceVersion, directory =>
+                    Directory.Exists(directory) ? Directory.GetFiles(directory, "*.jar") : Array.Empty<string>()));
                 if (jars.Length == 0)
                 {
                     MessageBox.Show("Aktif mod klasöründe (.jar uzantılı) hiç mod bulunamadı!", "Mod Yok", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -1807,7 +1820,6 @@ namespace MistikLauncher.Pages
                 if (confirm != MessageBoxResult.Yes) return;
 
                 btn.IsEnabled = false;
-                var origText = btn.Content.ToString();
                 btn.Content = "Yedekleniyor & Sürüm değiştiriliyor...";
 
                 // Runtime mod IDs are not Modrinth project IDs; identify the exact local file before switching profiles.
@@ -1816,6 +1828,7 @@ namespace MistikLauncher.Pages
                 var failedMods = new List<string>();
                 foreach (var jar in jars)
                 {
+                    if (_main.Config.Version != sourceVersion) throw new IOException("The selected Minecraft version changed during mod migration.");
                     btn.Content = $"Mod tanımlanıyor: {Path.GetFileName(jar)}…";
                     try
                     {
@@ -1844,19 +1857,20 @@ namespace MistikLauncher.Pages
 
                 // 2. Mevcut modları güvenle askıya al (SyncModsForCurrentVersion)
                 if (_main.Config.Version != sourceVersion) throw new IOException("The selected Minecraft version changed during mod migration.");
-                if(!_main.SyncModsForCurrentVersion()) throw new IOException(Localization.T("modSyncFailed"));
+                await Task.Run(() => _main.WithModChanges(sourceVersion, _ => true));
 
                 // 3. Launcher ana sürümünü hedef sürüme geçir (VerBox listesinde arayarak)
                 string matchedVerName = targetProfile;
                 _main.Dispatcher.Invoke(() => {
+                    if (_main.Config.Version != sourceVersion) throw new IOException("The selected Minecraft version changed during mod migration.");
                     if (!_main.VerBox.Items.Contains(matchedVerName)) _main.VerBox.Items.Add(matchedVerName);
                     _main.VerBox.SelectedItem = matchedVerName;
                     var profile=GameProfiles.Read(App.GameDir,matchedVerName);
                     if(profile==null || !GameProfiles.Loader(App.GameDir, matchedVerName).Equals(loader, StringComparison.OrdinalIgnoreCase)) throw new IOException(Localization.T("modMigrationTargetInvalid"));
                     _main.SetVersion(matchedVerName);
-                    if(!_main.SyncModsForCurrentVersion()) throw new IOException(Localization.T("modSyncFailed"));
                     _main.StatusLbl.Text = $"Surum: {matchedVerName}";
                 });
+                await Task.Run(() => _main.WithModChanges(matchedVerName, _ => true));
 
                 // Merge into the target set; failed downloads must not remove its existing mods.
                 int downloadedCount = 0;
@@ -1906,6 +1920,10 @@ namespace MistikLauncher.Pages
                 MessageBox.Show($"Mod taşıma sırasında hata oluştu:\n{ex.Message}", "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
                 btn.Content = "Hata!";
                 btn.IsEnabled = true;
+            }
+            finally {
+                _migrationRunning = false; btn.Content = origText; btn.IsEnabled = true;
+                if (_migrationButton != null) _migrationButton.IsEnabled = _migrationTargetCombo.Items.Count > 0;
             }
         }
 

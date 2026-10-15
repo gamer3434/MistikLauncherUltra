@@ -24,6 +24,24 @@ static class ModImportBoundaryTests
         Check(ModFiles.Import(target, source) && File.ReadAllText(Path.Combine(target, "incoming.jar")) == "valid local bytes" &&
             File.ReadAllText(source) == "valid local bytes" && !Directory.GetFiles(target, "*.tmp").Any(),
             "bounded local mod import preserves source and commits complete bytes without staging residue");
+        var outside = Path.Combine(root, "junction destination"); Directory.CreateDirectory(outside);
+        var marker = Path.Combine(outside, "personal.txt"); File.WriteAllText(marker, "preserved personal file");
+        var link = Path.Combine(root, "junction link");
+        var linkProcess = new System.Diagnostics.ProcessStartInfo("cmd.exe") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var argument in new[] { "/d", "/c", "mklink", "/J", link, outside }) linkProcess.ArgumentList.Add(argument);
+        using (var process = System.Diagnostics.Process.Start(linkProcess)!)
+        {
+            process.WaitForExit();
+            if (process.ExitCode != 0) throw new Exception("Could not create isolated junction fixture: " + process.StandardError.ReadToEnd());
+        }
+        try
+        {
+            invalidRejected = false;
+            try { ModFiles.Import(Path.Combine(link, "must-not-be-created"), source); } catch (IOException) { invalidRejected = true; }
+            Check(invalidRejected && !Directory.Exists(Path.Combine(outside, "must-not-be-created")) && File.ReadAllText(marker) == "preserved personal file",
+                "mod destination rejects linked ancestors before creating any directory outside the requested root");
+        }
+        finally { Directory.Delete(link); }
         return checks;
     }
 }

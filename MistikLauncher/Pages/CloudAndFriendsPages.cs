@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Newtonsoft.Json.Linq;
 
 namespace MistikLauncher.Pages
 {
@@ -179,15 +180,22 @@ namespace MistikLauncher.Pages
             resetBtn.Height = 35;
             resetBtn.Margin = new Thickness(0, 8, 0, 0);
             resetBtn.Click += async (_, _) => {
-                main.Config.SkinType = "none";
-                main.Config.SkinUser = "";
-                ConfigManager.Save(main.Config);
-                main.ReloadConfig();
-                if (!await main.PrepareSkinPackAsync(main.Config.Version)) {
-                    MessageBox.Show(Localization.T("skinApplyFailed"), Localization.T("error"), MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
+                resetBtn.IsEnabled = false;
+                try {
+                    main.Config.SkinType = "none";
+                    main.Config.SkinUser = "";
+                    ConfigManager.Save(main.Config);
+                    main.ReloadConfig();
+                    if (!await main.PrepareSkinPackAsync(main.Config.Version)) {
+                        MessageBox.Show(Localization.T("skinApplyFailed"), Localization.T("error"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    MessageBox.Show("Skin ayarı sıfırlandı ve kaynak paketi kapatıldı.\nOyunda varsayılan (Steve/Alex) skini göreceksiniz.", "Sıfırlandı", MessageBoxButton.OK, MessageBoxImage.Information);
+                } catch (Exception ex) {
+                    MessageBox.Show(Localization.T("skinApplyError")+"\n"+ex.Message, Localization.T("error"), MessageBoxButton.OK, MessageBoxImage.Error);
+                } finally {
+                    resetBtn.IsEnabled = true;
                 }
-                MessageBox.Show("Skin ayarı sıfırlandı ve kaynak paketi kapatıldı.\nOyunda varsayılan (Steve/Alex) skini göreceksiniz.", "Sıfırlandı", MessageBoxButton.OK, MessageBoxImage.Information);
             };
             searchSp.Children.Add(resetBtn);
 
@@ -351,22 +359,11 @@ namespace MistikLauncher.Pages
                 try
                 {
                     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30), MaxResponseContentBufferSize = 128 * 1024 * 1024 };
-                    http.DefaultRequestHeaders.Add("User-Agent", "MistikLauncher/5.0");
-                    var resp = await http.GetStringAsync("https://api.modrinth.com/v2/project/customskinloader/version");
-                    var versions = Newtonsoft.Json.Linq.JArray.Parse(resp);
-
-                    var targetVersionObj = ModManagerPage.FindCompatibleVersion(versions, mcVersion, loader);
-                    if (targetVersionObj != null)
+                    http.DefaultRequestHeaders.Add("User-Agent", "MistikLauncher/" + App.LocalVersion);
+                    var installed = await InstallCustomSkinLoaderAsync(main, currentVer, http);
+                    if (installed != null)
                     {
-                        var fileUrl = targetVersionObj["files"]?[0]?["url"]?.ToString();
-                        var fname   = targetVersionObj["files"]?[0]?["filename"]?.ToString() ?? "CustomSkinLoader.jar";
-                        if (string.IsNullOrEmpty(fileUrl)) throw new Exception("İndirme adresi (URL) bulunamadı!");
-
-                        var bytes = await http.GetByteArrayAsync(ModFiles.DownloadUrl(fileUrl));
-                        if (main.Config.Version != currentVer) throw new IOException("Seçili oyun sürümü değişti. Kurulumu yeni sürüm için tekrar başlatın.");
-                        ModFiles.Install(App.ModsDir, fname, bytes, targetVersionObj["files"]?[0]?["hashes"]?["sha512"]?.ToString());
-
-                        MessageBox.Show($"CustomSkinLoader ({fname}) başarıyla indirildi ve mod klasörünüze kuruldu!\n\nArtık oyunda diğer oyuncuların skinlerini görebilirsiniz.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
+                        MessageBox.Show($"CustomSkinLoader ({Path.GetFileName(installed)}) başarıyla indirildi ve mod klasörünüze kuruldu!\n\nArtık oyunda diğer oyuncuların skinlerini görebilirsiniz.", "Başarılı", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     else
                     {
@@ -390,6 +387,20 @@ namespace MistikLauncher.Pages
             sp.Children.Add(cslCard);
 
             Content = new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        }
+
+        internal static async Task<string?> InstallCustomSkinLoaderAsync(MainWindow main, string expectedProfile, HttpClient http)
+        {
+            var game = GameProfiles.MinecraftVersion(App.GameDir, expectedProfile);
+            var loader = GameProfiles.Loader(App.GameDir, expectedProfile);
+            var versions = JArray.Parse(await http.GetStringAsync("https://api.modrinth.com/v2/project/customskinloader/version").ConfigureAwait(false));
+            var version = ModManagerPage.FindCompatibleVersion(versions, game, loader);
+            if (version == null) return null;
+            var file = (version["files"] as JArray)?.FirstOrDefault(value => value["primary"]?.Value<bool>() == true)
+                ?? version["files"]?.FirstOrDefault() ?? throw new InvalidDataException("Missing mod file.");
+            var bytes = await http.GetByteArrayAsync(ModFiles.DownloadUrl(file["url"]?.ToString() ?? "")).ConfigureAwait(false);
+            return await Task.Run(() => main.WithModChanges(expectedProfile,
+                destination => ModManagerPage.InstallDownloadedMod(destination, file, bytes, false, versions))).ConfigureAwait(false);
         }
 
         public static async Task<bool> LoadImgAsync(Image img, string user, int size, HttpClient? client = null)
