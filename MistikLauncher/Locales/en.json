@@ -455,5 +455,7 @@
   "supportSharingToggle": "Share my player name and installed mods with the administrator",
   "supportRequestsToggle": "Receive mod installation suggestions from the administrator",
   "supportSharingHelp": "Separate and optional. Your player name, selected profile, launcher version, activity time and up to 300 mod filenames/states are shared only with the authorized administrator. Modpack names are not inferred. Each suggestion needs approval unless you explicitly allow automatic installation. Turning this off attempts to delete the shared record; offline cleanup retries on the next start.",
-  "supportAutoInstallToggle": "Allow the administrator to install compatible mods and dependencies automatically without asking again"
+  "supportAutoInstallToggle": "Allow the administrator to install compatible mods and dependencies automatically without asking again",
+  "modDeclaredConflict": "These mods cannot run together: {0} / {1}. Disable one of them and try again.",
+  "modConflictTitle": "Conflicting mods"
 }

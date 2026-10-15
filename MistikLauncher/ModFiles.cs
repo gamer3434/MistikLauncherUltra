@@ -57,6 +57,10 @@ public static class ModFiles
         if(File.Exists(target) && File.Exists(target+".disabled")) throw new IOException(Localization.T("modToggleConflict"));
         if(File.Exists(target+".disabled")) target+=".disabled";
         if(File.Exists(target) && (File.GetAttributes(target)&FileAttributes.ReparsePoint)!=0) throw new IOException(Localization.T("modToggleInvalid"));
+        if(Enabled(target)) {
+            using var candidate = new MemoryStream(bytes, writable: false);
+            ModConflictGuard.CheckInstall(root,filename,candidate);
+        }
         string temporary=Path.Combine(root,".download-"+Guid.NewGuid().ToString("N")+".tmp");
         try {
             File.WriteAllBytes(temporary,bytes);
@@ -80,6 +84,7 @@ public static class ModFiles
         string temporary=Path.Combine(root,".import-"+Guid.NewGuid().ToString("N")+".tmp");
         try {
             using(var output=new FileStream(temporary,FileMode.CreateNew,FileAccess.Write,FileShare.None)) input.CopyTo(output);
+            using(var candidate=File.OpenRead(temporary)) ModConflictGuard.CheckInstall(root,filename,candidate);
             File.Move(temporary,target); return true;
         }
         finally { if(File.Exists(temporary)) File.Delete(temporary); }
@@ -131,6 +136,10 @@ public static class ModFiles
         path=ValidateExistingMod(root,path);
         string target=Enabled(path)?path+".disabled":path[..^9];
         if(File.Exists(target)) throw new IOException(Localization.T("modToggleConflict"));
+        if(!Enabled(path)) {
+            using var candidate = File.OpenRead(path);
+            ModConflictGuard.CheckInstall(root,Path.GetFileName(target),candidate);
+        }
         File.Move(path,target); return target;
     }
 }

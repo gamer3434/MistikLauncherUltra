@@ -62,6 +62,7 @@ class Program
             var invalidLighting=ConfigManager.Normalize(new LauncherConfig { CloseLighting="bad",CloseRgb="invalid" });
             Check(invalidLighting.CloseLighting=="Theme" && invalidLighting.CloseRgb=="#FFB000","close lighting settings validation");
             checks += ModToggleTests.Run(Path.Combine(testRoot,"mod-toggle"));
+            checks += ModConflictGuardTests.Run(Path.Combine(testRoot,"mod-conflict-guard"));
             checks += ModBackupTests.Run(Path.Combine(testRoot,"mod-backup"));
             checks += ModMigrationTargetTests.Run(Path.Combine(testRoot,"migration-targets"));
             checks += ModCatalogTests.Run(Path.Combine(testRoot,"mod-catalog"));

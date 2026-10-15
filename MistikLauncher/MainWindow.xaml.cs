@@ -807,6 +807,10 @@ namespace MistikLauncher
                     MessageBox.Show(Localization.T("modSyncFailed"),"Mistik Launcher",MessageBoxButton.OK,MessageBoxImage.Warning);
                     return;
                 }
+                bool checkFabricConflicts = GameProfiles.Loader(App.GameDir,version) is "fabric" or "quilt";
+                if(checkFabricConflicts) await Task.Run(() => WithSyncedMods(version, directory => {
+                    ModConflictGuard.CheckDirectory(directory); return true;
+                }));
                 // 1. Java bul
                 SetStatus("Java aranıyor...");
                 var javaPath = await FindJavaAsync();
@@ -896,7 +900,10 @@ namespace MistikLauncher
                     WorkingDirectory=App.GameDir, UseShellExecute=false, CreateNoWindow=true,
                     RedirectStandardOutput=true, RedirectStandardError=true
                 };
-                var process=await Task.Run(() => WithSyncedMods(version, _ => Process.Start(psi))) ?? throw new InvalidOperationException("Java process could not start.");
+                var process=await Task.Run(() => WithSyncedMods(version, directory => {
+                    if(checkFabricConflicts) ModConflictGuard.CheckDirectory(directory);
+                    return Process.Start(psi);
+                })) ?? throw new InvalidOperationException("Java process could not start.");
                 void Capture(object sender,DataReceivedEventArgs line) {
                     if(line.Data==null) return;
                     lock(outputGate) {
@@ -944,6 +951,11 @@ namespace MistikLauncher
 
 
 
+            }
+            catch (ModConflictException ex)
+            {
+                App.Log("Launch blocked by declared mod conflict: " + ex.Message);
+                MessageBox.Show(this,ex.Message,Localization.T("modConflictTitle"),MessageBoxButton.OK,MessageBoxImage.Warning);
             }
             catch (Exception ex)
             {

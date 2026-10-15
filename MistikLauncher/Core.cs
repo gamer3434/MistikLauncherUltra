@@ -218,6 +218,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.41","2026-10-15","#00D4AA", new[]{
+                "Açık Fabric mod çakışmaları indirme, elle ekleme ve yeniden etkinleştirme sırasında engellenir.",
+                "Oyun başlamadan önce etkin modlar tekrar kontrol edilir; çakışan dosyalar adlarıyla gösterilir.",
+                "Devre dışı modlar, karma Forge paketleri ve iç içe çok sürümlü alternatifler yanlışlıkla engellenmez.",
+                "Explicit Fabric mod conflicts are blocked during installation, import and re-enabling.",
+                "Active mods are checked again before launch; conflicting filenames appear in the warning.",
+                "Disabled mods, hybrid Forge packages and nested multi-version alternatives are excluded."
+            }),
             new("v6.2.40","2026-10-15","#00D4AA", new[]{
                 "Ayarlar’a bir kez izin vererek yönetici modlarını tekrar onay penceresi olmadan kurma seçeneği eklendi.",
                 "Otomatik kurulum ayrı ve varsayılan kapalıdır; eski öneri izni otomatik kuruluma dönüşmez.",
