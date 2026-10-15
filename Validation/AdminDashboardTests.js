@@ -20,7 +20,7 @@ async function dashboard(fetch = async () => { throw new Error("No network fixtu
     return elements.get(id);
   }};
   const source = readFileSync(resolve(root, 'site/admin/admin.js'), 'utf8')
-    .replace(/^import .*?;\r?\n/, '')
+    .replace(/^import .*?;\r?\n/gm, '')
     .split(/\r?\ntry \{\r?\n  const response = await fetch\('\.\/admin-config\.json'/)[0];
   const context = vm.createContext({document, summarize, Intl, Date, URL, URLSearchParams, AbortSignal, fetch});
   vm.runInContext(source, context);
@@ -76,11 +76,11 @@ async function liveDashboard() {
     const listener={path,next,error,stopped:false}; listeners.push(listener); return ()=>{listener.stopped=true;};
   }};
   let timerId=0;
-  const source=readFileSync(resolve(root,'site/admin/admin.js'),'utf8').replace(/^import .*?;\r?\n/,'')
+  const source=readFileSync(resolve(root,'site/admin/admin.js'),'utf8').replace(/^import .*?;\r?\n/gm,'')
     .replace(/const \[\{initializeApp\}, authSdk, dbSdk\] = await Promise\.all\(\[[\s\S]*?\]\);/,
       'const {initializeApp,authSdk,dbSdk}=sdk;');
   const context=vm.createContext({document,summarize,Intl,Date,URL,URLSearchParams,AbortSignal,
-    sdk:{initializeApp:()=>({}),authSdk,dbSdk},
+    sdk:{initializeApp:()=>({}),authSdk,dbSdk}, mountSupport:()=>({stop(){},connection(){},refresh(){}}),
     fetch:async url=>url==='./admin-config.json'?{ok:true,json:async()=>({apiKey:'fixture',authDomain:'fixture',databaseURL:'https://fixture.firebaseio.com',projectId:'fixture'})}:{ok:false},
     setInterval(callback){const timer={id:++timerId,callback}; timers.add(timer); return timer;},clearInterval(timer){timers.delete(timer);}});
   await vm.runInContext('(async()=>{'+source+'})()',context);
@@ -89,7 +89,7 @@ async function liveDashboard() {
 
 test('auth failure stops realtime work and rejects already queued data and timer callbacks', async () => {
   const {elements,listeners,timers,authCallbacks}=await liveDashboard();
-  authCallbacks.next({uid:'fixture'});
+  authCallbacks.next({uid:'fixture',emailVerified:true,providerData:[{providerId:'google.com'}]});
   const first=listeners.slice(), timer=[...timers][0];
   first.find(item=>item.path==='.info/connected').next({val:()=>true});
   first.find(item=>item.path==='launcherMetrics').next({val:()=>({})});
@@ -106,14 +106,14 @@ test('auth failure stops realtime work and rejects already queued data and timer
 
 test('permission error is retained across connection updates and old account callbacks are ignored', async () => {
   const {elements,listeners,authCallbacks}=await liveDashboard();
-  authCallbacks.next({uid:'first'});
+  authCallbacks.next({uid:'first',emailVerified:true,providerData:[{providerId:'google.com'}]});
   const first=listeners.slice();
   first.find(item=>item.path==='launcherMetrics').error(new Error('Controlled permission failure'));
   const error=elements.get('status').textContent;
   first.find(item=>item.path==='.info/connected').next({val:()=>false});
   first.find(item=>item.path==='.info/connected').next({val:()=>true});
   assert.equal(elements.get('status').textContent,error);
-  authCallbacks.next({uid:'second'});
+  authCallbacks.next({uid:'second',emailVerified:true,providerData:[{providerId:'google.com'}]});
   first.find(item=>item.path==='launcherMetrics').next({val:()=>reports});
   first.find(item=>item.path==='launcherMetrics').error(new Error('Old account callback'));
   assert.equal(elements.get('dashboard').hidden,true);

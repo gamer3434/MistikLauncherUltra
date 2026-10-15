@@ -30,6 +30,20 @@
   <p id="status" class="status-banner" role="status" aria-live="polite">Firebase bağlantısı hazırlanıyor…</p>
 
   <section id="dashboard" class="dashboard" hidden aria-label="Kullanım bilgileri">
+    <section class="data-panel support-panel" aria-labelledby="support-title">
+      <div class="panel-heading"><div><p class="eyebrow">İZİNLİ DESTEK PAYLAŞIMI</p><h2 id="support-title">Paylaşan kurulumlar ve mod önerileri</h2></div><span id="supportCount" class="panel-caption"></span></div>
+      <p class="panel-footnote support-intro">Yalnızca launcher ayarlarında ayrı destek paylaşımını açan kurulumlar görünür. İsimler kullanıcının bildirdiği adlardır; doğrulanmış Minecraft hesap kimliği değildir. Aynı kişi birden fazla kurulumla görünebilir. Mod önerisi dosya indirmez; kullanıcı kendi launcher’ında onaylar ve uyumluluk kontrol edilir.</p>
+      <div class="table-scroll record-scroll" tabindex="0" role="region" aria-label="Destek paylaşan kurulumlar"><table><thead><tr><th>Ad</th><th>Etkinlik</th><th>Launcher</th><th>Mod dosyası</th></tr></thead><tbody id="supportRows"></tbody></table></div>
+      <div id="supportDetail" class="support-detail" hidden>
+        <div class="support-detail-heading"><h3 id="supportName"></h3><button id="supportClose" type="button" class="button button-quiet">Ayrıntıları kapat</button></div>
+        <p id="supportFacts" class="source-note"></p><p id="supportModCount" class="source-note"></p>
+        <ul id="supportModList" class="support-mods" aria-label="Bildirilen mod dosyaları"></ul>
+        <form id="supportSearchForm" class="support-search"><label for="supportSearch">Bu profile mod öner</label><div><input id="supportSearch" type="search" maxlength="100" placeholder="Modrinth mod adı" autocomplete="off" required><button id="supportSearchButton" class="button button-quiet" type="submit" disabled>Ara</button></div></form>
+        <div id="supportSearchResults" class="support-results" aria-label="Mod arama sonuçları"></div>
+        <p id="supportRequestStatus" class="source-note"></p><button id="supportSend" class="button button-primary" type="button" disabled>Kurulum isteği gönder</button>
+      </div>
+      <p id="supportStatus" class="support-status" role="status" aria-live="polite"></p>
+    </section>
     <div class="section-heading"><div><p class="eyebrow">GENEL BAKIŞ</p><h2>Kurulum ve etkinlik</h2></div><div class="data-freshness"><span class="live-label"><i aria-hidden="true"></i> CANLI</span><span>Son veri: <time id="lastUpdated">—</time></span></div></div>
     <div class="cards">
       <article class="metric-card"><div class="metric-top"><span>Katılan kurulumlar</span><span class="metric-icon" aria-hidden="true">01</span></div><strong id="installations">—</strong><p>Geçerli, paylaşım yapan kurulum kayıtları</p></article>
@@ -72,7 +86,7 @@
     <section class="data-panel installation-panel" aria-labelledby="installations-title">
       <div class="panel-heading"><div><p class="eyebrow">KURULUM AYRINTILARI</p><h2 id="installations-title">Anonim kurulum kayıtları</h2></div><span class="panel-caption" id="installationCount">En son 100 kayıt</span></div>
       <div class="table-scroll record-scroll" tabindex="0" role="region" aria-label="Anonim kurulum kayıtları tablosu"><table><thead><tr><th scope="col">Kurulum</th><th scope="col">Sürüm</th><th scope="col">İlk bildirim</th><th scope="col">Son bildirim</th><th scope="col">Etkinlik</th><th scope="col">Birikimli hata</th></tr></thead><tbody id="installationRows"></tbody></table></div>
-      <p class="panel-footnote">Son etkinliğe göre en yeni 100 kayıt gösterilir. Sıra etiketleri kişileri tanımlamaz; ilk bildirim, programın kurulduğu tarih anlamına gelmez. Kullanıcı adı, e-posta ve cihazdaki modlar toplanmaz.</p>
+      <p class="panel-footnote">Son etkinliğe göre en yeni 100 istatistik kaydı gösterilir. Sıra etiketleri kişileri tanımlamaz; ilk bildirim, programın kurulduğu tarih anlamına gelmez. Normal istatistik paylaşımı kullanıcı adı, e-posta ve cihazdaki modları içermez. Yukarıdaki destek paylaşımı ayrı izin gerektirir.</p>
     </section>
 
     <section class="data-panel error-panel" aria-labelledby="errors-title">
@@ -87,7 +101,7 @@
       <p class="panel-footnote">Her satır bir kurulumun bir hata kategorisindeki son bildirimidir. Birikimli olay, bu grubun tüm zamanlardaki sayacıdır; belirli bir günün veya tekil kullanıcıların sayısı değildir.</p>
     </section>
 
-    <details class="privacy-note"><summary>Veri kapsamı ve gizlilik</summary><p>Bunlar kullanıcı sayısı değildir. Yalnızca paylaşımı açık kurulumlar sayılır; aynı kişinin birden fazla kurulumu olabilir. Kullanıcı adı, e-posta, mod listesi ve ham hata günlüğü toplanmaz. Hata sayıları her kurulumun her kategori için son bildirimi ve toplamıdır. Yeniden kurulum yeni kimlik oluşturabilir; paylaşımı kapatınca kayıtların silinmesi denenir; çevrimdışı kapatılan kurulumların eski kayıtları kalabilir.</p></details>
+    <details class="privacy-note"><summary>Veri kapsamı ve gizlilik</summary><p>Bunlar kullanıcı sayısı değildir. Yalnızca paylaşımı açık kurulumlar sayılır; aynı kişinin birden fazla kurulumu olabilir. Normal istatistik paylaşımı kullanıcı adı, e-posta, mod listesi ve ham hata günlüğü içermez. Ayrı destek paylaşımını açan kurulumlar, bildirdikleri adını, seçili profili ve en fazla 300 mod dosyasının adını yöneticiye gösterir; mod önerilerini kabul etmek ayrıca isteğe bağlıdır. Hata sayıları her kurulumun her kategori için son bildirimi ve toplamıdır. Yeniden kurulum yeni kimlik oluşturabilir; paylaşımı kapatınca kayıtların silinmesi denenir; çevrimdışı kapatılan kurulumların eski kayıtları kalabilir.</p></details>
   </section>
 </main>
 <script type="module" src="admin.js"></script>

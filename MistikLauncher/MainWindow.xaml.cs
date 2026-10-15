@@ -26,6 +26,7 @@ namespace MistikLauncher
         public LauncherUpdater LauncherUpdates { get; }
         public LauncherMetrics? UsageMetrics { get; }
         public bool UsageMetricsAvailable => UsageMetrics != null;
+        public LauncherSupport? Support { get; }
         public MistikRelay?   Relay;
         readonly Dictionary<string, Page> _pageCache = new();
         readonly Dictionary<string, string> _pageLanguages = new();
@@ -46,6 +47,11 @@ namespace MistikLauncher
         {
 
             InitializeComponent();
+            // Menus own navigation; Frame history shortcuts must not bypass their selected state.
+            MainFrame.Navigating += (_, args) => {
+                if (args.NavigationMode is System.Windows.Navigation.NavigationMode.Back or System.Windows.Navigation.NavigationMode.Forward)
+                    args.Cancel = true;
+            };
             WindowSurface.SizeChanged += (_, _) => UpdateCompactShell();
             DpiChanged += (_, _) => Dispatcher.BeginInvoke(new Action(FitMonitorWorkArea));
             Config = ConfigManager.Load();
@@ -55,6 +61,9 @@ namespace MistikLauncher
             Title = "Mistik Launcher " + LauncherUpdates.CurrentVersion;
             var metricsOptions = LauncherMetricsOptions.Load(Path.Combine(AppContext.BaseDirectory, "metrics-config.json"));
             if (metricsOptions != null) UsageMetrics = new LauncherMetrics(metricsOptions, new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(6), MaxResponseContentBufferSize = 16384 }, App.AppData, LauncherUpdates.CurrentVersion);
+            if (metricsOptions != null) Support = new LauncherSupport(metricsOptions,
+                new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(8), MaxResponseContentBufferSize = 131072 },
+                App.AppData, ReadSupportInventory, ApproveSupportRequest);
             if (System.Windows.Application.Current is Application application) application.Metrics = UsageMetrics;
             Config.OpenCount++;
             ConfigManager.Save(Config);
@@ -124,6 +133,10 @@ namespace MistikLauncher
             updateTimer.Tick += async (_,_) => await CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate);
             Loaded += async (_,_) => {
                 if (UsageMetrics != null) await UsageMetrics.SetEnabledAsync(Config.UsageMetricsEnabled);
+                if (Support != null) {
+                    try { await Support.SetEnabledAsync(Config.SupportSharingEnabled); }
+                    catch (Exception ex) { App.Log("Support startup cleanup unavailable: " + ex.GetType().Name); }
+                }
                 QueueBackgroundModSync();
                 updateTimer.Start();
                 await CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate);
@@ -139,6 +152,7 @@ namespace MistikLauncher
             // Dispose the opt-in relay when the window closes.
             Closing += async (s, e) =>
             {
+                try { if (Support != null) await Support.StopAsync(); } catch (Exception ex) { App.Log("Support cleanup: " + ex.GetType().Name); }
                 try { if (Relay != null) await Relay.DisposeAsync(); } catch (Exception ex) { App.Log("Relay cleanup: " + ex.Message); }
             };
         }
@@ -150,6 +164,48 @@ namespace MistikLauncher
             try { ConfigManager.Save(Config); }
             catch { Config.UsageMetricsEnabled = previous; throw; }
             if (UsageMetrics != null) await UsageMetrics.SetEnabledAsync(enabled);
+        }
+
+        public async Task SetSupportSharing(bool enabled, bool requests)
+        {
+            var previous = (Config.SupportSharingEnabled, Config.SupportRequestsEnabled);
+            Config.SupportSharingEnabled = enabled; Config.SupportRequestsEnabled = enabled && requests;
+            try { ConfigManager.Save(Config); }
+            catch { (Config.SupportSharingEnabled, Config.SupportRequestsEnabled) = previous; throw; }
+            if (Support != null) {
+                if (enabled && Support.Enabled) await Support.StopAsync();
+                await Support.SetEnabledAsync(enabled);
+            }
+        }
+
+        Task<JObject> ReadSupportInventory(CancellationToken cancellation)
+            => Task.Run(() => {
+                cancellation.ThrowIfCancellationRequested();
+                lock (_modSyncGate) {
+                    cancellation.ThrowIfCancellationRequested();
+                    var directory = InstalledModCatalog.ProfileDirectory(App.GameDir, App.AppData, App.ModsDir, Config.Version, Config.LastSyncedVersion);
+                    return LauncherSupport.Inventory(Config.User, LauncherUpdates.CurrentVersion, Config.Version, directory, Config.SupportRequestsEnabled);
+                }
+            }, cancellation);
+
+        async Task ApproveSupportRequest(SupportRequest request, CancellationToken cancellation)
+        {
+            if (Dispatcher.HasShutdownStarted) return;
+            await Dispatcher.InvokeAsync(async () => {
+                if (cancellation.IsCancellationRequested || !Config.SupportSharingEnabled || !Config.SupportRequestsEnabled ||
+                    Config.Version != request.Profile || launchPreparing || gameRunning) return;
+                var en = Localization.Language == "en";
+                var message = en ? $"The launcher administrator suggests installing {request.ProjectName}.\nModrinth ID: {request.ProjectId}\n\nProfile: {request.Profile}\n\nInstall this mod and its required dependencies?"
+                    : $"Launcher yöneticisi {request.ProjectName} modunu kurmayı öneriyor.\nModrinth kimliği: {request.ProjectId}\n\nProfil: {request.Profile}\n\nMod ve gerekli bağımlılıkları kurulsun mu?";
+                if (MessageBox.Show(this, message, en ? "Mod installation request" : "Mod kurulum isteği", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+                if (cancellation.IsCancellationRequested || !Config.SupportSharingEnabled || !Config.SupportRequestsEnabled ||
+                    Config.Version != request.Profile || launchPreparing || gameRunning) return;
+                try {
+                    var page = new Pages.ModManagerPage(this, initializeCatalog: false);
+                    await page.InstallSupportMod(request.ProjectId, request.Profile, cancellation);
+                    StatusLbl.Text = en ? "Requested mod installed." : "İstenen mod kuruldu.";
+                } catch (Exception ex) { StatusLbl.Text = Localization.T("error") + ": " + ex.Message; }
+            }, System.Windows.Threading.DispatcherPriority.Background, cancellation).Task.Unwrap();
         }
 
         void ShowCrashReport(string report)

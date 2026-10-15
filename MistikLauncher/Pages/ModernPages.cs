@@ -403,6 +403,20 @@ public class ModernSettingsPage : Page, ILanguagePage
         };
         stack.Children.Add(usageMetrics);
         stack.Children.Add(PageHelpers.Lbl(Localization.T("usageMetricsHelp"),12,"#BDCAD8",wrap:TextWrapping.Wrap));
+        var supportSharing = new CheckBox { Name="SupportSharingToggle", Content=Localization.T("supportSharingToggle"), IsChecked=main.Config.SupportSharingEnabled, Foreground=Brushes.White, Margin=new Thickness(0,12,0,8), MinHeight=32, IsEnabled=main.Support!=null };
+        var supportRequests = new CheckBox { Name="SupportRequestsToggle", Content=Localization.T("supportRequestsToggle"), IsChecked=main.Config.SupportRequestsEnabled, Foreground=Brushes.White, Margin=new Thickness(0,0,0,8), MinHeight=32, IsEnabled=main.Config.SupportSharingEnabled && main.Support!=null };
+        async Task SaveSupport() {
+            supportSharing.IsEnabled=supportRequests.IsEnabled=false;
+            try { await main.SetSupportSharing(supportSharing.IsChecked==true,supportRequests.IsChecked==true); }
+            catch(Exception ex) { result.Text=Localization.T("error")+": "+ex.Message; }
+            finally {
+                supportSharing.IsChecked=main.Config.SupportSharingEnabled; supportRequests.IsChecked=main.Config.SupportRequestsEnabled;
+                supportSharing.IsEnabled=main.Support!=null; supportRequests.IsEnabled=main.Config.SupportSharingEnabled && main.Support!=null;
+            }
+        }
+        supportSharing.Click+=async (_,_)=>await SaveSupport(); supportRequests.Click+=async (_,_)=>await SaveSupport();
+        stack.Children.Add(supportSharing); stack.Children.Add(supportRequests);
+        stack.Children.Add(PageHelpers.Lbl(Localization.T("supportSharingHelp"),12,"#BDCAD8",wrap:TextWrapping.Wrap));
         if(!main.UsageMetricsAvailable) stack.Children.Add(PageHelpers.Lbl(Localization.T("usageMetricsUnavailable"),12,"#F0CF84",wrap:TextWrapping.Wrap));
         var privacy=PageHelpers.Lbl(Localization.T("privacyText"),13,"#BDCAD8",wrap:TextWrapping.Wrap);
         stack.Children.Add(new Expander { Header=Localization.T("privacy"),Foreground=Brushes.White,Content=privacy });

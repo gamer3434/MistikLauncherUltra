@@ -23,7 +23,7 @@ jobs:
           "MISTIK_RELEASE_TAG=v$version" >> $env:GITHUB_ENV
       - name: Validate ordinary build and website
         run: |
-          node --test Validation/WebsiteReleaseTests.js Validation/WebsitePrivacyTests.js Validation/FirebaseMetricsTests.js Validation/AdminDashboardTests.js Validation/MetricsAccuracyTests.js
+          node --test Validation/WebsiteReleaseTests.js Validation/WebsitePrivacyTests.js Validation/FirebaseMetricsTests.js Validation/AdminDashboardTests.js Validation/MetricsAccuracyTests.js Validation/AdminSupportTests.js
           dotnet run --project Validation -c Release -- artifacts/screenshots-ordinary
       - name: Build regular package
         shell: pwsh

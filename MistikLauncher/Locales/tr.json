@@ -53,7 +53,7 @@
   "saved": "Ayarlar kaydedildi.",
   "invalid": "Geçerli bir oyuncu adı ve 1–32 GB bellek gir.",
   "privacy": "Gizlilik ve güvenlik",
-  "privacyText": "Kullanım ve hata paylaşımı varsayılan olarak kapalıdır. Açarsanız anonim kurulum kimliği, sürüm, aktiflik zamanı ve hata kodları Firebase’e gönderilir. İsim, IP ve ham günlük gönderilmez. Güncelleme paketleri resmî GitHub deposundan doğrulanır.",
+  "privacyText": "Anonim kullanım ve hata paylaşımı varsayılan olarak kapalıdır; yalnızca anonim kimlik, sürüm, aktiflik zamanı ve hata kategorilerini gönderir. Ayrı yönetici desteği de varsayılan olarak kapalıdır; açarsanız oyuncu adı, seçili profil ve kurulu mod dosyaları yetkili yöneticiyle paylaşılır. Mod kurulum önerileri ayrıca açılır ve her kurulum sizin onayınızı ister. Ham günlük veya hesap şifresi paylaşılmaz. Güncellemeler resmî GitHub deposundan doğrulanır.",
   "updateDisabled": "İmzasız otomatik güncellemeler kapalıdır. GitHub sürüm sayfasını kullanın.",
   "error": "İşlem tamamlanamadı",
   "auth": "Cilt sağlayıcısı",
@@ -451,5 +451,8 @@
   "modNoResults": "Mod bulunamadı. Başka bir ad dene veya uyumluluk filtresini kapat.",
   "modGalleryLoading": "Resim yükleniyor…",
   "modGalleryFailed": "Resim yüklenemedi. Bağlantını kontrol edip tekrar dene.",
-  "modGalleryRetry": "Tekrar dene"
+  "modGalleryRetry": "Tekrar dene",
+  "supportSharingToggle": "Yöneticiyle adımı ve kurulu modlarımı paylaş",
+  "supportRequestsToggle": "Yöneticinin mod kurulum önerilerini al",
+  "supportSharingHelp": "Ayrı ve isteğe bağlıdır. Oyuncu adı, seçili profil, launcher sürümü, aktiflik zamanı ve en fazla 300 mod dosyasının adı/durumu yalnızca yetkili yöneticiye gönderilir. Mod paketi adı tahmin edilmez. Her kurulum önerisi ayrıca onayını ister. Kapatınca paylaşılan kayıt silinmeye çalışılır; bağlantı yoksa sonraki açılışta yeniden denenir."
 }

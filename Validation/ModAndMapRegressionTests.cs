@@ -81,7 +81,7 @@ static class ModAndMapRegressionTests
             using var client = new System.Net.Http.HttpClient(handler);
             var page = (ModManagerPage)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(ModManagerPage));
             var operation = (Task)typeof(ModManagerPage).GetMethod("DownloadModAndDependencies", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(page, new object?[] { sample.project, "fixture", new List<string>(), true, new HashSet<string>(), "pinned", "1.21.1", "fabric", "fixture-profile", client })!;
+                .Invoke(page, new object?[] { sample.project, "fixture", new List<string>(), true, new HashSet<string>(), "pinned", "1.21.1", "fabric", "fixture-profile", client, CancellationToken.None })!;
             rejected = false;
             try { await operation; } catch (InvalidDataException) { rejected = true; } catch (IOException) when (sample.valid) { }
             Check(sample.valid ? !rejected && handler.Requests.SequenceEqual(new[] { "/v2/version/pinned", "/v2/project/library/version" }) :
@@ -275,7 +275,7 @@ static class ModAndMapRegressionTests
         {
             window.Config.Version = "97.1-fabric";
             var operation = (Task)typeof(ModManagerPage).GetMethod("DownloadModAndDependencies", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(page, new object?[] { "parent-mod", "parent-mod", installed, true, visited, null, null, null, null, client })!;
+                .Invoke(page, new object?[] { "parent-mod", "parent-mod", installed, true, visited, null, null, null, null, client, CancellationToken.None })!;
             bool rejected = false; try { await operation; } catch (IOException) { rejected = true; }
             if (!rejected || !handler.Requests.SequenceEqual(new[] { "/v2/project/parent-mod/version" }) || installed.Count != 0 || visited.Count != 0 ||
                 !ModFiles.List(App.ModsDir).Order().SequenceEqual(activeBefore.Keys.Order()) ||
@@ -283,7 +283,7 @@ static class ModAndMapRegressionTests
                 throw new Exception("profile change during parent metadata download must prevent all required dependency requests and file writes");
             Console.WriteLine("PASS profile change during parent metadata download rejects required dependency resolution and preserves active mod bytes");
             var dependency=(Task)typeof(ModManagerPage).GetMethod("DownloadModAndDependencies",BindingFlags.Instance|BindingFlags.NonPublic)!
-                .Invoke(page,new object?[] { "required-library","required-library",installed,true,visited,null,null,null,"97.1-fabric",client })!;
+                .Invoke(page,new object?[] { "required-library","required-library",installed,true,visited,null,null,null,"97.1-fabric",client,CancellationToken.None })!;
             rejected=false; try { await dependency; } catch(IOException) { rejected=true; }
             if(!rejected || handler.Requests.Count!=1 || installed.Count!=0)
                 throw new Exception("A subsequent required dependency must retain the original profile before requesting metadata.");

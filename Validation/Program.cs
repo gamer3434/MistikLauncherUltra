@@ -87,6 +87,7 @@ class Program
             checks += LauncherUpdateTests.Run(testRoot).GetAwaiter().GetResult();
             checks += ReleaseCacheTests.Run(testRoot).GetAwaiter().GetResult();
             checks += LauncherMetricsTests.Run(Path.Combine(testRoot,"metrics-tests")).GetAwaiter().GetResult();
+            checks += LauncherSupportTests.Run(Path.Combine(testRoot,"support-tests")).GetAwaiter().GetResult();
             int packageIndex=Array.IndexOf(args,"--verify-package");
             if(packageIndex>=0) {
                 var packaged=MistikLauncher.Updates.UpdateEngine.Verify(Path.GetFullPath(args[packageIndex+1]));
@@ -422,6 +423,7 @@ class Program
                 window.Navigate("Opt"); Capture(window,Path.Combine(output,"performance-"+code+".png"),960,640);
                 Check(Texts((DependencyObject)((Frame)window.FindName("MainFrame")).Content).Contains(Localization.T("optTitle")),"optimization page opens in selected language: "+code);
             }
+            checks += NavigationKeyboardTests.Run(window);
             checks += ModCatalogUiTests.Run(window, name => Capture(window, Path.Combine(output,name+".png"), name == "mod-catalog-long-heading" ? 960 : 1200, name == "mod-catalog-long-heading" ? 640 : 820),
                 (name,width,height) => Capture(window, Path.Combine(output,name+".png"), width, height));
             checks += ModCatalogPositionTests.Run(window, name => Capture(window, Path.Combine(output,name+".png")));

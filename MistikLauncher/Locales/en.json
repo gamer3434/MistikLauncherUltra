@@ -53,7 +53,7 @@
   "saved": "Settings saved.",
   "invalid": "Enter a valid player name and 1–32 GB of memory.",
   "privacy": "Privacy and security",
-  "privacyText": "Usage and error sharing is off by default. If enabled, an anonymous installation ID, version, activity timestamp and error categories go to Firebase. Names, IP addresses and raw logs are excluded. Update packages are verified from the official GitHub repository.",
+  "privacyText": "Anonymous usage and error sharing is off by default; it sends only an anonymous ID, version, activity time and error categories. Separate administrator support is also off by default; enabling it shares your player name, selected profile and installed mod filenames with the authorized administrator. Installation suggestions have a separate switch, and each installation requires your approval. Raw logs and account passwords are excluded. Updates are verified from the official GitHub repository.",
   "updateDisabled": "Unsigned automatic updates are disabled. Use the GitHub release page.",
   "error": "Operation failed",
   "auth": "Skin provider",
@@ -451,5 +451,8 @@
   "modNoResults": "No mods found. Try a different name or turn off the compatibility filter.",
   "modGalleryLoading": "Loading image…",
   "modGalleryFailed": "Image could not load. Check your connection and retry.",
-  "modGalleryRetry": "Retry"
+  "modGalleryRetry": "Retry",
+  "supportSharingToggle": "Share my player name and installed mods with the administrator",
+  "supportRequestsToggle": "Receive mod installation suggestions from the administrator",
+  "supportSharingHelp": "Separate and optional. Your player name, selected profile, launcher version, activity time and up to 300 mod filenames/states are shared only with the authorized administrator. Modpack names are not inferred. Each suggested installation needs your approval. Turning this off attempts to delete the shared record; offline cleanup retries on the next start."
 }

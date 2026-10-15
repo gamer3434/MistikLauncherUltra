@@ -833,7 +833,7 @@ namespace MistikLauncher.Pages
         static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30),MaxResponseContentBufferSize=128*1024*1024 };
         static ModManagerPage() => Http.DefaultRequestHeaders.UserAgent.ParseAdd("MistikLauncher/6.2 (gamer3434/MistikLauncherUltra)");
 
-        public ModManagerPage(MainWindow main, HttpClient? client = null)
+        public ModManagerPage(MainWindow main, HttpClient? client = null, bool initializeCatalog = true)
         {
             _main = main;
             _client = client ?? Http;
@@ -1209,8 +1209,7 @@ namespace MistikLauncher.Pages
             Content = _catalogScroll = new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
 
             // Load popular mods on open
-            _ = LoadCatalog();
-            RenderInstalledMods();
+            if (initializeCatalog) { _ = LoadCatalog(); RenderInstalledMods(); }
             Loaded += (_, _) => {
                 if (InstalledModsWriteTimeUtc() != _installedModsWriteTimeUtc) RenderInstalledMods();
                 if (_searchProfile != (_main.Config.Version ?? "")) _ = SearchMods();
@@ -1434,6 +1433,19 @@ namespace MistikLauncher.Pages
             return installedList.Count > 0;
         }
 
+        internal async Task InstallSupportMod(string projectId, string expectedProfile, System.Threading.CancellationToken cancellation)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (!System.Text.RegularExpressions.Regex.IsMatch(projectId, "^[A-Za-z0-9]{8}$") || _main.Config.Version != expectedProfile)
+                throw new IOException("The support request no longer matches the selected profile.");
+            var project = JObject.Parse(await _client.GetStringAsync("https://api.modrinth.com/v2/project/" + projectId, cancellation));
+            if ((string?)project["id"] != projectId || (string?)project["project_type"] != "mod") throw new InvalidDataException("The requested project is not a verified mod.");
+            var versions = JArray.Parse(await _client.GetStringAsync("https://api.modrinth.com/v2/project/" + projectId + "/version", cancellation));
+            var version = FindCompatibleVersion(versions, GameProfiles.MinecraftVersion(App.GameDir, expectedProfile), GameProfiles.Loader(App.GameDir, expectedProfile));
+            if (version == null || string.IsNullOrWhiteSpace((string?)version["id"])) throw new IOException("This mod is incompatible with the selected profile.");
+            await DownloadModAndDependencies(projectId, (string?)project["title"] ?? projectId, new List<string>(), versionId: (string)version["id"]!, expectedProfile: expectedProfile, cancellation: cancellation);
+        }
+
 
         internal static JToken? FindInstalledCompatibleVersion(JArray versions, string root, string game, string loader)
             => versions.FirstOrDefault(version => CheckCompatibility(version, game, loader) &&
@@ -1502,8 +1514,9 @@ namespace MistikLauncher.Pages
 
         async Task DownloadModAndDependencies(string projectId, string name, List<string> installedList, bool isDependency = false,
             HashSet<string>? visited = null, string? versionId = null, string? queueGame = null, string? queueLoader = null,
-            string? expectedProfile = null, HttpClient? client = null)
+            string? expectedProfile = null, HttpClient? client = null, System.Threading.CancellationToken cancellation = default)
         {
+            cancellation.ThrowIfCancellationRequested();
             visited ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var currentVer = expectedProfile ?? _main.Config.Version ?? "";
             if (queueGame == null && _main.Config.Version != currentVer) throw new IOException("The selected Minecraft version changed during mod installation. Please retry.");
@@ -1514,7 +1527,7 @@ namespace MistikLauncher.Pages
             JArray? versions = null;
             if (versionId != null)
             {
-                targetVersion = JObject.Parse(await http.GetStringAsync($"https://api.modrinth.com/v2/version/{Uri.EscapeDataString(versionId)}"));
+                targetVersion = JObject.Parse(await http.GetStringAsync($"https://api.modrinth.com/v2/version/{Uri.EscapeDataString(versionId)}", cancellation));
                 var resolvedProject = targetVersion["project_id"]?.ToString();
                 if (targetVersion["id"]?.ToString() != versionId || string.IsNullOrWhiteSpace(resolvedProject) ||
                     (!string.IsNullOrWhiteSpace(projectId) && resolvedProject != projectId))
@@ -1522,11 +1535,11 @@ namespace MistikLauncher.Pages
                 projectId = resolvedProject;
                 if (!CheckCompatibility(targetVersion, mcVersion, loader))
                     throw new IOException($"Required dependency {versionId} is incompatible with {mcVersion} {loader}.");
-                versions = JArray.Parse(await http.GetStringAsync($"https://api.modrinth.com/v2/project/{Uri.EscapeDataString(projectId)}/version"));
+                versions = JArray.Parse(await http.GetStringAsync($"https://api.modrinth.com/v2/project/{Uri.EscapeDataString(projectId)}/version", cancellation));
             }
             else
             {
-                versions = JArray.Parse(await http.GetStringAsync($"https://api.modrinth.com/v2/project/{Uri.EscapeDataString(projectId)}/version"));
+                versions = JArray.Parse(await http.GetStringAsync($"https://api.modrinth.com/v2/project/{Uri.EscapeDataString(projectId)}/version", cancellation));
                 var existingRoot = queueGame == null
                     ? await Task.Run(() => _main.WithModChanges(currentVer, destination => destination))
                     : Path.Combine(App.AppData, "mods_pool", GameProfiles.VersionPoolKey(mcVersion, loader));
@@ -1542,10 +1555,10 @@ namespace MistikLauncher.Pages
                     .FirstOrDefault(value => value is "fabric" or "forge" or "neoforge" or "quilt")
                     ?? throw new IOException("No supported mod loader is available.");
                 await InstallRequiredDependencies(latest, (dependencyProject, dependencyVersion) =>
-                    DownloadModAndDependencies(dependencyProject, dependencyProject, new List<string>(), true, visited, dependencyVersion, targetGame, targetLoader, currentVer, http));
+                    DownloadModAndDependencies(dependencyProject, dependencyProject, new List<string>(), true, visited, dependencyVersion, targetGame, targetLoader, currentVer, http, cancellation));
                 var file = (latest["files"] as JArray)?.FirstOrDefault(value => value["primary"]?.Value<bool>() == true)
                     ?? latest["files"]?.FirstOrDefault() ?? throw new InvalidDataException("Missing mod file.");
-                var bytes = await http.GetByteArrayAsync(ModFiles.DownloadUrl(file["url"]?.ToString() ?? ""));
+                var bytes = await http.GetByteArrayAsync(ModFiles.DownloadUrl(file["url"]?.ToString() ?? ""), cancellation);
                 await Task.Run(() => _main.WithModPoolChanges(targetGame, targetLoader, destination => InstallDownloadedMod(destination, file, bytes, false)));
                 MessageBox.Show($"'{name}' modu şu anki oyun sürümünüz ({mcVersion} {loader}) ile uyumsuz!\n\n'{targetGame} {targetLoader}' havuzuna indirildi. Bu sürüm ve yükleyici seçildiğinde otomatik olarak etkinleştirilecektir.", "Sürüm Beklemeye Alındı", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
@@ -1558,7 +1571,7 @@ namespace MistikLauncher.Pages
             {
                 // Resolve required files before installing the parent, so a failed dependency cannot look like success.
                 await InstallRequiredDependencies(targetVersion, (dependencyProject, dependencyVersion) =>
-                    DownloadModAndDependencies(dependencyProject, dependencyProject, installedList, true, visited, dependencyVersion, queueGame, queueLoader, currentVer, http));
+                    DownloadModAndDependencies(dependencyProject, dependencyProject, installedList, true, visited, dependencyVersion, queueGame, queueLoader, currentVer, http, cancellation));
                 var file = (targetVersion["files"] as JArray)?.FirstOrDefault(value => value["primary"]?.Value<bool>() == true)
                     ?? targetVersion["files"]?.FirstOrDefault() ?? throw new InvalidDataException("Missing mod file.");
                 var reused = await Task.Run(() => queueGame == null
@@ -1570,11 +1583,12 @@ namespace MistikLauncher.Pages
                     if (!installedList.Contains(name)) installedList.Add(name);
                     return;
                 }
-                var bytes = await http.GetByteArrayAsync(ModFiles.DownloadUrl(file["url"]?.ToString() ?? ""));
+                var bytes = await http.GetByteArrayAsync(ModFiles.DownloadUrl(file["url"]?.ToString() ?? ""), cancellation);
+                cancellation.ThrowIfCancellationRequested();
                 if (queueGame == null && _main.Config.Version != currentVer) throw new IOException("The selected Minecraft version changed during mod installation. Please retry.");
                 var installedPath = await Task.Run(() => queueGame == null
-                    ? _main.WithModChanges(currentVer, destination => InstallDownloadedMod(destination, file, bytes, isDependency, versions))
-                    : _main.WithModPoolChanges(mcVersion, loader, destination => InstallDownloadedMod(destination, file, bytes, isDependency, versions)));
+                    ? _main.WithModChanges(currentVer, destination => { cancellation.ThrowIfCancellationRequested(); return InstallDownloadedMod(destination, file, bytes, isDependency, versions); })
+                    : _main.WithModPoolChanges(mcVersion, loader, destination => { cancellation.ThrowIfCancellationRequested(); return InstallDownloadedMod(destination, file, bytes, isDependency, versions); }));
                 if (isDependency) name = Path.GetFileName(installedPath);
                 if (!installedList.Contains(name)) installedList.Add(name);
             }

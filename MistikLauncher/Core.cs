@@ -24,6 +24,8 @@ namespace MistikLauncher
         [JsonProperty("launcher_auto_update")] public bool LauncherAutoUpdate { get; set; } = true;
         [JsonProperty("auto_mcs_update")] public bool AutoMcsAutoUpdate { get; set; } = true;
         [JsonProperty("usage_metrics_enabled")] public bool UsageMetricsEnabled { get; set; } = false;
+        [JsonProperty("support_sharing_enabled")] public bool SupportSharingEnabled { get; set; } = false;
+        [JsonProperty("support_requests_enabled")] public bool SupportRequestsEnabled { get; set; } = false;
 
         [JsonProperty("user")]       public string User       { get; set; } = "Oyuncu";
         [JsonProperty("version")]    public string Version    { get; set; } = "1.21";
@@ -214,6 +216,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.39","2026-10-15","#00D4AA", new[]{
+                "Backspace ve gizli geri/ileri geçmişi artık launcher menüsünü değiştirmez; metin silme çalışmaya devam eder.",
+                "Ayrı izinle yönetici panelinde oyuncu adı, etkinlik, profil ve kurulu mod dosyaları paylaşılabilir.",
+                "Yönetici Modrinth mod kurulum önerisi gönderebilir; her öneri kullanıcı onayı ve uyumluluk kontrolü gerektirir.",
+                "Backspace and hidden history traversal no longer change launcher menus; text editing still works.",
+                "Separate opt-in support sharing shows player names, activity, profiles and installed mod filenames to the administrator.",
+                "Administrators can suggest Modrinth installs; each request requires recipient approval and compatibility checks."
+            }),
             new("v6.2.38","2026-10-15","#00D4AA", new[]{
                 "Dil değişiminde açık mod sekmesi, açıklama ve galeri korunur; mod bilgileri yeniden indirilmez.",
                 "Yükleme hatası sonrasında tekrar deneme önceki sekmeyi geri açar.",

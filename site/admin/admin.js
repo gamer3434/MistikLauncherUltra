@@ -1,4 +1,5 @@
 import { summarize } from './metrics.mjs';
+import { mountSupport } from './support.mjs';
 const $ = id => document.getElementById(id);
 function status(message, error = false) { if ($('status').textContent !== message) $('status').textContent = message; $('status').dataset.error = String(error); }
 let displayedErrors = [];
@@ -131,9 +132,9 @@ try {
   await authSdk.setPersistence(auth, authSdk.browserSessionPersistence);
   let redirectError;
   try { await authSdk.getRedirectResult(auth); } catch (error) { redirectError = error?.code || "bağlantı"; }
-  let unsubscribe = () => {}, connectedStop = () => {}, offsetStop = () => {}, timer, data, receivedAt, connected = false, offset = 0, generation = 0;
+  let unsubscribe = () => {}, connectedStop = () => {}, offsetStop = () => {}, timer, data, receivedAt, connected = false, offset = 0, generation = 0, support;
   const stopMetrics = () => {
-    generation++; unsubscribe(); connectedStop(); offsetStop(); clearInterval(timer);
+    generation++; unsubscribe(); connectedStop(); offsetStop(); clearInterval(timer); support?.stop(); support = undefined;
     unsubscribe = connectedStop = offsetStop = () => {};
     data = undefined; connected = false; offset = 0; clear();
   };
@@ -154,17 +155,20 @@ try {
     stopMetrics();
     $('login').hidden = !!user; $('logout').hidden = !user;
     if (!user) { status(redirectError ? 'Google girişi tamamlanamadı. (' + redirectError + ')' : 'Bu panel yalnızca yetkili Google hesabına açıktır.', !!redirectError); return; }
+    if (!user.emailVerified || !user.providerData?.some(provider => provider.providerId === 'google.com')) { status('Doğrulanmış, yetkili Google hesabıyla giriş yap.', true); return; }
     status('Yetki ve Firebase verileri kontrol ediliyor…');
     void loadLauncherDetails(); void loadCatalogMods();
     const current = generation;
+    support = mountSupport({database, sdk:dbSdk, now:() => Date.now() + offset});
     let readError = false;
     const update = () => { if (current === generation && !readError && connected && data !== undefined) { render(data, Date.now() + offset, receivedAt); status('Bağlı · Canlı veriler; aktiflik her 30 saniyede yenilenir.'); } };
     connectedStop = dbSdk.onValue(dbSdk.ref(database, '.info/connected'), snapshot => {
       if (current !== generation || readError) return;
       connected = snapshot.val() === true;
+      support?.connection(connected);
       if (!connected) { clear(); status('Bağlantı bekleniyor; mevcut sayılar doğrulanamıyor.', true); } else update();
     });
-    offsetStop = dbSdk.onValue(dbSdk.ref(database, '.info/serverTimeOffset'), snapshot => { if (current !== generation) return; offset = Number(snapshot.val()) || 0; update(); });
+    offsetStop = dbSdk.onValue(dbSdk.ref(database, '.info/serverTimeOffset'), snapshot => { if (current !== generation) return; offset = Number(snapshot.val()) || 0; support?.refresh(); update(); });
     unsubscribe = dbSdk.onValue(dbSdk.ref(database, 'launcherMetrics'), snapshot => { if (current !== generation) return; readError = false; data = snapshot.val() || {}; receivedAt = Date.now() + offset; update(); }, () => {
       if (current !== generation) return;
       readError = true; data = undefined; clear(); status('Veriler okunamadı. Hesabın yönetici yetkisini ve veritabanı kurallarını kontrol edin.', true);
