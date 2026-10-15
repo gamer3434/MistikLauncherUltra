@@ -215,7 +215,13 @@ namespace MistikLauncher
                 StatusLbl.Text = (en ? "Installing administrator suggestion: " : "Yönetici önerisi kuruluyor: ") + request.ProjectName;
                 await install();
                 StatusLbl.Text = en ? "Requested mod installed." : "İstenen mod kuruldu.";
-            } catch (Exception ex) { StatusLbl.Text = Localization.T("error") + ": " + ex.Message; }
+            } catch (Exception ex) { ReportModOperationFailure(ex); StatusLbl.Text = Localization.T("error") + ": " + ex.Message; }
+        }
+
+        public void ReportModOperationFailure(Exception error)
+        {
+            var code = LauncherMetrics.ModFailureCode(error);
+            if (UsageMetrics != null && code != null) _ = UsageMetrics.ReportErrorAsync(code);
         }
 
         void ShowCrashReport(string report)
@@ -954,6 +960,7 @@ namespace MistikLauncher
             }
             catch (ModConflictException ex)
             {
+                ReportModOperationFailure(ex);
                 App.Log("Launch blocked by declared mod conflict: " + ex.Message);
                 MessageBox.Show(this,ex.Message,Localization.T("modConflictTitle"),MessageBoxButton.OK,MessageBoxImage.Warning);
             }

@@ -218,6 +218,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.42","2026-10-15","#00D4AA", new[]{
+                "Uyumlu mod sürümü yoksa başka Minecraft/yükleyici sürümüne otomatik indirme yapılmaz.",
+                "Belirsiz mod arşivleri indirilmeden reddedilir; mod işlemlerindeki hatalar açık paylaşım izniyle bildirilir.",
+                "Admin panelinde hata açıklamaları, önerilen adımlar, son bildirim ve açık/kapalı mod sayıları gösterilir.",
+                "Missing compatible builds no longer download mods for another Minecraft version or loader.",
+                "Ambiguous mod archives are rejected before download; opted-in installations report caught mod failures.",
+                "The admin panel adds error guidance, last heartbeat and enabled/disabled mod counts."
+            }),
             new("v6.2.41","2026-10-15","#00D4AA", new[]{
                 "Açık Fabric mod çakışmaları indirme, elle ekleme ve yeniden etkinleştirme sırasında engellenir.",
                 "Oyun başlamadan önce etkin modlar tekrar kontrol edilir; çakışan dosyalar adlarıyla gösterilir.",

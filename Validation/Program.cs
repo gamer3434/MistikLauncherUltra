@@ -66,6 +66,7 @@ class Program
             checks += ModBackupTests.Run(Path.Combine(testRoot,"mod-backup"));
             checks += ModMigrationTargetTests.Run(Path.Combine(testRoot,"migration-targets"));
             checks += ModCatalogTests.Run(Path.Combine(testRoot,"mod-catalog"));
+            checks += ModVersionSelectionTests.Run(Path.Combine(testRoot,"mod-version-selection")).GetAwaiter().GetResult();
             checks += InstalledModCatalogTests.Run(Path.Combine(testRoot,"installed-mod-catalog")).GetAwaiter().GetResult();
             checks += MistikMenuTests.Run(Path.Combine(testRoot,"mistik-menu"));
             checks += ModAndMapRegressionTests.Run(Path.Combine(testRoot,"mod-map-regressions")).GetAwaiter().GetResult();

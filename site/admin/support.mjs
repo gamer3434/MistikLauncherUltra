@@ -53,7 +53,9 @@ export function mountSupport({database, sdk, now}) {
     if (!device) { actions(); return; }
     $('supportName').textContent = device.username;
     $('supportFacts').textContent = `Launcher ${device.version} · ${device.profile} · ${device.active && connected ? 'Son 5 dk aktif' : 'Güncel etkinlik doğrulanamadı'}`;
-    $('supportModCount').textContent = `${device.mods.length} / ${device.modCount} mod dosyası${device.truncated ? ' · Liste ilk 300 dosyayla sınırlı' : ''}. Mod paketi kimliği bu dosyalardan belirlenemez.`;
+    const enabled = device.mods.filter(mod => mod.enabled).length;
+    $('supportModCount').textContent = `${device.mods.length} / ${device.modCount} mod dosyası · Gösterilenlerde ${enabled} açık, ${device.mods.length - enabled} kapalı${device.truncated ? ' · Liste ilk 300 dosyayla sınırlı; açık/kapalı sayıları yalnızca gösterilen dosyaları kapsar' : ''}. Mod paketi kimliği bu dosyalardan belirlenemez.`;
+    $('supportHeartbeat').textContent = `Son launcher bildirimi: ${new Date(device.lastSeen).toLocaleString('tr-TR')} · Mod önerileri: ${device.allowRequests ? 'Açık' : 'Kapalı'}. Otomatik kurulum izni bu kayıttan bilinmiyor.`;
     $('supportModList').replaceChildren(...device.mods.map(mod => node('li', `${mod.name} · ${mod.enabled ? 'Açık' : 'Kapalı'}`)));
     if (!device.mods.length) $('supportModList').append(node('li', 'Bu profilde mod dosyası bildirilmemiş.'));
     $('supportRequestStatus').textContent = !connected ? 'Çevrimdışı; istek gönderilemez.' : !device.active ? 'Kurulumun güncel etkinlik sinyali yok.' : !device.allowRequests ? 'Bu kurulum mod önerilerini kabul etmiyor.' : !requestLoaded ? 'İstek durumu kontrol ediliyor…' : pending !== null ? 'Bekleyen kurulum isteği var. Launcher’ın işlemesi bekleniyor; üzerine yazılmaz.' : 'Yeni istek gönderilebilir. Kullanıcının verdiği izinlere göre otomatik kurulur veya launcher onayı beklenir.';
@@ -130,7 +132,7 @@ export function mountSupport({database, sdk, now}) {
     raw = selected = project = pending = undefined; rows = [];
     $('supportRows').replaceChildren(); $('supportDetail').hidden = true; $('supportModList').replaceChildren();
     $('supportName').textContent = ''; $('supportFacts').textContent = ''; $('supportCount').textContent = ''; message('');
-    $('supportSearch').value = ''; $('supportModCount').textContent = ''; $('supportRequestStatus').textContent = '';
+    $('supportSearch').value = ''; $('supportModCount').textContent = ''; $('supportHeartbeat').textContent = ''; $('supportRequestStatus').textContent = '';
     $('supportSearchForm').onsubmit = $('supportSend').onclick = $('supportClose').onclick = null;
   }};
 }

@@ -46,6 +46,15 @@ test('admin filters intersect categories and versions, then reset without losing
   assert.equal(elements.get('errors').children.length, 3);
   assert.equal(elements.get('resetErrors').disabled, true);
 });
+test('admin error guidance comes from known category, not a supplied raw message', async () => {
+  const {elements,render} = await dashboard();
+  const secret = 'C:\\Users\\SecretPlayer\\secret.jar token=private-secret';
+  render({errors:{a:{java:{code:'MLU-JAVA',version:'6.2.38',lastSeen:now,count:1,message:secret,description:secret,nextStep:secret}}}},now);
+  const row = elements.get('errors').children[0];
+  assert.equal(row.children.length,5);
+  assert.match(row.children[4].textContent,/MLU-JAVA/);assert.match(row.children[4].textContent,/Java sürümünü seç/);
+  assert.ok(!row.children[4].textContent.includes(secret));
+});
 
 test('periodic refresh preserves the existing filter options when their values are unchanged', async () => {
   const {elements, render} = await dashboard();

@@ -85,10 +85,22 @@ test('support DOM fixture renders literal names and bounded inventory, then eras
   support.connection(true);data({device:fixture({username:'<img src=x onerror=alert(1)>'})});select();pending(null);
   assert.equal($('supportName').textContent,'<img src=x onerror=alert(1)>');assert.equal($('supportName').children.length,0);
   assert.equal($('supportModList').children[0].textContent,'voicechat.jar · Açık');
+  assert.match($('supportModCount').textContent,/1 açık, 0 kapalı/);
+  assert.match($('supportHeartbeat').textContent,/Son launcher bildirimi:/);
+  assert.match($('supportHeartbeat').textContent,/Mod önerileri: Açık/);
+  assert.match($('supportHeartbeat').textContent,/Otomatik kurulum izni bu kayıttan bilinmiyor/);
   const oldHandler=handlers.get('launcherSupport/devices');support.stop();
   oldHandler.ok({val:()=>({device:fixture()})});
   assert.equal($('supportRows').children.length,0);assert.equal($('supportName').textContent,'');assert.equal($('supportDetail').hidden,true);
+  assert.equal($('supportHeartbeat').textContent,'');
   assert.ok(stopped.includes('launcherSupport/devices'));assert.ok(stopped.includes('launcherSupport/requests/device'));
+});
+test('support DOM fixture does not present truncated enabled counts as a full inventory', async t => {
+  const {$,support,data,select,pending} = await supportFixture(t);
+  support.connection(true);data({device:fixture({mods:[{name:'open.jar',enabled:true},{name:'closed.jar.disabled',enabled:false}],modCount:380,truncated:true})});select();pending(null);
+  assert.match($('supportModCount').textContent,/2 \/ 380/);
+  assert.match($('supportModCount').textContent,/1 açık, 1 kapalı/);
+  assert.match($('supportModCount').textContent,/yalnızca gösterilen dosyaları kapsar/);
 });
 test('support DOM fixture sends canonical proposal once, blocks pending and offline targets', async t => {
   const {$,support,data,select,pending,transactions} = await supportFixture(t);

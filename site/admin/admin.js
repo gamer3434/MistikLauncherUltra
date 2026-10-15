@@ -26,7 +26,7 @@ function renderErrors() {
   const category = $('errorCategory').value, version = $('errorVersion').value;
   const matches = displayedErrors.filter(item => (!category || item.label === category) && (!version || item.version === version));
   const visible = matches.slice(0, 50);
-  table('errors', visible.map(item => [item.label, item.version, date(item.lastSeen), number(item.count)]), 4, displayedErrors.length ? 'Bu filtrelere uyan bildirim yok' : 'Henüz hata bildirilmedi');
+  table('errors', visible.map(item => [item.label, item.version, date(item.lastSeen), number(item.count), `${item.code}\n${item.description}\nÖnerilen adım: ${item.nextStep}`]), 5, displayedErrors.length ? 'Bu filtrelere uyan bildirim yok' : 'Henüz hata bildirilmedi');
   $('errorCount').textContent = `${visible.length} / ${displayedErrors.length} kayıt gösteriliyor${matches.length > visible.length ? ` · Filtreye uyan ${number(matches.length)} kaydın en yeni 50 tanesi` : ''}`;
   $('resetErrors').disabled = !category && !version;
 }

@@ -36,7 +36,7 @@ public sealed class LauncherMetrics
     Task? loop;
     string? uid, token, refresh;
     DateTime expires;
-    bool enabled;
+    bool enabled, registered;
     public bool Enabled => enabled;
     public LauncherMetrics(LauncherMetricsOptions settings, HttpClient client, string dataDirectory, string launcherVersion)
     {
@@ -46,6 +46,12 @@ public sealed class LauncherMetrics
     }
     static JObject Timestamp() => new() { [".sv"] = "timestamp" };
     JObject Presence() => new() { ["lastSeen"] = Timestamp(), ["version"] = version };
+    public static string? ModFailureCode(Exception error) => error switch {
+        OperationCanceledException => null,
+        ModConflictException => "MLU-MOD-DEPENDENCY",
+        IOException or InvalidDataException or UnauthorizedAccessException or HttpRequestException => "MLU-FILE",
+        _ => "MLU-APP"
+    };
     async Task<JObject> JsonAsync(HttpRequestMessage request, CancellationToken cancellation)
     {
         using (request) {
@@ -114,7 +120,7 @@ public sealed class LauncherMetrics
                 }
                 if (File.Exists(tokenPath)) File.Delete(tokenPath);
                 if (File.Exists(tokenPath + ".tmp")) File.Delete(tokenPath + ".tmp");
-                uid = token = refresh = null; expires = default;
+                uid = token = refresh = null; expires = default; registered = false;
             }
         } finally { gate.Release(); }
     }
@@ -132,13 +138,18 @@ public sealed class LauncherMetrics
         try {
             if (!enabled) return;
             await AuthenticateAsync(cancellation).ConfigureAwait(false);
-            var existing = await JsonAsync(new(HttpMethod.Get, Url("installations/" + uid)), cancellation).ConfigureAwait(false);
-            var installation = Presence();
-            installation["firstSeen"] = existing["firstSeen"]?.DeepClone() ?? Timestamp();
-            await WriteAsync(HttpMethod.Put, "installations/" + uid, installation, cancellation).ConfigureAwait(false);
+            await RegisterInstallationAsync(cancellation).ConfigureAwait(false);
             await WriteAsync(HttpMethod.Put, "sessions/" + uid, Presence(), cancellation).ConfigureAwait(false);
         } catch (Exception ex) { App.Log("Metrics heartbeat unavailable: " + ex.GetType().Name); }
         finally { gate.Release(); }
+    }
+    async Task RegisterInstallationAsync(CancellationToken cancellation)
+    {
+        var existing = await JsonAsync(new(HttpMethod.Get, Url("installations/" + uid)), cancellation).ConfigureAwait(false);
+        var installation = Presence();
+        installation["firstSeen"] = existing["firstSeen"]?.DeepClone() ?? Timestamp();
+        await WriteAsync(HttpMethod.Put, "installations/" + uid, installation, cancellation).ConfigureAwait(false);
+        registered = true;
     }
     public async Task ReportErrorAsync(string code)
     {
@@ -148,6 +159,7 @@ public sealed class LauncherMetrics
             if (!enabled) return;
             using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(6));
             await AuthenticateAsync(cancellation.Token).ConfigureAwait(false);
+            if (!registered) await RegisterInstallationAsync(cancellation.Token).ConfigureAwait(false);
             var error = Presence(); error["code"] = code; error["count"] = new JObject { [".sv"] = new JObject { ["increment"] = 1 } };
             await WriteAsync(HttpMethod.Patch, "errors/" + uid + "/" + code, error, cancellation.Token).ConfigureAwait(false);
         } catch (Exception ex) { App.Log("Metrics error recording unavailable: " + ex.GetType().Name); }

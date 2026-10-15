@@ -9,10 +9,15 @@ static class LauncherMetricsTests
     sealed class Fake : HttpMessageHandler
     {
         public readonly List<(string Method, string Url, string Body)> Requests = new();
+        public bool FailInstallationOnce;
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellation)
         {
             var body = request.Content == null ? "" : await request.Content.ReadAsStringAsync(cancellation);
             lock (Requests) Requests.Add((request.Method.Method, request.RequestUri!.AbsoluteUri, body));
+            if (FailInstallationOnce && request.Method == HttpMethod.Put && request.RequestUri.AbsolutePath.Contains("/installations/")) {
+                FailInstallationOnce = false;
+                return new(HttpStatusCode.ServiceUnavailable) { Content = new StringContent("null") };
+            }
             string response = request.RequestUri!.Host switch {
                 "identitytoolkit.googleapis.com" => "{\"localId\":\"anonymousFixture\",\"idToken\":\"fixture-token\",\"refreshToken\":\"fixture-refresh-secret\"}",
                 "securetoken.googleapis.com" => "{\"user_id\":\"anonymousFixture\",\"id_token\":\"fixture-token\",\"refresh_token\":\"fixture-refresh-secret\"}",
@@ -28,6 +33,13 @@ static class LauncherMetricsTests
         var options = new LauncherMetricsOptions("fixture_public_api_key_123456", "https://mistiklauncher-9eb4b-default-rtdb.firebaseio.com/");
         Check(options.Valid && !new LauncherMetricsOptions(options.ApiKey, "https://attacker.firebaseio.com/").Valid && !new LauncherMetricsOptions(options.ApiKey, options.DatabaseUrl + "other").Valid, "metrics configuration restricts destination to project root");
         Check(!new LauncherConfig().UsageMetricsEnabled, "anonymous metrics require explicit opt-in by default");
+        Check(LauncherMetrics.ModFailureCode(new OperationCanceledException()) == null &&
+            LauncherMetrics.ModFailureCode(new ModConflictException("private mod names")) == "MLU-MOD-DEPENDENCY" &&
+            LauncherMetrics.ModFailureCode(new IOException("private path")) == "MLU-FILE" &&
+            LauncherMetrics.ModFailureCode(new InvalidDataException("private metadata")) == "MLU-FILE" &&
+            LauncherMetrics.ModFailureCode(new HttpRequestException("private URL")) == "MLU-FILE" &&
+            LauncherMetrics.ModFailureCode(new InvalidOperationException("private message")) == "MLU-APP",
+            "mod operation reports classify expected conflicts and file/network failures without transmitting exception text or cancellations");
         var fake = new Fake(); using var http = new HttpClient(fake);
         var service = new LauncherMetrics(options, http, directory, "6.2.14");
         await service.HeartbeatAsync(); await service.ReportErrorAsync("MLU-APP"); await service.SetEnabledAsync(false);
@@ -77,6 +89,17 @@ static class LauncherMetricsTests
         await shutdown.HeartbeatAsync();
         Check(!shutdown.Enabled && queuedFake.Requests.Count == 0 && !Directory.Exists(Path.Combine(directory, "queued-shutdown")),
             "shutdown stops an earlier queued enable before any telemetry authentication or file creation");
+        var startupFake = new Fake { FailInstallationOnce = true }; using var startupHttp = new HttpClient(startupFake);
+        var startup = new LauncherMetrics(options, startupHttp, Path.Combine(directory,"startup-error"), "6.2.14");
+        await startup.SetEnabledAsync(true);
+        await startup.ReportErrorAsync("MLU-FILE");
+        var startupRequests = startupFake.Requests.ToArray();
+        int errorIndex = Array.FindIndex(startupRequests, r => r.Method == "PATCH" && r.Url.Contains("/errors/"));
+        Check(errorIndex > 0 && startupRequests.Take(errorIndex).Count(r => r.Method == "PUT" && r.Url.Contains("/installations/")) == 2,
+            "error after a failed first heartbeat registers its consenting installation before sending the report");
+        Check(!startupRequests.Any(r => r.Method == "PUT" && r.Url.Contains("/sessions/")),
+            "error reporting alone does not invent an active launcher heartbeat after failed presence publication");
+        await startup.SetEnabledAsync(false);
         return count;
     }
 }

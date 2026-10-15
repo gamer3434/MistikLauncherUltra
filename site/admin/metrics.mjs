@@ -1,9 +1,25 @@
 const codes = Object.freeze({
   'MLU-INTEGRITY': 'Dosya bütünlüğü', 'MLU-MEMORY': 'Bellek', 'MLU-JAVA': 'Java sürümü',
   'MLU-MOD-DEPENDENCY': 'Mod bağımlılığı', 'MLU-MOD-MIXIN': 'Mod uyumsuzluğu',
-  'MLU-CLASSPATH': 'Eksik sınıf', 'MLU-FILE': 'Eksik dosya', 'MLU-EXIT': 'Oyun çıkışı',
+  'MLU-CLASSPATH': 'Eksik sınıf', 'MLU-FILE': 'Dosya / indirme', 'MLU-EXIT': 'Oyun çıkışı',
   'MLU-LAUNCH': 'Oyun başlatma', 'MLU-APP': 'Launcher hatası'
 });
+const advice = Object.freeze({
+  'MLU-INTEGRITY': ['Gerekli oyun dosyasının bütünlük doğrulaması başarısız.', 'Oyunu tekrar başlatıp dosya doğrulamasını çalıştır; sorun sürerse seçili sürümü kontrol et.'],
+  'MLU-MEMORY': ['Bellek ayırma veya kullanılabilir RAM sorunu bildirildi.', 'Ayrılan RAM’i ve boş belleği kontrol et; ağır modları azaltmayı dene.'],
+  'MLU-JAVA': ['Java sınıf sürümü seçili çalışma ortamıyla uyuşmuyor.', 'Minecraft profilinin gerektirdiği Java sürümünü seç.'],
+  'MLU-MOD-DEPENDENCY': ['Mod bağımlılığı veya modlar arasında sürüm uyumsuzluğu bildirildi.', 'Minecraft ve yükleyici sürümünü, zorunlu bağımlılıkları kontrol et; değişiklikten önce yedek al.'],
+  'MLU-MOD-MIXIN': ['Modun oyun koduna uyguladığı değişiklik başarısız oldu.', 'Yerel hata analizindeki şüpheli modları kontrol et; silmek yerine devre dışı bırakarak dene.'],
+  'MLU-CLASSPATH': ['Gerekli bir Java sınıfı yüklenemedi.', 'Profilin ana sınıfını, oyun dosyalarını ve kütüphane/mod uyumunu kontrol et.'],
+  'MLU-FILE': ['Dosya okuma, indirme veya arşiv doğrulaması sırasında sorun bildirildi.', 'Bağlantıyı ve yerel hata analizinde belirtilen dosyayı incele; yeniden kurmadan önce yedek al.'],
+  'MLU-EXIT': ['Minecraft beklenmeyen çıkış bildirdi; kategori kesin nedeni açıklamıyor.', 'Kullanıcıdan launcher içindeki yerel hata analizini incelemesini iste.'],
+  'MLU-LAUNCH': ['Minecraft başlatma işlemi tamamlanamadı.', 'Yerel hata analizinden Java, seçili profil ve oyun dosyalarını kontrol et.'],
+  'MLU-APP': ['Launcher uygulamasında yakalanan bir hata bildirildi.', 'Güncel sürümü kontrol et; tekrarlanıyorsa kullanıcıdan yaptığı adımları paylaşmasını iste.']
+});
+export function errorAdvice(code) {
+  const item = Object.hasOwn(advice, code) ? advice[code] : null;
+  return item ? {description:item[0], nextStep:item[1]} : {description:'Kategori doğrulanamadı.', nextStep:'Bu kayıttan kesin neden çıkarılamaz.'};
+}
 export function summarize(data, now) {
   const entries = object => Object.entries(object && typeof object === 'object' && !Array.isArray(object) ? object : {});
   const timestamp = time => Number.isSafeInteger(time) && time >= 0 && time <= now + 60000;
@@ -29,7 +45,7 @@ export function summarize(data, now) {
   const errors = [];
   for (const [id, perInstallation] of entries(data?.errors)) for (const [, item] of entries(perInstallation)) {
     if (!item || !Object.hasOwn(codes, item.code) || !validVersion(item.version) || !timestamp(item.lastSeen) || !Number.isSafeInteger(item.count) || item.count < 1 || item.count > 1000000000) { ignoredRecords++; continue; }
-    errors.push({code: item.code, label: codes[item.code], version: item.version, lastSeen: item.lastSeen, count: item.count});
+    errors.push({code: item.code, label: codes[item.code], version: item.version, lastSeen: item.lastSeen, count: item.count, ...errorAdvice(item.code)});
     errorOwners.add(id); ownerErrors.set(id, (ownerErrors.get(id) || 0) + item.count);
     if (!installations.has(id)) unlinkedErrorRows++;
     const category = categories.get(item.code) || {label:codes[item.code], count:0, owners:new Set(), lastSeen:0};

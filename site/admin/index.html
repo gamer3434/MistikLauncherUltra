@@ -36,7 +36,7 @@
       <div class="table-scroll record-scroll" tabindex="0" role="region" aria-label="Destek paylaşan kurulumlar"><table><thead><tr><th>Ad</th><th>Etkinlik</th><th>Launcher</th><th>Mod dosyası</th></tr></thead><tbody id="supportRows"></tbody></table></div>
       <div id="supportDetail" class="support-detail" hidden>
         <div class="support-detail-heading"><h3 id="supportName"></h3><button id="supportClose" type="button" class="button button-quiet">Ayrıntıları kapat</button></div>
-        <p id="supportFacts" class="source-note"></p><p id="supportModCount" class="source-note"></p>
+        <p id="supportFacts" class="source-note"></p><p id="supportHeartbeat" class="source-note"></p><p id="supportModCount" class="source-note"></p>
         <ul id="supportModList" class="support-mods" aria-label="Bildirilen mod dosyaları"></ul>
         <form id="supportSearchForm" class="support-search"><label for="supportSearch">Bu profile mod öner</label><div><input id="supportSearch" type="search" maxlength="100" placeholder="Modrinth mod adı" autocomplete="off" required><button id="supportSearchButton" class="button button-quiet" type="submit" disabled>Ara</button></div></form>
         <div id="supportSearchResults" class="support-results" aria-label="Mod arama sonuçları"></div>
@@ -97,8 +97,8 @@
         <button id="resetErrors" class="button button-quiet" type="button" disabled>Filtreleri temizle</button>
         <p id="errorCount" class="filter-count" role="status" aria-live="polite"></p>
       </div>
-      <div class="table-scroll" tabindex="0" role="region" aria-label="Hata bildirimleri tablosu"><table><thead><tr><th scope="col">Hata</th><th scope="col">Son bildirimin sürümü</th><th scope="col">Son bildirim</th><th scope="col">Birikimli olay</th></tr></thead><tbody id="errors"></tbody></table></div>
-      <p class="panel-footnote">Her satır bir kurulumun bir hata kategorisindeki son bildirimidir. Birikimli olay, bu grubun tüm zamanlardaki sayacıdır; belirli bir günün veya tekil kullanıcıların sayısı değildir.</p>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Hata bildirimleri tablosu"><table><thead><tr><th scope="col">Hata</th><th scope="col">Son bildirimin sürümü</th><th scope="col">Son bildirim</th><th scope="col">Birikimli olay</th><th scope="col">Kategori açıklaması ve öneri</th></tr></thead><tbody id="errors"></tbody></table></div>
+      <p class="panel-footnote">Her satır bir kurulumun bir hata kategorisindeki son bildirimidir. Açıklama ve öneri, doğrulanmış kategoriye ait genel rehberdir; kullanıcının ham hata mesajı veya kesin tanı değildir. Dosya yolu, kullanıcı adı, token ve tam günlük burada toplanmaz. Birikimli olay, bu grubun tüm zamanlardaki sayacıdır; belirli bir günün veya tekil kullanıcıların sayısı değildir. Bildirimin gelmesi için kullanıcı anonim hata istatistiklerini ayrıca açmış olmalıdır; destek paylaşımı bunu açmaz.</p>
     </section>
 
     <details class="privacy-note"><summary>Veri kapsamı ve gizlilik</summary><p>Bunlar kullanıcı sayısı değildir. Yalnızca paylaşımı açık kurulumlar sayılır; aynı kişinin birden fazla kurulumu olabilir. Normal istatistik paylaşımı kullanıcı adı, e-posta, mod listesi ve ham hata günlüğü içermez. Ayrı destek paylaşımını açan kurulumlar, bildirdikleri adını, seçili profili ve en fazla 300 mod dosyasının adını yöneticiye gösterir; mod önerilerini kabul etmek ayrıca isteğe bağlıdır. Otomatik mod kurulumu varsayılan olarak kapalıdır; yalnızca kullanıcı kendi launcher ayarlarından ayrıca izin verebilir. Yönetici bu izni panelden açamaz. Hata sayıları her kurulumun her kategori için son bildirimi ve toplamıdır. Yeniden kurulum yeni kimlik oluşturabilir; paylaşımı kapatınca kayıtların silinmesi denenir; çevrimdışı kapatılan kurulumların eski kayıtları kalabilir.</p></details>

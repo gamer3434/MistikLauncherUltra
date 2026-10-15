@@ -134,6 +134,7 @@ static class ModPagePerformanceTests
                 "vanilla profile can browse mods for every Minecraft version and loader");
             transport.Pending["filtered-vanilla"].Complete("vanilla result"); Wait(vanilla);
 
+            window.Config.Version="98.1-fabric";
             var install=fields.GetMethod("InstallMod",BindingFlags.Instance|BindingFlags.NonPublic)!;
             var runButton=fields.GetMethod("RunInstallButton",BindingFlags.Static|BindingFlags.NonPublic)!;
             var installButton=new Button { Content="KUR" }; int failures=0;
