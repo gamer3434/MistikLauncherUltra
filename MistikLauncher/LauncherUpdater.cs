@@ -259,7 +259,8 @@ public sealed class LauncherUpdater
             using var current=Process.GetCurrentProcess();
             string plan=Path.Combine(stage,"plan.json");
             File.WriteAllText(plan,JsonSerializer.Serialize(new UpdatePlan(directory,payload,current.Id,current.StartTime.ToUniversalTime().Ticks,Localization.Language,LatestVersion,preparedDowngrade)));
-            var start=new ProcessStartInfo(externalHelper) { UseShellExecute=false, CreateNoWindow=true, WindowStyle=ProcessWindowStyle.Hidden };
+            // Native runtime DLLs must load outside the installation being replaced.
+            var start=new ProcessStartInfo(externalHelper) { UseShellExecute=false, WorkingDirectory=stage, CreateNoWindow=true, WindowStyle=ProcessWindowStyle.Hidden };
             start.ArgumentList.Add(plan); child=Process.Start(start)??throw new IOException("Cannot start update helper.");
             for(int count=0;count<100;count++)
             {

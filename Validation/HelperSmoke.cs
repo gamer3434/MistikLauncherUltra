@@ -22,7 +22,8 @@ static class HelperSmoke
             for(int i=0;i<200&&!File.Exists(plan+".started");i++) await Task.Delay(100);
             if(!File.Exists(plan+".started")) throw new Exception("Fixture launcher did not start.");
             File.WriteAllText(plan,JsonSerializer.Serialize(new UpdatePlan(target,payload,parent.Id,parent.StartTime.ToUniversalTime().Ticks,"en")));
-            var childStart=new ProcessStartInfo(helper) { UseShellExecute=false, CreateNoWindow=true, WindowStyle=ProcessWindowStyle.Hidden }; childStart.ArgumentList.Add(plan);
+            // Older launchers inherited this directory; the helper must leave it before applying the update.
+            var childStart=new ProcessStartInfo(helper) { UseShellExecute=false, WorkingDirectory=target, CreateNoWindow=true, WindowStyle=ProcessWindowStyle.Hidden }; childStart.ArgumentList.Add(plan);
             using var child=Process.Start(childStart)!;
             using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(45));
             await child.WaitForExitAsync(timeout.Token);

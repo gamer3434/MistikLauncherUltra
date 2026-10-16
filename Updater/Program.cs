@@ -11,11 +11,13 @@ class Program
         try
         {
             if(args.Length!=1) return 2;
-            plan=JsonSerializer.Deserialize<UpdatePlan>(File.ReadAllText(args[0])) ?? throw new InvalidDataException("Missing update plan.");
+            string planPath=Path.GetFullPath(args[0]);
+            Directory.SetCurrentDirectory(AppContext.BaseDirectory);
+            plan=JsonSerializer.Deserialize<UpdatePlan>(File.ReadAllText(planPath)) ?? throw new InvalidDataException("Missing update plan.");
             using var parent=Process.GetProcessById(plan.ParentId);
             if(parent.StartTime.ToUniversalTime().Ticks!=plan.ParentStarted || !string.Equals(parent.MainModule?.FileName,UpdateEngine.SafePath(plan.Target,"MistikLauncher.exe"),StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("Update parent identity mismatch.");
-            File.WriteAllText(args[0]+".ready","ready");
+            File.WriteAllText(planPath+".ready","ready");
             if(!parent.WaitForExit(60000)) throw new IOException("Launcher is still running.");
             UpdateEngine.Apply(plan.Payload,plan.Target,plan.ExpectedVersion,allowDowngrade:plan.AllowDowngrade);
             Process.Start(new ProcessStartInfo(UpdateEngine.SafePath(plan.Target,"MistikLauncher.exe")) { UseShellExecute=true, WorkingDirectory=plan.Target });
@@ -23,8 +25,15 @@ class Program
         }
         catch(Exception ex)
         {
-            string message=plan?.Language=="tr"?"Güncelleme tamamlanamadı. Önceki dosyalar korundu.\n":"Update failed. Previous files were preserved.\n";
-            MessageBox(0,message+ex.Message,"Mistik Launcher",0x10);
+            string? report=null;
+            try {
+                report=Path.Combine(AppContext.BaseDirectory,"update-error.txt");
+                File.WriteAllText(report,ex.ToString());
+            } catch(IOException) { report=null; } catch(UnauthorizedAccessException) { report=null; }
+            bool tr=plan?.Language=="tr";
+            string message=tr?"Güncelleme tamamlanamadı. Launcher'ı kapatıp yeniden deneyin. Gerekirse onarıcıyı kullanın.":"Update failed. Close the launcher and retry. Use the repair tool if needed.";
+            if(report!=null) message+=(tr?"\n\nAyrıntılı rapor: ":"\n\nFull report: ")+(report.Length>500?report[..499]+"…":report);
+            MessageBox(0,message,"Mistik Launcher",0x10);
             return 1;
         }
     }

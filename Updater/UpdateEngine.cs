@@ -93,6 +93,7 @@ public static class UpdateEngine
         string backupParent=System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(payload))!;
         string backup=System.IO.Path.Combine(backupParent,"backup-"+Guid.NewGuid().ToString("N")); Directory.CreateDirectory(backup);
         var completed=new List<(string Destination,string? Backup)>();
+        var prepared=new List<(string Destination,string? Backup,string Temporary)>();
         bool cleanBackup=false;
         try
         {
@@ -124,6 +125,22 @@ public static class UpdateEngine
                 File.WriteAllText(updated,JsonSerializer.Serialize(new UpdateInstallState("MistikLauncher",System.IO.Path.GetFullPath(target),manifest.Version,owned.Concat(manifest.Files.Select(item=>item.Path)).Append("update-manifest.json").Distinct(StringComparer.OrdinalIgnoreCase).ToArray())));
                 replacements.Add(("install-state.json",updated));
             }
+            replacements.RemoveAll(item => {
+                string destination=SafePath(target,item.Path);
+                if(!File.Exists(destination)) return false;
+                using var original=File.OpenRead(destination);
+                using var incoming=File.OpenRead(item.Source);
+                return original.Length==incoming.Length && SHA256.HashData(original).SequenceEqual(SHA256.HashData(incoming));
+            });
+            // Detect current locks before changing any installed bytes; rollback still handles later races.
+            foreach(var item in replacements) {
+                string destination=SafePath(target,item.Path);
+                if(Directory.Exists(destination)) throw new IOException("A directory blocks an update file: "+item.Path);
+                if(File.Exists(destination)) {
+                    using var writable=new FileStream(destination,FileMode.Open,FileAccess.ReadWrite,FileShare.None);
+                }
+            }
+            // Stage every replacement and original first, so copy/disk failures cannot leave a partial installation.
             foreach(var item in replacements)
             {
                 string destination=SafePath(target,item.Path), source=item.Source;
@@ -131,9 +148,13 @@ public static class UpdateEngine
                 string? saved=null;
                 if(File.Exists(destination)) { saved=SafePath(backup,item.Path); Directory.CreateDirectory(System.IO.Path.GetDirectoryName(saved)!); File.Copy(destination,saved); }
                 string temporary=destination+".update-"+Guid.NewGuid().ToString("N");
-                try { File.Copy(source,temporary); File.Move(temporary,destination,true); }
-                finally { if(File.Exists(temporary)) File.Delete(temporary); }
-                completed.Add((destination,saved));
+                prepared.Add((destination,saved,temporary));
+                File.Copy(source,temporary);
+                File.SetAttributes(temporary,File.GetAttributes(temporary)&~FileAttributes.ReadOnly);
+            }
+            foreach(var item in prepared) {
+                File.Move(item.Temporary,item.Destination,true);
+                completed.Add((item.Destination,item.Backup));
             }
             using var key=Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\MistikLauncherUltra",true);
             if(key?.GetValue("InstallLocation") is string location && System.IO.Path.GetFullPath(location).Equals(System.IO.Path.GetFullPath(target),StringComparison.OrdinalIgnoreCase)) key.SetValue("DisplayVersion",manifest.Version);
@@ -143,7 +164,7 @@ public static class UpdateEngine
         {
             var rollbackErrors=new List<Exception>();
             foreach(var item in completed.AsEnumerable().Reverse())
-                try { if(item.Backup!=null) File.Copy(item.Backup,item.Destination,true); else File.Delete(item.Destination); }
+                try { if(item.Backup!=null) RestoreFile(item.Backup,item.Destination); else File.Delete(item.Destination); }
                 catch(Exception rollbackError) { rollbackErrors.Add(rollbackError); }
             if(rollbackErrors.Count>0)
                 throw new AggregateException("Update rollback incomplete; recovery files preserved in "+backup,
@@ -152,6 +173,8 @@ public static class UpdateEngine
             throw;
         }
         finally {
+            foreach(var item in prepared) try { if(File.Exists(item.Temporary)) File.Delete(item.Temporary); }
+                catch(Exception ex) when(ex is IOException or UnauthorizedAccessException) { System.Diagnostics.Trace.TraceWarning("Update staging cleanup: "+ex.Message); }
             // A failed rollback keeps its recovery files; cleanup cannot undo a committed update.
             if(cleanBackup) try {
                 if(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(backup))!=backupParent) throw new InvalidDataException("Invalid backup path.");
@@ -165,6 +188,17 @@ public static class UpdateEngine
                 if(File.Exists(backup+".install-state.json")) File.Delete(backup+".install-state.json");
             } catch(Exception ex) when(ex is IOException or UnauthorizedAccessException) { System.Diagnostics.Trace.TraceWarning("Update backup cleanup: "+ex.Message); }
         }
+    }
+
+    internal static void RestoreFile(string backup,string destination)
+    {
+        string temporary=destination+".rollback-"+Guid.NewGuid().ToString("N");
+        try {
+            File.Copy(backup,temporary);
+            File.SetAttributes(temporary,File.GetAttributes(temporary)&~FileAttributes.ReadOnly);
+            if(File.Exists(destination)) File.Replace(temporary,destination,null);
+            else File.Move(temporary,destination);
+        } finally { if(File.Exists(temporary)) File.Delete(temporary); }
     }
 
     static Version ReleaseNumber(string? value)

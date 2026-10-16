@@ -218,6 +218,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.43","2026-10-16","#00D4AA", new[]{
+                "Güncelleme başlamadan önce değişecek dosyaların kullanım kilitleri denetlenir; aynı dosyalar yeniden yazılmaz.",
+                "Tüm yeni dosyalar ve yedekler değiştirme öncesinde hazırlanır; geri alma Windows dosya değiştirme işlemiyle yapılır.",
+                "Yardımcı kurulum klasöründen bağımsız çalışır; hata penceresi kısadır, ayrıntılar yerel rapora kaydedilir.",
+                "Updates preflight changed files for locks and skip identical installed files.",
+                "All replacements and backups are staged before commit; rollback uses Windows file replacement.",
+                "The helper runs outside the installation directory; concise failures link to a full local report."
+            }),
             new("v6.2.42","2026-10-15","#00D4AA", new[]{
                 "Uyumlu mod sürümü yoksa başka Minecraft/yükleyici sürümüne otomatik indirme yapılmaz.",
                 "Belirsiz mod arşivleri indirilmeden reddedilir; mod işlemlerindeki hatalar açık paylaşım izniyle bildirilir.",

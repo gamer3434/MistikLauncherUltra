@@ -132,27 +132,40 @@ static class LauncherUpdateTests
         try { UpdateEngine.Apply(payload,target); } catch(Exception ex) when(ex is IOException or UnauthorizedAccessException) { readOnlyRejected=true; }
         finally { File.SetAttributes(Path.Combine(target,names[0]),FileAttributes.Normal); }
         Check(readOnlyRejected && names.All(name=>File.ReadAllText(Path.Combine(target,name))=="old "+name) && !Directory.EnumerateDirectories(root,"backup-*").Any(),"read-only installed file failure preserves the installation and cleans its read-only backup copy");
-        bool rollbackFailed=false;
-        File.SetAttributes(Path.Combine(payload,names[0]),FileAttributes.ReadOnly);
-        try {
-            using var locked=new FileStream(Path.Combine(target,names[1]),FileMode.Open,FileAccess.Read,FileShare.None);
-            try { UpdateEngine.Apply(payload,target); } catch(AggregateException ex) { rollbackFailed=ex.InnerExceptions.Any(error=>error is UnauthorizedAccessException); }
-        } finally { File.SetAttributes(Path.Combine(payload,names[0]),FileAttributes.Normal); File.SetAttributes(Path.Combine(target,names[0]),FileAttributes.Normal); }
-        var recovery=Directory.EnumerateDirectories(root,"backup-*").SingleOrDefault();
-        Check(rollbackFailed && recovery!=null && File.ReadAllText(Path.Combine(recovery,names[0]))=="old "+names[0],"failed update rollback retains the original executable in its recovery backup");
+        bool changedLockRejected=false;
+        using(var locked=new FileStream(Path.Combine(target,names[2]),FileMode.Open,FileAccess.Read,FileShare.Read|FileShare.Delete))
+            try { UpdateEngine.Apply(payload,target); } catch(IOException) { changedLockRejected=true; }
+        Check(changedLockRejected && names.All(name=>File.ReadAllText(Path.Combine(target,name))=="old "+name),
+            "delete-sharing lock on a changed file is detected before any installed bytes change");
+        File.WriteAllText(Path.Combine(target,names[1]),"new "+names[1]);
+        using(var unchanged=new FileStream(Path.Combine(target,names[1]),FileMode.Open,FileAccess.Read,FileShare.Read|FileShare.Delete))
+            UpdateEngine.Apply(payload,target);
+        Check(names.All(name=>File.ReadAllText(Path.Combine(target,name))=="new "+name),
+            "unchanged locked runtime files are skipped while other files update successfully");
         foreach(var name in names) File.WriteAllText(Path.Combine(target,name),"old "+name);
-        var priorRecovery=Directory.EnumerateDirectories(root,"backup-*").ToHashSet(StringComparer.OrdinalIgnoreCase);
-        AggregateException? partialRollback=null;
-        File.SetAttributes(Path.Combine(payload,names[1]),FileAttributes.ReadOnly);
+        File.Delete(Path.Combine(target,names[2])); Directory.CreateDirectory(Path.Combine(target,names[2]));
+        bool directoryRejected=false;
+        try { UpdateEngine.Apply(payload,target); } catch(IOException) { directoryRejected=true; }
+        finally { Directory.Delete(Path.Combine(target,names[2])); File.WriteAllText(Path.Combine(target,names[2]),"old "+names[2]); }
+        Check(directoryRejected && names.All(name=>File.ReadAllText(Path.Combine(target,name))=="old "+name),
+            "a late destination directory collision is rejected before any replacement");
+        var restoreTarget=Path.Combine(root,"restore-locked.dll"); var restoreBackup=Path.Combine(root,"restore-original.dll");
+        File.WriteAllText(restoreTarget,"new mapped bytes"); File.WriteAllText(restoreBackup,"original bytes");
+        File.SetAttributes(restoreBackup,FileAttributes.ReadOnly);
         try {
-            using var locked=new FileStream(Path.Combine(target,names[2]),FileMode.Open,FileAccess.Read,FileShare.None);
-            try { UpdateEngine.Apply(payload,target); } catch(AggregateException ex) { partialRollback=ex; }
-        } finally { File.SetAttributes(Path.Combine(payload,names[1]),FileAttributes.Normal); File.SetAttributes(Path.Combine(target,names[1]),FileAttributes.Normal); }
-        var partialRecovery=Directory.EnumerateDirectories(root,"backup-*").SingleOrDefault(path=>!priorRecovery.Contains(path));
-        Check(partialRollback?.InnerExceptions.Count>=2 && partialRollback.InnerExceptions[0] is IOException &&
-            partialRecovery!=null && File.ReadAllText(Path.Combine(target,names[0]))=="old "+names[0] &&
-            File.ReadAllText(Path.Combine(partialRecovery,names[1]))=="old "+names[1] && partialRollback.Message.Contains(partialRecovery,StringComparison.Ordinal),
-            "rollback restores remaining files after one recovery fails and preserves original error plus recovery location");
+            using var locked=new FileStream(restoreTarget,FileMode.Open,FileAccess.Read,FileShare.Read|FileShare.Delete);
+            typeof(UpdateEngine).GetMethod("RestoreFile",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic)!
+                .Invoke(null,new object[]{restoreBackup,restoreTarget});
+            Check(File.ReadAllText(restoreTarget)=="original bytes" && locked.Length=="new mapped bytes".Length &&
+                (File.GetAttributes(restoreTarget)&FileAttributes.ReadOnly)==0,
+                "rollback restores through adjacent rename without overwriting a locked mapped file or inheriting read-only attributes");
+        } finally { File.SetAttributes(restoreBackup,FileAttributes.Normal); }
+        File.SetAttributes(Path.Combine(payload,names[0]),FileAttributes.ReadOnly);
+        try { UpdateEngine.Apply(payload,target); }
+        finally { File.SetAttributes(Path.Combine(payload,names[0]),FileAttributes.Normal); }
+        Check(names.All(name=>File.ReadAllText(Path.Combine(target,name))=="new "+name &&
+            (File.GetAttributes(Path.Combine(target,name))&FileAttributes.ReadOnly)==0) && !Directory.EnumerateDirectories(root,"backup-*").Any(),
+            "staged replacement strips read-only source attributes and removes completed recovery backups");
         foreach(var name in names) File.WriteAllText(Path.Combine(target,name),"old "+name);
         bool rejected=false;
         try { UpdateEngine.SafePath(target,"../outside.exe"); } catch(InvalidDataException) { rejected=true; }
