@@ -457,5 +457,11 @@
   "supportSharingHelp": "Separate and optional. Your player name, selected profile, launcher version, activity time and up to 300 mod filenames/states are shared only with the authorized administrator. Modpack names are not inferred. Each suggestion needs approval unless you explicitly allow automatic installation. Turning this off attempts to delete the shared record; offline cleanup retries on the next start.",
   "supportAutoInstallToggle": "Allow the administrator to install compatible mods and dependencies automatically without asking again",
   "modDeclaredConflict": "These mods cannot run together: {0} / {1}. Disable one of them and try again.",
-  "modConflictTitle": "Conflicting mods"
+  "modConflictTitle": "Conflicting mods",
+  "modProjectUnavailable": "This project is unavailable through the public Modrinth API. Check its URL and publication status; if you have its JAR file, use Import instead.",
+  "modProjectNotMod": "This link does not point to a mod project. The mod catalog installs only mod JAR files.",
+  "modSearchLinkHelp": "Search by name or paste a direct Modrinth mod link.",
+  "modAutoUpdate": "Automatically update mods within the same game version",
+  "modAutoUpdateHelp": "Fabric/Quilt mods are checked before launch. Only stable Modrinth releases for the same Minecraft version and loader are installed. Previous files are backed up. Updates requiring new dependencies, Java or loader requirements are skipped.",
+  "modAutoUpdateChecking": "Checking compatible mod updates…"
 }

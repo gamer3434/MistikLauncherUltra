@@ -457,5 +457,11 @@
   "supportSharingHelp": "Ayrı ve isteğe bağlıdır. Oyuncu adı, seçili profil, launcher sürümü, aktiflik zamanı ve en fazla 300 mod dosyasının adı/durumu yalnızca yetkili yöneticiye gönderilir. Mod paketi adı tahmin edilmez. Otomatik kurulum izni vermediysen her öneri ayrıca onayını ister. Kapatınca paylaşılan kayıt silinmeye çalışılır; bağlantı yoksa sonraki açılışta yeniden denenir.",
   "supportAutoInstallToggle": "Yöneticinin uyumlu modlarını ve bağımlılıklarını tekrar sormadan otomatik kurmasına izin ver",
   "modDeclaredConflict": "Bu iki mod birlikte çalışamaz: {0} / {1}. Birini devre dışı bırakıp tekrar dene.",
-  "modConflictTitle": "Çakışan modlar"
+  "modConflictTitle": "Çakışan modlar",
+  "modProjectUnavailable": "Bu proje Modrinth’in herkese açık API’sinde bulunamadı. Bağlantıyı ve projenin yayın durumunu kontrol et; varsa JAR dosyasını İçe aktar ile kurabilirsin.",
+  "modProjectNotMod": "Bu bağlantı bir mod projesi değil. Mod merkezinde yalnızca mod JAR dosyaları kurulabilir.",
+  "modSearchLinkHelp": "Mod adı ara veya doğrudan Modrinth mod bağlantısını yapıştır.",
+  "modAutoUpdate": "Aynı oyun sürümündeki modları otomatik güncelle",
+  "modAutoUpdateHelp": "Fabric/Quilt modları oyun başlamadan kontrol edilir. Yalnızca aynı Minecraft sürümüne ve yükleyiciye uygun kararlı Modrinth sürümleri yüklenir. Eski dosyalar yedeklenir. Yeni bağımlılık, Java veya yükleyici gerektiren güncellemeler atlanır.",
+  "modAutoUpdateChecking": "Uyumlu mod güncellemeleri kontrol ediliyor…"
 }

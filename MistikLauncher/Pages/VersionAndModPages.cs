@@ -968,6 +968,7 @@ namespace MistikLauncher.Pages
             for(int column=0;column<3;column++) searchRow.ColumnDefinitions.Add(new ColumnDefinition { Width=GridLength.Auto });
             sp.Children.Add(PageHelpers.Lbl("modSearch",14,"#FFFFFF",true));
             _searchBox = PageHelpers.DarkTextBox();
+            _searchBox.ToolTip = Localization.T("modSearchLinkHelp");
             System.Windows.Automation.AutomationProperties.SetName(_searchBox,Localization.T("modSearch"));
             _searchBox.MinWidth = 180;
             var searchBtn = PageHelpers.MkBtn("modSearchAction", "#00A3FF", 80); searchBtn.Margin = new Thickness(8, 0, 0, 0);
@@ -1023,6 +1024,7 @@ namespace MistikLauncher.Pages
                 importBtn.Margin = compact ? new Thickness(8, 8, 0, 0) : new Thickness(8, 0, 0, 0);
             };
             sp.Children.Add(searchRow);
+            sp.Children.Add(PageHelpers.Lbl("modSearchLinkHelp", 12, "#98A8BB", wrap: TextWrapping.Wrap));
             var profileControls = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
             _compatibleOnly = new CheckBox { Name = "ModCompatibleOnly", Foreground = PageHelpers.HexBrush("#EFF5FF"),
                 MinHeight = 32, VerticalContentAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 18, 0) };
@@ -1292,10 +1294,8 @@ namespace MistikLauncher.Pages
                     }
                     facets.Add(new JArray { "versions:" + game }); facets.Add(new JArray { "categories:" + loader });
                 }
-                var searchUrl = $"https://api.modrinth.com/v2/search?limit=20&offset={_searchOffset}&index={_sort}&facets={Uri.EscapeDataString(facets.ToString(Newtonsoft.Json.Formatting.None))}";
-                if (q.Length > 0) searchUrl += "&query=" + Uri.EscapeDataString(q);
-                var resp = await _client.GetStringAsync(searchUrl, cancellation.Token);
-                var response = JObject.Parse(resp); var hits = response["hits"] as JArray;
+                var response = await ModCatalogSearch.SearchAsync(_client, q, facets, _sort, _searchOffset, cancellation.Token);
+                var hits = response["hits"] as JArray;
                 if (generation != _searchGeneration) return;
                 if ((_main.Config.Version ?? "") != profile) { await SearchMods(); return; }
                 _resultsPanel.Children.Clear();

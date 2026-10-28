@@ -22,6 +22,7 @@ namespace MistikLauncher
         [JsonProperty("close_lighting")] public string CloseLighting { get; set; } = "Theme";
         [JsonProperty("close_rgb")] public string CloseRgb { get; set; } = "#FFB000";
         [JsonProperty("launcher_auto_update")] public bool LauncherAutoUpdate { get; set; } = true;
+        [JsonProperty("mod_auto_update")] public bool ModAutoUpdate { get; set; } = true;
         [JsonProperty("auto_mcs_update")] public bool AutoMcsAutoUpdate { get; set; } = true;
         [JsonProperty("usage_metrics_enabled")] public bool UsageMetricsEnabled { get; set; } = false;
         [JsonProperty("support_sharing_enabled")] public bool SupportSharingEnabled { get; set; } = false;
@@ -218,6 +219,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.44","2026-10-28","#00D4AA", new[]{
+                "Fabric/Quilt modları aynı Minecraft sürümündeki kararlı güncellemeler için oyun başlamadan kontrol edilir; eski dosyalar yedeklenir.",
+                "Sabit bağımlılık, bozuk indirme veya dosya değişikliği algılanırsa mevcut modlar korunur. Otomatik mod güncelleme ayarlardan kapatılabilir.",
+                "Yeni herkese açık Modrinth projeleri arama indeksine girmeden de doğrudan bağlantılarıyla bulunabilir.",
+                "Fabric/Quilt mods automatically check stable updates for the same game version before launch, retaining original backups.",
+                "Pinned dependencies, invalid downloads and concurrent file changes preserve existing mods. Settings include an opt-out.",
+                "Direct Modrinth project links can find public projects before they appear in search."
+            }),
             new("v6.2.43","2026-10-16","#00D4AA", new[]{
                 "Güncelleme başlamadan önce değişecek dosyaların kullanım kilitleri denetlenir; aynı dosyalar yeniden yazılmaz.",
                 "Tüm yeni dosyalar ve yedekler değiştirme öncesinde hazırlanır; geri alma Windows dosya değiştirme işlemiyle yapılır.",

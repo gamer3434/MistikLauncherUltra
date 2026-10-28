@@ -207,6 +207,17 @@ public class ModernSettingsPage : Page, ILanguagePage
             }
         };
         updateContent.Children.Add(autoUpdate);
+        var modAutoUpdate = new CheckBox { Name="ModAutoUpdate", Content=Localization.T("modAutoUpdate"),
+            IsChecked=main.Config.ModAutoUpdate, Foreground=Brushes.White, Margin=new Thickness(0,0,0,8) };
+        modAutoUpdate.Click += (_,_) => {
+            lock(main.ConfigurationGate) {
+                bool previous=main.Config.ModAutoUpdate;
+                try { main.Config.ModAutoUpdate=modAutoUpdate.IsChecked==true; ConfigManager.Save(main.Config); }
+                catch(Exception ex) { main.Config.ModAutoUpdate=previous; modAutoUpdate.IsChecked=previous; updateStatus.Text=Localization.T("error")+": "+ex.Message; }
+            }
+        };
+        updateContent.Children.Add(modAutoUpdate);
+        updateContent.Children.Add(PageHelpers.Lbl("modAutoUpdateHelp",12,"#ADBED6",wrap:TextWrapping.Wrap,pad:new Thickness(0,0,0,12)));
         updateButton=PageHelpers.MkBtn(Localization.T("luCheck"),"#226DA0"); updateButton.HorizontalAlignment=HorizontalAlignment.Left;
         updateButton.Click += async (_,_)=> await main.CheckLauncherUpdatesAsync(true); updateContent.Children.Add(updateButton);
         var downgrade=new Expander { Header=Localization.T("luDowngrade"), Foreground=Brushes.White, Margin=new Thickness(0,14,0,0) };
