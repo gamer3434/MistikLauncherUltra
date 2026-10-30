@@ -94,19 +94,35 @@ internal sealed class ModAutoUpdater : IDisposable
                     byFile.Add(file.Key, version);
                 }
             }
+            var latest = new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase);
+            foreach (var batch in byFile.Keys.Chunk(100))
+            {
+                using var body = new StringContent(new JObject {
+                    ["algorithm"] = "sha512", ["hashes"] = new JArray(batch.Select(name => update.snapshot[name])),
+                    ["loaders"] = new JArray(loader), ["game_versions"] = new JArray(game), ["version_types"] = new JArray("release")
+                }.ToString(), Encoding.UTF8, "application/json");
+                using var response = await client.PostAsync("https://api.modrinth.com/v2/version_files/update", body, token);
+                response.EnsureSuccessStatusCode();
+                var matches = JObject.Parse(await response.Content.ReadAsStringAsync(token));
+                foreach (var name in batch)
+                {
+                    var match = matches[update.snapshot[name]];
+                    if (match == null) continue;
+                    if (match is not JObject version || !Id((string?)version["id"]) ||
+                        (string?)version["project_id"] != (string?)byFile[name]["project_id"])
+                        throw new InvalidDataException("Mod update lookup does not match its installed project.");
+                    latest[name] = version;
+                }
+            }
             var final = new Dictionary<string, JObject>(installed, StringComparer.Ordinal);
             foreach (var entry in byFile)
             {
                 token.ThrowIfCancellationRequested();
                 var project = (string)entry.Value["project_id"]!;
-                var versions = JArray.Parse(await client.GetStringAsync("https://api.modrinth.com/v2/project/" + project + "/version", token));
-                var candidate = versions.OfType<JObject>().Where(version =>
-                    (string?)version["project_id"] == project && Id((string?)version["id"]) &&
-                    (string?)version["id"] != (string?)entry.Value["id"] &&
-                    (string?)version["version_type"] == "release" && ModManagerPage.CheckCompatibility(version, game, loader) &&
-                    Published(version) is DateTimeOffset published && Published(entry.Value) is DateTimeOffset current && published > current)
-                    .OrderByDescending(Published).FirstOrDefault();
-                if (candidate == null) continue;
+                if (!latest.TryGetValue(entry.Key, out var candidate) ||
+                    (string?)candidate["id"] == (string?)entry.Value["id"] ||
+                    (string?)candidate["version_type"] != "release" || !ModManagerPage.CheckCompatibility(candidate, game, loader) ||
+                    Published(candidate) is not DateTimeOffset published || Published(entry.Value) is not DateTimeOffset current || published <= current) continue;
                 var file = ModManagerPage.SelectModFile(candidate);
                 var name = (string)file["filename"]!;
                 if (!name.Equals(entry.Key, StringComparison.OrdinalIgnoreCase) &&

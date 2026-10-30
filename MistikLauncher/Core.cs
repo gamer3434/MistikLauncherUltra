@@ -219,6 +219,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.48","2026-10-30","#00D4AA", new[]{
+                "Otomatik mod güncellemesi her projenin tüm sürümlerini indirmek yerine 100 modluk toplu sorgular kullanır.",
+                "Sorgular aynı Minecraft sürümü, yükleyici ve kararlı yayınlarla sınırlıdır; sonuçların proje kimliği tekrar doğrulanır.",
+                "Sabit bağımlılıklar, dosya hash'leri, geri alınabilir yedekler ve Başlat sırasında iptal korunur.",
+                "Automatic mod updates use batches of 100 instead of downloading each project's complete version history.",
+                "Requests filter by exact Minecraft version, loader and stable releases; returned project identities are independently checked.",
+                "Pinned dependencies, checksums, recoverable backups and immediate Play cancellation remain enforced."
+            }),
             new("v6.2.47","2026-10-30","#00D4AA", new[]{
                 "Seçilen görüş mesafesi korunur; 30 chunk artık açılışta 12'ye düşürülmez. FPS optimizasyonunda simülasyon en fazla 8 kalır.",
                 "Açılışta son 15 dakikanın doğrulanmış skini kullanılabilir; aynı skin dokuları yeniden yazılmaz. Elle yenileme güncel skini indirir.",
