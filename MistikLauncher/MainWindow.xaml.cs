@@ -127,10 +127,10 @@ namespace MistikLauncher
                 if (e.Content is Page loaded && _pendingTranslations.Remove(loaded))
                     Localization.TranslateTree(loaded);
             };
-            Closed += (_,_) => { Localization.Changed -= RefreshLanguage; _http.Dispose(); _skinHttp.Dispose(); };
+            Closed += (_,_) => { StopModUpdates(); Localization.Changed -= RefreshLanguage; _http.Dispose(); _skinHttp.Dispose(); };
             RefreshLanguage();
             var updateTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
-            updateTimer.Tick += async (_,_) => await CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate);
+            updateTimer.Tick += async (_,_) => { QueueBackgroundModUpdates(); await CheckLauncherUpdatesAsync(Config.LauncherAutoUpdate); };
             Loaded += async (_,_) => {
                 if (UsageMetrics != null) await UsageMetrics.SetEnabledAsync(Config.UsageMetricsEnabled);
                 if (Support != null) {
@@ -627,6 +627,7 @@ namespace MistikLauncher
                     lock (_modSyncGate) currentVersion = Config.Version ?? "";
                     if (!string.Equals(currentVersion,requestedVersion,StringComparison.Ordinal))
                         QueueBackgroundModSync();
+                    else QueueBackgroundModUpdates();
                 }
             });
         }
@@ -808,32 +809,25 @@ namespace MistikLauncher
 
             try
             {
+                using var readyModUpdate = TakePreparedModUpdate(version);
                 if(!await Task.Run(() => SyncModsForCurrentVersion(version, verifyCompatibility: true)))
                 {
                     MessageBox.Show(Localization.T("modSyncFailed"),"Mistik Launcher",MessageBoxButton.OK,MessageBoxImage.Warning);
                     return;
                 }
                 bool checkFabricConflicts = GameProfiles.Loader(App.GameDir,version) is "fabric" or "quilt";
-                if (Config.ModAutoUpdate && checkFabricConflicts)
+                if (readyModUpdate != null && Config.ModAutoUpdate && checkFabricConflicts)
                 {
-                    SetStatus(Localization.T("modAutoUpdateChecking"));
                     try
                     {
-                        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
-                        using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect=false }) { MaxResponseContentBufferSize=128L*1024*1024 };
-                        client.DefaultRequestHeaders.UserAgent.ParseAdd("MistikLauncher/"+LauncherUpdates.CurrentVersion);
-                        var game = GameProfiles.MinecraftVersion(App.GameDir,version);
-                        var loader = GameProfiles.Loader(App.GameDir,version);
-                        using var update = await Task.Run(() => ModAutoUpdater.PrepareAsync(client, App.ModsDir, game, loader, timeout.Token));
-                        timeout.Token.ThrowIfCancellationRequested();
                         await Task.Run(() => WithSyncedMods(version, directory => {
                             if(gameRunning || !Config.ModAutoUpdate) return false;
                             // Another launcher may already have a game open; do not replace its loaded files.
                             if(Process.GetProcessesByName("java").Concat(Process.GetProcessesByName("javaw")).Any(process => { using(process) return !process.HasExited; }))
                                 throw new IOException("Mod updates postponed while Java is running.");
-                            update.Apply(); return true;
+                            readyModUpdate.Apply(); return true;
                         }));
-                        if(update.Count>0) App.Log($"Updated {update.Count} compatible mods. Backup: {update.Backup}");
+                        App.Log($"Updated {readyModUpdate.Count} compatible mods. Backup: {readyModUpdate.Backup}");
                     }
                     catch(Exception error) when(error is IOException or InvalidDataException or HttpRequestException or OperationCanceledException or Newtonsoft.Json.JsonException)
                     { App.Log("Automatic mod update skipped; existing mods retained: "+error.Message); }

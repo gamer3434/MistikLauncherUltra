@@ -219,6 +219,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.45","2026-10-30","#00D4AA", new[]{
+                "Mod güncelleme kontrolü launcher boşta çalışır; Başlat düğmesi ağ yanıtını beklemez.",
+                "Yalnızca hazır ve seçili profile uygun güncellemeler uygulanır. Hazır değilse mevcut modlarla açılır.",
+                "Güncelleme olmayan kontrollerde modlar kopyalanmaz; yedekleme ve dosya doğrulamaları korunur.",
+                "Mod updates are checked while the launcher is idle; Play no longer waits for network checks.",
+                "Only prepared updates matching the selected profile are applied; otherwise existing mods launch.",
+                "Checks without updates do not copy mods. Backups and file verification remain enforced."
+            }),
             new("v6.2.44","2026-10-28","#00D4AA", new[]{
                 "Fabric/Quilt modları aynı Minecraft sürümündeki kararlı güncellemeler için oyun başlamadan kontrol edilir; eski dosyalar yedeklenir.",
                 "Sabit bağımlılık, bozuk indirme veya dosya değişikliği algılanırsa mevcut modlar korunur. Otomatik mod güncelleme ayarlardan kapatılabilir.",

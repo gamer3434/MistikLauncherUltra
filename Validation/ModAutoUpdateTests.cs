@@ -20,6 +20,17 @@ static class ModAutoUpdateTests
             !Accept("1.11.4-p2", "1.11.8") && !Accept("^1.0", "1.2.0"), "automatic mod updates enforce numeric ranges and exact prerelease pins, declining unsupported predicates");
         Check(new LauncherConfig().ModAutoUpdate && Newtonsoft.Json.JsonConvert.DeserializeObject<LauncherConfig>("{\"mod_auto_update\":false}")!.ModAutoUpdate == false,
             "automatic mod updates default on and the saved opt-out is retained");
+        var owner = (MainWindow)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(MainWindow));
+        owner.Config = new LauncherConfig { Version = "fixture-profile" };
+        using (var pending = new CancellationTokenSource())
+        {
+            typeof(MainWindow).GetField("_modUpdateCancellation", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(owner, pending);
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+            var ready = typeof(MainWindow).GetMethod("TakePreparedModUpdate", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(owner, new object[] { "fixture-profile" });
+            Check(ready == null && pending.IsCancellationRequested && timer.Elapsed < TimeSpan.FromSeconds(1),
+                "launch cancels an unfinished background update and immediately uses existing mods without awaiting network work");
+            typeof(MainWindow).GetField("_modUpdateCancellation", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(owner, null);
+        }
         async Task<IDisposable> Prepare(HttpClient client, string directory, CancellationToken token = default)
         {
             var task = (Task)Type.GetMethod("PrepareAsync")!.Invoke(null, new object[] { client, directory, "1.21.11", "fabric", token })!;
@@ -30,6 +41,23 @@ static class ModAutoUpdateTests
         {
             try { Type.GetMethod("Apply")!.Invoke(plan, null); }
             catch(TargetInvocationException error) { throw error.InnerException!; }
+        }
+        var waitingDirectory = Path.Combine(root, "waiting-network"); Directory.CreateDirectory(waitingDirectory);
+        var waitingBytes = Jar("leaf_mod", "1.0.0"); File.WriteAllBytes(Path.Combine(waitingDirectory, "old.jar"), waitingBytes);
+        using (var handler = new Handler(waitingBytes, "delayed"))
+        using (var client = new HttpClient(handler))
+        using (var pending = new CancellationTokenSource())
+        {
+            var preparation = Prepare(client, waitingDirectory, pending.Token);
+            await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            typeof(MainWindow).GetField("_modUpdateCancellation", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(owner, pending);
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+            var ready = typeof(MainWindow).GetMethod("TakePreparedModUpdate", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(owner, new object[] { "fixture-profile" });
+            bool immediate = timer.Elapsed < TimeSpan.FromSeconds(1);
+            bool cancelled = false; try { using var ignored = await preparation; } catch (OperationCanceledException) { cancelled = true; }
+            Check(immediate && ready == null && cancelled && File.ReadAllBytes(Path.Combine(waitingDirectory, "old.jar")).SequenceEqual(waitingBytes),
+                "Play cancels a genuinely blocked HTTP request without waiting or changing installed mods");
+            typeof(MainWindow).GetField("_modUpdateCancellation", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(owner, null);
         }
         foreach (var scenario in new[] { "success", "wrong-game", "wrong-loader", "beta", "older", "downgrade", "checksum", "new-java", "pin", "alias-pin", "missing-dependency", "stale", "collision", "network", "cancel", "locked" })
         {
@@ -61,8 +89,12 @@ static class ModAutoUpdateTests
                         "automatic update replaces the old filename once, verifies downloads, backs up originals and preserves disabled/private mods; count=" + Type.GetProperty("Count")!.GetValue(plan) + "; requests=" + string.Join(",",handler.Requests));
                 }
                 else if (scenario is "wrong-game" or "wrong-loader" or "beta" or "older" or "downgrade" or "new-java")
+                {
                     Check((int)Type.GetProperty("Count")!.GetValue(plan)! == 0 && originals.All(file => File.ReadAllBytes(Path.Combine(directory, file.Key!)).SequenceEqual(file.Value)),
                         "automatic update skips " + scenario + " without changing installed files");
+                    var stage = (string)Type.GetField("stage", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(plan)!;
+                    Check(!Directory.EnumerateFiles(stage, "*.jar").Any(), "no compatible update means no installed JARs are copied to staging: " + scenario);
+                }
             }
             catch(Exception error) when (error is IOException or InvalidDataException or HttpRequestException or OperationCanceledException)
             { failed = true; }
@@ -72,6 +104,23 @@ static class ModAutoUpdateTests
                     "automatic update preserves all originals after " + scenario);
             if (scenario == "stale") Check(failed && File.ReadAllBytes(Path.Combine(directory,"old.jar")).SequenceEqual(local), "stale automatic update cannot overwrite a concurrent mod change");
             Check(handler.Requests.All(uri => uri.Host is "api.modrinth.com" or "cdn.modrinth.com"), "automatic updater uses official hosts: " + scenario);
+        }
+        foreach (var mode in new[] { "ready", "wrong-profile", "disabled", "running" })
+        {
+            var directory = Path.Combine(root, "ready-" + mode); Directory.CreateDirectory(directory);
+            var bytes = Jar("leaf_mod", "1.0.0"); File.WriteAllBytes(Path.Combine(directory, "old.jar"), bytes);
+            using var handler = new Handler(bytes, "success"); using var client = new HttpClient(handler);
+            using var plan = await Prepare(client, directory);
+            owner.Config = new LauncherConfig { Version = "fixture-profile", ModAutoUpdate = mode != "disabled" };
+            var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            typeof(MainWindow).GetField("_modUpdateProfile", flags)!.SetValue(owner, mode == "wrong-profile" ? "another-profile" : "fixture-profile");
+            typeof(MainWindow).GetField("_preparedModUpdate", flags)!.SetValue(owner, plan);
+            typeof(MainWindow).GetField("gameRunning", flags)!.SetValue(owner, mode == "running");
+            int requests = handler.Requests.Count;
+            var result = typeof(MainWindow).GetMethod("TakePreparedModUpdate", flags)!.Invoke(owner, new object[] { "fixture-profile" });
+            Check((mode == "ready" ? ReferenceEquals(plan, result) : result == null) && handler.Requests.Count == requests &&
+                typeof(MainWindow).GetField("_preparedModUpdate", flags)!.GetValue(owner) == null && File.ReadAllBytes(Path.Combine(directory, "old.jar")).SequenceEqual(bytes),
+                "launch consumes only a prepared matching-profile update without network requests or live-file changes: " + mode);
         }
         return checks;
     }
@@ -95,6 +144,7 @@ static class ModAutoUpdateTests
         readonly byte[] old;
         readonly string scenario;
         public List<Uri> Requests = new();
+        public TaskCompletionSource<bool> Started = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Handler(byte[] old, string scenario)
         {
             this.old = old; this.scenario = scenario;
@@ -115,6 +165,7 @@ static class ModAutoUpdateTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             token.ThrowIfCancellationRequested(); Requests.Add(request.RequestUri!);
+            if (scenario == "delayed") { Started.TrySetResult(true); return new TaskCompletionSource<HttpResponseMessage>().Task.WaitAsync(token); }
             if (scenario == "network") throw new HttpRequestException("Offline fixture");
             if (request.RequestUri!.Host == "cdn.modrinth.com") return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(NewBytes) });
             JToken body = request.Method == HttpMethod.Post ? new JObject { [Convert.ToHexString(SHA512.HashData(old)).ToLowerInvariant()] = Version(false) } : new JArray(Version(true));

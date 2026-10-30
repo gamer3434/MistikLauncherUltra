@@ -462,6 +462,6 @@
   "modProjectNotMod": "This link does not point to a mod project. The mod catalog installs only mod JAR files.",
   "modSearchLinkHelp": "Search by name or paste a direct Modrinth mod link.",
   "modAutoUpdate": "Automatically update mods within the same game version",
-  "modAutoUpdateHelp": "Fabric/Quilt mods are checked before launch. Only stable Modrinth releases for the same Minecraft version and loader are installed. Previous files are backed up. Updates requiring new dependencies, Java or loader requirements are skipped.",
+  "modAutoUpdateHelp": "Fabric/Quilt updates are prepared in the background while idle. Play does not wait for checks; if none is ready, existing mods launch. Only stable releases for the same Minecraft version and loader are selected. Old files are backed up and unverifiable dependencies are skipped.",
   "modAutoUpdateChecking": "Checking compatible mod updates…"
 }

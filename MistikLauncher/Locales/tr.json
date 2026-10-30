@@ -462,6 +462,6 @@
   "modProjectNotMod": "Bu bağlantı bir mod projesi değil. Mod merkezinde yalnızca mod JAR dosyaları kurulabilir.",
   "modSearchLinkHelp": "Mod adı ara veya doğrudan Modrinth mod bağlantısını yapıştır.",
   "modAutoUpdate": "Aynı oyun sürümündeki modları otomatik güncelle",
-  "modAutoUpdateHelp": "Fabric/Quilt modları oyun başlamadan kontrol edilir. Yalnızca aynı Minecraft sürümüne ve yükleyiciye uygun kararlı Modrinth sürümleri yüklenir. Eski dosyalar yedeklenir. Yeni bağımlılık, Java veya yükleyici gerektiren güncellemeler atlanır.",
+  "modAutoUpdateHelp": "Fabric/Quilt güncellemeleri launcher boşta arka planda hazırlanır. Başlat düğmesi kontrolü beklemez; hazır değilse mevcut modlarla açılır. Yalnızca aynı Minecraft sürümü ve yükleyici için kararlı sürümler seçilir. Eski dosyalar yedeklenir; doğrulanamayan bağımlılıklar atlanır.",
   "modAutoUpdateChecking": "Uyumlu mod güncellemeleri kontrol ediliyor…"
 }

@@ -212,7 +212,7 @@ public class ModernSettingsPage : Page, ILanguagePage
         modAutoUpdate.Click += (_,_) => {
             lock(main.ConfigurationGate) {
                 bool previous=main.Config.ModAutoUpdate;
-                try { main.Config.ModAutoUpdate=modAutoUpdate.IsChecked==true; ConfigManager.Save(main.Config); }
+                try { main.Config.ModAutoUpdate=modAutoUpdate.IsChecked==true; ConfigManager.Save(main.Config); main.QueueBackgroundModUpdates(); }
                 catch(Exception ex) { main.Config.ModAutoUpdate=previous; modAutoUpdate.IsChecked=previous; updateStatus.Text=Localization.T("error")+": "+ex.Message; }
             }
         };

@@ -14,25 +14,40 @@ internal sealed class ModAutoUpdater : IDisposable
     readonly string root;
     readonly Dictionary<string, string> snapshot = new(StringComparer.OrdinalIgnoreCase);
     readonly string stage;
+    bool staged;
     bool retain;
     public int Count { get; private set; }
     public string? Backup { get; private set; }
-    ModAutoUpdater(string directory)
+    ModAutoUpdater(string directory, CancellationToken token)
     {
         root = Path.GetFullPath(directory);
         stage = Path.Combine(Path.GetTempPath(), "MistikModUpdates", Guid.NewGuid().ToString("N"));
-        ModFiles.EnsureRoot(root); ModFiles.EnsureRoot(stage);
+        ModFiles.EnsureRoot(root);
         var files = ModFiles.List(root).ToArray();
         if (files.Length > 2048 || files.Sum(path => new FileInfo(path).Length) > 2L * 1024 * 1024 * 1024)
             throw new IOException("Mod update snapshot exceeds its safe size limit.");
         foreach (var path in files)
         {
+            token.ThrowIfCancellationRequested();
             ValidateFile(path);
             snapshot.Add(Path.GetFileName(path), Hash(path));
-            File.Copy(path, Path.Combine(stage, Path.GetFileName(path)));
-            if (Hash(Path.Combine(stage, Path.GetFileName(path))) != snapshot[Path.GetFileName(path)])
-                throw new IOException("Mod changed while preparing its update.");
         }
+        ModFiles.EnsureRoot(stage);
+    }
+
+    void StageSnapshot(CancellationToken token)
+    {
+        if (staged) return;
+        foreach (var file in snapshot)
+        {
+            token.ThrowIfCancellationRequested();
+            var source = Path.Combine(root, file.Key);
+            ValidateFile(source);
+            var destination = Path.Combine(stage, file.Key);
+            File.Copy(source, destination);
+            if (Hash(destination) != file.Value) throw new IOException("Mod changed while preparing its update.");
+        }
+        staged = true;
     }
 
     static string Hash(string path) { using var stream = File.OpenRead(path); return Convert.ToHexString(SHA512.HashData(stream)).ToLowerInvariant(); }
@@ -53,7 +68,8 @@ internal sealed class ModAutoUpdater : IDisposable
 
     public static async Task<ModAutoUpdater> PrepareAsync(HttpClient client, string directory, string game, string loader, CancellationToken token)
     {
-        var update = new ModAutoUpdater(directory);
+        token.ThrowIfCancellationRequested();
+        var update = new ModAutoUpdater(directory, token);
         try
         {
             // shortcut: automatic runtime dependency checks currently cover Fabric/Quilt; other loaders keep their existing mods.
@@ -94,12 +110,12 @@ internal sealed class ModAutoUpdater : IDisposable
                 var file = ModManagerPage.SelectModFile(candidate);
                 var name = (string)file["filename"]!;
                 if (!name.Equals(entry.Key, StringComparison.OrdinalIgnoreCase) &&
-                    (File.Exists(Path.Combine(update.stage, name)) || File.Exists(Path.Combine(update.stage, name + ".disabled"))))
+                    (update.snapshot.ContainsKey(name) || update.snapshot.ContainsKey(name + ".disabled") || File.Exists(Path.Combine(update.stage, name))))
                     throw new IOException("Updated mod filename conflicts with another installed file.");
                 var bytes = await client.GetByteArrayAsync(ModFiles.DownloadUrl((string)file["url"]!), token);
                 if (bytes.Length > 128 * 1024 * 1024 || !Convert.ToHexString(SHA512.HashData(bytes)).Equals((string?)file["hashes"]?["sha512"], StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("Mod update checksum mismatch.");
-                var oldMetadata = ReadMetadata(Path.Combine(update.stage, entry.Key));
+                var oldMetadata = ReadMetadata(Path.Combine(update.root, entry.Key));
                 string candidatePath = Path.Combine(update.stage, ".candidate-" + Guid.NewGuid().ToString("N") + ".tmp");
                 File.WriteAllBytes(candidatePath, bytes);
                 var newMetadata = ReadMetadata(candidatePath);
@@ -112,6 +128,7 @@ internal sealed class ModAutoUpdater : IDisposable
                 // Never silently raise the required Java or loader version.
                 if (new[] { "java", "fabricloader", "quilt_loader" }.Any(builtin =>
                     !JToken.DeepEquals(oldMetadata["depends"]?[builtin], newMetadata["depends"]?[builtin]))) continue;
+                update.StageSnapshot(token);
                 File.Delete(Path.Combine(update.stage, entry.Key));
                 File.Move(candidatePath, Path.Combine(update.stage, name));
                 final[project] = candidate;
@@ -227,5 +244,11 @@ internal sealed class ModAutoUpdater : IDisposable
         catch { retain = true; throw; }
     }
 
-    public void Dispose() { if (!retain && Directory.Exists(stage)) Directory.Delete(stage, true); }
+    public void Dispose()
+    {
+        if (retain || !Directory.Exists(stage)) return;
+        try { Directory.Delete(stage, true); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        { App.Log("Temporary mod update cleanup deferred: " + error.Message); }
+    }
 }
