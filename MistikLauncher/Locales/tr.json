@@ -46,7 +46,7 @@
   "settingsIntro": "Oyuncu, dil ve performans tercihlerini tek yerden yönet.",
   "username": "Oyuncu adı",
   "usernameHelp": "3–16 karakter: harf, rakam veya alt çizgi.",
-  "ramHelp": "Windows ve diğer uygulamalar için en az 2 GB boş bırak.",
+  "ramHelp": "Seçilen değer en yüksek heap sınırıdır. Oyun en fazla 2 GB başlangıç heap'iyle açılır ve gerektiğinde büyür. Windows ve diğer uygulamalar için boş bellek bırak.",
   "language": "Arayüz dili",
   "close": "Oyun başlatılınca başlatıcıyı kapat",
   "save": "Değişiklikleri kaydet",

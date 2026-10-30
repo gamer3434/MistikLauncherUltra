@@ -219,6 +219,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.49","2026-10-30","#00D4AA", new[]{
+                "Başlangıç heap'i seçilen maksimum belleğe eşitlenmez; en fazla 2 GB ile açılır ve gerektiğinde büyür.",
+                "Seçilen maksimum bellek sınırı, Java seçimi ve modlar korunur. Düşük bellek sınırında başlangıç değeri maksimumu aşmaz.",
+                "Bellek ayarının yardım metni başlangıç heap'i ile maksimum sınırın farkını açıklar.",
+                "Initial heap no longer equals the selected maximum; it starts at at most 2 GB and can grow as needed.",
+                "The selected heap ceiling, Java selection and mods are preserved. Low-memory limits keep initial heap below the ceiling.",
+                "Memory settings help now distinguishes initial heap from the maximum limit."
+            }),
             new("v6.2.48","2026-10-30","#00D4AA", new[]{
                 "Otomatik mod güncellemesi her projenin tüm sürümlerini indirmek yerine 100 modluk toplu sorgular kullanır.",
                 "Sorgular aynı Minecraft sürümü, yükleyici ve kararlı yayınlarla sınırlıdır; sonuçların proje kimliği tekrar doğrulanır.",

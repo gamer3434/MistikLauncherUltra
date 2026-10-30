@@ -46,7 +46,7 @@
   "settingsIntro": "Manage your player, language and performance preferences in one place.",
   "username": "Player name",
   "usernameHelp": "3–16 characters: letters, numbers or underscores.",
-  "ramHelp": "Leave at least 2 GB free for Windows and other applications.",
+  "ramHelp": "The selected value is the maximum heap limit. The game starts with at most 2 GB and grows as needed. Leave memory available for Windows and other applications.",
   "language": "Interface language",
   "close": "Close launcher after game starts",
   "save": "Save changes",

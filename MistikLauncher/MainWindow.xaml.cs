@@ -1740,8 +1740,8 @@ namespace MistikLauncher
         string BuildLaunchArgs(string version, int ramMb, string natives, string? injectorPath = null, string? resolvedUuid = null)
         {
             var libs    = BuildClasspath(version);
-            // ★ PERF FIX: Xms = Xmx → G1GC heap resize yok, daha az GC pause
-            var jvm     = $"-Xmx{ramMb}m -Xms{ramMb}m";
+            // Reserve the chosen ceiling without committing a large heap before it is needed.
+            var jvm     = $"-Xmx{ramMb}m -Xms{Math.Min(ramMb,2048)}m";
             if (!string.IsNullOrEmpty(injectorPath) && File.Exists(injectorPath))
             {
                 jvm += $" -javaagent:\"{injectorPath}\"=https://authserver.ely.by/api/authlib-injector";
