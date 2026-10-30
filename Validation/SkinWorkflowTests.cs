@@ -74,6 +74,19 @@ static class SkinWorkflowTests
             var fallbackHandler=new SkinHandler(bytes);
             using var fallback=new HttpClient(fallbackHandler);
             Check(Wait(window.PrepareSkinPackAsync("1.20.1",fallback)) && fallbackHandler.FallbackRequests==1 && File.ReadAllBytes(Path.Combine(pack,"assets","minecraft","textures","entity","steve.png")).SequenceEqual(bytes),"corrupt Ely.by skin falls back to a validated Minecraft skin and installs it");
+            var launchCache=Path.Combine(App.AppData,"launch-skin-TestSkin.png");
+            var texture=Path.Combine(pack,"assets","minecraft","textures","entity","steve.png");
+            var textureTime=File.GetLastWriteTimeUtc(texture); var cacheTime=File.GetLastWriteTimeUtc(launchCache);
+            Check(Wait(window.PrepareSkinPackAsync("1.20.1",offline,allowCachedSkin:true)) && File.GetLastWriteTimeUtc(texture)==textureTime && File.GetLastWriteTimeUtc(launchCache)==cacheTime,
+                "launch reuses a recent validated skin without network requests, texture rewrites or extending freshness");
+            File.SetLastWriteTimeUtc(launchCache,DateTime.UtcNow-TimeSpan.FromHours(1));
+            Check(!Wait(window.PrepareSkinPackAsync("1.20.1",offline,allowCachedSkin:true)) && File.GetLastWriteTimeUtc(texture)==textureTime,
+                "expired launch skin cache requires refresh and preserves existing textures offline");
+            File.WriteAllText(launchCache,"invalid cached image");
+            var cacheRepairHandler=new SkinHandler(bytes); using var cacheRepairClient=new HttpClient(cacheRepairHandler);
+            Check(Wait(window.PrepareSkinPackAsync("1.20.1",cacheRepairClient,allowCachedSkin:true)) && cacheRepairHandler.FallbackRequests==1 && File.ReadAllBytes(launchCache).SequenceEqual(bytes),
+                "corrupt launch skin cache is revalidated and replaced from the official skin flow");
+            Check(!Wait(window.PrepareSkinPackAsync("1.20.1",offline)),"manual skin refresh bypasses a fresh launch cache");
             var image=new Image();
             var previewHandler=new SkinHandler(bytes);
             using var preview=new HttpClient(previewHandler);

@@ -72,6 +72,23 @@ static class LaunchLifecycleTests
                     throw new Exception("Missing Java must request the profile's runtime once without downloading an intermediate runtime.");
             }
             Console.WriteLine("PASS missing Java21/25 installs the required runtime exactly once"); checks++;
+            var priorFps = window.Config.OptFps;
+            try
+            {
+                window.Config.OptFps = true;
+                var tuningDirectory = Path.Combine(App.GameDir,"versions","startup-tuning");
+                Directory.CreateDirectory(tuningDirectory);
+                File.WriteAllText(Path.Combine(tuningDirectory,"startup-tuning.json"),"{\"id\":\"startup-tuning\",\"libraries\":[],\"mainClass\":\"net.fabricmc.loader.impl.launch.knot.KnotClient\"}");
+                foreach (var ram in new[] { 1024, 4096, 8192 })
+                {
+                    var command = (string)typeof(MainWindow).GetMethod("BuildLaunchArgs", flags)!.Invoke(window, new object?[] { "startup-tuning", ram, Path.Combine(App.GameDir,"natives"), null, null })!;
+                    if (!command.Contains("-Xmx" + ram + "m") || !command.Contains("-XX:+TieredCompilation") ||
+                        new[] { "DontCompileHugeMethods", "MaxInlineSize", "MaxInlineLevel", "UseNUMA", "UseLargePages" }.Any(command.Contains))
+                        throw new Exception("Launch tuning must preserve memory limits and use adaptive JIT defaults.");
+                }
+            }
+            finally { window.Config.OptFps = priorFps; }
+            Console.WriteLine("PASS launch tuning retains heap limits and tiered compilation without forcing large-method, inline, NUMA or large-page policies"); checks++;
             Directory.CreateDirectory(App.ModsDir);
             var runningJar = Path.Combine(App.ModsDir, "running-pool-guard.jar");
             File.WriteAllText(runningJar, "active game mod");

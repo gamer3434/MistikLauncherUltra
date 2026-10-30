@@ -9,7 +9,7 @@ public static class OptimizationTests
     {
         Directory.CreateDirectory(root);
         var path = Path.Combine(root, "options.txt");
-        const string original = "maxFps:300\nrenderDistance:20\nsimulationDistance:12\ncustomSetting:keep-me\n";
+        const string original = "maxFps:300\nrenderDistance:30\nsimulationDistance:12\ncustomSetting:keep-me\n";
         File.WriteAllText(path, original);
         var originalBytes = File.ReadAllBytes(path);
         var checks = 0;
@@ -26,10 +26,10 @@ public static class OptimizationTests
         Check(GameGraphicsOptions.EnsureStartupSettings(root, enabled: true),
             "enabled FPS optimization updates startup settings");
         var startup = File.ReadAllText(path);
-        Check(startup.Contains("renderDistance:12") && startup.Contains("simulationDistance:8") &&
+        Check(startup.Contains("renderDistance:30") && startup.Contains("simulationDistance:8") &&
               startup.Contains("syncChunkWrites:false") && startup.Contains("maxFps:300") &&
               startup.Contains("customSetting:keep-me"),
-            "startup optimization preserves FPS limit and unrelated options");
+            "startup optimization preserves a selected 30-chunk view and FPS limit while bounding simulation work");
         var backup = path + ".mistik-backup";
         Check(File.ReadAllBytes(backup).SequenceEqual(originalBytes),
             "first Minecraft settings backup keeps exact original bytes");

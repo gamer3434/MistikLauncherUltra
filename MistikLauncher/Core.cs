@@ -219,6 +219,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.47","2026-10-30","#00D4AA", new[]{
+                "Seçilen görüş mesafesi korunur; 30 chunk artık açılışta 12'ye düşürülmez. FPS optimizasyonunda simülasyon en fazla 8 kalır.",
+                "Açılışta son 15 dakikanın doğrulanmış skini kullanılabilir; aynı skin dokuları yeniden yazılmaz. Elle yenileme güncel skini indirir.",
+                "Zorlanan büyük metot, inline, NUMA ve büyük sayfa JVM politikaları kaldırıldı. Bellek sınırı ve tiered compilation korundu.",
+                "Selected render distance is preserved; startup no longer reduces 30 chunks to 12. FPS optimization still caps simulation at 8.",
+                "Launch can reuse a validated skin for 15 minutes without rewriting identical textures; manual refresh still downloads the latest skin.",
+                "Forced huge-method, inline, NUMA and large-page JVM policies were removed. Heap limits and tiered compilation remain intact."
+            }),
             new("v6.2.46","2026-10-30","#00D4AA", new[]{
                 "Mod çakışma taraması kimlik ve takma ad indeksleriyle çalışır; bütün mod çiftlerini karşılaştırmaz.",
                 "Bağımsız oyun kütüphaneleri en fazla dört dosya paralel doğrulanır ve onarılır.",

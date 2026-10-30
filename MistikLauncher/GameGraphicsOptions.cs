@@ -45,10 +45,7 @@ public static class GameGraphicsOptions
             var colon = line.IndexOf(':');
             if (colon < 0) continue;
             var key = line[..colon].Trim();
-            if (key.Equals("renderDistance", StringComparison.OrdinalIgnoreCase) &&
-                int.TryParse(line[(colon + 1)..].Trim(), out var render) && render > 12)
-                settings["renderDistance"] = "12";
-            else if (key.Equals("simulationDistance", StringComparison.OrdinalIgnoreCase) &&
+            if (key.Equals("simulationDistance", StringComparison.OrdinalIgnoreCase) &&
                      int.TryParse(line[(colon + 1)..].Trim(), out var simulation) && simulation > 8)
                 settings["simulationDistance"] = "8";
         }

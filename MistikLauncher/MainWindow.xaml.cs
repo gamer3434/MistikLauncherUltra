@@ -801,6 +801,8 @@ namespace MistikLauncher
             if(launchPreparing || gameRunning) return;
             launchPreparing = true;
             var started=DateTime.UtcNow;
+            var launchTimer=Stopwatch.StartNew();
+            int audioReadyRecorded=0;
             var captured=new System.Text.StringBuilder();
             var outputGate=new object();
             BtnLaunch.IsEnabled = false;
@@ -868,7 +870,7 @@ namespace MistikLauncher
                 Directory.CreateDirectory(natives);
 
                 SetStatus("Karakter (Skin) yaması uygulanıyor...");
-                await PrepareSkinPackAsync(version);
+                await PrepareSkinPackAsync(version, allowCachedSkin: true);
 
                 SetStatus("Oyun dili senkronize ediliyor...");
                 EnsureGameLanguageMatchesLauncher();
@@ -926,10 +928,13 @@ namespace MistikLauncher
                 };
                 var process=await Task.Run(() => WithSyncedMods(version, directory => {
                     if(checkFabricConflicts) ModConflictGuard.CheckDirectory(directory);
+                    App.Log("[LaunchTiming] preparation_ms="+launchTimer.ElapsedMilliseconds);
                     return Process.Start(psi);
                 })) ?? throw new InvalidOperationException("Java process could not start.");
                 void Capture(object sender,DataReceivedEventArgs line) {
                     if(line.Data==null) return;
+                    if(line.Data.Contains("Sound engine started",StringComparison.Ordinal) && Interlocked.Exchange(ref audioReadyRecorded,1)==0)
+                        App.Log("[LaunchTiming] audio_ready_ms="+launchTimer.ElapsedMilliseconds);
                     lock(outputGate) {
                         captured.AppendLine(line.Data.Length>4096?line.Data[..4096]:line.Data);
                         if(captured.Length>65536) captured.Remove(0,captured.Length-65536);
@@ -1564,7 +1569,7 @@ namespace MistikLauncher
             return 1;
         }
 
-        public async Task<bool> PrepareSkinPackAsync(string version, HttpClient? client = null)
+        public async Task<bool> PrepareSkinPackAsync(string version, HttpClient? client = null, bool allowCachedSkin = false)
         {
             int generation = ++_skinPackGeneration;
             var selection = SkinSelection();
@@ -1586,7 +1591,23 @@ namespace MistikLauncher
                     }
 
                     byte[]? skinBytes = null;
-                    try {
+                    bool cachedSkinUsed = false;
+                    var skinCache = Path.Combine(App.AppData, "launch-skin-" + user + ".png");
+                    if (allowCachedSkin)
+                    {
+                        try
+                        {
+                            var info = new FileInfo(skinCache);
+                            var age = DateTime.UtcNow - info.LastWriteTimeUtc;
+                            if (info.Exists && info.Length <= 65536 && age >= TimeSpan.Zero && age < TimeSpan.FromMinutes(15))
+                            {
+                                var cached = await File.ReadAllBytesAsync(skinCache);
+                                SkinValidator.Validate(cached); skinBytes = cached; cachedSkinUsed = true;
+                            }
+                        }
+                        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException) { }
+                    }
+                    if (skinBytes == null) try {
                         var jsonStr = await client.GetStringAsync($"https://skinsystem.ely.by/textures/{Uri.EscapeDataString(user)}");
                         var jObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
                         var texUrl = SkinTextureUrl(jObj["SKIN"]?["url"]?.ToString());
@@ -1612,6 +1633,19 @@ namespace MistikLauncher
                         SkinValidator.Validate(skinBytes);
                         if (!Current()) return false;
                         CommitSkinPack(packDir, skinBytes, format);
+                        // Manual refresh still fetches the latest skin; launch can reuse a recent validated PNG.
+                        string temporaryCache = skinCache + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                        try
+                        {
+                            // Do not extend the freshness of an existing cache hit.
+                            if (!cachedSkinUsed)
+                            {
+                                await File.WriteAllBytesAsync(temporaryCache, skinBytes);
+                                File.Move(temporaryCache, skinCache, true);
+                            }
+                        }
+                        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+                        finally { try { if (File.Exists(temporaryCache)) File.Delete(temporaryCache); } catch { } }
                         // Clear old previews only after a replacement skin has been committed.
                         try
                         {
@@ -1671,18 +1705,26 @@ namespace MistikLauncher
 
         static void CommitSkinPack(string packDir, byte[] skinBytes, int format)
         {
+            var metadata = "{\"pack\":{\"pack_format\":" + format + ",\"description\":\"Mistik Launcher Ozel Skin Kaynak Paketi\"}}";
+            var textures = new[] { "steve.png", "alex.png", "player/wide/steve.png", "player/slim/alex.png" };
+            var existingMetadata = Path.Combine(packDir, "pack.mcmeta");
+            if (File.Exists(existingMetadata) && File.ReadAllText(existingMetadata) == metadata && textures.All(relative =>
+            {
+                var path = Path.Combine(packDir, "assets", "minecraft", "textures", "entity", relative);
+                return File.Exists(path) && new FileInfo(path).Length == skinBytes.Length && File.ReadAllBytes(path).SequenceEqual(skinBytes);
+            })) return;
             string stage = packDir + ".stage-" + Guid.NewGuid().ToString("N");
             string backup = packDir + ".backup-" + Guid.NewGuid().ToString("N");
             bool committed = false;
             try
             {
-                foreach (var relative in new[] { "steve.png", "alex.png", "player/wide/steve.png", "player/slim/alex.png" })
+                foreach (var relative in textures)
                 {
                     var path = Path.Combine(stage, "assets", "minecraft", "textures", "entity", relative);
                     Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                     File.WriteAllBytes(path, skinBytes);
                 }
-                File.WriteAllText(Path.Combine(stage, "pack.mcmeta"), "{\"pack\":{\"pack_format\":" + format + ",\"description\":\"Mistik Launcher Ozel Skin Kaynak Paketi\"}}");
+                File.WriteAllText(Path.Combine(stage, "pack.mcmeta"), metadata);
                 if (Directory.Exists(packDir)) Directory.Move(packDir, backup);
                 try { Directory.Move(stage, packDir); committed = true; }
                 catch { if (Directory.Exists(backup)) Directory.Move(backup, packDir); throw; }
@@ -1760,29 +1802,11 @@ namespace MistikLauncher
 
             if (Config.OptFps)
             {
-                // ── Agresif JIT Derleyici Optimizasyonları ──
-                optList.Add("-XX:+UnlockDiagnosticVMOptions");
-                optList.Add("-XX:-DontCompileHugeMethods");        // Büyük metodları da derle (Minecraft çok büyük metodlar içerir)
+                // Keep adaptive JIT defaults instead of forcing expensive compilation at startup.
                 optList.Add("-XX:+TieredCompilation");              // Kademeli derleme aktif (hızlı başlangıç + max performans)
-
-                // ── C2 Compiler (Max Performans Katmanı) Ayarları ──
-                optList.Add("-XX:MaxInlineLevel=15");               // Derin inline zinciri (varsayılan 9) → daha az method call overhead
-                optList.Add("-XX:MaxInlineSize=100");               // Daha büyük metodları da inline yap (varsayılan 35 byte)
-                optList.Add("-XX:FreqInlineSize=325");              // Sık çağrılan büyük metodları inline yap (varsayılan 325)
-
 
                 // ── GC Logging ve Overhead Kapatma ──
                 optList.Add("-XX:-OmitStackTraceInFastThrow");      // Exception bilgisini koru (hata ayıklama için)
-                optList.Add("-XX:+AlwaysActAsServerClassMachine");  // JVM'i sunucu modunda çalıştır (daha agresif C2 JIT)
-                optList.Add("-XX:+UseNUMA");                        // NUMA farkındalığı (multi-socket/hybrid CPU'larda faydalı)
-
-                // ── Büyük Sayfa (Large Pages) Desteği ──
-                if (KernelOptimizer.IsLargePageAvailable())
-                {
-                    optList.Add("-XX:+UseLargePages");
-                    App.Log("[KernelOpt] JVM Large Pages aktif edildi.");
-                }
-
                 // ── LWJGL / OpenGL Performans Flagleri ──
                 optList.Add("-Dorg.lwjgl.opengl.Display.allowSoftwareOpenGL=false"); // Yazılım OpenGL'i engelle, her zaman GPU kullan
             }
