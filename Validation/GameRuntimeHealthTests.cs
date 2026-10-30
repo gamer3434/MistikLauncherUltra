@@ -154,6 +154,32 @@ public static class GameRuntimeHealthTests
         catch (OperationCanceledException) { cancellationObserved = true; }
         Check(cancellationObserved, "runtime verification supports cancellation");
 
+        foreach (var scenario in new[] { "parallel", "parallel-invalid", "parallel-cancel" })
+        {
+            string parallel = Path.Combine(root, scenario);
+            var specs = Enumerable.Range(0, 8).Select(i => ($"fixture:batch{i}:1", $"fixture/batch{i}/1/batch{i}.jar", libraryJar)).ToArray();
+            Profile(parallel, "base", ProfileJson("base", clientJar, specs));
+            Write(Path.Combine(parallel, "versions", "base", "base.jar"), clientJar);
+            using var handler = new ParallelHandler(libraryJar, scenario);
+            using var client = new HttpClient(handler);
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var verification = GameRuntimeHealth.VerifyAndRepairAsync(parallel, "base", client, cancellation.Token);
+            if (scenario == "parallel-cancel")
+            {
+                await handler.FourStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                cancellation.Cancel();
+                bool parallelCancelled = false;
+                try { await verification; } catch (OperationCanceledException) { parallelCancelled = true; }
+                Check(parallelCancelled && handler.Active == 0 && handler.Requests == 4 && !Directory.EnumerateFiles(parallel, "*.tmp", SearchOption.AllDirectories).Any(),
+                    "parallel verification cancellation waits for all workers and leaves no temporary files");
+                continue;
+            }
+            var outcome = await verification;
+            Check(handler.Peak == 4 && handler.Active == 0 && (scenario == "parallel"
+                ? outcome.CanLaunch && outcome.RepairedCount == 8 && handler.Requests == 8
+                : !outcome.CanLaunch && outcome.FailedArtifact == "library:fixture:batch0:1" && outcome.RepairedCount == 3 && handler.Requests == 4),
+                "bounded parallel runtime repair preserves checksums and launch blocking: " + scenario);
+        }
         return checks;
     }
 
@@ -199,6 +225,28 @@ public static class GameRuntimeHealthTests
 
     static string Sha1(byte[] bytes) => Convert.ToHexString(SHA1.HashData(bytes)).ToLowerInvariant();
     static HttpResponseMessage Bytes(byte[] bytes) => new(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) };
+
+    sealed class ParallelHandler(byte[] bytes, string scenario) : HttpMessageHandler
+    {
+        public int Active, Peak, Requests;
+        public TaskCompletionSource<bool> FourStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref Requests);
+            int active = Interlocked.Increment(ref Active);
+            lock (FourStarted) Peak = Math.Max(Peak, active);
+            if (active == 4) FourStarted.TrySetResult(true);
+            try
+            {
+                await FourStarted.Task.WaitAsync(cancellationToken);
+                if (scenario == "parallel-cancel") await Task.Delay(Timeout.Infinite, cancellationToken);
+                var content = (byte[])bytes.Clone();
+                if (scenario == "parallel-invalid" && request.RequestUri!.AbsolutePath == "/batch0.jar") content[^1] ^= 1;
+                return Bytes(content);
+            }
+            finally { Interlocked.Decrement(ref Active); }
+        }
+    }
 
     sealed class FakeHandler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
     {

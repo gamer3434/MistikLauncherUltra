@@ -219,6 +219,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.46","2026-10-30","#00D4AA", new[]{
+                "Mod çakışma taraması kimlik ve takma ad indeksleriyle çalışır; bütün mod çiftlerini karşılaştırmaz.",
+                "Bağımsız oyun kütüphaneleri en fazla dört dosya paralel doğrulanır ve onarılır.",
+                "Hash, iptal, bağımlılık ve açılışı engelleme kontrolleri korunur; native dosyalar sırayla açılır.",
+                "Mod conflict checks use identity and alias indexes instead of comparing every pair.",
+                "Independent game libraries are verified and repaired with at most four concurrent operations.",
+                "Checksums, cancellation and launch blocking remain enforced; native extraction stays ordered."
+            }),
             new("v6.2.45","2026-10-30","#00D4AA", new[]{
                 "Mod güncelleme kontrolü launcher boşta çalışır; Başlat düğmesi ağ yanıtını beklemez.",
                 "Yalnızca hazır ve seçili profile uygun güncellemeler uygulanır. Hazır değilse mevcut modlarla açılır.",

@@ -102,6 +102,26 @@ public static class ModConflictGuardTests
         var inactive = Path.Combine(installed, "second.jar.disabled"); File.WriteAllBytes(inactive, second);
         Check(Conflict(() => ModFiles.Toggle(installed, inactive)) && File.Exists(inactive) && File.ReadAllBytes(inactive).SequenceEqual(second) &&
             !File.Exists(Path.Combine(installed, "second.jar")), "enabling a conflicting mod preserves its disabled state and bytes");
+        var random = new Random(173);
+        for (int scenario = 0; scenario < 48; scenario++)
+        {
+            var folder = Folder("indexed-" + scenario);
+            var ids = new List<HashSet<string>>(); var breaks = new List<HashSet<string>>();
+            for (int i = 0; i < 8; i++)
+            {
+                string id = "fixture_" + i;
+                var aliases = new JArray("alias_" + random.Next(8));
+                var constraints = new JObject();
+                if (random.Next(3) == 0) constraints[(random.Next(2) == 0 ? "alias_" : "fixture_") + random.Next(8)] = "*";
+                ids.Add(new HashSet<string> { id, (string)aliases[0]! });
+                breaks.Add(constraints.Properties().Select(p => p.Name).ToHashSet());
+                File.WriteAllBytes(Path.Combine(folder, i + ".jar"), Mod(id, constraints, aliases));
+            }
+            bool expected = Enumerable.Range(0, 8).Any(i => Enumerable.Range(i + 1, 7 - i).Any(j =>
+                breaks[i].Overlaps(ids[j]) || breaks[j].Overlaps(ids[i])));
+            if (Conflict(() => ModConflictGuard.CheckDirectory(folder)) != expected) throw new Exception("Indexed conflict mismatch: " + scenario);
+        }
+        Check(true, "indexed conflict detection matches pairwise checks across 48 graphs with aliases, self references and both directions");
         return checks;
     }
 }

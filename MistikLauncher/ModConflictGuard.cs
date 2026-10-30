@@ -18,8 +18,17 @@ public static class ModConflictGuard
     {
         if (!Directory.Exists(root)) return;
         var mods = ReadDirectory(root, null);
-        for (var i = 0; i < mods.Count; i++)
-            for (var j = i + 1; j < mods.Count; j++) CheckPair(mods[i], mods[j]);
+        var identities = new Dictionary<string, Metadata>(StringComparer.Ordinal);
+        var exclusions = new Dictionary<string, Metadata>(StringComparer.Ordinal);
+        foreach (var mod in mods)
+        {
+            foreach (var id in mod.Breaks)
+                if (identities.TryGetValue(id, out var previous)) CheckPair(previous, mod);
+            foreach (var id in mod.Ids)
+                if (exclusions.TryGetValue(id, out var previous)) CheckPair(previous, mod);
+            foreach (var id in mod.Ids) identities.TryAdd(id, mod);
+            foreach (var id in mod.Breaks) exclusions.TryAdd(id, mod);
+        }
     }
 
     public static void CheckInstall(string root, string filename, Stream candidate)

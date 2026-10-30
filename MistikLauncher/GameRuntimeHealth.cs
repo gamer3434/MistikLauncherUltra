@@ -166,12 +166,15 @@ public static class GameRuntimeHealth
             }
         }
 
-        foreach (var library in libraries.Values)
+        // Independent library paths can be verified together; native extraction stays ordered.
+        foreach (var batch in libraries.Values.Chunk(4))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var outcome = await EnsureArtifactAsync(library, httpClient, false, cancellationToken, progress).ConfigureAwait(false);
-            if (!outcome.Success) return Failed(repaired, outcome.Artifact, outcome.Path, outcome.Reason!);
-            if (outcome.Repaired) repaired++;
+            var outcomes = await Task.WhenAll(batch.Select(library =>
+                EnsureArtifactAsync(library, httpClient, false, cancellationToken, progress))).ConfigureAwait(false);
+            repaired += outcomes.Count(outcome => outcome.Repaired);
+            foreach (var outcome in outcomes)
+                if (!outcome.Success) return Failed(repaired, outcome.Artifact, outcome.Path, outcome.Reason!);
         }
 
         foreach (var native in natives.Values)
