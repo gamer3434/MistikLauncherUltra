@@ -375,6 +375,7 @@
   "skinLocalHelp": "Choose a 64×64 or 64×32 Minecraft skin file.",
   "skinPreviewLoading": "Loading skin preview…",
   "skinPreviewReady": "Skin preview is ready.",
+  "elybyInjectorFailed": "The verified Ely.by login helper could not be installed. Check your connection and try again.",
   "skinPreviewFailed": "Skin preview could not be loaded.",
   "skinCustom": "Custom skin",
   "skinChooseFirst": "Choose a skin file first.",

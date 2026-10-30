@@ -885,7 +885,8 @@ namespace MistikLauncher
                 if ((Config.AuthType ?? "").ToLower() == "elyby")
                 {
                     SetStatus("Ely.by skin doğrulayıcı kontrol ediliyor...");
-                    injectorPath = await EnsureAuthlibInjectorInstalledAsync();
+                    injectorPath = await EnsureAuthlibInjectorInstalledAsync()
+                        ?? throw new IOException(Localization.T("elybyInjectorFailed"));
                     try
                     {
                         var elyJson = await _http.GetStringAsync($"https://authserver.ely.by/api/users/profiles/minecraft/{Uri.EscapeDataString(Config.User)}");
@@ -1136,38 +1137,12 @@ namespace MistikLauncher
         {
             try
             {
-                var injectorPath = Path.Combine(App.AppData, "authlib-injector.jar");
-                if (File.Exists(injectorPath) && new FileInfo(injectorPath).Length > 10000)
-                {
-                    return injectorPath;
-                }
-
-                App.Log("authlib-injector.jar not found, downloading from official release...");
-                var url = "https://github.com/yushijinhun/authlib-injector/releases/download/v1.2.5/authlib-injector-1.2.5.jar";
-                var bytes = await _http.GetByteArrayAsync(url);
-                Directory.CreateDirectory(App.AppData);
-                await File.WriteAllBytesAsync(injectorPath, bytes);
-                App.Log("authlib-injector.jar downloaded successfully!");
-                return injectorPath;
+                return await AuthlibInjector.EnsureAsync(App.AppData, _http);
             }
             catch (Exception ex)
             {
-                App.Log($"Failed to download authlib-injector: {ex.Message}");
-                try
-                {
-                    var fallbackUrl = "https://authlib-injector.yushijinhun.ms/artifact/latest/authlib-injector.jar";
-                    var bytes = await _http.GetByteArrayAsync(fallbackUrl);
-                    var injectorPath = Path.Combine(App.AppData, "authlib-injector.jar");
-                    Directory.CreateDirectory(App.AppData);
-                    await File.WriteAllBytesAsync(injectorPath, bytes);
-                    App.Log("authlib-injector.jar fallback download success!");
-                    return injectorPath;
-                }
-                catch (Exception ex2)
-                {
-                    App.Log($"Fallback download failed: {ex2.Message}");
-                    return null;
-                }
+                App.Log($"Failed to install verified authlib-injector: {ex.Message}");
+                return null;
             }
         }
 

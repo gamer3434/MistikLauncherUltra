@@ -219,6 +219,14 @@ namespace MistikLauncher
 
         public static readonly List<ChangelogEntry> Changelog = new()
         {
+            new("v6.2.50","2026-10-30","#00D4AA", new[]{
+                "Ely.by giriş yardımcısı 1.2.8'e yükseltildi; Java 25'te eski ASM sınıf dönüştürme hataları giderildi.",
+                "İndirmeler sabit SHA-256 ile doğrulanır; doğrulanmış dosya çevrimdışı kullanılır, eski dosya atomik yedekle korunur.",
+                "Giriş yardımcısı hazırlanamazsa oyun yardımcısız başlatılmaz; hata açıkça gösterilir.",
+                "Updated the Ely.by login helper to 1.2.8, resolving old ASM class transformation failures on Java 25.",
+                "Pinned SHA-256 verification, offline cache reuse and atomic replacement protect the previous helper.",
+                "Failed helper installation now stops launch with a clear error instead of silently omitting authentication support."
+            }),
             new("v6.2.49","2026-10-30","#00D4AA", new[]{
                 "Başlangıç heap'i seçilen maksimum belleğe eşitlenmez; en fazla 2 GB ile açılır ve gerektiğinde büyür.",
                 "Seçilen maksimum bellek sınırı, Java seçimi ve modlar korunur. Düşük bellek sınırında başlangıç değeri maksimumu aşmaz.",

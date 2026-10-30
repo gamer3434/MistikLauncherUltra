@@ -375,6 +375,7 @@
   "skinLocalHelp": "64×64 veya 64×32 boyutlarında bir Minecraft skin dosyası seç.",
   "skinPreviewLoading": "Skin önizlemesi yükleniyor…",
   "skinPreviewReady": "Skin önizlemesi hazır.",
+  "elybyInjectorFailed": "Doğrulanmış Ely.by giriş yardımcısı kurulamadı. Bağlantını kontrol edip tekrar dene.",
   "skinPreviewFailed": "Skin önizlemesi yüklenemedi.",
   "skinCustom": "Özel skin",
   "skinChooseFirst": "Önce bir skin dosyası seç.",

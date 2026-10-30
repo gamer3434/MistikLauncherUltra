@@ -79,6 +79,8 @@ class Program
             checks += AutoMcsConcurrencyTests.Run(testRoot).GetAwaiter().GetResult();
 
             checks += JavaRuntimeInstallerTests.Run(testRoot).GetAwaiter().GetResult();
+            checks += AuthlibInjectorTests.Run(Path.Combine(testRoot,"authlib-injector")).GetAwaiter().GetResult();
+            if(args.Contains("--live-injector")) checks += AuthlibInjectorTests.Live(Path.Combine(testRoot,"official-injector")).GetAwaiter().GetResult();
             if(args.Contains("--live-java"))
             {
                 foreach(int major in new[]{21,25})
